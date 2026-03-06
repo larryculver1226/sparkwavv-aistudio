@@ -1,0 +1,35 @@
+# Wavvault PostgreSQL Schema for Firebase Data Connect
+# Maps users to career roles and employers
+
+type User @table {
+  id: String! @primaryKey
+  email: String! @unique
+  name: String
+  role: String
+}
+
+type Employer @table {
+  id: UUID! @default(expr: "uuid_generate_v4()") @primaryKey
+  name: String! @unique
+  industry: String
+  website: String
+}
+
+type CareerRole @table {
+  id: UUID! @default(expr: "uuid_generate_v4()") @primaryKey
+  title: String!
+  description: String
+}
+
+type UserCareerMapping @table {
+  id: UUID! @default(expr: "uuid_generate_v4()") @primaryKey
+  userId: String!
+  user: User! @ref(fields: ["userId"])
+  roleId: UUID!
+  role: CareerRole! @ref(fields: ["roleId"])
+  employerId: UUID!
+  employer: Employer! @ref(fields: ["employerId"])
+  startDate: Date
+  endDate: Date
+  isCurrent: Boolean @default(value: false)
+}

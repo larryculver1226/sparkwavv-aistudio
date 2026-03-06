@@ -1,0 +1,58 @@
+@import "tailwindcss";
+
+@layer utilities {
+  .no-scrollbar::-webkit-scrollbar {
+    display: none;
+  }
+  .no-scrollbar {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+}
+
+@theme {
+  --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
+  --font-display: "Space Grotesk", sans-serif;
+  --color-neon-cyan: #00f3ff;
+  --color-neon-magenta: #ff00ff;
+  --color-neon-lime: #ccff00;
+  --color-dark-bg: #0a0a0c;
+  --color-dark-surface: #16161e;
+}
+
+@layer base {
+  body {
+    @apply bg-dark-bg text-white font-sans antialiased;
+  }
+
+  h1, h2, h3, h4 {
+    @apply font-display tracking-tight;
+  }
+}
+
+.neon-border-cyan {
+  box-shadow: 0 0 10px rgba(0, 243, 255, 0.3);
+  border: 1px solid rgba(0, 243, 255, 0.5);
+}
+
+.neon-border-magenta {
+  box-shadow: 0 0 10px rgba(255, 0, 255, 0.3);
+  border: 1px solid rgba(255, 0, 255, 0.5);
+}
+
+.neon-text-cyan {
+  text-shadow: 0 0 8px rgba(0, 243, 255, 0.6);
+}
+
+.glass-panel {
+  @apply bg-dark-surface/80 backdrop-blur-xl border border-white/10 rounded-2xl;
+}
+
+@keyframes pulse-neon {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.7; }
+}
+
+.animate-pulse-neon {
+  animation: pulse-neon 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+}

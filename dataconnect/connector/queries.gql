@@ -1,0 +1,38 @@
+# Wavvault Data Connect Queries
+
+# Get user's career history
+query GetUserCareerHistory($userId: String!) @auth(level: USER) {
+  userCareerMappings(where: { userId: { eq: $userId } }) {
+    id
+    startDate
+    endDate
+    isCurrent
+    role {
+      title
+      description
+    }
+    employer {
+      name
+      industry
+      website
+    }
+  }
+}
+
+# Get all employers in an industry
+query GetEmployersByIndustry($industry: String!) @auth(level: USER) {
+  employers(where: { industry: { eq: $industry } }) {
+    id
+    name
+    website
+  }
+}
+
+# Search for career roles by title
+query SearchRoles($title: String!) @auth(level: USER) {
+  careerRoles(where: { title: { contains: $title } }) {
+    id
+    title
+    description
+  }
+}

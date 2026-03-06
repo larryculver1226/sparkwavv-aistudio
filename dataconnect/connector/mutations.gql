@@ -1,0 +1,30 @@
+# Wavvault Data Connect Mutations
+
+# Create a new employer
+mutation CreateEmployer($name: String!, $industry: String, $website: String) @auth(level: ADMIN) {
+  employer_insert(data: { name: $name, industry: $industry, website: $website })
+}
+
+# Create a new career role
+mutation CreateCareerRole($title: String!, $description: String) @auth(level: ADMIN) {
+  careerRole_insert(data: { title: $title, description: $description })
+}
+
+# Map a user to a career role and employer
+mutation MapUserToCareer($userId: String!, $roleId: UUID!, $employerId: UUID!, $startDate: Date, $isCurrent: Boolean) @auth(level: USER) {
+  userCareerMapping_insert(data: {
+    userId: $userId,
+    roleId: $roleId,
+    employerId: $employerId,
+    startDate: $startDate,
+    isCurrent: $isCurrent
+  })
+}
+
+# Update user's career mapping
+mutation UpdateCareerMapping($id: UUID!, $endDate: Date, $isCurrent: Boolean) @auth(level: USER) {
+  userCareerMapping_update(id: $id, data: {
+    endDate: $endDate,
+    isCurrent: $isCurrent
+  })
+}

@@ -1,0 +1,6 @@
+User-agent: *
+Allow: /
+Disallow: /sparkwavv-admin/
+Disallow: /dashboard/
+
+Sitemap: https://ais-pre-6de5lrtpnvciah3xwxmagf-232918548667.us-east1.run.app/sitemap.xml

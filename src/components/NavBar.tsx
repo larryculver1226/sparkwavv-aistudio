@@ -1,0 +1,298 @@
+"use client";
+
+import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { Menu, X, Sparkles, ChevronDown, LayoutDashboard, LogOut } from 'lucide-react';
+import { motion, AnimatePresence } from 'motion/react';
+import { onAuthStateChanged, User as FirebaseUser, signOut } from 'firebase/auth';
+import { auth } from '../lib/firebase';
+
+interface NavItem {
+  label: string;
+  href: string;
+  subItems?: { label: string; href: string }[];
+}
+
+const navItems: NavItem[] = [
+  { label: 'Home', href: 'landing' },
+  { 
+    label: 'Product', 
+    href: '#product',
+    subItems: [
+      { label: 'Skylar', href: 'product-skylar' },
+      { label: 'Features', href: 'product-features' },
+      { label: 'Technology', href: 'product-technology' },
+      { label: 'Wavvault', href: 'product-wavvault' },
+    ]
+  },
+  { 
+    label: 'Company', 
+    href: '#company',
+    subItems: [
+      { label: 'Vision', href: 'company-vision' },
+      { label: 'About Us', href: 'company-about' },
+      { label: 'Investors', href: 'company-investors' },
+      { label: 'Give a Little', href: 'company-give' },
+      { label: 'Testimonials', href: 'company-testimonials' },
+    ]
+  },
+  { label: 'Pricing', href: '#pricing' },
+];
+
+interface NavBarProps {
+  onNavigate: (href: string) => void;
+}
+
+/**
+ * NavBar Component
+ * 
+ * A highly responsive, modern Top Navigation Bar for Sparkwavv.
+ * Integrates with Firebase Auth for dynamic login/dashboard states.
+ * 
+ * Note: Uses standard anchor tags for preview compatibility. 
+ * In a Next.js environment, replace <a> with <Link> from 'next/link'.
+ */
+export const NavBar: React.FC<NavBarProps> = ({ onNavigate }) => {
+  const navigate = useNavigate();
+  const [isOpen, setIsOpen] = useState(false);
+  const [scrolled, setScrolled] = useState(false);
+  const [activeDropdown, setActiveDropdown] = useState<string | null>(null);
+  const [user, setUser] = useState<FirebaseUser | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const handleScroll = () => {
+      setScrolled(window.scrollY > 20);
+    };
+    window.addEventListener('scroll', handleScroll);
+
+    // Firebase Auth Listener
+    if (!auth) {
+      setLoading(false);
+      return;
+    }
+
+    const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
+      setUser(currentUser);
+      setLoading(false);
+    });
+
+    return () => {
+      window.removeEventListener('scroll', handleScroll);
+      unsubscribe();
+    };
+  }, []);
+
+  const handleNavClick = (href: string, e: React.MouseEvent) => {
+    if (href.startsWith('#')) {
+      e.preventDefault();
+      return;
+    }
+    
+    if (href.startsWith('/')) {
+      e.preventDefault();
+      navigate(href);
+    } else {
+      onNavigate(href);
+    }
+    
+    setIsOpen(false);
+    setActiveDropdown(null);
+  };
+
+  return (
+    <nav 
+      className={`fixed top-0 left-0 right-0 z-[100] transition-all duration-500 ${
+        scrolled ? 'py-4 bg-black/60 backdrop-blur-xl border-b border-white/10' : 'py-8 bg-transparent'
+      }`}
+    >
+      <div className="max-w-[1600px] mx-auto px-12 flex items-center justify-between">
+        {/* Logo */}
+        <div 
+          className="flex items-center gap-4 group cursor-pointer"
+          onClick={() => onNavigate('landing')}
+        >
+          <div className="w-10 h-10 md:w-12 md:h-12 rounded-2xl bg-neon-cyan/10 border border-neon-cyan/30 flex items-center justify-center group-hover:bg-neon-cyan/20 transition-all duration-500 shadow-[0_0_15px_rgba(0,255,255,0.1)]">
+            <Sparkles className="w-5 h-5 md:w-6 md:h-6 text-neon-cyan" />
+          </div>
+          <span className="text-xl md:text-2xl font-display font-bold tracking-tighter text-white">
+            SPARK<span className="text-neon-cyan italic">WAVV</span>
+          </span>
+        </div>
+
+        {/* Desktop Navigation & Auth */}
+        <div className="hidden md:flex items-center gap-12">
+          <div className="flex items-center gap-8 lg:gap-12">
+            {navItems.map((item) => (
+              <div 
+                key={item.label} 
+                className="relative group"
+                onMouseEnter={() => item.subItems && setActiveDropdown(item.label)}
+                onMouseLeave={() => setActiveDropdown(null)}
+              >
+                <a
+                  href={item.href}
+                  onClick={(e) => handleNavClick(item.href, e)}
+                  className="text-lg font-medium text-white hover:text-neon-cyan transition-colors flex items-center gap-1.5 py-2"
+                >
+                  {item.label}
+                  {item.subItems && (
+                    <ChevronDown className={`w-4 h-4 transition-transform duration-300 ${activeDropdown === item.label ? 'rotate-180' : ''}`} />
+                  )}
+                </a>
+                
+                {/* Dropdown Menu */}
+                <AnimatePresence>
+                  {item.subItems && activeDropdown === item.label && (
+                    <motion.div
+                      initial={{ opacity: 0, y: 15, scale: 0.95 }}
+                      animate={{ opacity: 1, y: 0, scale: 1 }}
+                      exit={{ opacity: 0, y: 15, scale: 0.95 }}
+                      className="absolute top-full left-1/2 -translate-x-1/2 w-56 bg-black/95 backdrop-blur-3xl border border-white/10 rounded-2xl overflow-hidden shadow-[0_20px_50px_rgba(0,0,0,0.5)] mt-3"
+                    >
+                      <div className="py-3">
+                        {item.subItems.map((sub) => (
+                          <a
+                            key={sub.label}
+                            href={sub.href}
+                            onClick={(e) => {
+                              e.preventDefault();
+                              handleNavClick(sub.href, e);
+                            }}
+                            className="block px-6 py-3 text-base text-white/80 hover:text-neon-cyan hover:bg-white/5 transition-all"
+                          >
+                            {sub.label}
+                          </a>
+                        ))}
+                      </div>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+                
+                {!item.subItems && (
+                  <span className="absolute -bottom-1 left-0 w-0 h-0.5 bg-neon-cyan transition-all duration-300 group-hover:w-full shadow-[0_0_10px_#00f3ff]" />
+                )}
+              </div>
+            ))}
+          </div>
+
+          {/* Auth Button */}
+          <div className="flex justify-end items-center gap-3">
+            {!loading && (
+              user ? (
+                <>
+                  <button 
+                    onClick={() => navigate(`/dashboard/${user.uid}`)}
+                    className="flex items-center gap-2 px-4 py-2 rounded-full bg-white/5 border border-white/10 text-white text-sm font-bold hover:bg-white/10 hover:border-white/20 transition-all duration-300 group"
+                  >
+                    <LayoutDashboard className="w-3.5 h-3.5 text-neon-cyan" />
+                    <span>Dashboard</span>
+                  </button>
+                  <button 
+                    onClick={() => auth && signOut(auth)}
+                    className="p-2 rounded-full bg-white/5 border border-white/10 text-white/60 hover:text-red-400 hover:border-red-400/30 transition-all duration-300"
+                    title="Sign Out"
+                  >
+                    <LogOut className="w-4 h-4" />
+                  </button>
+                </>
+              ) : (
+                <button 
+                  onClick={() => onNavigate('onboarding')}
+                  className="px-4 py-2 rounded-full bg-neon-cyan text-black text-sm font-bold hover:shadow-[0_0_25px_rgba(0,255,255,0.5)] hover:scale-105 transition-all duration-300"
+                >
+                  Sparkwavv Login
+                </button>
+              )
+            )}
+          </div>
+        </div>
+
+        {/* Mobile Toggle */}
+        <div className="md:hidden flex justify-end col-start-3">
+          <button 
+            className="p-2 text-white hover:text-neon-cyan transition-colors"
+            onClick={() => setIsOpen(!isOpen)}
+          >
+            {isOpen ? <X className="w-8 h-8" /> : <Menu className="w-8 h-8" />}
+          </button>
+        </div>
+      </div>
+
+      {/* Mobile Menu */}
+      <AnimatePresence>
+        {isOpen && (
+          <motion.div
+            initial={{ opacity: 0, x: '100%' }}
+            animate={{ opacity: 1, x: 0 }}
+            exit={{ opacity: 0, x: '100%' }}
+            transition={{ type: 'spring', damping: 25, stiffness: 200 }}
+            className="fixed inset-0 top-[80px] md:hidden bg-black/98 backdrop-blur-3xl border-t border-white/5 overflow-y-auto"
+          >
+            <div className="px-8 py-12 flex flex-col gap-10">
+              {navItems.map((item) => (
+                <div key={item.label} className="space-y-6">
+                  <a
+                    href={item.href}
+                    onClick={(e) => {
+                      if (!item.subItems) handleNavClick(item.href, e);
+                    }}
+                    className="text-4xl font-display font-bold text-white hover:text-neon-cyan transition-colors block"
+                  >
+                    {item.label}
+                  </a>
+                  {item.subItems && (
+                    <div className="pl-6 flex flex-col gap-6 border-l border-white/10">
+                      {item.subItems.map((sub) => (
+                        <a
+                          key={sub.label}
+                          href={sub.href}
+                          onClick={(e) => {
+                            e.preventDefault();
+                            handleNavClick(sub.href, e);
+                          }}
+                          className="text-2xl font-medium text-white/60 hover:text-neon-cyan transition-colors"
+                        >
+                          {sub.label}
+                        </a>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              ))}
+              
+              <div className="pt-8 border-t border-white/10">
+                {!loading && (
+                  user ? (
+                    <button 
+                      onClick={() => {
+                        navigate(`/dashboard/${user.uid}`);
+                        setIsOpen(false);
+                      }}
+                      className="w-full py-5 rounded-2xl bg-white/5 border border-white/10 text-white font-bold text-2xl flex items-center justify-center gap-3"
+                    >
+                      <LayoutDashboard className="w-7 h-7 text-neon-cyan" />
+                      Sparkwavv Dashboard
+                    </button>
+                  ) : (
+                    <button 
+                      onClick={() => {
+                        onNavigate('onboarding');
+                        setIsOpen(false);
+                      }}
+                      className="w-full py-5 rounded-2xl bg-neon-cyan text-black font-bold text-2xl shadow-[0_0_30px_rgba(0,255,255,0.3)]"
+                    >
+                      Sparkwavv Login
+                    </button>
+                  )
+                )}
+              </div>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </nav>
+  );
+};
+
+export default NavBar;
