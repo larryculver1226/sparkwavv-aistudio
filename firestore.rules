@@ -1,0 +1,460 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ===============================================================
+    // Assumed Data Model
+    // ===============================================================
+    //
+    // Collection: tenants
+    // Document ID: {tenantId}
+    // Fields:
+    //   - id: string (required)
+    //   - name: string (required)
+    //   - brand: string (required) - sparkwavv or kwieri
+    //   - description: string (optional)
+    //
+    // Collection: users
+    // Document ID: {uid}
+    // Fields:
+    //   - uid: string (required)
+    //   - sparkwavvId: string (optional) - SW-YYYY-XXXX
+    //   - email: string (required)
+    //   - displayName: string (optional)
+    //   - role: string (required) - admin, user, operator, mentor, agent
+    //   - tenantId: string (required)
+    //   - generationalPersona: string (optional)
+    //   - careerStageRole: string (optional)
+    //   - hierarchicalRole: string (optional)
+    //   - brandPersona: string (optional)
+    //   - brandDNAAttributes: list (optional)
+    //   - journeyStage: string (optional)
+    //   - onboardingComplete: bool (optional)
+    //   - linkedinId: string (optional)
+    //   - linkedinProfile: map (optional)
+    //
+    // Collection: dashboards
+    // Document ID: {userId}
+    // Fields:
+    //   - userId: string (required)
+    //   - sparkwavvId: string (optional)
+    //   - tenantId: string (required)
+    //   - careerHappiness: int (optional)
+    //   - discoveryProgress: string (optional)
+    //   - validationGateMode: string (optional)
+    //
+    // Collection: wavvault
+    // Document ID: {userId}
+    // Fields:
+    //   - userId: string (required)
+    //   - tenantId: string (required)
+    //   - identity: string (optional)
+    //   - strengths: list (optional)
+    //   - careerStories: list (optional)
+    //   - embedding: list (optional)
+    //   - updatedAt: timestamp (optional)
+    //
+    // Collection: artifacts
+    // Document ID: {artifactId}
+    // Fields:
+    //   - id: string (required)
+    //   - userId: string (required)
+    //   - tenantId: string (required)
+    //   - filename: string (required)
+    //   - type: string (required)
+    //   - storagePath: string (required)
+    //   - createdAt: timestamp (required)
+    //
+    // Collection: programs
+    // Document ID: {programId}
+    // Fields:
+    //   - id: string (required)
+    //   - name: string (required)
+    //   - description: string (optional)
+    //   - type: string (optional)
+    //   - curriculum: list (optional)
+    //   - duration: string (optional)
+    //   - tenantId: string (required)
+    //
+    // Collection: cohorts
+    // Document ID: {cohortId}
+    // Fields:
+    //   - id: string (required)
+    //   - programId: string (required)
+    //   - name: string (required)
+    //   - type: string (optional)
+    //   - description: string (optional)
+    //   - targetAudience: string (optional)
+    //   - startDate: timestamp (optional)
+    //   - endDate: timestamp (optional)
+    //   - institution: string (optional)
+    //   - tenantId: string (required)
+    //
+    // Collection: journeys
+    // Document ID: {journeyId}
+    // Fields:
+    //   - id: string (required)
+    //   - userId: string (required)
+    //   - programId: string (required)
+    //   - status: string (required) - active, completed, on-hold
+    //   - currentStep: string (optional)
+    //   - steps: list (optional)
+    //   - startedAt: timestamp (optional)
+    //   - completedAt: timestamp (optional)
+    //   - tenantId: string (required)
+    //
+    // Collection: security_logs
+    // Document ID: {logId}
+    // Fields:
+    //   - id: string (required)
+    //   - timestamp: timestamp (required)
+    //   - actorId: string (required)
+    //   - actorEmail: string (optional)
+    //   - actorRole: string (optional)
+    //   - actionType: string (required)
+    //   - severity: string (required) - INFO, WARNING, CRITICAL
+    //   - targetId: string (optional)
+    //   - targetEmail: string (optional)
+    //   - details: map (optional)
+    //   - ipAddress: string (optional)
+    //
+    // Collection: flagged_content
+    // Document ID: {contentId}
+    // Fields:
+    //   - id: string (required)
+    //   - authorId: string (required)
+    //   - authorName: string (optional)
+    //   - authorEmail: string (optional)
+    //   - type: string (required) - post, comment, profile, artifact
+    //   - reason: string (required)
+    //   - content: string (optional)
+    //   - timestamp: timestamp (required)
+    //   - status: string (required) - pending, approved, deleted
+    //
+    // ===============================================================
+
+    // ===============================================================
+    // Helper Functions
+    // ===============================================================
+
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+
+    function isAdmin() {
+      return isAuthenticated() && 
+        (get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin' ||
+         (request.auth.token.email == "larry.culver1226@gmail.com" && request.auth.token.email_verified == true));
+    }
+
+    function isOperator() {
+      return isAuthenticated() && isAdmin();
+    }
+
+    function isRecent(time) {
+      return time is timestamp && 
+             time > request.time - duration.value(5, 'm') && 
+             time <= request.time;
+    }
+
+    function unchanged(field) {
+      return !(field in request.resource.data) || 
+             request.resource.data[field] == resource.data[field];
+    }
+
+    function hasRequiredFields(fields) {
+      return request.resource.data.keys().hasAll(fields);
+    }
+
+    function hasOnlyAllowedFields(fields) {
+      return request.resource.data.keys().hasOnly(fields);
+    }
+
+    function isValidEmail(email) {
+      return email is string && email.matches("^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}$");
+    }
+
+    function validString(field, min, max) {
+      return request.resource.data[field] is string && 
+             request.resource.data[field].size() >= min && 
+             request.resource.data[field].size() <= max;
+    }
+
+    // ===============================================================
+    // Domain Validators
+    // ===============================================================
+
+    function isValidUser(data) {
+      let allowedFields = ['uid', 'sparkwavvId', 'email', 'displayName', 'role', 'tenantId', 'generationalPersona', 'careerStageRole', 'hierarchicalRole', 'brandPersona', 'brandDNAAttributes', 'journeyStage', 'onboardingComplete', 'linkedinId', 'linkedinProfile'];
+      return hasRequiredFields(['uid', 'email', 'role', 'tenantId']) &&
+             hasOnlyAllowedFields(allowedFields) &&
+             data.uid is string && data.uid.size() < 128 &&
+             isValidEmail(data.email) && data.email.size() < 256 &&
+             data.role in ['admin', 'user', 'operator', 'mentor', 'agent'] &&
+             data.tenantId is string && data.tenantId.size() < 64 &&
+             (!('sparkwavvId' in data) || (data.sparkwavvId is string && data.sparkwavvId.size() < 64)) &&
+             (!('displayName' in data) || (data.displayName is string && data.displayName.size() < 100)) &&
+             (!('generationalPersona' in data) || data.generationalPersona in ["Gen Z", "Millennial", "Gen X", "Baby Boomer", "Silent Generation", "Alpha", "Beta"]) &&
+             (!('careerStageRole' in data) || data.careerStageRole in ["Wave Rider", "Explorer", "Career Switcher"]) &&
+             (!('hierarchicalRole' in data) || data.hierarchicalRole in ["Owner", "C-suite", "Vice President", "Director or Manager", "Consultant", "Independent Contractor"]) &&
+             (!('brandPersona' in data) || data.brandPersona in ["Left Brain (Kick/Yin)", "Right Brain (Spark/Yang)"]) &&
+             (!('journeyStage' in data) || data.journeyStage in ["Dive-In", "Ignition", "Discovery", "Branding", "Outreach", "NONE"]);
+    }
+
+    function isValidDashboard(data) {
+      let allowedFields = [
+        'userId', 'sparkwavvId', 'tenantId', 'careerHappiness', 'discoveryProgress', 
+        'validationGateMode', 'strengths', 'resumeStatus', 'careerProfileStatus', 
+        'jobMatches', 'aiCompanion', 'effortTier', 'energyTrough', 'financialExpenses', 
+        'rppValidated', 'milestones', 'updatedAt'
+      ];
+      return hasRequiredFields(['userId', 'tenantId']) &&
+             hasOnlyAllowedFields(allowedFields) &&
+             data.userId is string && data.userId.size() < 128 &&
+             data.tenantId is string && data.tenantId.size() < 64 &&
+             (!('sparkwavvId' in data) || (data.sparkwavvId is string && data.sparkwavvId.size() < 64)) &&
+             (!('careerHappiness' in data) || (data.careerHappiness is int && data.careerHappiness >= 0 && data.careerHappiness <= 100)) &&
+             (!('discoveryProgress' in data) || (data.discoveryProgress is string && data.discoveryProgress.size() < 100)) &&
+             (!('validationGateMode' in data) || (data.validationGateMode is string && data.validationGateMode.size() < 100)) &&
+             (!('strengths' in data) || (data.strengths is list && data.strengths.size() < 50)) &&
+             (!('resumeStatus' in data) || (data.resumeStatus is string && data.resumeStatus.size() < 500)) &&
+             (!('careerProfileStatus' in data) || (data.careerProfileStatus is string && data.careerProfileStatus.size() < 500)) &&
+             (!('jobMatches' in data) || (data.jobMatches is list && data.jobMatches.size() < 20)) &&
+             (!('aiCompanion' in data) || (data.aiCompanion is map)) &&
+             (!('effortTier' in data) || (data.effortTier is string && data.effortTier.size() < 20)) &&
+             (!('energyTrough' in data) || (data.energyTrough is map)) &&
+             (!('financialExpenses' in data) || (data.financialExpenses is list && data.financialExpenses.size() < 100)) &&
+             (!('rppValidated' in data) || (data.rppValidated is bool)) &&
+             (!('milestones' in data) || (data.milestones is list && data.milestones.size() < 50)) &&
+             (!('updatedAt' in data) || isRecent(data.updatedAt));
+    }
+
+    function isValidArtifact(data) {
+      let allowedFields = ['id', 'userId', 'tenantId', 'filename', 'type', 'storagePath', 'createdAt'];
+      return hasRequiredFields(allowedFields) &&
+             hasOnlyAllowedFields(allowedFields) &&
+             data.id is string && data.id.size() < 128 &&
+             data.userId is string && data.userId.size() < 128 &&
+             data.tenantId is string && data.tenantId.size() < 64 &&
+             data.filename is string && data.filename.size() < 256 &&
+             data.type is string && data.type.size() < 64 &&
+             data.storagePath is string && data.storagePath.size() < 512 &&
+             isRecent(data.createdAt);
+    }
+
+    function isValidSecurityLog(data) {
+      let allowedFields = ['id', 'timestamp', 'actorId', 'actorEmail', 'actorRole', 'actionType', 'severity', 'targetId', 'targetEmail', 'details', 'ipAddress'];
+      return hasRequiredFields(['id', 'timestamp', 'actorId', 'actionType', 'severity']) &&
+             hasOnlyAllowedFields(allowedFields) &&
+             data.id is string && data.id.size() < 128 &&
+             isRecent(data.timestamp) &&
+             data.actorId is string && data.actorId.size() < 128 &&
+             data.actionType in ["USER_CREATE", "USER_UPDATE", "USER_DELETE", "ROLE_CHANGE", "ADMIN_PROMOTION", "LOGIN_FAILURE", "PASSWORD_RESET"] &&
+             data.severity in ["INFO", "WARNING", "CRITICAL"];
+    }
+
+    function isValidFlaggedContent(data) {
+      let allowedFields = ['id', 'authorId', 'authorName', 'authorEmail', 'type', 'reason', 'content', 'timestamp', 'status'];
+      return hasRequiredFields(['id', 'authorId', 'type', 'reason', 'timestamp', 'status']) &&
+             hasOnlyAllowedFields(allowedFields) &&
+             data.id is string && data.id.size() < 128 &&
+             data.authorId is string && data.authorId.size() < 128 &&
+             data.type in ["post", "comment", "profile", "artifact"] &&
+             data.reason is string && data.reason.size() < 500 &&
+             isRecent(data.timestamp) &&
+             data.status in ["pending", "approved", "deleted"];
+    }
+
+    function isValidWavvault(data) {
+      let allowedFields = ['userId', 'tenantId', 'identity', 'strengths', 'careerStories', 'embedding', 'updatedAt'];
+      return hasRequiredFields(['userId', 'tenantId']) &&
+             hasOnlyAllowedFields(allowedFields) &&
+             data.userId is string && data.userId.size() < 128 &&
+             data.tenantId is string && data.tenantId.size() < 64 &&
+             (!('identity' in data) || (data.identity is string && data.identity.size() < 5000)) &&
+             (!('strengths' in data) || (data.strengths is list && data.strengths.size() < 50)) &&
+             (!('careerStories' in data) || (data.careerStories is list && data.careerStories.size() < 20)) &&
+             (!('updatedAt' in data) || isRecent(data.updatedAt));
+    }
+
+    function isValidSystemLog(data) {
+      let allowedFields = ['id', 'timestamp', 'level', 'serviceName', 'message', 'details'];
+      return hasRequiredFields(['id', 'timestamp', 'level', 'serviceName', 'message']) &&
+             hasOnlyAllowedFields(allowedFields) &&
+             data.id is string && data.id.size() < 128 &&
+             isRecent(data.timestamp) &&
+             data.level in ["INFO", "WARN", "ERROR", "DEBUG"] &&
+             data.serviceName in ["AUTH", "API", "FIRESTORE", "STORAGE", "SYSTEM"] &&
+             data.message is string && data.message.size() < 2000;
+    }
+
+    function isValidStorageMetric(data) {
+      let allowedFields = ['id', 'totalSize', 'artifactCount', 'lastUpdated'];
+      return hasRequiredFields(['id', 'totalSize', 'artifactCount']) &&
+             hasOnlyAllowedFields(allowedFields) &&
+             data.id is string && data.id.size() < 64 &&
+             (data.totalSize is float || data.totalSize is int) &&
+             data.artifactCount is int &&
+             (!('lastUpdated' in data) || isRecent(data.lastUpdated));
+    }
+
+    function isValidInvitation(data) {
+      let allowedFields = ['id', 'senderId', 'senderName', 'recipientEmail', 'recipientName', 'relationship', 'status', 'createdAt', 'acceptedAt'];
+      return hasRequiredFields(['id', 'senderId', 'recipientEmail', 'status', 'createdAt']) &&
+             hasOnlyAllowedFields(allowedFields) &&
+             data.id is string && data.id.size() < 128 &&
+             data.senderId is string && data.senderId.size() < 128 &&
+             isValidEmail(data.recipientEmail) &&
+             data.status in ["pending", "accepted", "declined"] &&
+             isRecent(data.createdAt);
+    }
+
+    function isValidPartnerAccess(data) {
+      let allowedFields = ['id', 'partnerUid', 'userUid', 'userName', 'relationship', 'grantedAt'];
+      return hasRequiredFields(['id', 'partnerUid', 'userUid', 'grantedAt']) &&
+             hasOnlyAllowedFields(allowedFields) &&
+             data.id is string && data.id.size() < 128 &&
+             data.partnerUid is string && data.partnerUid.size() < 128 &&
+             data.userUid is string && data.userUid.size() < 128 &&
+             isRecent(data.grantedAt);
+    }
+
+    function isPartnerOf(userId) {
+      return isAuthenticated() && 
+             exists(/databases/$(database)/documents/partner_access/$(request.auth.uid + '_' + userId));
+    }
+
+    function isValidJourney(data) {
+      let allowedFields = ['id', 'userId', 'programId', 'status', 'currentStep', 'steps', 'startedAt', 'completedAt', 'tenantId'];
+      return hasRequiredFields(['id', 'userId', 'programId', 'tenantId']) &&
+             hasOnlyAllowedFields(allowedFields) &&
+             data.id is string && data.id.size() < 128 &&
+             data.userId is string && data.userId.size() < 128 &&
+             data.programId is string && data.programId.size() < 128 &&
+             data.tenantId is string && data.tenantId.size() < 64 &&
+             (!('status' in data) || data.status in ["active", "completed", "on-hold"]) &&
+             (!('startedAt' in data) || isRecent(data.startedAt)) &&
+             (!('completedAt' in data) || isRecent(data.completedAt));
+    }
+
+    // ===============================================================
+    // Rules
+    // ===============================================================
+
+    // Default deny
+    match /{path=**} {
+      allow read, write: if false;
+    }
+
+    match /tenants/{tenantId} {
+      allow read: if isAuthenticated();
+      allow create: if isAdmin() && hasRequiredFields(['id', 'name', 'brand']);
+      allow update: if isAdmin() && unchanged('id');
+      allow delete: if isAdmin();
+    }
+
+    match /users/{uid} {
+      allow read: if isOwner(uid) || isAdmin();
+      allow create: if isAuthenticated() && 
+                      isValidUser(request.resource.data) && 
+                      (isOwner(uid) || isAdmin()) &&
+                      (request.resource.data.role == 'user' || isAdmin());
+      allow update: if isAuthenticated() && 
+                      isValidUser(request.resource.data) && 
+                      (isOwner(uid) || isAdmin()) &&
+                      unchanged('uid') && unchanged('email') && unchanged('tenantId') &&
+                      (request.resource.data.role == resource.data.role || isAdmin());
+    }
+
+    match /dashboards/{userId} {
+      allow read: if isOwner(userId) || isAdmin() || isPartnerOf(userId);
+      allow write: if (isOwner(userId) || isAdmin()) && 
+                      isValidDashboard(request.resource.data) &&
+                      unchanged('userId') && unchanged('tenantId');
+    }
+
+    match /wavvault/{userId} {
+      allow read: if isOwner(userId) || isAdmin() || isPartnerOf(userId);
+      allow write: if (isOwner(userId) || isAdmin()) && 
+                      isValidWavvault(request.resource.data) &&
+                      unchanged('userId') && unchanged('tenantId');
+    }
+
+    match /artifacts/{artifactId} {
+      allow read: if isOwner(resource.data.userId) || isAdmin();
+      allow create: if isAuthenticated() && 
+                      isOwner(request.resource.data.userId) && 
+                      isValidArtifact(request.resource.data);
+      allow update: if (isOwner(resource.data.userId) || isAdmin()) &&
+                      isValidArtifact(request.resource.data) &&
+                      unchanged('id') && unchanged('userId') && unchanged('tenantId') && unchanged('createdAt');
+      allow delete: if isOwner(resource.data.userId) || isAdmin();
+    }
+
+    match /programs/{programId} {
+      allow read: if isAuthenticated();
+      allow create: if isAdmin() && hasRequiredFields(['id', 'name', 'tenantId']);
+      allow update: if isAdmin() && unchanged('id') && unchanged('tenantId');
+      allow delete: if isAdmin();
+    }
+
+    match /cohorts/{cohortId} {
+      allow read: if isAuthenticated();
+      allow create: if isAdmin() && hasRequiredFields(['id', 'programId', 'name', 'tenantId']);
+      allow update: if isAdmin() && unchanged('id') && unchanged('programId') && unchanged('tenantId');
+      allow delete: if isAdmin();
+    }
+
+    match /journeys/{journeyId} {
+      allow read: if isOwner(resource.data.userId) || isAdmin();
+      allow create: if isAuthenticated() && 
+                      isOwner(request.resource.data.userId) && 
+                      isValidJourney(request.resource.data);
+      allow update: if (isOwner(resource.data.userId) || isAdmin()) &&
+                      isValidJourney(request.resource.data) &&
+                      unchanged('id') && unchanged('userId') && unchanged('programId') && unchanged('tenantId');
+      allow delete: if isAdmin();
+    }
+
+    match /security_logs/{logId} {
+      allow read: if isAdmin();
+      allow create: if isAuthenticated() && isValidSecurityLog(request.resource.data);
+    }
+
+    match /flagged_content/{contentId} {
+      allow read: if isOperator();
+      allow write: if isOperator() && isValidFlaggedContent(request.resource.data);
+    }
+
+    match /system_logs/{logId} {
+      allow read: if isAdmin();
+      allow create: if isAuthenticated() && isValidSystemLog(request.resource.data);
+    }
+
+    match /storage_metrics/{metricId} {
+      allow read: if isAdmin();
+      allow write: if isAdmin() && isValidStorageMetric(request.resource.data);
+    }
+
+    match /invitations/{invitationId} {
+      allow read: if isAuthenticated() && (isOwner(resource.data.senderId) || request.auth.token.email == resource.data.recipientEmail || isAdmin());
+      allow create: if isAuthenticated() && isOwner(request.resource.data.senderId) && isValidInvitation(request.resource.data);
+      allow update: if isAuthenticated() && 
+                      (isOwner(resource.data.senderId) || request.auth.token.email == resource.data.recipientEmail || isAdmin()) &&
+                      isValidInvitation(request.resource.data) &&
+                      unchanged('id') && unchanged('senderId') && unchanged('recipientEmail') && unchanged('createdAt');
+      allow delete: if isAuthenticated() && (isOwner(resource.data.senderId) || isAdmin());
+    }
+
+    match /partner_access/{accessId} {
+      allow read: if isAuthenticated() && (isOwner(resource.data.userUid) || isOwner(resource.data.partnerUid) || isAdmin());
+      allow create: if isAuthenticated() && (isOwner(request.resource.data.userUid) || isAdmin()) && isValidPartnerAccess(request.resource.data);
+      allow update: if isAdmin();
+      allow delete: if isAuthenticated() && (isOwner(resource.data.userUid) || isAdmin());
+    }
+  }
+}

@@ -2,10 +2,11 @@
 
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Menu, X, Sparkles, ChevronDown, LayoutDashboard, LogOut } from 'lucide-react';
+import { Menu, X, Sparkles, ChevronDown, LayoutDashboard, LogOut, Settings } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { onAuthStateChanged, User as FirebaseUser, signOut } from 'firebase/auth';
 import { auth } from '../lib/firebase';
+import { useAuthContext } from '../contexts/AuthContext';
 
 interface NavItem {
   label: string;
@@ -46,7 +47,7 @@ interface NavBarProps {
 /**
  * NavBar Component
  * 
- * A highly responsive, modern Top Navigation Bar for Sparkwavv.
+ * A highly responsive, modern Top Navigation Bar for SPARKWavv.
  * Integrates with Firebase Auth for dynamic login/dashboard states.
  * 
  * Note: Uses standard anchor tags for preview compatibility. 
@@ -57,30 +58,14 @@ export const NavBar: React.FC<NavBarProps> = ({ onNavigate }) => {
   const [isOpen, setIsOpen] = useState(false);
   const [scrolled, setScrolled] = useState(false);
   const [activeDropdown, setActiveDropdown] = useState<string | null>(null);
-  const [user, setUser] = useState<FirebaseUser | null>(null);
-  const [loading, setLoading] = useState(true);
+  const { user, profile, loading, isConfirmed } = useAuthContext();
 
   useEffect(() => {
     const handleScroll = () => {
       setScrolled(window.scrollY > 20);
     };
     window.addEventListener('scroll', handleScroll);
-
-    // Firebase Auth Listener
-    if (!auth) {
-      setLoading(false);
-      return;
-    }
-
-    const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
-      setUser(currentUser);
-      setLoading(false);
-    });
-
-    return () => {
-      window.removeEventListener('scroll', handleScroll);
-      unsubscribe();
-    };
+    return () => window.removeEventListener('scroll', handleScroll);
   }, []);
 
   const handleNavClick = (href: string, e: React.MouseEvent) => {
@@ -103,7 +88,7 @@ export const NavBar: React.FC<NavBarProps> = ({ onNavigate }) => {
   return (
     <nav 
       className={`fixed top-0 left-0 right-0 z-[100] transition-all duration-500 ${
-        scrolled ? 'py-4 bg-black/60 backdrop-blur-xl border-b border-white/10' : 'py-8 bg-transparent'
+        scrolled ? 'py-4 bg-black/90 backdrop-blur-xl border-b border-white/10' : 'py-8 bg-transparent'
       }`}
     >
       <div className="max-w-[1600px] mx-auto px-12 flex items-center justify-between">
@@ -116,7 +101,7 @@ export const NavBar: React.FC<NavBarProps> = ({ onNavigate }) => {
             <Sparkles className="w-5 h-5 md:w-6 md:h-6 text-neon-cyan" />
           </div>
           <span className="text-xl md:text-2xl font-display font-bold tracking-tighter text-white">
-            SPARK<span className="text-neon-cyan italic">WAVV</span>
+            SPARK<span className="text-neon-cyan italic">Wavv</span>
           </span>
         </div>
 
@@ -179,18 +164,25 @@ export const NavBar: React.FC<NavBarProps> = ({ onNavigate }) => {
           {/* Auth Button */}
           <div className="flex justify-end items-center gap-3">
             {!loading && (
-              user ? (
+              user && isConfirmed ? (
                 <>
                   <button 
-                    onClick={() => navigate(`/dashboard/${user.uid}`)}
+                    onClick={() => navigate(`/dashboard/${profile?.uid || user.uid}`)}
                     className="flex items-center gap-2 px-4 py-2 rounded-full bg-white/5 border border-white/10 text-white text-sm font-bold hover:bg-white/10 hover:border-white/20 transition-all duration-300 group"
                   >
                     <LayoutDashboard className="w-3.5 h-3.5 text-neon-cyan" />
                     <span>Dashboard</span>
                   </button>
                   <button 
+                    onClick={() => onNavigate('settings')}
+                    className="p-2 rounded-full bg-white/5 border border-white/10 text-white/60 hover:text-neon-cyan hover:border-neon-cyan/30 transition-all duration-300"
+                    title="Settings"
+                  >
+                    <Settings className="w-4 h-4" />
+                  </button>
+                  <button 
                     onClick={() => auth && signOut(auth)}
-                    className="p-2 rounded-full bg-white/5 border border-white/10 text-white/60 hover:text-red-400 hover:border-red-400/30 transition-all duration-300"
+                    className="p-2 rounded-full bg-white/5 border border-white/10 text-white/60 hover:text-neon-magenta hover:border-neon-magenta/30 transition-all duration-300"
                     title="Sign Out"
                   >
                     <LogOut className="w-4 h-4" />
@@ -198,10 +190,10 @@ export const NavBar: React.FC<NavBarProps> = ({ onNavigate }) => {
                 </>
               ) : (
                 <button 
-                  onClick={() => onNavigate('onboarding')}
+                  onClick={() => onNavigate('login')}
                   className="px-4 py-2 rounded-full bg-neon-cyan text-black text-sm font-bold hover:shadow-[0_0_25px_rgba(0,255,255,0.5)] hover:scale-105 transition-all duration-300"
                 >
-                  Sparkwavv Login
+                  Dashboard
                 </button>
               )
             )}
@@ -263,26 +255,26 @@ export const NavBar: React.FC<NavBarProps> = ({ onNavigate }) => {
               
               <div className="pt-8 border-t border-white/10">
                 {!loading && (
-                  user ? (
+                  user && isConfirmed ? (
                     <button 
                       onClick={() => {
-                        navigate(`/dashboard/${user.uid}`);
+                        navigate(`/dashboard/${profile?.uid || user.uid}`);
                         setIsOpen(false);
                       }}
                       className="w-full py-5 rounded-2xl bg-white/5 border border-white/10 text-white font-bold text-2xl flex items-center justify-center gap-3"
                     >
                       <LayoutDashboard className="w-7 h-7 text-neon-cyan" />
-                      Sparkwavv Dashboard
+                      Dashboard
                     </button>
                   ) : (
                     <button 
                       onClick={() => {
-                        onNavigate('onboarding');
+                        onNavigate('login');
                         setIsOpen(false);
                       }}
                       className="w-full py-5 rounded-2xl bg-neon-cyan text-black font-bold text-2xl shadow-[0_0_30px_rgba(0,255,255,0.3)]"
                     >
-                      Sparkwavv Login
+                      Dashboard
                     </button>
                   )
                 )}

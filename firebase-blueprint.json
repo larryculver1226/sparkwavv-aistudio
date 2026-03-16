@@ -1,0 +1,324 @@
+{
+  "entities": {
+    "Tenant": {
+      "title": "Tenant",
+      "description": "A platform tenant (e.g., SPARKWavv or Kwieri)",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "description": "Unique identifier for the tenant" },
+        "name": { "type": "string", "description": "Display name of the tenant" },
+        "brand": { "type": "string", "description": "Brand identifier (sparkwavv or kwieri)" },
+        "description": { "type": "string", "description": "Description of the tenant's focus" }
+      },
+      "required": ["id", "name", "brand"]
+    },
+    "User": {
+      "title": "User",
+      "description": "A user profile within the platform",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string", "description": "Firebase Auth UID" },
+        "sparkwavvId": { "type": "string", "description": "Unique Sparkwavv identifier for users" },
+        "email": { "type": "string", "description": "User's email address" },
+        "displayName": { "type": "string", "description": "User's display name" },
+        "role": { 
+          "type": "string", 
+          "enum": ["admin", "user", "operator", "mentor", "agent"],
+          "description": "System access role" 
+        },
+        "tenantId": { "type": "string", "description": "ID of the tenant the user belongs to" },
+        "generationalPersona": { 
+          "type": "string", 
+          "enum": ["Gen Z", "Millennial", "Gen X", "Baby Boomer", "Silent Generation", "Alpha", "Beta"],
+          "description": "Generational cohort" 
+        },
+        "careerStageRole": { 
+          "type": "string", 
+          "enum": ["Wave Rider", "Explorer", "Career Switcher"],
+          "description": "Career stage classification" 
+        },
+        "hierarchicalRole": { 
+          "type": "string", 
+          "enum": ["Owner", "C-suite", "Vice President", "Director or Manager", "Consultant", "Independent Contractor"],
+          "description": "Professional hierarchy level" 
+        },
+        "brandPersona": { 
+          "type": "string", 
+          "enum": ["Left Brain (Kick/Yin)", "Right Brain (Spark/Yang)"],
+          "description": "Methodological branding persona" 
+        },
+        "brandDNAAttributes": { 
+          "type": "array", 
+          "items": { "type": "string" },
+          "description": "Personal brand attributes (e.g., creator, builder, strategist)" 
+        },
+        "journeyStage": { 
+          "type": "string", 
+          "enum": ["Dive-In", "Ignition", "Discovery", "Branding", "Outreach", "NONE"],
+          "description": "Current stage in the SPARKWavv journey" 
+        },
+        "onboardingComplete": { "type": "boolean" }
+      },
+      "required": ["uid", "email", "tenantId"]
+    },
+    "Dashboard": {
+      "title": "Dashboard",
+      "description": "User's career dashboard data",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "sparkwavvId": { "type": "string", "description": "Linked unique Sparkwavv identifier" },
+        "tenantId": { "type": "string" },
+        "careerHappiness": { "type": "integer" },
+        "discoveryProgress": { "type": "string" },
+        "validationGateMode": { "type": "string" }
+      },
+      "required": ["userId", "tenantId"]
+    },
+    "Wavvault": {
+      "title": "Wavvault",
+      "description": "User's identity and career data for vector search",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "tenantId": { "type": "string" },
+        "identity": { "type": "string" },
+        "strengths": { "type": "array", "items": { "type": "string" } },
+        "careerStories": { "type": "array", "items": { "type": "string" } },
+        "embedding": { "type": "array", "items": { "type": "number" }, "description": "Vector embedding" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["userId", "tenantId"]
+    },
+    "Artifact": {
+      "title": "Artifact",
+      "description": "Metadata for user-uploaded files",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "userId": { "type": "string" },
+        "tenantId": { "type": "string" },
+        "filename": { "type": "string" },
+        "type": { "type": "string" },
+        "storagePath": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "userId", "tenantId"]
+    },
+    "Program": {
+      "title": "Program",
+      "description": "A specific educational or career program",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "description": { "type": "string" },
+        "type": { "type": "string" },
+        "curriculum": { "type": "array", "items": { "type": "string" } },
+        "duration": { "type": "string" },
+        "tenantId": { "type": "string" }
+      },
+      "required": ["id", "name", "tenantId"]
+    },
+    "Cohort": {
+      "title": "Cohort",
+      "description": "A group of users participating in a program together",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "programId": { "type": "string" },
+        "name": { "type": "string" },
+        "type": { "type": "string" },
+        "description": { "type": "string" },
+        "targetAudience": { "type": "string" },
+        "startDate": { "type": "string", "format": "date-time" },
+        "endDate": { "type": "string", "format": "date-time" },
+        "institution": { "type": "string" },
+        "tenantId": { "type": "string" }
+      },
+      "required": ["id", "programId", "name", "tenantId"]
+    },
+    "Journey": {
+      "title": "Journey",
+      "description": "A user's specific path through a program",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "userId": { "type": "string" },
+        "programId": { "type": "string" },
+        "status": { "type": "string", "enum": ["active", "completed", "on-hold"] },
+        "currentStep": { "type": "string" },
+        "steps": { 
+          "type": "array", 
+          "items": { 
+            "type": "object",
+            "properties": {
+              "name": { "type": "string" },
+              "status": { "type": "string", "enum": ["pending", "in-progress", "completed"] },
+              "completedAt": { "type": "string", "format": "date-time" }
+            }
+          }
+        },
+        "startedAt": { "type": "string", "format": "date-time" },
+        "completedAt": { "type": "string", "format": "date-time" },
+        "tenantId": { "type": "string" }
+      },
+      "required": ["id", "userId", "programId", "tenantId"]
+    },
+    "SecurityLog": {
+      "title": "SecurityLog",
+      "description": "A record of a security-relevant event or admin action",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "timestamp": { "type": "string", "format": "date-time" },
+        "actorId": { "type": "string", "description": "UID of the user performing the action" },
+        "actorEmail": { "type": "string" },
+        "actorRole": { "type": "string" },
+        "actionType": { 
+          "type": "string", 
+          "enum": ["USER_CREATE", "USER_UPDATE", "USER_DELETE", "ROLE_CHANGE", "ADMIN_PROMOTION", "LOGIN_FAILURE", "PASSWORD_RESET"],
+          "description": "Type of security event"
+        },
+        "severity": { "type": "string", "enum": ["INFO", "WARNING", "CRITICAL"] },
+        "targetId": { "type": "string", "description": "UID of the user affected by the action" },
+        "targetEmail": { "type": "string" },
+        "details": { "type": "object", "description": "Additional event-specific metadata" },
+        "ipAddress": { "type": "string" }
+      },
+      "required": ["id", "timestamp", "actorId", "actionType", "severity"]
+    },
+    "FlaggedContent": {
+      "title": "FlaggedContent",
+      "description": "Content flagged for moderation",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "authorId": { "type": "string" },
+        "authorName": { "type": "string" },
+        "authorEmail": { "type": "string" },
+        "type": { "type": "string", "enum": ["post", "comment", "profile", "artifact"] },
+        "reason": { "type": "string" },
+        "content": { "type": "string" },
+        "timestamp": { "type": "string", "format": "date-time" },
+        "status": { "type": "string", "enum": ["pending", "approved", "deleted"] }
+      },
+      "required": ["id", "authorId", "type", "reason", "timestamp", "status"]
+    },
+    "SystemLog": {
+      "title": "SystemLog",
+      "description": "A general system event log",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "timestamp": { "type": "string", "format": "date-time" },
+        "level": { "type": "string", "enum": ["INFO", "WARN", "ERROR", "DEBUG"] },
+        "serviceName": { "type": "string", "enum": ["AUTH", "API", "FIRESTORE", "STORAGE", "SYSTEM"] },
+        "message": { "type": "string" },
+        "details": { "type": "object" }
+      },
+      "required": ["id", "timestamp", "level", "serviceName", "message"]
+    },
+    "StorageMetric": {
+      "title": "StorageMetric",
+      "description": "Global storage usage metrics",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "description": "Usually 'global'" },
+        "totalSize": { "type": "number", "description": "Total size in bytes" },
+        "artifactCount": { "type": "integer" },
+        "lastUpdated": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "totalSize", "artifactCount"]
+    },
+    "Invitation": {
+      "title": "Invitation",
+      "description": "An invitation sent to a Relational Power Partner (RPP)",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "senderId": { "type": "string" },
+        "senderName": { "type": "string" },
+        "recipientEmail": { "type": "string" },
+        "recipientName": { "type": "string" },
+        "relationship": { "type": "string" },
+        "status": { "type": "string", "enum": ["pending", "accepted", "declined"] },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "acceptedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "senderId", "recipientEmail", "status", "createdAt"]
+    },
+    "PartnerAccess": {
+      "title": "PartnerAccess",
+      "description": "Links a Partner to a User's data for shared progress viewing",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "partnerUid": { "type": "string" },
+        "userUid": { "type": "string" },
+        "userName": { "type": "string" },
+        "relationship": { "type": "string" },
+        "grantedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "partnerUid", "userUid", "grantedAt"]
+    }
+  },
+  "firestore": {
+    "/tenants/{tenantId}": {
+      "schema": "Tenant",
+      "description": "Platform tenants"
+    },
+    "/users/{uid}": {
+      "schema": "User",
+      "description": "User profiles"
+    },
+    "/dashboards/{userId}": {
+      "schema": "Dashboard",
+      "description": "User dashboard data"
+    },
+    "/wavvault/{userId}": {
+      "schema": "Wavvault",
+      "description": "Vector-searchable career data"
+    },
+    "/artifacts/{artifactId}": {
+      "schema": "Artifact",
+      "description": "Artifact metadata"
+    },
+    "/programs/{programId}": {
+      "schema": "Program",
+      "description": "Available programs"
+    },
+    "/cohorts/{cohortId}": {
+      "schema": "Cohort",
+      "description": "Active and past cohorts"
+    },
+    "/journeys/{journeyId}": {
+      "schema": "Journey",
+      "description": "User progress through specific programs"
+    },
+    "/security_logs/{logId}": {
+      "schema": "SecurityLog",
+      "description": "Security audit logs"
+    },
+    "/flagged_content/{contentId}": {
+      "schema": "FlaggedContent",
+      "description": "Content flagged for moderation"
+    },
+    "/system_logs/{logId}": {
+      "schema": "SystemLog",
+      "description": "General system logs"
+    },
+    "/storage_metrics/{metricId}": {
+      "schema": "StorageMetric",
+      "description": "Storage usage tracking"
+    },
+    "/invitations/{invitationId}": {
+      "schema": "Invitation",
+      "description": "RPP Invitations"
+    },
+    "/partner_access/{accessId}": {
+      "schema": "PartnerAccess",
+      "description": "Partner access permissions"
+    }
+  }
+}

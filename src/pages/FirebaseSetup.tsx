@@ -58,7 +58,7 @@ export const FirebaseSetup: React.FC = () => {
   const steps = setupMode === 'new' ? [
     {
       title: "1. Create a Firebase Project",
-      description: "Go to the Firebase Console and create a new project named 'Sparkwavv'.",
+      description: "Go to the Firebase Console and create a new project named 'SPARKWavv'.",
       link: "https://console.firebase.google.com/",
       icon: Cloud
     },
@@ -120,10 +120,10 @@ export const FirebaseSetup: React.FC = () => {
           </h3>
           <div className={`px-4 py-1 rounded-full text-xs font-bold uppercase tracking-widest flex items-center gap-2 ${
             status?.VITE_FIREBASE_API_KEY && status?.FIREBASE_PRIVATE_KEY 
-              ? 'bg-emerald-500/10 text-emerald-500 border border-emerald-500/20' 
-              : 'bg-amber-500/10 text-amber-500 border border-amber-500/20'
+              ? 'bg-neon-lime/10 text-neon-lime border border-neon-lime/20' 
+              : 'bg-neon-magenta/10 text-neon-magenta border border-neon-magenta/20'
           }`}>
-            <div className={`w-2 h-2 rounded-full ${status?.VITE_FIREBASE_API_KEY && status?.FIREBASE_PRIVATE_KEY ? 'bg-emerald-500' : 'bg-amber-500'} animate-pulse`} />
+            <div className={`w-2 h-2 rounded-full ${status?.VITE_FIREBASE_API_KEY && status?.FIREBASE_PRIVATE_KEY ? 'bg-neon-lime' : 'bg-neon-magenta'} animate-pulse`} />
             {status?.VITE_FIREBASE_API_KEY && status?.FIREBASE_PRIVATE_KEY ? 'Fully Configured' : 'Partial Setup'}
           </div>
         </div>
@@ -139,9 +139,9 @@ export const FirebaseSetup: React.FC = () => {
                 <div key={i} className="flex items-center justify-between p-3 rounded-xl bg-white/5 border border-white/5">
                   <span className="text-sm text-white/60">{item.label}</span>
                   {item.status ? (
-                    <CheckCircle2 className="w-4 h-4 text-emerald-500" />
+                    <CheckCircle2 className="w-4 h-4 text-neon-lime" />
                   ) : (
-                    <AlertCircle className="w-4 h-4 text-amber-500" />
+                    <AlertCircle className="w-4 h-4 text-neon-magenta" />
                   )}
                 </div>
               ))}
@@ -159,9 +159,9 @@ export const FirebaseSetup: React.FC = () => {
                 <div key={i} className="flex items-center justify-between p-3 rounded-xl bg-white/5 border border-white/5">
                   <span className="text-sm text-white/60">{item.label}</span>
                   {item.status ? (
-                    <CheckCircle2 className="w-4 h-4 text-emerald-500" />
+                    <CheckCircle2 className="w-4 h-4 text-neon-lime" />
                   ) : (
-                    <AlertCircle className="w-4 h-4 text-amber-500" />
+                    <AlertCircle className="w-4 h-4 text-neon-magenta" />
                   )}
                 </div>
               ))}
@@ -265,7 +265,7 @@ export const FirebaseSetup: React.FC = () => {
           </div>
 
           <div className="space-y-4 pt-4">
-            <h4 className="text-xs font-bold text-purple-500 uppercase tracking-[0.2em]">Server-Side (Admin)</h4>
+            <h4 className="text-xs font-bold text-neon-magenta uppercase tracking-[0.2em]">Server-Side (Admin)</h4>
             <div className="grid grid-cols-1 gap-3">
               {[
                 'FIREBASE_PROJECT_ID',
@@ -276,7 +276,7 @@ export const FirebaseSetup: React.FC = () => {
                 return (
                   <div key={key} className="flex items-center justify-between p-3 rounded-xl bg-black border border-white/5 font-mono text-xs group">
                     <div className="flex flex-col gap-1 overflow-hidden">
-                      <span className="text-purple-500/60 text-[10px] uppercase tracking-widest">{key}</span>
+                      <span className="text-neon-magenta/60 text-[10px] uppercase tracking-widest">{key}</span>
                       <span className="text-white/80 truncate max-w-[400px]">
                         {key === 'FIREBASE_PRIVATE_KEY' && value ? '••••••••••••••••' : (value || 'Not Set')}
                       </span>

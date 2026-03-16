@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { BrowserRouter as Router, Routes, Route, Navigate, useParams } from 'react-router-dom';
+import { BrowserRouter as Router, Routes, Route, Navigate, useParams, useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'motion/react';
 import { 
   Sparkles, 
@@ -7,6 +7,7 @@ import {
   Target, 
   Zap, 
   ShieldAlert, 
+  ShieldCheck,
   Heart, 
   Fingerprint, 
   Film, 
@@ -26,9 +27,32 @@ import {
   Settings,
   Lock
 } from 'lucide-react';
-import { createUserWithEmailAndPassword, sendEmailVerification, signInWithEmailAndPassword, signOut } from 'firebase/auth';
-import { auth, isFirebaseConfigured } from './lib/firebase';
-import { useAuth } from './hooks/useAuth';
+import { 
+  createUserWithEmailAndPassword, 
+  sendEmailVerification, 
+  signInWithEmailAndPassword, 
+  signOut,
+  signInWithPopup,
+  signInWithCustomToken,
+  sendPasswordResetEmail,
+  deleteUser,
+  updateProfile,
+  updatePassword
+} from 'firebase/auth';
+import { 
+  doc, 
+  setDoc, 
+  getDoc,
+  updateDoc,
+  collection,
+  query,
+  where,
+  getDocs,
+  onSnapshot
+} from 'firebase/firestore';
+import { auth, isFirebaseConfigured, googleProvider, linkedinProvider, db } from './lib/firebase';
+import { useAuthContext } from './contexts/AuthContext';
+import { CONFIRMED_USERS } from './mockDatabase';
 import { generateDiscoverySummary, parseResume, generateBrandImage, UserData } from './services/geminiService';
 import { NavBar } from './components/NavBar';
 import { Footer } from './components/Footer';
@@ -36,9 +60,20 @@ import { Hero } from './components/Hero';
 import { AdminLogin } from './pages/AdminLogin';
 import { AdminDashboard } from './pages/AdminDashboard';
 import { UserDashboard } from './pages/UserDashboard';
+import { PartnerDashboard } from './pages/PartnerDashboard';
+import { AcceptInvitation } from './pages/AcceptInvitation';
+import { ProfilePage } from './pages/ProfilePage';
+import { Button } from './components/Button';
+import OnboardingGate from './components/OnboardingGate';
+import { SkylarSidebar } from './components/skylar/SkylarSidebar';
+import { EveningSpark } from './components/skylar/EveningSpark';
+import { DashboardData } from './types/dashboard';
+import { CinematicIntro } from './components/landing/CinematicIntro';
+import { BrainModel } from './components/landing/BrainModel';
+import { Roadmap } from './components/landing/Roadmap';
 
 // --- Types ---
-type Step = 'landing' | 'onboarding' | 'module1' | 'module2' | 'module3' | 'module4' | 'module5' | 'processing' | 'results' | 'product-skylar' | 'product-features' | 'product-technology' | 'product-wavvault' | 'company-vision' | 'company-about' | 'company-investors' | 'company-give' | 'company-testimonials';
+type Step = 'landing' | 'login' | 'onboarding' | 'forgot-password' | 'settings' | 'module1' | 'module2' | 'module3' | 'module4' | 'module5' | 'processing' | 'results' | 'product-skylar' | 'product-features' | 'product-technology' | 'product-wavvault' | 'company-vision' | 'company-about' | 'company-investors' | 'company-give' | 'company-testimonials';
 
 // --- Constants ---
 const INDUSTRIES = [
@@ -63,40 +98,33 @@ const INDUSTRIES = [
   "Transportation"
 ];
 
-// --- Components ---
+const ProtectedRoute = ({ user, children, onRedirect }: { user: any; children: React.ReactNode; onRedirect: () => void }) => {
+  useEffect(() => {
+    if (!user) {
+      onRedirect();
+    }
+  }, [user, onRedirect]);
 
-const Button = ({ 
-  children, 
-  onClick, 
-  variant = 'primary', 
-  className = '', 
-  disabled = false,
-  loading = false
-}: { 
-  children: React.ReactNode; 
-  onClick?: () => void; 
-  variant?: 'primary' | 'secondary' | 'outline' | 'neon'; 
-  className?: string;
-  disabled?: boolean;
-  loading?: boolean;
-}) => {
-  const variants = {
-    primary: 'bg-white text-black hover:bg-gray-200',
-    secondary: 'bg-dark-surface text-white border border-white/10 hover:bg-white/5',
-    outline: 'border border-white/20 text-white hover:border-white/40',
-    neon: 'bg-neon-cyan/10 text-neon-cyan border border-neon-cyan/50 hover:bg-neon-cyan/20 neon-border-cyan'
-  };
+  if (!user) return null;
+  return <>{children}</>;
+};
 
+const VerificationBanner = ({ user, onResend }: { user: any; onResend: () => void }) => {
+  if (!user || user.emailVerified) return null;
   return (
-    <button 
-      onClick={onClick}
-      disabled={disabled || loading}
-      className={`px-6 py-3 rounded-full font-medium transition-all flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed ${variants[variant]} ${className}`}
-    >
-      {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : children}
-    </button>
+    <div className="bg-neon-cyan/10 border-b border-neon-cyan/20 py-2 px-4 flex items-center justify-center gap-4 text-xs md:text-sm">
+      <ShieldAlert className="w-4 h-4 text-neon-cyan" />
+      <span className="text-white/80">Your email is not verified. Please check your inbox.</span>
+      <button 
+        onClick={onResend}
+        className="text-neon-cyan font-bold hover:underline"
+      >
+        Resend Verification
+      </button>
+    </div>
   );
 };
+
 
 const ProgressBar = ({ current, total }: { current: number; total: number }) => (
   <div className="fixed top-0 left-0 w-full h-1 bg-white/5 z-50">
@@ -108,10 +136,94 @@ const ProgressBar = ({ current, total }: { current: number; total: number }) => 
   </div>
 );
 
-export function SparkwavvApp() {
+const ProgressRail = ({ step }: { step: Step }) => {
+  const steps: Step[] = ['onboarding', 'module1', 'module2', 'module3', 'module4', 'module5', 'processing', 'results'];
+  const currentIndex = steps.indexOf(step);
+  if (currentIndex === -1 || step === 'landing' || step === 'login' || step === 'results') return null;
+
+  const progress = ((currentIndex + 1) / steps.length) * 100;
+
+  return (
+    <div className="fixed top-0 left-0 w-full h-1 z-50 bg-white/5">
+      <motion.div 
+        className="h-full bg-neon-cyan progress-rail-glow"
+        initial={{ width: 0 }}
+        animate={{ width: `${progress}%` }}
+        transition={{ type: 'spring', stiffness: 50, damping: 20 }}
+      />
+    </div>
+  );
+};
+
+const InspirationTooltip = ({ content }: { content: string }) => (
+  <div className="group relative inline-block ml-2">
+    <Lightbulb className="w-4 h-4 text-neon-cyan cursor-help opacity-50 group-hover:opacity-100 transition-opacity" />
+    <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-64 p-3 bg-dark-surface border border-neon-cyan/20 rounded-xl text-xs text-white/80 opacity-0 group-hover:opacity-100 pointer-events-none transition-all translate-y-2 group-hover:translate-y-0 z-50 shadow-2xl">
+      <div className="font-bold text-neon-cyan mb-1">Skylar's Tip:</div>
+      {content}
+      <div className="absolute top-full left-1/2 -translate-x-1/2 border-8 border-transparent border-t-dark-surface" />
+    </div>
+  </div>
+);
+
+const ValidationFeedback = ({ value, maxLength }: { value: string, maxLength: number }) => {
+  const length = value.trim().length;
+  if (length === 0) return null;
+  
+  let feedback = "";
+  let colorClass = "text-white/40";
+  
+  if (length < maxLength * 0.2) {
+    feedback = "Good start! Add more detail for a better DNA synthesis.";
+  } else if (length < maxLength * 0.5) {
+    feedback = "Great detail! Skylar is getting a clear picture.";
+  } else if (length < maxLength * 0.9) {
+    feedback = "Excellent! This is a high-impact story.";
+  } else {
+    feedback = "Perfect! Very comprehensive.";
+    colorClass = "text-neon-cyan";
+  }
+
+  return (
+    <div className={`text-[10px] italic ${colorClass} transition-all duration-500 mt-1`}>
+      {feedback}
+    </div>
+  );
+};
+
+const Toast = ({ message, type = 'success', onClose }: { message: string, type?: 'success' | 'error', onClose: () => void }) => {
+  useEffect(() => {
+    const timer = setTimeout(onClose, 3000);
+    return () => clearTimeout(timer);
+  }, [onClose]);
+
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 50 }}
+      animate={{ opacity: 1, y: 0 }}
+      exit={{ opacity: 0, y: 50 }}
+      className={`fixed bottom-8 right-8 px-6 py-3 rounded-xl shadow-2xl z-[100] flex items-center gap-3 border ${
+        type === 'success' ? 'bg-neon-lime/20 border-neon-lime/50 text-neon-lime' : 'bg-neon-magenta/20 border-neon-magenta/50 text-neon-magenta'
+      }`}
+    >
+      {type === 'success' ? <CheckCircle2 className="w-5 h-5" /> : <ShieldAlert className="w-5 h-5" />}
+      <span className="text-sm font-medium">{message}</span>
+    </motion.div>
+  );
+};
+
+export function SPARKWavvApp({ isAdmin = false }: { isAdmin?: boolean }) {
+  const navigate = useNavigate();
   const [step, setStep] = useState<Step>('landing');
+  const [posterVibe, setPosterVibe] = useState<'Minimalist' | 'Brutalist' | 'Corporate' | 'Creative'>('Creative');
+  const [lastSaved, setLastSaved] = useState<string | null>(null);
+  const [showToast, setShowToast] = useState<{ message: string, type: 'success' | 'error' } | null>(null);
+  const [forgotPasswordEmail, setForgotPasswordEmail] = useState('');
   const [userData, setUserData] = useState<UserData>({
-    onboarding: { name: '', role: '', bio: '', email: '', industry: '', password: '' },
+    onboarding: { 
+      firstName: '', lastName: '', jobTitle: '', companyOrg: '', email: '', phone: '', programTrack: '', lifecycleStage: '', outcomesAttributes: '', feedbackQuote: '', userId: '', password: '',
+      name: '', role: '', bio: '', industry: '' 
+    },
     accomplishments: [
       { title: '', description: '' },
       { title: '', description: '' },
@@ -132,9 +244,79 @@ export function SparkwavvApp() {
   const [hasApiKey, setHasApiKey] = useState(false);
   const [registrationMessage, setRegistrationMessage] = useState<string | null>(null);
   const [isRegistering, setIsRegistering] = useState(false);
-  const { user, loading: authLoading } = useAuth();
+  const [userId, setUserId] = useState<string | null>(null);
+  const [dashboardData, setDashboardData] = useState<DashboardData | null>(null);
+  const { user, profile, status: authStatus, loading: authLoading, isConfirmed, refreshProfile, loginAsMockUser, logout } = useAuthContext();
 
-  const isConfirmed = user?.emailVerified || false;
+  // Auto-redirect to dashboard when ready
+  useEffect(() => {
+    if (authStatus === 'ready' && profile) {
+      console.log('🚀 Auth ready, redirecting to dashboard:', profile.uid);
+      navigate(`/dashboard/${profile.uid}`);
+    }
+  }, [authStatus, profile, navigate]);
+
+  // OAuth Message Listener
+  useEffect(() => {
+    const handleMessage = (event: MessageEvent) => {
+      const origin = event.origin;
+      if (!origin.endsWith('.run.app') && !origin.includes('localhost')) {
+        return;
+      }
+      
+      if (event.data?.type === 'OAUTH_AUTH_SUCCESS' && event.data?.provider === 'linkedin') {
+        console.log('LinkedIn Auth Success!');
+        const token = event.data.token;
+        if (token && auth) {
+          signInWithCustomToken(auth, token)
+            .then(() => {
+              refreshProfile();
+              setStep('landing');
+            })
+            .catch(err => {
+              console.error('Error signing in with custom token:', err);
+              setErrors({ general: 'Failed to complete LinkedIn login.' });
+            });
+        } else {
+          refreshProfile();
+          setStep('landing');
+        }
+      } else if (event.data?.type === 'OAUTH_AUTH_ERROR') {
+        setErrors({ general: `LinkedIn login failed: ${event.data.error}` });
+      }
+    };
+    window.addEventListener('message', handleMessage);
+    return () => window.removeEventListener('message', handleMessage);
+  }, [refreshProfile]);
+
+  useEffect(() => {
+    if (user && profile) {
+      setUserId(profile.uid);
+      
+      const fetchDashboard = async () => {
+        try {
+          const idToken = await user.getIdToken();
+          const dashResponse = await fetch('/api/user/dashboard', {
+            headers: { 'Authorization': `Bearer ${idToken}` }
+          });
+          const dashData = await dashResponse.json();
+          setDashboardData(dashData);
+        } catch (error) {
+          console.error("Error fetching dashboard:", error);
+        }
+      };
+      fetchDashboard();
+    } else {
+      setUserId(null);
+      setDashboardData(null);
+    }
+  }, [user, profile]);
+
+  useEffect(() => {
+    // Clear notifications/popups on mount for all users
+    setRegistrationMessage(null);
+    setErrors({});
+  }, []);
 
   useEffect(() => {
     const checkKey = async () => {
@@ -155,29 +337,46 @@ export function SparkwavvApp() {
 
   // Load progress on mount
   useEffect(() => {
-    const savedData = localStorage.getItem('sparkwavv_user_data');
-    const savedStep = localStorage.getItem('sparkwavv_current_step');
-    const savedSummary = localStorage.getItem('sparkwavv_summary');
+    const checkSavedProgress = async () => {
+      const savedData = localStorage.getItem('sparkwavv_user_data');
+      const savedStep = localStorage.getItem('sparkwavv_current_step');
+      const savedSummary = localStorage.getItem('sparkwavv_summary');
 
-    if (savedData || savedStep || savedSummary) {
-      if (savedStep && savedStep !== 'onboarding') {
-        setHasSavedProgress(true);
-      } else if (savedData) {
+      if (savedData || savedStep || savedSummary) {
+        if (savedStep && savedStep !== 'onboarding') {
+          setHasSavedProgress(true);
+        } else if (savedData) {
+          try {
+            const parsed = JSON.parse(savedData);
+            if (parsed.onboarding?.name || parsed.onboarding?.email) {
+              setHasSavedProgress(true);
+            }
+          } catch (e) {
+            console.error("Error parsing saved data:", e);
+          }
+        } else if (savedSummary) {
+          setHasSavedProgress(true);
+        }
+      } else if (user && db) {
         try {
-          const parsed = JSON.parse(savedData);
-          if (parsed.onboarding?.name || parsed.onboarding?.email) {
+          const docRef = doc(db, 'users', user.uid);
+          const docSnap = await getDoc(docRef);
+          if (docSnap.exists()) {
+            const data = docSnap.data();
+            if (data.updatedAt) {
+              setLastSaved(new Date(data.updatedAt).toLocaleString());
+            }
             setHasSavedProgress(true);
           }
         } catch (e) {
-          console.error("Error parsing saved data:", e);
+          console.error("Error checking Firestore for progress:", e);
         }
-      } else if (savedSummary) {
-        setHasSavedProgress(true);
       }
-    }
-  }, []);
+    };
+    checkSavedProgress();
+  }, [user]);
 
-  const resumeJourney = () => {
+  const resumeJourney = async () => {
     const savedData = localStorage.getItem('sparkwavv_user_data');
     const savedStep = localStorage.getItem('sparkwavv_current_step');
     const savedSummary = localStorage.getItem('sparkwavv_summary');
@@ -196,9 +395,30 @@ export function SparkwavvApp() {
         }
       }
       setUserData(parsed);
+      if (savedStep) setStep(savedStep as Step);
+      if (savedSummary) setSummary(JSON.parse(savedSummary));
+      setShowToast({ message: "Welcome back! Journey resumed.", type: 'success' });
+      return;
     }
-    if (savedStep) setStep(savedStep as Step);
-    if (savedSummary) setSummary(JSON.parse(savedSummary));
+
+    // If not in localStorage, try Firestore
+    if (user && db) {
+      setLoading(true);
+      try {
+        const docRef = doc(db, 'users', user.uid);
+        const docSnap = await getDoc(docRef);
+        if (docSnap.exists()) {
+          const data = docSnap.data();
+          if (data.userData) setUserData(data.userData);
+          if (data.currentStep) setStep(data.currentStep);
+          if (data.summary) setSummary(data.summary);
+        }
+      } catch (e) {
+        console.error("Error loading from Firestore:", e);
+      } finally {
+        setLoading(false);
+      }
+    }
   };
 
   const startOver = () => {
@@ -206,7 +426,10 @@ export function SparkwavvApp() {
     localStorage.removeItem('sparkwavv_current_step');
     localStorage.removeItem('sparkwavv_summary');
     setUserData({
-      onboarding: { name: '', role: '', bio: '', email: '', industry: '', password: '' },
+      onboarding: { 
+        firstName: '', lastName: '', jobTitle: '', companyOrg: '', email: '', phone: '', programTrack: '', lifecycleStage: '', outcomesAttributes: '', feedbackQuote: '', userId: '', password: '',
+        name: '', role: '', bio: '', industry: '' 
+      },
       accomplishments: [
         { title: '', description: '' },
         { title: '', description: '' },
@@ -227,7 +450,7 @@ export function SparkwavvApp() {
     const steps: Step[] = ['landing', 'onboarding', 'module1', 'module2', 'module3', 'module4', 'module5', 'processing', 'results'];
     const currentIndex = steps.indexOf(step);
     
-    if (currentIndex > 1 && !isConfirmed) {
+    if (currentIndex > 1 && !isConfirmed && process.env.NODE_ENV !== 'development') {
       setStep('landing');
       setErrors({ general: "Please confirm your registration via email before continuing." });
     }
@@ -239,40 +462,59 @@ export function SparkwavvApp() {
         localStorage.setItem('sparkwavv_user_data', JSON.stringify(userData));
         localStorage.setItem('sparkwavv_current_step', step);
         setHasSavedProgress(true);
+
+        // Sync to Firestore if logged in
+        if (user && db) {
+          const syncProgress = async () => {
+            try {
+              await setDoc(doc(db, 'users', user.uid), {
+                userData,
+                currentStep: step,
+                updatedAt: new Date().toISOString()
+              }, { merge: true });
+            } catch (e) {
+              console.error("Error syncing to Firestore:", e);
+            }
+          };
+          syncProgress();
+        }
       }
     }
     if (step === 'results' && summary) {
       localStorage.setItem('sparkwavv_summary', JSON.stringify(summary));
       setHasSavedProgress(true);
+
+      // Sync results to Firestore
+      if (user && db) {
+        const syncResults = async () => {
+          try {
+            await setDoc(doc(db, 'users', user.uid), {
+              summary,
+              updatedAt: new Date().toISOString()
+            }, { merge: true });
+          } catch (e) {
+            console.error("Error syncing results to Firestore:", e);
+          }
+        };
+        syncResults();
+      }
     }
-  }, [userData, step, summary, uploadedFileName, isConfirmed]);
+  }, [userData, step, summary, uploadedFileName, isConfirmed, user]);
 
   const validateOnboarding = () => {
-    // If a resume is uploaded, we don't strictly require the manual fields to be filled
-    // but if they ARE filled, they must be valid.
-    // However, the prompt says: "If the user uploads a resume, the user should not be required to also fill the fields in manually"
-    // So if uploadedFileName is present, we skip the "required" check but still check lengths if they are present.
-    
     const newErrors: Record<string, string> = {};
     const isResumeUploaded = !!uploadedFileName;
 
+    if (!userData.onboarding.email.trim()) newErrors.email = 'Email is required';
+
     if (!isResumeUploaded) {
-      if (!userData.onboarding.name.trim()) newErrors.name = 'Name is required';
-      if (!userData.onboarding.role.trim()) newErrors.role = 'Role is required';
-      if (!userData.onboarding.bio.trim()) newErrors.bio = 'Bio is required';
-      if (!userData.onboarding.email.trim()) newErrors.email = 'Email is required';
-      if (!userData.onboarding.industry) newErrors.industry = 'Industry is required';
+      if (!userData.onboarding.firstName.trim()) newErrors.firstName = 'First Name is required';
+      if (!userData.onboarding.lastName.trim()) newErrors.lastName = 'Last Name is required';
+      if (!userData.onboarding.jobTitle.trim()) newErrors.jobTitle = 'Job Title is required';
     }
 
-    if (userData.onboarding.name.length > 50) newErrors.name = 'Name is too long (max 50 chars)';
-    if (userData.onboarding.role.length > 100) newErrors.role = 'Role is too long (max 100 chars)';
-    if (userData.onboarding.bio.length > 500) newErrors.bio = 'Bio is too long (max 500 chars)';
-    
     if (userData.onboarding.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(userData.onboarding.email)) {
       newErrors.email = 'Please enter a valid email address';
-    } else if (isResumeUploaded && !userData.onboarding.email.trim()) {
-      // Even if resume is uploaded, we want email now
-      newErrors.email = 'Email is required';
     }
 
     if (!userData.onboarding.password || userData.onboarding.password.length < 6) {
@@ -295,12 +537,25 @@ export function SparkwavvApp() {
       return;
     }
 
+    // Default User ID to email if blank
+    let finalUserId = userData.onboarding.userId.trim() || userData.onboarding.email;
+    if (finalUserId === 'undefined') finalUserId = userData.onboarding.email;
+    
+    const updatedUserData = {
+      ...userData,
+      onboarding: {
+        ...userData.onboarding,
+        userId: finalUserId
+      }
+    };
+    setUserData(updatedUserData);
+
     try {
       // Create user in Firebase Auth
       const userCredential = await createUserWithEmailAndPassword(
         auth, 
-        userData.onboarding.email, 
-        userData.onboarding.password || ''
+        updatedUserData.onboarding.email, 
+        updatedUserData.onboarding.password || ''
       );
       
       // Send verification email
@@ -311,10 +566,18 @@ export function SparkwavvApp() {
       await fetch('/api/user/init-role', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ idToken }),
+        body: JSON.stringify({ 
+          idToken, 
+          userId: finalUserId,
+          email: updatedUserData.onboarding.email,
+          firstName: updatedUserData.onboarding.firstName,
+          lastName: updatedUserData.onboarding.lastName
+        }),
       });
 
-      setRegistrationMessage("Confirm Your Registration - Check Your Email to Confirm Your Sparkwavv Account");
+      await refreshProfile();
+
+      setRegistrationMessage("Registration Confirmed! Please reply to the confirmation email to activate your SPARKWavv account.");
       
       // Redirect to landing after 5 seconds
       setTimeout(() => {
@@ -334,6 +597,125 @@ export function SparkwavvApp() {
       setErrors({ ...errors, general: message });
     } finally {
       setIsRegistering(false);
+    }
+  };
+
+  const handleLogin = async () => {
+    if (!userData.onboarding.email || !userData.onboarding.password) {
+      setErrors({ general: "Email and password are required to login." });
+      return;
+    }
+
+    if (!isFirebaseConfigured || !auth) {
+      setErrors({ general: "Firebase is not configured. Please check your environment variables." });
+      return;
+    }
+
+    setIsRegistering(true);
+    try {
+      await signInWithEmailAndPassword(auth, userData.onboarding.email, userData.onboarding.password);
+      
+      // For industry standards, we check verified status but might allow entry with a banner
+      // However, the user specifically asked for "confirmed account user" logic previously
+      // Let's keep the verification check but make it cleaner
+      
+      setStep('landing');
+      setErrors({});
+    } catch (err: any) {
+      console.error("Login error:", err);
+      let message = "Login failed. Please check your credentials.";
+      if (err.code === 'auth/user-not-found' || err.code === 'auth/wrong-password' || err.code === 'auth/invalid-credential') {
+        message = "Invalid email or password.";
+      } else if (err.code === 'auth/too-many-requests') {
+        message = "Too many failed attempts. Please try again later.";
+      } else if (err.code === 'auth/invalid-email') {
+        message = "Invalid email address.";
+      }
+      setErrors({ general: message });
+    } finally {
+      setIsRegistering(false);
+    }
+  };
+
+  const handleSocialLogin = async (provider: 'google' | 'linkedin') => {
+    if (!auth) return;
+    
+    if (provider === 'google') {
+      setIsRegistering(true);
+      try {
+        const result = await signInWithPopup(auth, googleProvider);
+        
+        // Initialize role if new user
+        const idToken = await result.user.getIdToken();
+        const [firstName, ...lastNameParts] = (result.user.displayName || '').split(' ');
+        const lastName = lastNameParts.join(' ');
+        
+        await fetch('/api/user/init-role', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ 
+            idToken, 
+            userId: result.user.email,
+            email: result.user.email,
+            firstName: firstName || '',
+            lastName: lastName || ''
+          }),
+        });
+
+        await refreshProfile();
+
+        setStep('landing');
+        setErrors({});
+      } catch (err: any) {
+        console.error(`${provider} login error:`, err);
+        setErrors({ general: `Failed to login with ${provider}.` });
+      } finally {
+        setIsRegistering(false);
+      }
+    } else if (provider === 'linkedin') {
+      try {
+        // 1. Fetch the OAuth URL from your server
+        const response = await fetch('/api/auth/linkedin/url');
+        if (!response.ok) {
+          throw new Error('Failed to get auth URL');
+        }
+        const { url } = await response.json();
+
+        // 2. Open the OAuth PROVIDER's URL directly in popup
+        const authWindow = window.open(
+          url,
+          'linkedin_oauth_popup',
+          'width=600,height=700'
+        );
+
+        if (!authWindow) {
+          alert('Please allow popups for this site to connect your LinkedIn account.');
+        }
+      } catch (error) {
+        console.error('LinkedIn OAuth error:', error);
+        setErrors({ general: 'Failed to initiate LinkedIn login.' });
+      }
+    }
+  };
+
+  const handleForgotPassword = async (email: string) => {
+    if (!auth || !email) {
+      setErrors({ forgotPassword: "Email is required." });
+      return;
+    }
+    setLoading(true);
+    try {
+      await sendPasswordResetEmail(auth, email);
+      setRegistrationMessage("Password reset email sent! Please check your inbox.");
+      setTimeout(() => {
+        setStep('login');
+        setRegistrationMessage(null);
+      }, 3000);
+    } catch (err: any) {
+      console.error("Password reset error:", err);
+      setErrors({ forgotPassword: "Failed to send reset email. Please check the address." });
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -404,16 +786,46 @@ export function SparkwavvApp() {
       const reader = new FileReader();
       reader.onload = async (event) => {
         const base64 = (event.target?.result as string).split(',')[1];
+        
+        // Upload as artifact for storage tracking
+        try {
+          const artifactRes = await fetch('/api/wavvault/artifact', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              userId: userData.onboarding.userId || 'anonymous',
+              type: 'resume',
+              content: base64,
+              metadata: { fileName: file.name, mimeType: file.type }
+            })
+          });
+
+          if (!artifactRes.ok) {
+            const err = await artifactRes.json();
+            if (err.error === 'bucket_quota_exceeded') {
+              alert("Storage quota exceeded. Please contact an administrator.");
+              setParsingResume(false);
+              return;
+            }
+          }
+        } catch (err) {
+          console.error("Failed to store artifact:", err);
+        }
+
         const result = await parseResume(base64, file.type);
         if (result) {
           setUserData(prev => ({
             ...prev,
             onboarding: {
-              name: result.name || prev.onboarding.name,
-              role: result.role || prev.onboarding.role,
-              bio: result.bio || prev.onboarding.bio,
+              ...prev.onboarding,
+              firstName: result.name?.split(' ')[0] || prev.onboarding.firstName,
+              lastName: result.name?.split(' ').slice(1).join(' ') || prev.onboarding.lastName,
+              jobTitle: result.role || prev.onboarding.jobTitle,
               email: result.email || prev.onboarding.email,
-              industry: result.industry || prev.onboarding.industry
+              bio: result.bio || prev.onboarding.bio,
+              industry: result.industry || prev.onboarding.industry,
+              name: result.name || prev.onboarding.name,
+              role: result.role || prev.onboarding.role
             },
             accomplishments: result.accomplishments && result.accomplishments.length > 0 
               ? result.accomplishments.slice(0, 3).concat(Array(Math.max(0, 3 - result.accomplishments.length)).fill({ title: '', description: '' }))
@@ -462,18 +874,51 @@ export function SparkwavvApp() {
     if (step === 'processing') {
       const process = async () => {
         setLoading(true);
+        
+        // Generate Summary
         const result = await generateDiscoverySummary(userData);
-        setSummary(result);
+        
+        // Generate Brand Image (Movie Poster)
+        const posterPrompt = `A high-end, cinematic professional movie poster for a person named ${userData.onboarding.name}. 
+          Vibe: ${posterVibe}. 
+          Tagline: ${userData.tagline}. 
+          Attributes: ${userData.attributes.join(', ')}. 
+          The style should be modern, professional, and visually striking.`;
+        
+        try {
+          const brandImage = await generateBrandImage(posterPrompt);
+          if (brandImage) {
+            setUserData(prev => ({ ...prev, brandImage }));
+          }
+        } catch (e) {
+          console.error("Error generating brand image:", e);
+        }
+
+        if (!result) {
+          console.warn("Using fallback summary due to API error");
+          setSummary({
+            brandPortrait: "A visionary leader transforming the career landscape through AI and human-centric design.",
+            strengths: ["Strategic Thinking", "Technical Innovation", "Empathetic Leadership"],
+            careerClusters: ["AI Product Management", "Career Technology Strategy"],
+            nextExperiments: ["Launch a beta testing group", "Publish a whitepaper on AI in careers"],
+            nextSteps: [
+              { title: "Review Your Brand", description: "Take a moment to reflect on your new brand portrait.", actionLabel: "Review" },
+              { title: "Share Your Success", description: "Let others know about your SPARKWavv journey.", actionLabel: "Share" }
+            ]
+          });
+        } else {
+          setSummary(result);
+        }
         setLoading(false);
         setStep('results');
       };
       process();
     }
-  }, [step, userData]);
+  }, [step, userData, posterVibe]);
 
   return (
     <div 
-      className="min-h-screen selection:bg-neon-cyan selection:text-black relative transition-all duration-1000"
+      className="min-h-screen selection:bg-neon-cyan selection:text-black relative transition-all duration-1000 overflow-x-hidden"
       style={userData.brandImage ? {
         backgroundImage: `linear-gradient(to bottom, rgba(10, 10, 10, 0.8), rgba(10, 10, 10, 0.95)), url(${userData.brandImage})`,
         backgroundSize: 'cover',
@@ -481,9 +926,28 @@ export function SparkwavvApp() {
         backgroundAttachment: 'fixed'
       } : {}}
     >
-      <header>
+      <AnimatePresence>
+        {showToast && (
+          <Toast 
+            message={showToast.message} 
+            type={showToast.type} 
+            onClose={() => setShowToast(null)} 
+          />
+        )}
+      </AnimatePresence>
+
+      {/* Atmospheric Background */}
+      <div className="fixed inset-0 pointer-events-none overflow-hidden z-0">
+        <div className="atmosphere absolute inset-[-100px]" />
+      </div>
+
+      <ProgressRail step={step} />
+
+      <header className="relative z-10">
         <NavBar onNavigate={(s) => {
-          if (s === 'onboarding') {
+          if (s === 'login') {
+            setStep('login');
+          } else if (s === 'onboarding') {
             if (isConfirmed) {
               setStep('module1');
             } else {
@@ -493,29 +957,31 @@ export function SparkwavvApp() {
             setStep(s as Step);
           }
         }} />
+        <VerificationBanner 
+          user={user} 
+          onResend={async () => {
+            if (auth?.currentUser) {
+              await sendEmailVerification(auth.currentUser);
+              setRegistrationMessage("Verification email resent!");
+              setTimeout(() => setRegistrationMessage(null), 3000);
+            }
+          }} 
+        />
       </header>
       <ProgressBar current={['landing', 'onboarding', 'module1', 'module2', 'module3', 'module4', 'module5', 'processing', 'results'].indexOf(step)} total={8} />
       
       <div className="flex flex-col min-h-screen">
-        <main className="flex-grow max-w-7xl mx-auto px-6 pt-48 pb-32">
+        <main className="flex-grow pt-24">
           <AnimatePresence mode="wait">
           {step === 'landing' && (
-            <motion.div 
-              key="landing"
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -20 }}
-              className="text-center space-y-8"
-            >
-              {isConfirmed && (
-                <motion.div 
-                  initial={{ opacity: 0, scale: 0.95 }}
-                  animate={{ opacity: 1, scale: 1 }}
-                  className="max-w-2xl mx-auto p-6 rounded-2xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-500 text-center font-bold mb-8"
-                >
-                  Registration Confirmed! You can now login to continue your journey.
-                </motion.div>
-              )}
+            <div className="space-y-0">
+              <CinematicIntro />
+              <motion.div 
+                key="landing"
+                initial={{ opacity: 0 }}
+                whileInView={{ opacity: 1 }}
+                className="text-center space-y-8 pt-8 pb-32 px-6 max-w-7xl mx-auto"
+              >
               {errors.general && (
                 <motion.div 
                   initial={{ opacity: 0, scale: 0.95 }}
@@ -539,80 +1005,93 @@ export function SparkwavvApp() {
               <p className="text-xl text-white/60 max-w-2xl mx-auto leading-relaxed">
                 A meticulously engineered career branding framework. Move from "overwhelmed" to "market dominant" through cinematic self-discovery.
               </p>
-              <p className="text-xl text-white/60 max-w-2xl mx-auto leading-relaxed mt-4">
-                The next-gen AI-powered career wellness platform that transforms job searching into a personalized journey to career happiness, with smart guidance every step of the way.
-              </p>
               <div className="flex flex-col sm:flex-row items-center justify-center gap-4 pt-8">
-                {hasSavedProgress ? (
-                  <>
-                    <Button onClick={resumeJourney} variant="neon" className="w-full sm:w-auto text-lg px-12 py-4">
-                      Resume Journey <ArrowRight className="w-5 h-5" />
+                {!isConfirmed && (
+                  <div className="flex flex-col sm:flex-row gap-4 w-full sm:w-auto">
+                    <Button 
+                      onClick={nextStep} 
+                      variant="neon" 
+                      className="w-full sm:w-auto text-lg px-12 py-4"
+                    >
+                      Dive-In <ArrowRight className="w-5 h-5" />
                     </Button>
-                    <Button onClick={() => setShowStartOverConfirm(true)} variant="outline" className="w-full sm:w-auto text-lg px-12 py-4">
-                      Dive-In/Start
-                    </Button>
-                  </>
-                ) : isConfirmed ? (
-                  <Button onClick={() => setStep('module1')} variant="neon" className="w-full sm:w-auto text-lg px-12 py-4">
-                    Continue to Module 1 <ArrowRight className="w-5 h-5" />
-                  </Button>
-                ) : (
-                  <Button onClick={nextStep} variant="neon" className="w-full sm:w-auto text-lg px-12 py-4">
-                    Begin Ignition <ArrowRight className="w-5 h-5" />
-                  </Button>
+                    {hasSavedProgress && (
+                      <div className="flex flex-col items-center gap-2">
+                        <Button 
+                          onClick={resumeJourney} 
+                          variant="outline" 
+                          className="w-full sm:w-auto text-lg px-12 py-4 border-neon-cyan/20 text-neon-cyan/60 hover:text-neon-cyan"
+                        >
+                          Resume Journey
+                        </Button>
+                        {lastSaved && (
+                          <p className="text-[10px] text-white/30 italic">Last saved: {lastSaved}</p>
+                        )}
+                      </div>
+                    )}
+                  </div>
                 )}
                 <p className="text-sm text-white/40">2-4 weeks to total clarity</p>
               </div>
-
-              {/* Hero Section with 3 Panels */}
-              <div className="pt-20">
-                <Hero />
-              </div>
-
-              {/* Start Over Confirmation Modal */}
-              <AnimatePresence>
-                {showStartOverConfirm && (
-                  <div className="fixed inset-0 z-50 flex items-center justify-center p-6 bg-black/80 backdrop-blur-sm">
-                    <motion.div 
-                      initial={{ opacity: 0, scale: 0.9 }}
-                      animate={{ opacity: 1, scale: 1 }}
-                      exit={{ opacity: 0, scale: 0.9 }}
-                      className="glass-panel max-w-md w-full p-8 space-y-6 border-red-500/30"
-                    >
-                      <div className="flex flex-col items-center text-center space-y-4">
-                        <div className="w-16 h-16 rounded-full bg-red-500/10 flex items-center justify-center">
-                          <ShieldAlert className="w-8 h-8 text-red-500" />
-                        </div>
-                        <div className="space-y-2">
-                          <h3 className="text-2xl font-bold text-white">Warning</h3>
-                          <p className="text-white/60">ALL Previous Information Will Be Deleted. This action cannot be undone.</p>
-                        </div>
-                      </div>
-                      <div className="flex flex-col gap-3">
-                        <Button 
-                          onClick={() => {
-                            startOver();
-                            setShowStartOverConfirm(false);
-                          }} 
-                          variant="neon" 
-                          className="w-full bg-red-500 hover:bg-red-600 border-red-500 text-white shadow-[0_0_20px_rgba(239,68,68,0.3)]"
-                        >
-                          Confirmation: Dive-In/Start
-                        </Button>
-                        <Button 
-                          onClick={() => setShowStartOverConfirm(false)} 
-                          variant="secondary" 
-                          className="w-full"
-                        >
-                          Cancel
-                        </Button>
-                      </div>
-                    </motion.div>
-                  </div>
-                )}
-              </AnimatePresence>
             </motion.div>
-          )}
+
+            <BrainModel />
+            <Roadmap />
+
+            <div className="py-24 text-center">
+              <Button 
+                onClick={nextStep} 
+                variant="neon" 
+                className="text-xl px-16 py-6 rounded-full shadow-[0_0_30px_rgba(0,255,255,0.3)]"
+              >
+                Start Your Dive-In Now
+              </Button>
+            </div>
+
+            {/* Start Over Confirmation Modal */}
+            <AnimatePresence>
+              {showStartOverConfirm && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center p-6 bg-black/80 backdrop-blur-sm">
+                  <motion.div 
+                    initial={{ opacity: 0, scale: 0.9 }}
+                    animate={{ opacity: 1, scale: 1 }}
+                    exit={{ opacity: 0, scale: 0.9 }}
+                    className="glass-panel max-w-md w-full p-8 space-y-6 border-red-500/30"
+                  >
+                    <div className="flex flex-col items-center text-center space-y-4">
+                      <div className="w-16 h-16 rounded-full bg-red-500/10 flex items-center justify-center">
+                        <ShieldAlert className="w-8 h-8 text-red-500" />
+                      </div>
+                      <div className="space-y-2">
+                        <h3 className="text-2xl font-bold text-white">Warning</h3>
+                        <p className="text-white/60">ALL Previous Information Will Be Deleted. This action cannot be undone.</p>
+                      </div>
+                    </div>
+                    <div className="flex flex-col gap-3">
+                      <Button 
+                        onClick={() => {
+                          startOver();
+                          setShowStartOverConfirm(false);
+                        }} 
+                        variant="neon" 
+                        className="w-full bg-red-500 hover:bg-red-600 border-red-500 text-white shadow-[0_0_20px_rgba(239,68,68,0.3)]"
+                      >
+                        Confirmation: Dive-In/Start
+                      </Button>
+                      <Button 
+                        onClick={() => setShowStartOverConfirm(false)} 
+                        variant="secondary" 
+                        className="w-full"
+                      >
+                        Cancel
+                      </Button>
+                    </div>
+                  </motion.div>
+                </div>
+              )}
+            </AnimatePresence>
+          </div>
+        )}
 
           {step === 'product-skylar' && (
             <motion.div 
@@ -620,7 +1099,7 @@ export function SparkwavvApp() {
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: -20 }}
-              className="space-y-12 text-center"
+              className="max-w-4xl mx-auto px-6 space-y-12 text-center pb-24"
             >
               <header className="space-y-4">
                 <h2 className="text-5xl font-bold">Skylar</h2>
@@ -639,14 +1118,14 @@ export function SparkwavvApp() {
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: -20 }}
-              className="space-y-12 text-center"
+              className="max-w-4xl mx-auto px-6 space-y-12 text-center pb-24"
             >
               <header className="space-y-4">
                 <h2 className="text-5xl font-bold">Features</h2>
-                <p className="text-neon-cyan font-display uppercase tracking-widest">The Sparkwavv Toolkit</p>
+                <p className="text-neon-cyan font-display uppercase tracking-widest">The SPARKWavv Toolkit</p>
               </header>
               <div className="glass-panel p-12 border-neon-cyan/20">
-                <p className="text-xl text-white/60">Placeholder for Sparkwavv's feature showcase. Coming soon.</p>
+                <p className="text-xl text-white/60">Placeholder for SPARKWavv's feature showcase. Coming soon.</p>
               </div>
               <Button onClick={() => setStep('landing')} variant="outline">Back to Home</Button>
             </motion.div>
@@ -658,14 +1137,14 @@ export function SparkwavvApp() {
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: -20 }}
-              className="space-y-12 text-center"
+              className="max-w-4xl mx-auto px-6 space-y-12 text-center pb-24"
             >
               <header className="space-y-4">
                 <h2 className="text-5xl font-bold">Technology</h2>
                 <p className="text-neon-cyan font-display uppercase tracking-widest">The Engine Behind the Wave</p>
               </header>
               <div className="glass-panel p-12 border-neon-cyan/20">
-                <p className="text-xl text-white/60">Placeholder for Sparkwavv's technology deep-dive. Coming soon.</p>
+                <p className="text-xl text-white/60">Placeholder for SPARKWavv's technology deep-dive. Coming soon.</p>
               </div>
               <Button onClick={() => setStep('landing')} variant="outline">Back to Home</Button>
             </motion.div>
@@ -677,13 +1156,13 @@ export function SparkwavvApp() {
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: -20 }}
-              className="space-y-12 text-center"
+              className="max-w-4xl mx-auto px-6 space-y-12 text-center pb-24"
             >
               <header className="space-y-4">
                 <h2 className="text-5xl font-bold">Wavvault</h2>
                 <p className="text-neon-cyan font-display uppercase tracking-widest">Secure Career Asset Storage</p>
               </header>
-              <div className="glass-panel p-12 border-neon-cyan/20">
+              <div className="glass-panel p-12 border-neon-cyan/20 bg-black/40 backdrop-blur-xl rounded-3xl">
                 <p className="text-xl text-white/60">Placeholder for Wavvault's secure storage features. Coming soon.</p>
               </div>
               <Button onClick={() => setStep('landing')} variant="outline">Back to Home</Button>
@@ -696,14 +1175,14 @@ export function SparkwavvApp() {
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: -20 }}
-              className="space-y-12 text-center"
+              className="max-w-4xl mx-auto px-6 space-y-12 text-center pb-24"
             >
               <header className="space-y-4">
                 <h2 className="text-5xl font-bold">Vision</h2>
                 <p className="text-neon-cyan font-display uppercase tracking-widest">The Future of Career Wellness</p>
               </header>
               <div className="glass-panel p-12 border-neon-cyan/20">
-                <p className="text-xl text-white/60">Placeholder for Sparkwavv's vision. Coming soon.</p>
+                <p className="text-xl text-white/60">Placeholder for SPARKWavv's vision. Coming soon.</p>
               </div>
               <Button onClick={() => setStep('landing')} variant="outline">Back to Home</Button>
             </motion.div>
@@ -715,7 +1194,7 @@ export function SparkwavvApp() {
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: -20 }}
-              className="space-y-12 text-center"
+              className="max-w-4xl mx-auto px-6 space-y-12 text-center pb-24"
             >
               <header className="space-y-4">
                 <h2 className="text-5xl font-bold">About Us</h2>
@@ -734,7 +1213,7 @@ export function SparkwavvApp() {
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: -20 }}
-              className="space-y-12 text-center"
+              className="max-w-4xl mx-auto px-6 space-y-12 text-center pb-24"
             >
               <header className="space-y-4">
                 <h2 className="text-5xl font-bold">Investors</h2>
@@ -753,7 +1232,7 @@ export function SparkwavvApp() {
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: -20 }}
-              className="space-y-12 text-center"
+              className="max-w-4xl mx-auto px-6 space-y-12 text-center pb-24"
             >
               <header className="space-y-4">
                 <h2 className="text-5xl font-bold">Give a Little</h2>
@@ -772,7 +1251,7 @@ export function SparkwavvApp() {
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: -20 }}
-              className="space-y-12 text-center"
+              className="max-w-4xl mx-auto px-6 space-y-12 text-center pb-24"
             >
               <header className="space-y-4">
                 <h2 className="text-5xl font-bold">Testimonials</h2>
@@ -785,184 +1264,608 @@ export function SparkwavvApp() {
             </motion.div>
           )}
 
+          {step === 'login' && (
+            <motion.div 
+              key="login"
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.95 }}
+              className="max-w-xl mx-auto px-6 space-y-12 pb-24"
+            >
+              <header className="text-center space-y-4">
+                <div className="w-16 h-16 rounded-2xl bg-neon-cyan/10 border border-neon-cyan/30 flex items-center justify-center mx-auto mb-6">
+                  <Lock className="w-8 h-8 text-neon-cyan" />
+                </div>
+                <h2 className="text-4xl font-bold">Dashboard Login</h2>
+                <p className="text-white/60">Enter your credentials to access your career dashboard.</p>
+              </header>
+
+              {authStatus === 'ready' ? (
+                <div className="glass-panel p-12 flex flex-col items-center justify-center space-y-6">
+                  <Loader2 className="w-12 h-12 text-neon-cyan animate-spin" />
+                  <div className="text-center space-y-2">
+                    <p className="text-xl font-bold">Authentication Successful</p>
+                    <p className="text-white/40 text-sm uppercase tracking-widest animate-pulse">Redirecting to your dashboard...</p>
+                  </div>
+                </div>
+              ) : (
+                <div className="glass-panel p-8 space-y-6">
+                  <div className="space-y-4">
+                    <div className="space-y-2">
+                      <label className="text-sm font-medium text-white/40 uppercase tracking-wider">Email Address</label>
+                      <input 
+                        type="email" 
+                        className={`w-full bg-white/5 border rounded-xl px-4 py-3 focus:outline-none transition-colors ${errors.email ? 'border-red-500' : 'border-white/10 focus:border-neon-cyan'}`}
+                        placeholder="michael.t@testcrm.com"
+                        value={userData.onboarding.email}
+                        onChange={(e) => setUserData({...userData, onboarding: {...userData.onboarding, email: e.target.value}})}
+                      />
+                      {errors.email && <p className="text-xs text-red-500 mt-1">{errors.email}</p>}
+                    </div>
+                    <div className="space-y-2">
+                      <label className="text-sm font-medium text-white/40 uppercase tracking-wider">Password</label>
+                      <input 
+                        type="password" 
+                        className={`w-full bg-white/5 border rounded-xl px-4 py-3 focus:outline-none transition-colors ${errors.password ? 'border-red-500' : 'border-white/10 focus:border-neon-cyan'}`}
+                        placeholder="••••••••"
+                        value={userData.onboarding.password}
+                        onChange={(e) => setUserData({...userData, onboarding: {...userData.onboarding, password: e.target.value}})}
+                      />
+                      {errors.password && <p className="text-xs text-red-500 mt-1">{errors.password}</p>}
+                    </div>
+                  </div>
+
+                  {errors.general && (
+                    <div className="p-4 rounded-xl bg-red-500/10 border border-red-500/30 text-red-500 text-sm font-bold text-center">
+                      {errors.general}
+                    </div>
+                  )}
+
+                  <div className="flex flex-col gap-4">
+                    <Button 
+                      onClick={handleLogin} 
+                      loading={isRegistering}
+                      className="w-full"
+                    >
+                      Login to Dashboard <ArrowRight className="w-5 h-5" />
+                    </Button>
+                    
+                    <div className="relative py-4">
+                      <div className="absolute inset-0 flex items-center"><div className="w-full border-t border-white/10"></div></div>
+                      <div className="relative flex justify-center text-xs uppercase"><span className="bg-black px-2 text-white/40">Or continue with</span></div>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-4">
+                      <button 
+                        onClick={() => handleSocialLogin('google')}
+                        className="flex items-center justify-center gap-2 px-4 py-3 rounded-xl bg-white/5 border border-white/10 hover:bg-white/10 transition-all"
+                      >
+                        <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" className="w-5 h-5" alt="Google" />
+                        <span className="text-sm font-medium">Google</span>
+                      </button>
+                      <button 
+                        onClick={() => handleSocialLogin('linkedin')}
+                        className="flex items-center justify-center gap-2 px-4 py-3 rounded-xl bg-white/5 border border-white/10 hover:bg-white/10 transition-all"
+                      >
+                        <svg viewBox="0 0 24 24" className="w-5 h-5 fill-[#0077b5]"><path d="M19 0h-14c-2.761 0-5 2.239-5 5v14c0 2.761 2.239 5 5 5h14c2.762 0 5-2.239 5-5v-14c0-2.761-2.238-5-5-5zm-11 19h-3v-11h3v11zm-1.5-12.268c-.966 0-1.75-.79-1.75-1.764s.784-1.764 1.75-1.764 1.75.79 1.75 1.764-.783 1.764-1.75 1.764zm13.5 12.268h-3v-5.604c0-3.368-4-3.113-4 0v5.604h-3v-11h3v1.765c1.396-2.586 7-2.777 7 2.476v6.759z"/></svg>
+                        <span className="text-sm font-medium">LinkedIn</span>
+                      </button>
+                    </div>
+
+                    <div className="relative py-4">
+                      <div className="absolute inset-0 flex items-center"><div className="w-full border-t border-white/10"></div></div>
+                      <div className="relative flex justify-center text-xs uppercase"><span className="bg-black px-2 text-white/40">Demo Accounts (Evaluation)</span></div>
+                    </div>
+
+                    <div className="grid grid-cols-1 gap-2">
+                      {CONFIRMED_USERS.slice(0, 3).map((mock) => (
+                        <button
+                          key={mock.userId}
+                          disabled={isRegistering}
+                          onClick={() => {
+                            setIsRegistering(true);
+                            setErrors({});
+                            loginAsMockUser(mock);
+                          }}
+                          className="flex items-center justify-between px-4 py-3 rounded-xl bg-neon-cyan/5 border border-neon-cyan/20 hover:bg-neon-cyan/10 transition-all group disabled:opacity-50 disabled:cursor-not-allowed"
+                        >
+                          <div className="text-left">
+                            <p className="text-sm font-bold text-white group-hover:text-neon-cyan transition-colors">{mock.firstName} {mock.lastName}</p>
+                            <p className="text-[10px] text-white/40 uppercase tracking-wider">{mock.jobTitle}</p>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <span className="text-[10px] px-2 py-0.5 rounded-full bg-neon-cyan/10 text-neon-cyan border border-neon-cyan/20">{mock.journeyStage}</span>
+                            <ArrowRight className="w-4 h-4 text-neon-cyan opacity-0 group-hover:opacity-100 transition-all transform translate-x-[-10px] group-hover:translate-x-0" />
+                          </div>
+                        </button>
+                      ))}
+                    </div>
+
+                    <div className="flex justify-between items-center pt-4">
+                      <button 
+                        onClick={() => setStep('forgot-password')}
+                        className="text-neon-cyan text-sm font-bold hover:underline transition-all flex items-center gap-1"
+                      >
+                        <Lock className="w-3 h-3" /> Forgot Password?
+                      </button>
+                      <button 
+                        onClick={() => setStep('onboarding')}
+                        className="text-white/40 text-sm hover:text-white transition-colors"
+                      >
+                        Don't have an account? Start Dive-In
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </motion.div>
+          )}
+
+          {step === 'forgot-password' && (
+            <motion.div 
+              key="forgot-password"
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.95 }}
+              className="max-w-xl mx-auto px-6 space-y-12 pb-24"
+            >
+              <header className="text-center space-y-4">
+                <div className="w-16 h-16 rounded-2xl bg-neon-cyan/10 border border-neon-cyan/30 flex items-center justify-center mx-auto mb-6">
+                  <Mail className="w-8 h-8 text-neon-cyan" />
+                </div>
+                <h2 className="text-4xl font-bold">Reset Password</h2>
+                <p className="text-white/60">Enter your email and we'll send you a link to reset your password.</p>
+              </header>
+
+              <div className="glass-panel p-8 space-y-6">
+                <div className="space-y-4">
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium text-white/40 uppercase tracking-wider">Email Address</label>
+                    <input 
+                      type="email" 
+                      className={`w-full bg-white/5 border rounded-xl px-4 py-3 focus:outline-none transition-colors ${errors.forgotPassword ? 'border-red-500' : 'border-white/10 focus:border-neon-cyan'}`}
+                      placeholder="michael.t@testcrm.com"
+                      value={forgotPasswordEmail}
+                      onChange={(e) => setForgotPasswordEmail(e.target.value)}
+                    />
+                    {errors.forgotPassword && <p className="text-xs text-red-500 mt-1">{errors.forgotPassword}</p>}
+                  </div>
+                </div>
+
+                {registrationMessage && (
+                  <div className="p-4 rounded-xl bg-green-500/10 border border-green-500/30 text-green-500 text-sm font-bold text-center">
+                    {registrationMessage}
+                  </div>
+                )}
+
+                <div className="flex flex-col gap-4">
+                  <Button 
+                    onClick={() => handleForgotPassword(forgotPasswordEmail)} 
+                    loading={loading}
+                    className="w-full"
+                  >
+                    Send Reset Link
+                  </Button>
+                  <button 
+                    onClick={() => setStep('login')}
+                    className="text-white/40 text-sm hover:text-neon-cyan transition-colors"
+                  >
+                    Back to Login
+                  </button>
+                </div>
+              </div>
+            </motion.div>
+          )}
+
+          {step === 'settings' && user && (
+            <motion.div 
+              key="settings"
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -20 }}
+              className="max-w-4xl mx-auto px-6 space-y-12 pb-24"
+            >
+              <header className="flex items-center justify-between">
+                <div className="space-y-2">
+                  <h2 className="text-4xl font-bold">Account Settings</h2>
+                  <p className="text-white/60">Manage your profile and security preferences.</p>
+                </div>
+                <Button onClick={() => setStep('landing')} variant="outline">Back to Home</Button>
+              </header>
+
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+                <div className="md:col-span-1 space-y-4">
+                  <div className="glass-panel p-6 text-center space-y-4">
+                    <div className="w-24 h-24 rounded-full bg-neon-cyan/10 border-2 border-neon-cyan/30 flex items-center justify-center mx-auto relative group">
+                      {user.photoURL ? (
+                        <img src={user.photoURL} alt="Profile" className="w-full h-full rounded-full object-cover" />
+                      ) : (
+                        <span className="text-3xl font-bold text-neon-cyan">{user.email?.[0].toUpperCase()}</span>
+                      )}
+                      <button className="absolute inset-0 bg-black/60 rounded-full opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                        <Camera className="w-6 h-6 text-white" />
+                      </button>
+                    </div>
+                    <div>
+                      <h3 className="font-bold text-lg">{user.displayName || 'SPARKWavv User'}</h3>
+                      <p className="text-sm text-white/40">{user.email}</p>
+                    </div>
+                  </div>
+
+                  <nav className="glass-panel overflow-hidden">
+                    <button className="w-full px-6 py-4 text-left text-neon-cyan bg-white/5 border-l-2 border-neon-cyan font-medium">Profile & Security</button>
+                    <button className="w-full px-6 py-4 text-left text-white/60 hover:bg-white/5 transition-colors">Notifications</button>
+                    <button className="w-full px-6 py-4 text-left text-white/60 hover:bg-white/5 transition-colors">Billing</button>
+                  </nav>
+                </div>
+
+                <div className="md:col-span-2 space-y-8">
+                  <section className="glass-panel p-8 space-y-6">
+                    <h3 className="text-xl font-bold flex items-center gap-2">
+                      <Fingerprint className="w-5 h-5 text-neon-cyan" /> Profile Information
+                    </h3>
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="space-y-2">
+                        <label className="text-xs font-medium text-white/40 uppercase">Display Name</label>
+                        <input 
+                          type="text" 
+                          defaultValue={user.displayName || ''}
+                          className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-2 focus:outline-none focus:border-neon-cyan transition-colors"
+                          id="settings-display-name"
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <label className="text-xs font-medium text-white/40 uppercase">Email Address</label>
+                        <input 
+                          type="email" 
+                          value={user.email || ''}
+                          disabled
+                          className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-2 opacity-50 cursor-not-allowed"
+                        />
+                      </div>
+                    </div>
+                    <Button 
+                      onClick={async () => {
+                        const name = (document.getElementById('settings-display-name') as HTMLInputElement).value;
+                        if (auth?.currentUser) {
+                          await updateProfile(auth.currentUser, { displayName: name });
+                          setRegistrationMessage("Profile updated successfully!");
+                          setTimeout(() => setRegistrationMessage(null), 3000);
+                        }
+                      }}
+                      variant="secondary"
+                    >
+                      Save Changes
+                    </Button>
+                  </section>
+
+                  <section className="glass-panel p-8 space-y-6">
+                    <h3 className="text-xl font-bold flex items-center gap-2">
+                      <Lock className="w-5 h-5 text-neon-cyan" /> Security
+                    </h3>
+                    <div className="space-y-4">
+                      <div className="space-y-2">
+                        <label className="text-xs font-medium text-white/40 uppercase">New Password</label>
+                        <input 
+                          type="password" 
+                          placeholder="••••••••"
+                          className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-2 focus:outline-none focus:border-neon-cyan transition-colors"
+                          id="settings-new-password"
+                        />
+                      </div>
+                      <Button 
+                        onClick={async () => {
+                          const pwd = (document.getElementById('settings-new-password') as HTMLInputElement).value;
+                          if (auth?.currentUser && pwd) {
+                            try {
+                              await updatePassword(auth.currentUser, pwd);
+                              setRegistrationMessage("Password updated successfully!");
+                              (document.getElementById('settings-new-password') as HTMLInputElement).value = '';
+                              setTimeout(() => setRegistrationMessage(null), 3000);
+                            } catch (e: any) {
+                              setErrors({ settings: e.message });
+                            }
+                          }
+                        }}
+                        variant="secondary"
+                      >
+                        Update Password
+                      </Button>
+                    </div>
+                  </section>
+
+                  <section className="glass-panel p-8 border-red-500/20 space-y-6">
+                    <h3 className="text-xl font-bold text-red-500">Danger Zone</h3>
+                    <p className="text-white/60 text-sm">Once you delete your account, there is no going back. Please be certain.</p>
+                    <Button 
+                      onClick={async () => {
+                        if (window.confirm("Are you absolutely sure? This action cannot be undone.") && auth?.currentUser) {
+                          await deleteUser(auth.currentUser);
+                          setStep('landing');
+                        }
+                      }}
+                      className="bg-red-500/10 text-red-500 border border-red-500/30 hover:bg-red-500/20"
+                    >
+                      Delete Account
+                    </Button>
+                  </section>
+                </div>
+              </div>
+            </motion.div>
+          )}
+
           {step === 'onboarding' && (
             <motion.div 
               key="onboarding"
               initial={{ opacity: 0, x: 20 }}
               animate={{ opacity: 1, x: 0 }}
               exit={{ opacity: 0, x: -20 }}
-              className="space-y-12"
+              className="max-w-4xl mx-auto px-6 space-y-12 pb-24"
             >
-              <header className="space-y-4">
-                <h2 className="text-4xl font-bold">Phase 0: Dive-In</h2>
-                <p className="text-white/60">Let's Dive-In, and get started with building your Sparkwavv Profile</p>
+              <header className="space-y-4 text-center">
+                <h2 className="text-4xl font-bold">Let's Dive-In, and get started with building your SPARKWavv Profile</h2>
               </header>
               
               <div className="space-y-6">
-                <div className="space-y-4">
-                  {uploadedFileName && (
-                    <div className="flex items-center gap-2 px-4 py-2 rounded-lg bg-neon-cyan/10 border border-neon-cyan/20 text-neon-cyan text-sm w-fit mx-auto">
-                      <FileUp className="w-4 h-4" />
-                      <span className="font-medium">{uploadedFileName}</span>
-                    </div>
-                  )}
-                  <div className="glass-panel p-8 border-dashed border-2 border-white/10 hover:border-neon-cyan/40 transition-all group relative">
-                    <input 
-                      type="file" 
-                      className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10" 
-                      accept=".pdf,.doc,.docx,text/plain"
-                      onChange={handleFileUpload}
-                    />
-                    <div className="flex flex-col items-center justify-center space-y-4 py-4">
-                      {parsingResume ? (
-                        <>
-                          <Loader2 className="w-10 h-10 text-neon-cyan animate-spin" />
-                          <p className="text-neon-cyan font-medium animate-pulse">Analyzing Resume...</p>
-                        </>
-                      ) : (
-                        <>
-                          <div className="w-16 h-16 rounded-full bg-white/5 flex items-center justify-center group-hover:bg-neon-cyan/10 transition-colors">
-                            <Upload className="w-8 h-8 text-white/40 group-hover:text-neon-cyan transition-colors" />
-                          </div>
-                          <div className="text-center">
-                            <p className="text-lg font-medium">Upload Resume</p>
-                            <p className="text-sm text-white/40">PDF, DOCX or TXT (Max 5MB)</p>
-                          </div>
-                        </>
-                      )}
-                    </div>
-                  </div>
-                </div>
-
-                <div className="relative flex items-center py-4">
-                  <div className="flex-grow border-t border-white/10"></div>
-                  <span className="flex-shrink mx-4 text-white/20 text-xs uppercase tracking-widest">Or fill manually</span>
-                  <div className="flex-grow border-t border-white/10"></div>
-                </div>
-
                 <div className="glass-panel p-8 space-y-6">
-                <div className="space-y-2">
-                  <div className="flex justify-between">
-                    <label className="text-sm font-medium text-white/40 uppercase tracking-wider">Full Name</label>
-                    <span className={`text-[10px] ${userData.onboarding.name.length > 50 ? 'text-red-500' : 'text-white/20'}`}>
-                      {userData.onboarding.name.length}/50
-                    </span>
+                  <div className="space-y-6">
+                    <h3 className="text-2xl font-bold text-center text-neon-cyan">SPARKWavv Account Registration</h3>
+                    <div className="p-4 rounded-xl bg-white/5 border border-white/10 space-y-3">
+                      <div className="flex items-start gap-3">
+                        <ShieldCheck className="w-5 h-5 text-neon-cyan mt-0.5" />
+                        <div className="space-y-1">
+                          <p className="text-sm font-medium text-white">Confidentiality Statement</p>
+                          <p className="text-xs text-white/60">Your information is kept strictly confidential and used only for your SPARKWavv profile and career guidance.</p>
+                        </div>
+                      </div>
+                      <div className="flex items-start gap-3">
+                        <Mail className="w-5 h-5 text-neon-magenta mt-0.5" />
+                        <div className="space-y-1">
+                          <p className="text-sm font-medium text-white">Account Activation</p>
+                          <p className="text-xs text-white/60">Please reply to the confirmation email to activate your SPARKWavv account.</p>
+                        </div>
+                      </div>
+                    </div>
                   </div>
-                  <input 
-                    type="text" 
-                    className={`w-full bg-white/5 border rounded-xl px-4 py-3 focus:outline-none transition-colors ${errors.name ? 'border-red-500' : 'border-white/10 focus:border-neon-cyan'}`}
-                    placeholder="Alex Chen"
-                    value={userData.onboarding.name}
-                    onChange={(e) => setUserData({...userData, onboarding: {...userData.onboarding, name: e.target.value}})}
-                  />
-                  {errors.name && <p className="text-xs text-red-500 mt-1">{errors.name}</p>}
-                </div>
 
-                <div className="space-y-2">
-                  <div className="flex justify-between">
-                    <label className="text-sm font-medium text-white/40 uppercase tracking-wider">Email Address (Required)</label>
-                    <Mail className="w-3 h-3 text-white/20" />
-                  </div>
-                  <input 
-                    type="email" 
-                    className={`w-full bg-white/5 border rounded-xl px-4 py-3 focus:outline-none transition-colors ${errors.email ? 'border-red-500' : 'border-white/10 focus:border-neon-cyan'}`}
-                    placeholder="alex@example.com"
-                    value={userData.onboarding.email || ''}
-                    onChange={(e) => setUserData({...userData, onboarding: {...userData.onboarding, email: e.target.value}})}
-                  />
-                  {errors.email && <p className="text-xs text-red-500 mt-1">{errors.email}</p>}
-                </div>
+                  <div className="space-y-6">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                      <div className="space-y-2">
+                        <label className="text-sm font-medium text-white/40 uppercase tracking-wider">First Name</label>
+                        <input 
+                          type="text" 
+                          className={`w-full bg-white/5 border rounded-xl px-4 py-3 focus:outline-none transition-colors ${errors.firstName ? 'border-red-500' : 'border-white/10 focus:border-neon-cyan'}`}
+                          placeholder="Michael"
+                          value={userData.onboarding.firstName}
+                          onChange={(e) => setUserData({...userData, onboarding: {...userData.onboarding, firstName: e.target.value}})}
+                        />
+                        {errors.firstName && <p className="text-xs text-red-500 mt-1">{errors.firstName}</p>}
+                      </div>
+                      <div className="space-y-2">
+                        <label className="text-sm font-medium text-white/40 uppercase tracking-wider">Last Name</label>
+                        <input 
+                          type="text" 
+                          className={`w-full bg-white/5 border rounded-xl px-4 py-3 focus:outline-none transition-colors ${errors.lastName ? 'border-red-500' : 'border-white/10 focus:border-neon-cyan'}`}
+                          placeholder="T."
+                          value={userData.onboarding.lastName}
+                          onChange={(e) => setUserData({...userData, onboarding: {...userData.onboarding, lastName: e.target.value}})}
+                        />
+                        {errors.lastName && <p className="text-xs text-red-500 mt-1">{errors.lastName}</p>}
+                      </div>
+                    </div>
 
-                <div className="space-y-2">
-                  <div className="flex justify-between">
-                    <label className="text-sm font-medium text-white/40 uppercase tracking-wider">Industry</label>
-                    <Compass className="w-3 h-3 text-white/20" />
-                  </div>
-                  <select 
-                    className={`w-full bg-white/5 border rounded-xl px-4 py-3 focus:outline-none transition-colors appearance-none ${errors.industry ? 'border-red-500' : 'border-white/10 focus:border-neon-cyan'}`}
-                    value={userData.onboarding.industry}
-                    onChange={(e) => setUserData({...userData, onboarding: {...userData.onboarding, industry: e.target.value}})}
-                  >
-                    <option value="" disabled className="bg-dark-bg text-white/40">Select your industry</option>
-                    {INDUSTRIES.map(industry => (
-                      <option key={industry} value={industry} className="bg-dark-bg text-white">{industry}</option>
-                    ))}
-                  </select>
-                  {errors.industry && <p className="text-xs text-red-500 mt-1">{errors.industry}</p>}
-                </div>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                      <div className="space-y-2">
+                        <label className="text-sm font-medium text-white/40 uppercase tracking-wider">Job Title</label>
+                        <input 
+                          type="text" 
+                          className={`w-full bg-white/5 border rounded-xl px-4 py-3 focus:outline-none transition-colors ${errors.jobTitle ? 'border-red-500' : 'border-white/10 focus:border-neon-cyan'}`}
+                          placeholder="Software Engineer"
+                          value={userData.onboarding.jobTitle}
+                          onChange={(e) => setUserData({...userData, onboarding: {...userData.onboarding, jobTitle: e.target.value}})}
+                        />
+                        {errors.jobTitle && <p className="text-xs text-red-500 mt-1">{errors.jobTitle}</p>}
+                      </div>
+                      <div className="space-y-2">
+                        <label className="text-sm font-medium text-white/40 uppercase tracking-wider">Company/Org</label>
+                        <input 
+                          type="text" 
+                          className={`w-full bg-white/5 border rounded-xl px-4 py-3 focus:outline-none transition-colors ${errors.companyOrg ? 'border-red-500' : 'border-white/10 focus:border-neon-cyan'}`}
+                          placeholder="Tech Corp"
+                          value={userData.onboarding.companyOrg}
+                          onChange={(e) => setUserData({...userData, onboarding: {...userData.onboarding, companyOrg: e.target.value}})}
+                        />
+                        {errors.companyOrg && <p className="text-xs text-red-500 mt-1">{errors.companyOrg}</p>}
+                      </div>
+                    </div>
 
-                <div className="space-y-2">
-                  <div className="flex justify-between">
-                    <label className="text-sm font-medium text-white/40 uppercase tracking-wider">Password (Min 6 characters)</label>
-                    <Lock className="w-3 h-3 text-white/20" />
-                  </div>
-                  <input 
-                    type="password" 
-                    className={`w-full bg-white/5 border rounded-xl px-4 py-3 focus:outline-none transition-colors ${errors.password ? 'border-red-500' : 'border-white/10 focus:border-neon-cyan'}`}
-                    placeholder="••••••••"
-                    value={userData.onboarding.password || ''}
-                    onChange={(e) => setUserData({...userData, onboarding: {...userData.onboarding, password: e.target.value}})}
-                  />
-                  {errors.password && <p className="text-xs text-red-500 mt-1">{errors.password}</p>}
-                </div>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                      <div className="space-y-2">
+                        <label className="text-sm font-medium text-white/40 uppercase tracking-wider">Email Address</label>
+                        <input 
+                          type="email" 
+                          className={`w-full bg-white/5 border rounded-xl px-4 py-3 focus:outline-none transition-colors ${errors.email ? 'border-red-500' : 'border-white/10 focus:border-neon-cyan'}`}
+                          placeholder="michael.t@testcrm.com"
+                          value={userData.onboarding.email}
+                          onChange={(e) => setUserData({...userData, onboarding: {...userData.onboarding, email: e.target.value}})}
+                        />
+                        {errors.email && <p className="text-xs text-red-500 mt-1">{errors.email}</p>}
+                      </div>
+                      <div className="space-y-2">
+                        <label className="text-sm font-medium text-white/40 uppercase tracking-wider">Phone</label>
+                        <input 
+                          type="tel" 
+                          className={`w-full bg-white/5 border rounded-xl px-4 py-3 focus:outline-none transition-colors ${errors.phone ? 'border-red-500' : 'border-white/10 focus:border-neon-cyan'}`}
+                          placeholder="555-0101"
+                          value={userData.onboarding.phone}
+                          onChange={(e) => setUserData({...userData, onboarding: {...userData.onboarding, phone: e.target.value}})}
+                        />
+                        {errors.phone && <p className="text-xs text-red-500 mt-1">{errors.phone}</p>}
+                      </div>
+                    </div>
 
-                <div className="space-y-2">
-                  <div className="flex justify-between">
-                    <label className="text-sm font-medium text-white/40 uppercase tracking-wider">Current Role or Focus</label>
-                    <span className={`text-[10px] ${userData.onboarding.role.length > 100 ? 'text-red-500' : 'text-white/20'}`}>
-                      {userData.onboarding.role.length}/100
-                    </span>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                      <div className="space-y-2">
+                        <label className="text-sm font-medium text-white/40 uppercase tracking-wider">Program/Track</label>
+                        <input 
+                          type="text" 
+                          className={`w-full bg-white/5 border rounded-xl px-4 py-3 focus:outline-none transition-colors ${errors.programTrack ? 'border-red-500' : 'border-white/10 focus:border-neon-cyan'}`}
+                          placeholder="Skylar Beta User"
+                          value={userData.onboarding.programTrack}
+                          onChange={(e) => setUserData({...userData, onboarding: {...userData.onboarding, programTrack: e.target.value}})}
+                        />
+                        {errors.programTrack && <p className="text-xs text-red-500 mt-1">{errors.programTrack}</p>}
+                      </div>
+                      <div className="space-y-2">
+                        <label className="text-sm font-medium text-white/40 uppercase tracking-wider">Lifecycle Stage</label>
+                        <input 
+                          type="text" 
+                          className={`w-full bg-white/5 border rounded-xl px-4 py-3 focus:outline-none transition-colors ${errors.lifecycleStage ? 'border-red-500' : 'border-white/10 focus:border-neon-cyan'}`}
+                          placeholder="Closed Won (Placed)"
+                          value={userData.onboarding.lifecycleStage}
+                          onChange={(e) => setUserData({...userData, onboarding: {...userData.onboarding, lifecycleStage: e.target.value}})}
+                        />
+                        {errors.lifecycleStage && <p className="text-xs text-red-500 mt-1">{errors.lifecycleStage}</p>}
+                      </div>
+                    </div>
+
+                    <div className="space-y-2">
+                      <label className="text-sm font-medium text-white/40 uppercase tracking-wider">Outcomes & Attributes</label>
+                      <textarea 
+                        className={`w-full bg-white/5 border rounded-xl px-4 py-3 focus:outline-none transition-colors h-24 resize-none ${errors.outcomesAttributes ? 'border-red-500' : 'border-white/10 focus:border-neon-cyan'}`}
+                        placeholder="Used AI-powered application process..."
+                        value={userData.onboarding.outcomesAttributes}
+                        onChange={(e) => setUserData({...userData, onboarding: {...userData.onboarding, outcomesAttributes: e.target.value}})}
+                      />
+                      {errors.outcomesAttributes && <p className="text-xs text-red-500 mt-1">{errors.outcomesAttributes}</p>}
+                    </div>
+
+                    <div className="space-y-2">
+                      <label className="text-sm font-medium text-white/40 uppercase tracking-wider">Feedback / Quote</label>
+                      <textarea 
+                        className={`w-full bg-white/5 border rounded-xl px-4 py-3 focus:outline-none transition-colors h-24 resize-none ${errors.feedbackQuote ? 'border-red-500' : 'border-white/10 focus:border-neon-cyan'}`}
+                        placeholder="The strengths assessment was eye-opening..."
+                        value={userData.onboarding.feedbackQuote}
+                        onChange={(e) => setUserData({...userData, onboarding: {...userData.onboarding, feedbackQuote: e.target.value}})}
+                      />
+                      {errors.feedbackQuote && <p className="text-xs text-red-500 mt-1">{errors.feedbackQuote}</p>}
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                      <div className="space-y-2">
+                        <label className="text-sm font-medium text-white/40 uppercase tracking-wider">User ID (Optional)</label>
+                        <input 
+                          type="text" 
+                          className={`w-full bg-white/5 border rounded-xl px-4 py-3 focus:outline-none transition-colors border-white/10 focus:border-neon-cyan`}
+                          placeholder="michael.t (defaults to email)"
+                          value={userData.onboarding.userId}
+                          onChange={(e) => setUserData({...userData, onboarding: {...userData.onboarding, userId: e.target.value}})}
+                        />
+                        <p className="text-[10px] text-white/30 italic">This will be your unique dashboard URL</p>
+                      </div>
+                      <div className="space-y-2">
+                        <label className="text-sm font-medium text-white/40 uppercase tracking-wider">Password</label>
+                        <input 
+                          type="password" 
+                          className={`w-full bg-white/5 border rounded-xl px-4 py-3 focus:outline-none transition-colors ${errors.password ? 'border-red-500' : 'border-white/10 focus:border-neon-cyan'}`}
+                          placeholder="••••••••"
+                          value={userData.onboarding.password}
+                          onChange={(e) => setUserData({...userData, onboarding: {...userData.onboarding, password: e.target.value}})}
+                        />
+                        {errors.password && <p className="text-xs text-red-500 mt-1">{errors.password}</p>}
+                      </div>
+                    </div>
                   </div>
-                  <input 
-                    type="text" 
-                    className={`w-full bg-white/5 border rounded-xl px-4 py-3 focus:outline-none transition-colors ${errors.role ? 'border-red-500' : 'border-white/10 focus:border-neon-cyan'}`}
-                    placeholder="Junior Product Designer"
-                    value={userData.onboarding.role}
-                    onChange={(e) => setUserData({...userData, onboarding: {...userData.onboarding, role: e.target.value}})}
-                  />
-                  {errors.role && <p className="text-xs text-red-500 mt-1">{errors.role}</p>}
-                </div>
-                <div className="space-y-2">
-                  <div className="flex justify-between">
-                    <label className="text-sm font-medium text-white/40 uppercase tracking-wider">Brief Bio</label>
-                    <span className={`text-[10px] ${userData.onboarding.bio.length > 500 ? 'text-red-500' : 'text-white/20'}`}>
-                      {userData.onboarding.bio.length}/500
-                    </span>
+
+                  <div className="space-y-4">
+                    <div className="relative flex items-center py-4">
+                      <div className="flex-grow border-t border-white/10"></div>
+                      <span className="flex-shrink mx-4 text-white/20 text-xs uppercase tracking-widest">Optional: Upload Resume</span>
+                      <div className="flex-grow border-t border-white/10"></div>
+                    </div>
+
+                    {uploadedFileName && (
+                      <div className="flex items-center gap-2 px-4 py-2 rounded-lg bg-neon-cyan/10 border border-neon-cyan/20 text-neon-cyan text-sm w-fit mx-auto">
+                        <FileUp className="w-4 h-4" />
+                        <span className="font-medium">{uploadedFileName}</span>
+                      </div>
+                    )}
+                    <div className="glass-panel p-8 border-dashed border-2 border-white/10 hover:border-neon-cyan/40 transition-all group relative">
+                      <input 
+                        type="file" 
+                        className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10" 
+                        accept=".pdf,.doc,.docx,text/plain"
+                        onChange={handleFileUpload}
+                      />
+                      <div className="flex flex-col items-center justify-center space-y-4 py-4">
+                        {parsingResume ? (
+                          <>
+                            <Loader2 className="w-10 h-10 text-neon-cyan animate-spin" />
+                            <p className="text-neon-cyan font-medium animate-pulse">Analyzing Resume...</p>
+                          </>
+                        ) : (
+                          <>
+                            <div className="w-16 h-16 rounded-full bg-white/5 flex items-center justify-center group-hover:bg-neon-cyan/10 transition-colors">
+                              <Upload className="w-8 h-8 text-white/40 group-hover:text-neon-cyan transition-colors" />
+                            </div>
+                            <div className="text-center">
+                              <p className="text-lg font-medium">Upload Resume</p>
+                              <p className="text-sm text-white/40">PDF, DOCX or TXT (Max 5MB)</p>
+                            </div>
+                          </>
+                        )}
+                      </div>
+                    </div>
                   </div>
-                  <textarea 
-                    className={`w-full bg-white/5 border rounded-xl px-4 py-3 focus:outline-none transition-colors h-32 resize-none ${errors.bio ? 'border-red-500' : 'border-white/10 focus:border-neon-cyan'}`}
-                    placeholder="Tell us about your journey so far..."
-                    value={userData.onboarding.bio}
-                    onChange={(e) => setUserData({...userData, onboarding: {...userData.onboarding, bio: e.target.value}})}
-                  />
-                  {errors.bio && <p className="text-xs text-red-500 mt-1">{errors.bio}</p>}
+
+                  <div className="flex flex-col gap-6">
+                    {process.env.NODE_ENV === 'development' && (
+                      <Button 
+                        onClick={() => {
+                          localStorage.setItem('sparkwavv_current_step', 'module1');
+                          setStep('module1');
+                        }} 
+                        variant="outline" 
+                        className="w-full border-neon-cyan/20 text-neon-cyan/60 hover:text-neon-cyan"
+                      >
+                        [DEV] Skip Registration & Go to Module 1
+                      </Button>
+                    )}
+                    {registrationMessage && (
+                      <div className="p-6 rounded-2xl bg-neon-cyan/10 border border-neon-cyan/30 text-neon-cyan text-center font-bold">
+                        {registrationMessage}
+                      </div>
+                    )}
+
+                    {errors.general && (
+                      <div className="p-6 rounded-2xl bg-red-500/10 border border-red-500/30 text-red-500 text-center font-bold">
+                        {errors.general}
+                      </div>
+                    )}
+                    
+                    <div className="flex flex-col sm:flex-row justify-between items-center gap-4">
+                      <button 
+                        onClick={() => setStep('login')}
+                        className="text-neon-cyan text-sm font-medium hover:underline"
+                      >
+                        Already have an account? Login here
+                      </button>
+
+                      <div className="flex justify-end gap-4 w-full sm:w-auto">
+                        {!registrationMessage && (
+                          <Button 
+                            onClick={handleRegister} 
+                            loading={isRegistering}
+                            className="w-full sm:w-auto"
+                          >
+                            Register for Dive-In <ArrowRight className="w-5 h-5" />
+                          </Button>
+                        )}
+                      </div>
+                    </div>
+                  </div>
                 </div>
               </div>
-            </div>
-              
-            <div className="flex flex-col gap-6">
-              {registrationMessage && (
-                <motion.div 
-                  initial={{ opacity: 0, scale: 0.95 }}
-                  animate={{ opacity: 1, scale: 1 }}
-                  className="p-6 rounded-2xl bg-neon-cyan/10 border border-neon-cyan/30 text-neon-cyan text-center font-bold"
-                >
-                  {registrationMessage}
-                </motion.div>
-              )}
-              
-              <div className="flex justify-end gap-4">
-                {isConfirmed ? (
-                  <Button onClick={nextStep}>
-                    Continue to Module 1 <ChevronRight className="w-5 h-5" />
-                  </Button>
-                ) : !registrationMessage && (
-                  <Button onClick={handleRegister} loading={isRegistering}>
-                    Register for Dive-In <ArrowRight className="w-5 h-5" />
-                  </Button>
-                )}
-              </div>
-            </div>
             </motion.div>
           )}
 
@@ -972,12 +1875,13 @@ export function SparkwavvApp() {
               initial={{ opacity: 0, x: 20 }}
               animate={{ opacity: 1, x: 0 }}
               exit={{ opacity: 0, x: -20 }}
-              className="space-y-12"
+              className="max-w-4xl mx-auto px-6 space-y-12 pb-24"
             >
               <header className="space-y-4">
                 <div className="flex items-center gap-3 text-neon-magenta">
                   <Trophy className="w-6 h-6" />
                   <span className="font-display font-bold uppercase tracking-widest">Module 1</span>
+                  <InspirationTooltip content="Focus on the 'How' and the 'Impact'. Instead of 'I managed a team', try 'I led a team of 5 to deliver a project 2 weeks early, saving $20k'." />
                 </div>
                 <h2 className="text-4xl font-bold">Accomplishment Stories</h2>
                 <p className="text-white/60">List 3 key accomplishments that made you feel proud or energized. These are the seeds of your brand.</p>
@@ -1023,12 +1927,18 @@ export function SparkwavvApp() {
                           className={`w-full bg-white/5 border rounded-lg px-4 py-2 text-sm focus:outline-none transition-all h-24 resize-none ${errors[`acc_desc_${i}`] ? 'border-red-500 text-red-500' : 'border-white/10 focus:border-neon-magenta'}`}
                           placeholder="How did you do it? What was the impact?"
                           value={userData.accomplishments[i]?.description || ''}
+                          onKeyDown={(e) => {
+                            if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') {
+                              nextStep();
+                            }
+                          }}
                           onChange={(e) => {
                             const newAcc = [...userData.accomplishments];
                             newAcc[i] = { ...newAcc[i], description: e.target.value };
                             setUserData({...userData, accomplishments: newAcc});
                           }}
                         />
+                        <ValidationFeedback value={userData.accomplishments[i]?.description || ''} maxLength={300} />
                         {errors[`acc_desc_${i}`] && <p className="text-[10px] text-red-500">{errors[`acc_desc_${i}`]}</p>}
                       </div>
                     </div>
@@ -1051,12 +1961,13 @@ export function SparkwavvApp() {
               initial={{ opacity: 0, x: 20 }}
               animate={{ opacity: 1, x: 0 }}
               exit={{ opacity: 0, x: -20 }}
-              className="space-y-12"
+              className="max-w-4xl mx-auto px-6 space-y-12 pb-24"
             >
               <header className="space-y-4">
                 <div className="flex items-center gap-3 text-neon-lime">
                   <Compass className="w-6 h-6" />
                   <span className="font-display font-bold uppercase tracking-widest">Module 2</span>
+                  <InspirationTooltip content="Think about the environment where you lose track of time. Is it a quiet library, a bustling cafe, or a collaborative workshop?" />
                 </div>
                 <h2 className="text-4xl font-bold">Perfect Day & Extinguishers</h2>
                 <p className="text-white/60">Define your ideal environment and the "deal-breakers" that kill your energy.</p>
@@ -1077,8 +1988,14 @@ export function SparkwavvApp() {
                     className={`w-full bg-white/5 border rounded-xl px-4 py-3 focus:outline-none transition-colors h-48 resize-none ${errors.perfectDay ? 'border-red-500' : 'border-white/10 focus:border-neon-lime'}`}
                     placeholder="Describe your ideal workday flow..."
                     value={userData.environment.perfectDay}
+                    onKeyDown={(e) => {
+                      if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') {
+                        nextStep();
+                      }
+                    }}
                     onChange={(e) => setUserData({...userData, environment: {...userData.environment, perfectDay: e.target.value}})}
                   />
+                  <ValidationFeedback value={userData.environment.perfectDay} maxLength={1000} />
                   {errors.perfectDay && <p className="text-xs text-red-500">{errors.perfectDay}</p>}
                 </div>
 
@@ -1125,12 +2042,13 @@ export function SparkwavvApp() {
               initial={{ opacity: 0, x: 20 }}
               animate={{ opacity: 1, x: 0 }}
               exit={{ opacity: 0, x: -20 }}
-              className="space-y-12"
+              className="max-w-4xl mx-auto px-6 space-y-12 pb-24"
             >
               <header className="space-y-4">
                 <div className="flex items-center gap-3 text-neon-cyan">
                   <Heart className="w-6 h-6" />
                   <span className="font-display font-bold uppercase tracking-widest">Module 3</span>
+                  <InspirationTooltip content="Energizers are the tasks that give you energy rather than drain it. What would you do even if you weren't being paid?" />
                 </div>
                 <h2 className="text-4xl font-bold">Passions & Best-When</h2>
                 <p className="text-white/60">What energizes you? Under what conditions do you perform at your absolute best?</p>
@@ -1172,8 +2090,14 @@ export function SparkwavvApp() {
                     className={`w-full bg-white/5 border rounded-xl px-4 py-3 focus:outline-none transition-colors h-32 resize-none ${errors.bestWhen ? 'border-red-500' : 'border-white/10 focus:border-neon-cyan'}`}
                     placeholder="e.g., I have a clear goal but total freedom on how to reach it..."
                     value={userData.passions.bestWhen}
+                    onKeyDown={(e) => {
+                      if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') {
+                        nextStep();
+                      }
+                    }}
                     onChange={(e) => setUserData({...userData, passions: {...userData.passions, bestWhen: e.target.value}})}
                   />
+                  <ValidationFeedback value={userData.passions.bestWhen} maxLength={500} />
                   {errors.bestWhen && <p className="text-xs text-red-500">{errors.bestWhen}</p>}
                 </div>
               </div>
@@ -1193,12 +2117,13 @@ export function SparkwavvApp() {
               initial={{ opacity: 0, x: 20 }}
               animate={{ opacity: 1, x: 0 }}
               exit={{ opacity: 0, x: -20 }}
-              className="space-y-12"
+              className="max-w-4xl mx-auto px-6 space-y-12 pb-24"
             >
               <header className="space-y-4">
                 <div className="flex items-center gap-3 text-neon-magenta">
                   <Fingerprint className="w-6 h-6" />
                   <span className="font-display font-bold uppercase tracking-widest">Module 4</span>
+                  <InspirationTooltip content="Choose attributes that resonate with your core identity. Are you the one who starts things (Catalyst) or the one who perfects them (Optimizer)?" />
                 </div>
                 <h2 className="text-4xl font-bold">The Attributes Game</h2>
                 <p className="text-white/60">Select the attributes that form your Brand DNA. Choose 3-5 that define you.</p>
@@ -1240,12 +2165,13 @@ export function SparkwavvApp() {
               initial={{ opacity: 0, x: 20 }}
               animate={{ opacity: 1, x: 0 }}
               exit={{ opacity: 0, x: -20 }}
-              className="space-y-12"
+              className="max-w-4xl mx-auto px-6 space-y-12 pb-24"
             >
               <header className="space-y-4">
                 <div className="flex items-center gap-3 text-neon-cyan">
                   <Film className="w-6 h-6" />
                   <span className="font-display font-bold uppercase tracking-widest">Module 5</span>
+                  <InspirationTooltip content="Your tagline should be a punchy summary of your current professional mission. Think of it as the 'hook' for your career story." />
                 </div>
                 <h2 className="text-4xl font-bold">Season 1: The Movie Poster</h2>
                 <p className="text-white/60">Your career is a story. What is the tagline for this season of your professional life?</p>
@@ -1262,7 +2188,7 @@ export function SparkwavvApp() {
                 
                 <div className="absolute inset-0 p-8 flex flex-col justify-end items-center text-center space-y-4">
                   <div className="space-y-1">
-                    <p className="text-xs font-display uppercase tracking-[0.3em] text-neon-cyan">A Sparkwavv Original</p>
+                    <p className="text-xs font-display uppercase tracking-[0.3em] text-neon-cyan">A SPARKWavv Original</p>
                     <h3 className="text-4xl font-display font-bold tracking-tighter uppercase">{userData.onboarding.name}</h3>
                   </div>
                   
@@ -1291,6 +2217,25 @@ export function SparkwavvApp() {
                 </div>
               </div>
 
+              <div className="space-y-4">
+                <h3 className="text-sm font-display uppercase tracking-widest text-white/40 text-center">Choose Your Poster Vibe</h3>
+                <div className="flex flex-wrap justify-center gap-2">
+                  {['Minimalist', 'Brutalist', 'Corporate', 'Creative'].map((vibe) => (
+                    <button
+                      key={vibe}
+                      onClick={() => setPosterVibe(vibe as any)}
+                      className={`px-4 py-2 rounded-full border text-xs transition-all ${
+                        posterVibe === vibe
+                          ? 'bg-neon-cyan/10 border-neon-cyan text-neon-cyan'
+                          : 'bg-white/5 border-white/10 text-white/60 hover:border-white/20'
+                      }`}
+                    >
+                      {vibe}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
               <div className="flex justify-between items-center">
                 <Button onClick={() => setStep('module4')} variant="secondary">Back</Button>
                 <Button onClick={nextStep} variant="neon" className="px-12">
@@ -1305,15 +2250,33 @@ export function SparkwavvApp() {
               key="processing"
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
-              className="flex flex-col items-center justify-center space-y-8 py-20"
+              exit={{ opacity: 0 }}
+              className="fixed inset-0 z-50 flex flex-col items-center justify-center bg-dark-bg/90 backdrop-blur-3xl"
             >
-              <div className="relative">
-                <div className="w-24 h-24 border-4 border-neon-cyan/20 rounded-full animate-pulse" />
-                <Loader2 className="w-12 h-12 text-neon-cyan animate-spin absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2" />
-              </div>
-              <div className="text-center space-y-2">
-                <h2 className="text-3xl font-bold animate-pulse-neon">Synthesizing Your Brand DNA</h2>
-                <p className="text-white/40">Our AI is distilling your stories into a high-impact professional identity...</p>
+              <div className="absolute inset-0 atmosphere opacity-40" />
+              <div className="relative z-10 flex flex-col items-center space-y-8 max-w-md px-6 text-center">
+                <div className="relative">
+                  <motion.div 
+                    className="w-32 h-32 border-2 border-neon-cyan/30 rounded-full"
+                    animate={{ scale: [1, 1.2, 1], opacity: [0.3, 0.6, 0.3] }}
+                    transition={{ duration: 3, repeat: Infinity }}
+                  />
+                  <Loader2 className="w-12 h-12 text-neon-cyan animate-spin absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2" />
+                </div>
+                <div className="space-y-4">
+                  <h2 className="text-4xl font-bold animate-pulse-neon">Synthesizing Your Brand DNA</h2>
+                  <p className="text-white/60 leading-relaxed">
+                    Skylar is distilling your stories, passions, and achievements into a high-impact professional identity. This takes a moment of deep focus...
+                  </p>
+                </div>
+                <div className="w-full h-1 bg-white/5 rounded-full overflow-hidden">
+                  <motion.div 
+                    className="h-full bg-neon-cyan shadow-[0_0_15px_rgba(0,243,255,0.5)]"
+                    initial={{ width: 0 }}
+                    animate={{ width: '100%' }}
+                    transition={{ duration: 15, ease: "linear" }}
+                  />
+                </div>
               </div>
             </motion.div>
           )}
@@ -1323,7 +2286,7 @@ export function SparkwavvApp() {
               key="results"
               initial={{ opacity: 0, scale: 0.95 }}
               animate={{ opacity: 1, scale: 1 }}
-              className="space-y-12"
+              className="max-w-7xl mx-auto px-6 space-y-12 pb-24"
             >
               <header className="text-center space-y-4">
                 <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-green-500/10 border border-green-500/20 text-green-500 text-sm font-medium">
@@ -1423,14 +2386,28 @@ export function SparkwavvApp() {
       </main>
 
       <Footer onNavigate={(s) => setStep(s as Step)} />
+      
+      {/* Skylar AI Integration */}
+      {!isAdmin && <SkylarSidebar />}
+      {!isAdmin && (
+        <EveningSpark 
+          energyTrough={dashboardData?.energyTrough} 
+          onClose={() => {}} 
+        />
+      )}
     </div>
   </div>
 );
 }
 
-const UserDashboardWrapper = () => {
+const UserDashboardWrapper = ({ isAdmin }: { isAdmin: boolean }) => {
   const { userId } = useParams<{ userId: string }>();
-  return <UserDashboard userId={userId || 'default'} />;
+  return (
+    <OnboardingGate>
+      <UserDashboard userId={userId || 'default'} isAdmin={isAdmin} />
+      {!isAdmin && <SkylarSidebar />}
+    </OnboardingGate>
+  );
 };
 
 export default function App() {
@@ -1454,7 +2431,16 @@ export default function App() {
   return (
     <Router>
       <Routes>
-        <Route path="/" element={<SparkwavvApp />} />
+        <Route 
+          path="/" 
+          element={
+            isAdmin ? (
+              <Navigate to="/sparkwavv-admin" replace />
+            ) : (
+              <SPARKWavvApp isAdmin={false} />
+            )
+          } 
+        />
         <Route 
           path="/sparkwavv-admin" 
           element={
@@ -1465,8 +2451,11 @@ export default function App() {
             )
           } 
         />
-        <Route path="/dashboard/:userId" element={<UserDashboardWrapper />} />
-        <Route path="*" element={<Navigate to="/" />} />
+        <Route path="/dashboard/:userId" element={<UserDashboardWrapper isAdmin={!!isAdmin} />} />
+        <Route path="/partner-dashboard" element={<PartnerDashboard />} />
+        <Route path="/accept-invitation/:token" element={<AcceptInvitation />} />
+        <Route path="/profile" element={<ProfilePage />} />
+        <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     </Router>
   );

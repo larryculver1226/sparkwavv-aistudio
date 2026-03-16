@@ -44,7 +44,7 @@ export const Footer: React.FC<FooterProps> = ({ onNavigate }) => {
                 <Sparkles className="w-5 h-5 text-neon-cyan" />
               </div>
               <span className="text-xl font-display font-bold tracking-tighter text-white">
-                SPARK<span className="text-neon-cyan italic">WAVV</span>
+                SPARK<span className="text-neon-cyan italic">Wavv</span>
               </span>
             </div>
             <p className="text-white/40 max-w-sm leading-relaxed text-lg">
@@ -133,7 +133,7 @@ export const Footer: React.FC<FooterProps> = ({ onNavigate }) => {
         {/* Bottom Bar */}
         <div className="mt-20 pt-8 border-t border-white/5 flex flex-col md:flex-row items-center justify-between gap-6">
           <p className="text-white/20 text-sm">
-            © {currentYear} Sparkwavv Inc. All rights reserved.
+            © {currentYear} SPARKWavv Inc. All rights reserved.
           </p>
           <div className="flex items-center gap-8">
             <a href="#" className="text-white/20 hover:text-white text-sm transition-colors">Privacy Policy</a>

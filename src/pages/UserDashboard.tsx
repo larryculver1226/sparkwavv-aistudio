@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import { motion } from 'motion/react';
+import { motion, AnimatePresence } from 'motion/react';
 import { 
   LayoutDashboard, 
-  User, 
+  User as UserIcon, 
   Award, 
   Briefcase, 
   Users, 
@@ -14,318 +14,753 @@ import {
   ChevronRight,
   Zap,
   Loader2,
-  Database
+  Database,
+  Lock,
+  Clock,
+  TrendingUp,
+  ShieldCheck,
+  ShieldAlert,
+  Target,
+  Rocket,
+  Brain,
+  FileText,
+  Sparkles,
+  Search as SearchIcon,
+  UserPlus,
+  Send,
+  CheckCircle2
 } from 'lucide-react';
-import { DashboardData } from '../types/dashboard';
+import { DashboardData, Expense, Milestone } from '../types/dashboard';
+import { useAuthContext } from '../contexts/AuthContext';
+import { Navigate, useNavigate } from 'react-router-dom';
+import { v4 as uuidv4 } from 'uuid';
+import { InvitationModal } from '../components/InvitationModal';
+import { EveningSpark } from '../components/EveningSpark';
+import { PhaseDetails } from '../components/kickspark/PhaseDetails';
+import { MilestoneRoadmap } from '../components/kickspark/MilestoneRoadmap';
+import { X } from 'lucide-react';
 
-const GaugeChart: React.FC<{ value: number }> = ({ value }) => {
-  const radius = 80;
-  const stroke = 12;
+const MiniGauge: React.FC<{ value: number; label: string; color: string }> = ({ value, label, color }) => {
+  const normalizedValue = Math.min(Math.max(value, 0), 100);
+  const circumference = 2 * Math.PI * 24;
+  const offset = circumference - (normalizedValue / 100) * circumference;
+
+  return (
+    <div className="flex flex-col items-center gap-3">
+      <div className="relative w-14 h-14">
+        <svg className="w-full h-full transform -rotate-90">
+          <circle
+            cx="28"
+            cy="28"
+            r="24"
+            stroke="currentColor"
+            strokeWidth="3"
+            fill="transparent"
+            className="text-white/5"
+          />
+          <motion.circle
+            cx="28"
+            cy="28"
+            r="24"
+            stroke={color}
+            strokeWidth="3"
+            fill="transparent"
+            strokeDasharray={circumference}
+            initial={{ strokeDashoffset: circumference }}
+            animate={{ strokeDashoffset: offset }}
+            transition={{ duration: 1.5, ease: "easeOut" }}
+            strokeLinecap="round"
+          />
+        </svg>
+        <div className="absolute inset-0 flex items-center justify-center text-[10px] font-bold text-white">
+          {value}%
+        </div>
+      </div>
+      <span className="text-[8px] uppercase tracking-[0.2em] text-white/40 font-bold text-center leading-tight max-w-[60px]">
+        {label}
+      </span>
+    </div>
+  );
+};
+
+const GaugeChart: React.FC<{ value: number; matrix?: DashboardData['alignmentMatrix'] }> = ({ value, matrix }) => {
+  const radius = 85;
+  const stroke = 14;
   const normalizedValue = Math.min(Math.max(value, 0), 100);
   const angle = (normalizedValue / 100) * 180;
   const rotation = -90 + angle;
 
   return (
-    <div className="relative flex flex-col items-center justify-center">
-      <svg width="200" height="120" viewBox="0 0 200 120">
-        {/* Background Arc */}
-        <path
-          d="M 20 100 A 80 80 0 0 1 180 100"
-          fill="none"
-          stroke="#ffffff10"
-          strokeWidth={stroke}
-          strokeLinecap="round"
-        />
-        {/* Value Arc */}
-        <path
-          d="M 20 100 A 80 80 0 0 1 180 100"
-          fill="none"
-          stroke="url(#gaugeGradient)"
-          strokeWidth={stroke}
-          strokeLinecap="round"
-          strokeDasharray={`${(normalizedValue / 100) * 251} 251`}
-        />
-        <defs>
-          <linearGradient id="gaugeGradient" x1="0%" y1="0%" x2="100%" y2="0%">
-            <stop offset="0%" stopColor="#f59e0b" />
-            <stop offset="100%" stopColor="#fbbf24" />
-          </linearGradient>
-        </defs>
-        {/* Needle */}
-        <line
-          x1="100"
-          y1="100"
-          x2="100"
-          y2="30"
-          stroke="#fff"
-          strokeWidth="3"
-          strokeLinecap="round"
-          style={{
-            transform: `rotate(${rotation}deg)`,
-            transformOrigin: '100px 100px',
-            transition: 'transform 1s ease-out'
-          }}
-        />
-        <circle cx="100" cy="100" r="5" fill="#fff" />
-      </svg>
-      <div className="absolute bottom-2 text-center">
-        <span className="text-4xl font-display font-bold text-white">{value}</span>
-        <p className="text-[10px] uppercase tracking-[0.2em] text-white/40 font-bold mt-1">Career Happiness Meter</p>
+    <div className="w-full flex flex-col items-center">
+      <div className="flex flex-col lg:flex-row items-center justify-center gap-12 w-full">
+        {/* Main Gauge */}
+        <div className="relative flex flex-col items-center justify-center">
+          <svg width="240" height="140" viewBox="0 0 240 140">
+            {/* Background Arc */}
+            <path
+              d="M 30 120 A 90 90 0 0 1 210 120"
+              fill="none"
+              stroke="#ffffff08"
+              strokeWidth={stroke}
+              strokeLinecap="round"
+            />
+            {/* Value Arc */}
+            <path
+              d="M 30 120 A 90 90 0 0 1 210 120"
+              fill="none"
+              stroke="url(#cyanNeonGradient)"
+              strokeWidth={stroke}
+              strokeLinecap="round"
+              strokeDasharray={`${(normalizedValue / 100) * 283} 283`}
+              className="drop-shadow-[0_0_8px_rgba(0,243,255,0.5)]"
+            />
+            <defs>
+              <linearGradient id="cyanNeonGradient" x1="0%" y1="0%" x2="100%" y2="0%">
+                <stop offset="0%" stopColor="#0088ff" />
+                <stop offset="50%" stopColor="#00f3ff" />
+                <stop offset="100%" stopColor="#00ffff" />
+              </linearGradient>
+            </defs>
+            {/* Needle */}
+            <motion.line
+              initial={{ rotate: -90 }}
+              animate={{ rotate: rotation }}
+              transition={{ duration: 1.5, ease: "easeOut" }}
+              x1="120"
+              y1="120"
+              x2="120"
+              y2="40"
+              stroke="#fff"
+              strokeWidth="4"
+              strokeLinecap="round"
+              style={{
+                transformOrigin: '120px 120px',
+              }}
+            />
+            <circle cx="120" cy="120" r="6" fill="#fff" className="drop-shadow-[0_0_5px_rgba(255,255,255,0.5)]" />
+          </svg>
+          <div className="mt-4 text-center">
+            <div className="text-5xl font-display font-bold text-neon-cyan neon-text-cyan mb-2">
+              {value}
+            </div>
+            <p className="text-[11px] uppercase tracking-[0.3em] text-neon-cyan/80 font-bold neon-text-cyan">Career Happiness Meter</p>
+          </div>
+        </div>
+
+        {/* Alignment Matrix */}
+        <div className="flex gap-8 lg:border-l lg:border-white/10 lg:pl-12">
+          <MiniGauge 
+            value={matrix?.identityClarity || 0} 
+            label="Identity Clarity" 
+            color="#00f3ff" 
+          />
+          <MiniGauge 
+            value={matrix?.strengthsAlignment || 0} 
+            label="Strengths Alignment" 
+            color="#ff00ff" 
+          />
+          <MiniGauge 
+            value={matrix?.marketResonance || 0} 
+            label="Market Resonance" 
+            color="#39ff14" 
+          />
+        </div>
       </div>
     </div>
   );
 };
 
-export const UserDashboard: React.FC<{ userId: string }> = ({ userId }) => {
+const JourneyTimeline: React.FC<{ stage: string }> = ({ stage }) => {
+  const stages = [
+    { id: 'Dive-In', label: 'Dive-In', icon: Sparkles, desc: 'WEEKS 1-2' },
+    { id: 'Ignition', label: 'Ignition', icon: Zap, desc: 'WEEKS 3-4' },
+    { id: 'Discovery', label: 'Discovery', icon: SearchIcon, desc: 'WEEKS 5-6' },
+    { id: 'Branding', label: 'Branding', icon: Compass, desc: 'WEEKS 7-9' },
+    { id: 'Outreach', label: 'Outreach', icon: Handshake, desc: 'WEEKS 10-12' },
+  ];
+
+  const currentIndex = stages.findIndex(s => s.id === stage);
+  const progress = currentIndex === -1 ? 0 : (currentIndex / (stages.length - 1)) * 100;
+
+  return (
+    <div className="w-full py-12">
+      {/* Labels Layer */}
+      <div className="flex justify-between items-end mb-12 px-12 relative">
+        {stages.map((s, i) => {
+          const isCurrent = i === currentIndex;
+          const isCompleted = i < currentIndex;
+
+          return (
+            <div key={s.id} className="flex flex-col items-center gap-2 relative z-10 w-32">
+              <div className="flex flex-col items-center">
+                <span className={`font-display font-bold italic transition-all duration-700 text-center ${
+                  isCurrent 
+                    ? 'text-neon-cyan text-5xl mb-2 drop-shadow-[0_0_15px_rgba(0,243,255,0.4)]' 
+                    : isCompleted ? 'text-white text-2xl opacity-90' : 'text-white/20 text-2xl'
+                }`}>
+                  {s.label}
+                </span>
+                <span className={`text-[10px] uppercase tracking-[0.2em] font-bold transition-colors duration-500 ${
+                  isCurrent ? 'text-neon-cyan/60' : 'text-white/20'
+                }`}>
+                  {s.desc}
+                </span>
+              </div>
+              
+              {isCurrent && (
+                <motion.div 
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  className="mt-2 px-4 py-1.5 rounded-full bg-neon-cyan text-black font-black uppercase tracking-widest shadow-[0_0_20px_rgba(0,243,255,0.4)]"
+                >
+                  Active Phase
+                </motion.div>
+              )}
+            </div>
+          );
+        })}
+      </div>
+
+      <div className="relative px-12 mt-20">
+        {/* Background Track - Connecting the centers of the icons */}
+        <div className="absolute top-1/2 left-[112px] right-[112px] h-1.5 bg-white/5 -translate-y-1/2 z-0">
+          <motion.div 
+            initial={{ width: 0 }}
+            animate={{ width: `${progress}%` }}
+            transition={{ duration: 1.5, ease: "easeInOut" }}
+            className="h-full bg-neon-cyan shadow-[0_0_15px_rgba(0,243,255,0.8)] relative"
+          >
+            {/* Glow effect at the tip of the progress */}
+            <div className="absolute right-0 top-1/2 -translate-y-1/2 w-4 h-4 bg-neon-cyan rounded-full blur-md" />
+          </motion.div>
+        </div>
+
+        {/* Icons Layer */}
+        <div className="relative flex justify-between items-center z-10">
+          {stages.map((s, i) => {
+            const isCurrent = i === currentIndex;
+            const isCompleted = i < currentIndex;
+            const isLocked = i > currentIndex;
+
+            return (
+              <div key={s.id} className="flex flex-col items-center w-32">
+                <div 
+                  className={`w-16 h-16 rounded-2xl border-2 flex items-center justify-center transition-all duration-700 relative ${
+                    isCurrent 
+                      ? 'bg-black border-neon-cyan text-neon-cyan shadow-[0_0_40px_rgba(0,243,255,0.5)] scale-125 ring-8 ring-neon-cyan/5' 
+                      : isCompleted
+                        ? 'bg-zinc-900/80 border-neon-cyan/30 text-neon-cyan/60'
+                        : 'bg-zinc-900 border-white/5 text-white/10'
+                  }`}
+                >
+                  {isLocked ? (
+                    <Lock className="w-5 h-5 opacity-20" />
+                  ) : (
+                    <>
+                      <s.icon className={`${isCurrent ? 'w-8 h-8' : 'w-6 h-6'}`} />
+                      {isCompleted && (
+                        <div className="absolute -top-2 -right-2 w-6 h-6 bg-neon-cyan rounded-full flex items-center justify-center border-2 border-black shadow-lg">
+                          <CheckCircle2 className="w-3.5 h-3.5 text-black font-bold" />
+                        </div>
+                      )}
+                    </>
+                  )}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+    </div>
+  );
+};
+
+// Map journey stages to timeline stages
+export const getTimelineStage = (s: string) => {
+  const normalized = s.toLowerCase();
+  if (normalized === 'dive-in') return 'Dive-In';
+  if (normalized === 'ignition') return 'Ignition';
+  if (normalized === 'discovery' || normalized === 'search') return 'Discovery';
+  if (normalized === 'branding' || normalized === 'map') return 'Branding';
+  if (normalized === 'outreach' || normalized === 'match') return 'Outreach';
+  return s;
+};
+
+export const UserDashboard: React.FC<{ userId: string; isAdmin?: boolean }> = ({ userId, isAdmin = false }) => {
+  const { user, mockUser, profile, status, isConfirmed, error: authError } = useAuthContext();
+  const navigate = useNavigate();
   const [data, setData] = useState<DashboardData | null>(null);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  const [isInvitationModalOpen, setIsInvitationModalOpen] = useState(false);
+  const [showRoadmap, setShowRoadmap] = useState(false);
 
   useEffect(() => {
     const fetchData = async () => {
+      if (!user && !mockUser) return;
+      
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 8000); // 8s timeout
+
       try {
-        const response = await fetch(`/api/user/dashboard?userId=${userId}`);
+        setLoading(true);
+        const idToken = mockUser ? 'mock-token' : await user?.getIdToken();
+        const response = await fetch(`/api/user/dashboard?userId=${userId}`, {
+          headers: { 
+            'Authorization': `Bearer ${idToken}`,
+            'X-Mock-User': mockUser ? 'true' : 'false'
+          },
+          signal: controller.signal
+        });
+
+        clearTimeout(timeoutId);
+
         if (response.ok) {
           const dashboardData = await response.json();
           setData(dashboardData);
+          setError(null);
+        } else {
+          const errData = await response.json();
+          setError(errData.error || "Failed to load dashboard");
         }
-      } catch (error) {
-        console.error("Error fetching dashboard data:", error);
+      } catch (err: any) {
+        clearTimeout(timeoutId);
+        if (err.name === 'AbortError') {
+          setError("Dashboard request timed out. Please check your connection.");
+        } else {
+          console.error("Error fetching dashboard data:", err);
+          setError("Network error or server unavailable");
+        }
       } finally {
         setLoading(false);
       }
     };
-    fetchData();
-  }, [userId]);
 
-  if (loading) {
+    if (status !== 'initializing' && (user || mockUser)) {
+      fetchData();
+    }
+  }, [userId, user, mockUser, status]);
+
+  const toggleSkylar = () => {
+    window.dispatchEvent(new CustomEvent('toggle-skylar-sidebar'));
+  };
+
+  const handleToggleMilestone = async (milestoneId: string) => {
+    if (!data || !user) return;
+
+    const updatedMilestones = data.milestones?.map(m => 
+      m.id === milestoneId ? { ...m, completed: !m.completed } : m
+    ) || [];
+
+    // Optimistic update
+    setData({ ...data, milestones: updatedMilestones });
+
+    try {
+      const idToken = mockUser ? 'mock-token' : await user?.getIdToken();
+      const milestone = updatedMilestones.find(m => m.id === milestoneId);
+      
+      const url = mockUser 
+        ? `/api/user/milestones?userId=${userId}` 
+        : '/api/user/milestones';
+
+      await fetch(url, {
+        method: 'POST',
+        headers: { 
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${idToken}`,
+          ...(mockUser && { 'x-mock-user': 'true' })
+        },
+        body: JSON.stringify({ 
+          milestoneId, 
+          completed: milestone?.completed ?? false 
+        })
+      });
+    } catch (err) {
+      console.error("Error toggling milestone:", err);
+    }
+  };
+
+  const handleCompletePhase = async (nextStage: string) => {
+    if (!data || !user) return;
+
+    try {
+      const idToken = mockUser ? 'mock-token' : await user?.getIdToken();
+      const url = mockUser 
+        ? `/api/user/stage?userId=${userId}` 
+        : '/api/user/stage';
+
+      const response = await fetch(url, {
+        method: 'POST',
+        headers: { 
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${idToken}`,
+          ...(mockUser && { 'x-mock-user': 'true' })
+        },
+        body: JSON.stringify({ nextStage })
+      });
+
+      if (response.ok) {
+        // Update local state
+        setData({ ...data, discoveryProgress: nextStage as any });
+        // The profile in AuthContext might need a refresh or we can just rely on the dashboard data for now
+        // Since we unified the stage usage to timelineStage which uses data.discoveryProgress, it will update the UI
+      }
+    } catch (err) {
+      console.error("Error completing phase:", err);
+    }
+  };
+
+  if (status === 'initializing' || (loading && !data)) {
     return (
-      <div className="min-h-screen bg-[#050505] flex items-center justify-center">
-        <Loader2 className="w-12 h-12 text-amber-500 animate-spin" />
+      <div className="min-h-screen bg-dark-bg flex flex-col items-center justify-center">
+        <Loader2 className="w-12 h-12 text-neon-cyan animate-spin mb-4" />
+        <p className="text-white/40 text-xs uppercase tracking-widest animate-pulse">Initializing Skylar Dashboard...</p>
       </div>
     );
   }
 
-  if (!data) return null;
+  if (status === 'unauthenticated') {
+    return <Navigate to="/" />;
+  }
+
+  if (status === 'error' || (error && !data)) {
+    return (
+      <div className="min-h-screen bg-dark-bg flex flex-col items-center justify-center p-6 text-center">
+        <ShieldAlert className="w-16 h-16 text-neon-magenta mb-4" />
+        <h1 className="text-2xl font-display font-bold mb-2">Dashboard Error</h1>
+        <p className="text-white/60 mb-6 max-w-md">{error || authError || "An unexpected error occurred during initialization."}</p>
+        <button 
+          onClick={() => window.location.reload()}
+          className="px-6 py-2 bg-neon-cyan text-black font-bold rounded-xl hover:bg-neon-cyan/80 transition-colors"
+        >
+          Retry
+        </button>
+      </div>
+    );
+  }
+
+  const currentStage = data?.discoveryProgress || (isAdmin ? 'Ignition' : profile?.journeyStage) || 'Ignition';
+
+  const timelineStage = getTimelineStage(currentStage);
 
   return (
-    <div className="min-h-screen bg-[#050505] text-white font-sans selection:bg-amber-500 selection:text-black flex">
+    <div className="min-h-screen bg-dark-bg text-white font-sans selection:bg-neon-cyan selection:text-black flex">
       {/* Sidebar */}
-      <aside className="w-64 bg-black/40 border-r border-white/5 p-6 flex flex-col gap-8 hidden lg:flex">
+      <aside className="w-72 bg-black border-r border-white/5 p-8 flex flex-col gap-10 hidden lg:flex">
         <div className="flex items-center gap-3 px-2">
-          <div className="w-10 h-10 rounded-xl bg-amber-500/10 border border-amber-500/20 flex items-center justify-center">
-            <Zap className="w-6 h-6 text-amber-500" />
+          <div className="w-10 h-10 rounded-xl bg-neon-cyan/10 border border-neon-cyan/20 flex items-center justify-center">
+            <Zap className="w-6 h-6 text-neon-cyan" />
           </div>
           <span className="text-2xl font-display font-bold tracking-tight">Skylar</span>
         </div>
 
-        <nav className="flex flex-col gap-2">
+        <nav className="flex flex-col gap-3">
           {[
-            { icon: LayoutDashboard, label: 'Dashboard', active: true },
-            { icon: User, label: 'Profile' },
-            { icon: Award, label: 'My Strengths' },
-            { icon: Briefcase, label: 'Job Matches' },
-            { icon: Users, label: 'Community' },
-            { icon: Settings, label: 'Settings' },
+            { icon: LayoutDashboard, label: 'Dashboard', active: true, path: `/dashboard/${userId}` },
+            { icon: UserIcon, label: 'Profile', path: '/profile' },
+            { icon: Award, label: 'My Strengths', path: '/strengths' },
+            { icon: Briefcase, label: 'Job Matches', path: '/matches' },
+            { icon: Users, label: 'Community', path: '/community' },
+            { icon: Settings, label: 'Settings', path: '/settings' },
           ].map((item, i) => (
             <button 
               key={i}
-              className={`flex items-center gap-3 px-4 py-3 rounded-xl transition-all ${
+              onClick={() => navigate(item.path)}
+              className={`flex items-center gap-4 px-5 py-4 rounded-2xl transition-all ${
                 item.active 
-                  ? 'bg-amber-500/10 text-amber-500 border border-amber-500/20' 
+                  ? 'bg-neon-cyan/10 text-neon-cyan border border-neon-cyan/20 neon-border-cyan' 
                   : 'text-white/40 hover:text-white hover:bg-white/5'
               }`}
             >
               <item.icon className="w-5 h-5" />
-              <span className="text-sm font-medium">{item.label}</span>
+              <span className="text-sm font-bold tracking-wide">{item.label}</span>
             </button>
           ))}
         </nav>
 
         <div className="mt-auto">
-          <div className="glass-panel p-4 rounded-2xl border border-white/10 bg-white/5 relative overflow-hidden group">
-            <div className="absolute top-0 right-0 p-2 opacity-10 group-hover:opacity-20 transition-opacity">
-              <Zap className="w-12 h-12 text-amber-500" />
+          <button 
+            onClick={toggleSkylar}
+            className="w-full glass-panel p-6 rounded-[2rem] border border-neon-cyan/20 bg-neon-cyan/5 hover:bg-neon-cyan/10 transition-all text-center group relative overflow-hidden"
+          >
+            <div className="absolute top-0 right-0 p-4 opacity-5 group-hover:opacity-10 transition-opacity">
+              <Sparkles className="w-16 h-16 text-neon-cyan" />
             </div>
-            <div className="relative z-10 flex flex-col items-center text-center gap-3">
-              <div className="w-16 h-16 rounded-full bg-amber-500/20 border border-amber-500/30 flex items-center justify-center overflow-hidden">
-                <img 
-                  src="https://picsum.photos/seed/robot/200" 
-                  alt="AI Companion" 
-                  className="w-full h-full object-cover grayscale opacity-80"
-                  referrerPolicy="no-referrer"
-                />
+            <div className="relative z-10 flex flex-col items-center gap-4">
+              <div className="w-24 h-24 rounded-full bg-neon-cyan/20 border-2 border-neon-cyan/40 p-1">
+                <div className="w-full h-full rounded-full overflow-hidden bg-black">
+                  <img 
+                    src="https://picsum.photos/seed/skylar/200" 
+                    alt="Skylar" 
+                    className="w-full h-full object-cover"
+                    referrerPolicy="no-referrer"
+                  />
+                </div>
               </div>
               <div>
-                <h4 className="text-sm font-bold">Skylar</h4>
-                <p className="text-[10px] text-white/40 uppercase tracking-widest font-bold">(AI Companion)</p>
+                <h4 className="text-xl font-display font-bold text-white group-hover:text-neon-cyan transition-colors">Skylar</h4>
+                <p className="text-[10px] text-white/40 uppercase tracking-[0.2em] font-bold">(AI Companion)</p>
               </div>
-              <button className="text-[10px] text-amber-500 uppercase tracking-widest font-bold hover:underline">
-                Settings
-              </button>
+              <div className="flex items-center gap-2 text-[10px] text-neon-cyan uppercase tracking-widest font-bold">
+                <span className="w-2 h-2 rounded-full bg-neon-cyan animate-pulse" />
+                Online
+              </div>
             </div>
-          </div>
+          </button>
         </div>
       </aside>
 
       {/* Main Content */}
-      <main className="flex-1 p-8 overflow-y-auto">
+      <main className="flex-1 p-10 overflow-y-auto bg-[radial-gradient(circle_at_top_right,rgba(0,243,255,0.05),transparent_40%)]">
         <header className="flex items-center justify-between mb-12">
-          <h1 className="text-3xl font-display font-bold">Skylar Dashboard</h1>
-          <div className="flex items-center gap-4">
-            <button className="p-2 rounded-xl bg-white/5 border border-white/10 text-white/40 hover:text-white transition-all">
-              <Bell className="w-5 h-5" />
+          <h1 className="text-4xl font-display font-bold tracking-tight">
+            {isAdmin ? `Viewing: ${data?.displayName || 'User'}` : 'Your Sparkwavv Career Journey'}
+          </h1>
+          <div className="flex items-center gap-6">
+            <button 
+              onClick={() => setIsInvitationModalOpen(true)}
+              className="flex items-center gap-2 px-4 py-2 rounded-xl bg-neon-lime/10 border border-neon-lime/20 text-neon-lime hover:bg-neon-lime/20 transition-all text-xs font-bold uppercase tracking-wider"
+            >
+              <UserPlus className="w-4 h-4" />
+              Invite RPP
             </button>
-            <div className="flex items-center gap-3 pl-4 border-l border-white/10">
+            <button className="p-3 rounded-2xl bg-white/5 border border-white/10 text-white/40 hover:text-white hover:border-neon-cyan/40 transition-all">
+              <Bell className="w-6 h-6" />
+            </button>
+            <div className="flex items-center gap-4 pl-6 border-l border-white/10">
               <div className="text-right">
-                <p className="text-sm font-bold">Burnt Amber</p>
-                <p className="text-[10px] text-white/40 uppercase tracking-widest font-bold">Pro Member</p>
+                <p className="text-base font-bold text-white">{profile?.displayName || user?.displayName || 'User'}</p>
+                <p className="text-[10px] text-white/40 uppercase tracking-[0.2em] font-bold">{profile?.role || 'Member'}</p>
               </div>
-              <div className="w-10 h-10 rounded-full bg-white/10 border border-white/20 overflow-hidden">
-                <img src="https://picsum.photos/seed/user/100" alt="Avatar" referrerPolicy="no-referrer" />
+              <div className="w-12 h-12 rounded-2xl bg-white/10 border border-white/20 overflow-hidden neon-border-cyan">
+                <img src={profile?.photoURL || user?.photoURL || "https://picsum.photos/seed/user/100"} alt="Avatar" referrerPolicy="no-referrer" />
               </div>
             </div>
           </div>
         </header>
 
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 mb-8">
-          {/* Happiness Meter */}
-          <div className="lg:col-span-1 glass-panel p-8 rounded-3xl border border-white/5 bg-white/[0.02] flex items-center justify-center">
-            <GaugeChart value={data.careerHappiness} />
+        <div className="mb-12">
+          <EveningSpark currentStage={timelineStage as any} />
+        </div>
+
+        {/* Top Row: Happiness & Summary Cards */}
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 mb-12">
+          <div className="lg:col-span-5 glass-panel p-10 rounded-[2.5rem] border border-white/5 bg-black/40 flex items-center justify-center relative overflow-hidden">
+            <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,rgba(0,243,255,0.05),transparent_70%)]" />
+            <GaugeChart value={data?.careerHappiness || 0} matrix={data?.alignmentMatrix} />
           </div>
 
-          {/* Strengths Profile Cards */}
-          <div className="lg:col-span-2 grid grid-cols-1 md:grid-cols-3 gap-6">
+          <div className="lg:col-span-7 grid grid-cols-1 md:grid-cols-3 gap-6">
             {[
-              { label: 'Strengths', desc: 'AI Companion for emotional intelligence', icon: Award },
-              { label: 'Revvault', desc: 'Persistent data layer (credentials)', icon: Database },
-              { label: 'Job Matches', desc: 'Modern Strengths-based profiling', icon: Briefcase },
-            ].map((card, i) => (
-              <div key={i} className="glass-panel p-6 rounded-3xl border border-white/5 bg-white/[0.02] hover:bg-white/[0.05] transition-all cursor-pointer group">
-                <div className="w-10 h-10 rounded-xl bg-amber-500/10 border border-amber-500/20 flex items-center justify-center mb-4 group-hover:scale-110 transition-transform">
-                  <card.icon className="w-5 h-5 text-amber-500" />
+              { label: 'Strengths', desc: 'AI Companion for emotional intelligence', icon: Brain, path: '/strengths', stage: 'Discovery' },
+              { label: 'Revvault', desc: 'Persistent data layer (credentials)', icon: Database, path: '/wavvault', stage: 'Branding' },
+              { label: 'Job Matches', desc: 'Modern Strengths-based profiling', icon: Target, path: '/matches', stage: 'Outreach' },
+            ].map((card, i) => {
+              const stages = ['Dive-In', 'Ignition', 'Discovery', 'Branding', 'Outreach'];
+              const currentIdx = stages.indexOf(timelineStage);
+              const cardIdx = stages.indexOf(card.stage);
+              const isLocked = currentIdx < cardIdx;
+
+              return (
+                <button 
+                  key={i} 
+                  onClick={() => !isLocked && navigate(card.path)}
+                  disabled={isLocked}
+                  className={`glass-panel p-8 rounded-[2rem] border border-white/5 bg-black/40 transition-all text-left group relative ${
+                    isLocked ? 'opacity-50 cursor-not-allowed' : 'hover:bg-neon-cyan/5 hover:border-neon-cyan/30'
+                  }`}
+                >
+                  {isLocked && (
+                    <div className="absolute top-4 right-4">
+                      <Lock className="w-4 h-4 text-white/20" />
+                    </div>
+                  )}
+                  <div className={`w-12 h-12 rounded-2xl bg-neon-cyan/10 border border-neon-cyan/20 flex items-center justify-center mb-6 transition-all ${
+                    !isLocked && 'group-hover:scale-110 group-hover:bg-neon-cyan/20'
+                  }`}>
+                    <card.icon className="w-6 h-6 text-neon-cyan" />
+                  </div>
+                  <h3 className={`text-xl font-bold mb-3 transition-colors ${!isLocked && 'group-hover:text-neon-cyan'}`}>{card.label}</h3>
+                  <p className="text-xs text-white/40 leading-relaxed font-medium">{card.desc}</p>
+                </button>
+              );
+            })}
+          </div>
+        </div>
+
+        {/* Middle Row: Journey Timeline */}
+        <div className="glass-panel p-12 rounded-[2.5rem] border border-white/5 bg-black/40 mb-8 relative overflow-hidden">
+          <div className="absolute top-0 right-0 p-10 opacity-[0.02]">
+            <Rocket className="w-48 h-48 text-neon-cyan" />
+          </div>
+          <JourneyTimeline stage={timelineStage} />
+        </div>
+
+        {/* Phase Details Modal-like Section */}
+        <div className="mb-12">
+          <PhaseDetails 
+            stage={timelineStage} 
+            milestones={data?.milestones || []} 
+            onToggleMilestone={handleToggleMilestone}
+            onViewRoadmap={() => setShowRoadmap(true)}
+            onCompletePhase={handleCompletePhase}
+          />
+        </div>
+
+        {/* Roadmap Modal */}
+        <AnimatePresence>
+          {showRoadmap && (
+            <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 md:p-8">
+              <motion.div
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                onClick={() => setShowRoadmap(false)}
+                className="absolute inset-0 bg-black/80 backdrop-blur-sm"
+              />
+              <motion.div
+                initial={{ opacity: 0, scale: 0.95, y: 20 }}
+                animate={{ opacity: 1, scale: 1, y: 0 }}
+                exit={{ opacity: 0, scale: 0.95, y: 20 }}
+                className="relative w-full max-w-5xl max-h-[90vh] overflow-y-auto glass-panel p-8 md:p-12 rounded-[2.5rem] border border-white/10 bg-black/90 shadow-2xl"
+              >
+                <button 
+                  onClick={() => setShowRoadmap(false)}
+                  className="absolute top-6 right-6 p-2 rounded-full bg-white/5 border border-white/10 text-white/40 hover:text-white transition-colors"
+                >
+                  <X className="w-6 h-6" />
+                </button>
+
+                <div className="mb-10">
+                  <h2 className="text-3xl font-display font-bold text-white mb-2">Kickspark Journey Roadmap</h2>
+                  <p className="text-white/40">Your complete 12-week systemic career transition path.</p>
                 </div>
-                <h3 className="text-lg font-bold mb-2">{card.label}</h3>
-                <p className="text-xs text-white/40 leading-relaxed">{card.desc}</p>
-              </div>
-            ))}
-          </div>
-        </div>
 
-        {/* Discovery Timeline */}
-        <div className="glass-panel p-8 rounded-3xl border border-white/5 bg-white/[0.02] mb-8">
-          <div className="flex items-center justify-center gap-12 mb-8">
-            <div className="flex items-center gap-4">
-              <span className={`text-4xl font-display font-bold ${data.discoveryProgress === 'discovery' ? 'text-amber-500' : 'text-white/20'}`}>Discovery</span>
-              <ChevronRight className="w-8 h-8 text-white/10" />
+                <MilestoneRoadmap 
+                  milestones={data?.milestones || []}
+                  currentWeek={data?.milestones?.find(m => !m.completed)?.week || 1}
+                  onToggleMilestone={handleToggleMilestone}
+                  validationGateMode={data?.validationGateMode || 'soft-warning'}
+                  rppValidated={data?.rppValidated || false}
+                />
+              </motion.div>
             </div>
-            <div className="flex items-center gap-4">
-              <span className={`text-4xl font-display font-bold ${data.discoveryProgress === 'map' ? 'text-amber-500' : 'text-white/20'}`}>Map</span>
-              <ChevronRight className="w-8 h-8 text-white/10" />
-            </div>
-            <div className="flex items-center gap-4">
-              <span className={`text-4xl font-display font-bold ${data.discoveryProgress === 'match' ? 'text-amber-500' : 'text-white/20'}`}>Match</span>
-            </div>
-          </div>
-          
-          <div className="relative h-2 bg-white/5 rounded-full overflow-hidden">
-            <div 
-              className="absolute top-0 left-0 h-full bg-amber-500 transition-all duration-1000"
-              style={{ width: data.discoveryProgress === 'discovery' ? '33%' : data.discoveryProgress === 'map' ? '66%' : '100%' }}
-            />
-            <div className="absolute top-0 left-0 w-full h-full flex justify-between px-[15%] -translate-y-1/2 mt-1">
-              <div className={`w-10 h-10 rounded-full border-4 border-[#050505] flex items-center justify-center ${data.discoveryProgress === 'discovery' ? 'bg-amber-500' : 'bg-white/10'}`}>
-                <Search className="w-4 h-4 text-black" />
-              </div>
-              <div className={`w-10 h-10 rounded-full border-4 border-[#050505] flex items-center justify-center ${data.discoveryProgress === 'map' ? 'bg-amber-500' : 'bg-white/10'}`}>
-                <Compass className="w-4 h-4 text-black" />
-              </div>
-              <div className={`w-10 h-10 rounded-full border-4 border-[#050505] flex items-center justify-center ${data.discoveryProgress === 'match' ? 'bg-amber-500' : 'bg-white/10'}`}>
-                <Handshake className="w-4 h-4 text-black" />
-              </div>
-            </div>
-          </div>
-        </div>
+          )}
+        </AnimatePresence>
 
+        {/* Bottom Row: 3 Columns */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-          {/* Gallup Strengths */}
-          <div className="glass-panel p-8 rounded-3xl border border-white/5 bg-white/[0.02]">
-            <h3 className="text-sm font-bold text-white/40 uppercase tracking-widest mb-8">My Strengths Profile (Gallup)</h3>
-            <div className="space-y-6">
-              {data.strengths.map((strength, i) => (
-                <div key={i} className="space-y-2">
-                  <div className="flex justify-between text-xs font-medium">
-                    <span className="text-white/60">{strength.name}</span>
-                    <span className="text-amber-500">{strength.value}%</span>
+          {/* Column 1: Gallup Strengths */}
+          <div className="glass-panel p-10 rounded-[2.5rem] border border-white/5 bg-black/40">
+            <h3 className="text-xs font-bold text-white/40 uppercase tracking-[0.3em] mb-10 flex items-center gap-2">
+              <Award className="w-4 h-4 text-neon-cyan" />
+              My Strengths Profile (Gallup)
+            </h3>
+            <div className="space-y-8">
+              {(profile?.brandDNAAttributes?.length ? profile.brandDNAAttributes : ['Strategic', 'Analytical', 'Creative', 'Collaborative']).map((attr, i) => {
+                const value = 85 - (i * 8); // Mock values for visual impact
+                return (
+                  <div key={i} className="space-y-3">
+                    <div className="flex justify-between text-[11px] font-bold uppercase tracking-widest">
+                      <span className="text-white/60">{attr}</span>
+                      <span className="text-neon-cyan neon-text-cyan">{value}%</span>
+                    </div>
+                    <div className="h-2 bg-white/5 rounded-full overflow-hidden border border-white/5">
+                      <motion.div 
+                        initial={{ width: 0 }}
+                        animate={{ width: `${value}%` }}
+                        transition={{ duration: 1.5, delay: i * 0.1 }}
+                        className="h-full bg-gradient-to-r from-neon-cyan/60 to-neon-cyan shadow-[0_0_10px_rgba(0,243,255,0.3)]"
+                      />
+                    </div>
                   </div>
-                  <div className="h-1.5 bg-white/5 rounded-full overflow-hidden">
-                    <motion.div 
-                      initial={{ width: 0 }}
-                      animate={{ width: `${strength.value}%` }}
-                      transition={{ duration: 1, delay: i * 0.1 }}
-                      className="h-full bg-amber-500/60"
-                    />
-                  </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
-            <button className="w-full mt-8 py-3 rounded-xl border border-white/10 text-xs font-bold uppercase tracking-widest hover:bg-white/5 transition-all">
+            <button 
+              onClick={() => navigate('/strengths')}
+              className="w-full mt-12 py-4 rounded-2xl border border-white/10 text-[10px] font-bold uppercase tracking-[0.2em] hover:bg-neon-cyan/10 hover:border-neon-cyan/30 transition-all"
+            >
               Details Profile
             </button>
           </div>
 
-          {/* Resume & Credentials */}
-          <div className="glass-panel p-8 rounded-3xl border border-white/5 bg-white/[0.02]">
-            <h3 className="text-sm font-bold text-white/40 uppercase tracking-widest mb-8">Resume & Credentials (Wavvault)</h3>
+          {/* Column 2: Resume & Credentials */}
+          <div className="glass-panel p-10 rounded-[2.5rem] border border-white/5 bg-black/40">
+            <h3 className="text-xs font-bold text-white/40 uppercase tracking-[0.3em] mb-10 flex items-center gap-2">
+              <FileText className="w-4 h-4 text-neon-cyan" />
+              Resume & Credentials (Wavvault)
+            </h3>
             <div className="space-y-6">
-              <div className="flex items-start gap-4 group cursor-pointer">
-                <div className="w-10 h-10 rounded-xl bg-white/5 flex items-center justify-center group-hover:bg-amber-500/10 transition-all">
-                  <Database className="w-5 h-5 text-white/20 group-hover:text-amber-500" />
-                </div>
-                <div className="flex-1">
-                  <h4 className="text-sm font-bold mb-1">Resume Process</h4>
-                  <p className="text-xs text-white/40">{data.resumeStatus}</p>
-                </div>
-                <ChevronRight className="w-4 h-4 text-white/20" />
-              </div>
-              <div className="flex items-start gap-4 group cursor-pointer">
-                <div className="w-10 h-10 rounded-xl bg-white/5 flex items-center justify-center group-hover:bg-amber-500/10 transition-all">
-                  <User className="w-5 h-5 text-white/20 group-hover:text-amber-500" />
-                </div>
-                <div className="flex-1">
-                  <h4 className="text-sm font-bold mb-1">Career Profile</h4>
-                  <p className="text-xs text-white/40">{data.careerProfileStatus}</p>
-                </div>
-                <ChevronRight className="w-4 h-4 text-white/20" />
-              </div>
+              {[
+                { label: 'Resume Process', status: 'Reviewing items and themes', path: '/wavvault/resume' },
+                { label: 'Custom Profile', status: 'Modified achievements, skills, and stories', path: '/profile' },
+                { label: 'Certifications', status: '3 verified credentials', path: '/wavvault/credentials' },
+              ].map((item, i) => (
+                <button 
+                  key={i} 
+                  onClick={() => navigate(item.path)}
+                  className="w-full flex items-center justify-between p-5 rounded-2xl bg-white/5 border border-white/5 hover:bg-neon-cyan/5 hover:border-neon-cyan/20 transition-all group"
+                >
+                  <div className="text-left">
+                    <h4 className="text-sm font-bold mb-1 group-hover:text-neon-cyan transition-colors">{item.label}</h4>
+                    <p className="text-[10px] text-white/40 font-medium">{item.status}</p>
+                  </div>
+                  <ChevronRight className="w-4 h-4 text-white/20 group-hover:text-neon-cyan transition-all" />
+                </button>
+              ))}
             </div>
-            <button className="w-full mt-8 py-3 rounded-xl border border-white/10 text-xs font-bold uppercase tracking-widest hover:bg-white/5 transition-all">
-              Revvault Details
+            <button 
+              onClick={() => navigate('/wavvault')}
+              className="w-full mt-12 py-4 rounded-2xl border border-white/10 text-[10px] font-bold uppercase tracking-[0.2em] hover:bg-neon-cyan/10 hover:border-neon-cyan/30 transition-all"
+            >
+              Revvault
             </button>
           </div>
 
-          {/* Job Matches */}
-          <div className="glass-panel p-8 rounded-3xl border border-white/5 bg-white/[0.02]">
-            <h3 className="text-sm font-bold text-white/40 uppercase tracking-widest mb-8">Job Matches & Coaching</h3>
+          {/* Column 3: Job Matches */}
+          <div className="glass-panel p-10 rounded-[2.5rem] border border-white/5 bg-black/40">
+            <h3 className="text-xs font-bold text-white/40 uppercase tracking-[0.3em] mb-10 flex items-center gap-2">
+              <Target className="w-4 h-4 text-neon-cyan" />
+              Job Matches & Coaching
+            </h3>
             <div className="space-y-6">
-              {data.jobMatches.map((job, i) => (
-                <div key={i} className="flex items-start gap-4 group cursor-pointer">
-                  <div className="w-10 h-10 rounded-xl bg-white/5 flex items-center justify-center group-hover:bg-amber-500/10 transition-all">
-                    <Briefcase className="w-5 h-5 text-white/20 group-hover:text-amber-500" />
+              {(data?.jobMatches?.length ? data.jobMatches : [
+                { title: 'Senior Product Designer', company: 'TechFlow', matchScore: 94 },
+                { title: 'UX Strategist', company: 'Global Creative', matchScore: 88 },
+                { title: 'Design Systems Lead', company: 'Innova', matchScore: 82 },
+              ]).map((job, i) => (
+                <button 
+                  key={i} 
+                  onClick={() => navigate(`/matches/${i}`)}
+                  className="w-full flex items-start gap-5 p-5 rounded-2xl bg-white/5 border border-white/5 hover:bg-neon-cyan/5 hover:border-neon-cyan/20 transition-all group"
+                >
+                  <div className="w-12 h-12 rounded-2xl bg-white/5 flex items-center justify-center group-hover:bg-neon-cyan/10 transition-all">
+                    <Briefcase className="w-6 h-6 text-white/20 group-hover:text-neon-cyan" />
                   </div>
-                  <div className="flex-1">
-                    <h4 className="text-sm font-bold mb-1">{job.title}</h4>
-                    <p className="text-xs text-white/40">{job.company} • {job.matchScore}% Match</p>
+                  <div className="flex-1 text-left">
+                    <h4 className="text-sm font-bold mb-1 group-hover:text-neon-cyan transition-colors">{job.title}</h4>
+                    <p className="text-[10px] text-white/40 font-medium">{job.company} • {job.matchScore}% Match</p>
                   </div>
-                  <ChevronRight className="w-4 h-4 text-white/20" />
-                </div>
+                  <ChevronRight className="w-4 h-4 text-white/20 group-hover:text-neon-cyan transition-all mt-1" />
+                </button>
               ))}
             </div>
-            <button className="w-full mt-8 py-3 rounded-xl border border-white/10 text-xs font-bold uppercase tracking-widest hover:bg-white/5 transition-all">
+            <button 
+              onClick={() => navigate('/matches')}
+              className="w-full mt-12 py-4 rounded-2xl border border-white/10 text-[10px] font-bold uppercase tracking-[0.2em] hover:bg-neon-cyan/10 hover:border-neon-cyan/30 transition-all"
+            >
               Job Matches
             </button>
           </div>
         </div>
       </main>
+
+      <InvitationModal 
+        isOpen={isInvitationModalOpen} 
+        onClose={() => setIsInvitationModalOpen(false)} 
+      />
     </div>
   );
 };

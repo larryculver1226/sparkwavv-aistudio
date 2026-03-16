@@ -1,15 +1,30 @@
 import { GoogleGenAI, Type } from "@google/genai";
 
-const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY || "" });
+const getApiKey = () => {
+  return process.env.GEMINI_API_KEY || process.env.API_KEY || (import.meta as any).env?.VITE_GEMINI_API_KEY || "";
+};
+
+const ai = new GoogleGenAI({ apiKey: getApiKey() });
 
 export interface UserData {
   onboarding: {
+    firstName: string;
+    lastName: string;
+    jobTitle: string;
+    companyOrg: string;
+    email: string;
+    phone: string;
+    programTrack: string;
+    lifecycleStage: string;
+    outcomesAttributes: string;
+    feedbackQuote: string;
+    userId: string;
+    password?: string;
+    // Legacy fields for compatibility
     name: string;
     role: string;
     bio: string;
-    email: string;
     industry: string;
-    password?: string;
   };
   accomplishments: { title: string; description: string }[];
   environment: {
@@ -31,7 +46,7 @@ export async function generateBrandImage(
   mimeType?: string,
   size: "1K" | "2K" | "4K" = "1K"
 ) {
-  const ai = new GoogleGenAI({ apiKey: process.env.API_KEY || "" });
+  const ai = new GoogleGenAI({ apiKey: getApiKey() });
   
   const parts: any[] = [{ text: prompt }];
   if (base64Image && mimeType) {
@@ -72,7 +87,7 @@ export async function generateBrandImage(
 
 export async function generateDiscoverySummary(userData: UserData) {
   const prompt = `
-    Act as a high-end career branding strategist for Sparkwavv. 
+    Act as a high-end career branding strategist for SPARKWavv. 
     Analyze the following user data and generate a "Discovery Summary".
     
     User Data:

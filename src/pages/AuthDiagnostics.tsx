@@ -30,7 +30,7 @@ export const AuthDiagnostics: React.FC = () => {
         <header className="flex justify-between items-end">
           <div>
             <h1 className="text-4xl font-display font-bold">Connectivity Diagnostics</h1>
-            <p className="text-white/40 mt-2">Evaluate Sparkwavv & Firebase integration status</p>
+            <p className="text-white/40 mt-2">Evaluate SPARKWavv & Firebase integration status</p>
           </div>
           <button 
             onClick={checkStatus}
@@ -49,7 +49,7 @@ export const AuthDiagnostics: React.FC = () => {
             className="glass-panel p-8 space-y-6"
           >
             <div className="flex items-center gap-4">
-              <div className={`w-12 h-12 rounded-2xl flex items-center justify-center ${isFirebaseConfigured ? 'bg-emerald-500/10 text-emerald-500' : 'bg-red-500/10 text-red-500'}`}>
+              <div className={`w-12 h-12 rounded-2xl flex items-center justify-center ${isFirebaseConfigured ? 'bg-neon-lime/10 text-neon-lime' : 'bg-neon-magenta/10 text-neon-magenta'}`}>
                 {isFirebaseConfigured ? <ShieldCheck className="w-6 h-6" /> : <ShieldAlert className="w-6 h-6" />}
               </div>
               <div>
@@ -64,13 +64,13 @@ export const AuthDiagnostics: React.FC = () => {
                   <Key className="w-4 h-4 text-white/40" />
                   <span className="text-sm">API Key Status</span>
                 </div>
-                <span className={`text-xs font-bold px-2 py-1 rounded-full ${isFirebaseConfigured ? 'bg-emerald-500/20 text-emerald-500' : 'bg-red-500/20 text-red-500'}`}>
+                <span className={`text-xs font-bold px-2 py-1 rounded-full ${isFirebaseConfigured ? 'bg-neon-lime/20 text-neon-lime' : 'bg-neon-magenta/20 text-neon-magenta'}`}>
                   {isFirebaseConfigured ? 'CONFIGURED' : 'MISSING'}
                 </span>
               </div>
               
               {!isFirebaseConfigured && (
-                <div className="p-4 rounded-xl bg-red-500/10 border border-red-500/20 text-xs text-red-400 leading-relaxed">
+                <div className="p-4 rounded-xl bg-neon-magenta/10 border border-neon-magenta/20 text-xs text-neon-magenta leading-relaxed">
                   <strong>Error:</strong> auth/invalid-api-key. Please ensure VITE_FIREBASE_API_KEY is set in your environment variables.
                 </div>
               )}
@@ -85,11 +85,11 @@ export const AuthDiagnostics: React.FC = () => {
             className="glass-panel p-8 space-y-6"
           >
             <div className="flex items-center gap-4">
-              <div className={`w-12 h-12 rounded-2xl flex items-center justify-center ${status?.admin ? 'bg-emerald-500/10 text-emerald-500' : 'bg-amber-500/10 text-amber-500'}`}>
+              <div className={`w-12 h-12 rounded-2xl flex items-center justify-center ${status?.admin ? 'bg-neon-lime/10 text-neon-lime' : 'bg-neon-cyan/10 text-neon-cyan'}`}>
                 {status?.admin ? <Server className="w-6 h-6" /> : <ShieldAlert className="w-6 h-6" />}
               </div>
               <div>
-                <h3 className="text-xl font-bold">Sparkwavv Backend</h3>
+                <h3 className="text-xl font-bold">SPARKWavv Backend</h3>
                 <p className="text-sm text-white/40">Firebase Admin SDK Status</p>
               </div>
             </div>
@@ -97,11 +97,21 @@ export const AuthDiagnostics: React.FC = () => {
             <div className="space-y-4">
               <div className="flex justify-between items-center p-4 rounded-xl bg-white/5 border border-white/10">
                 <div className="flex items-center gap-3">
-                  <Database className="w-4 h-4 text-white/40" />
+                  <Server className="w-4 h-4 text-white/40" />
                   <span className="text-sm">Admin Credentials</span>
                 </div>
-                <span className={`text-xs font-bold px-2 py-1 rounded-full ${status?.admin ? 'bg-emerald-500/20 text-emerald-500' : 'bg-amber-500/20 text-amber-500'}`}>
+                <span className={`text-xs font-bold px-2 py-1 rounded-full ${status?.admin ? 'bg-neon-lime/20 text-neon-lime' : 'bg-neon-cyan/20 text-neon-cyan'}`}>
                   {status?.admin ? 'ACTIVE' : 'INACTIVE'}
+                </span>
+              </div>
+
+              <div className="flex justify-between items-center p-4 rounded-xl bg-white/5 border border-white/10">
+                <div className="flex items-center gap-3">
+                  <Database className="w-4 h-4 text-white/40" />
+                  <span className="text-sm">Firestore Status</span>
+                </div>
+                <span className={`text-xs font-bold px-2 py-1 rounded-full ${status?.firestore === 'connected' ? 'bg-neon-lime/20 text-neon-lime' : 'bg-neon-magenta/20 text-neon-magenta'}`}>
+                  {status?.firestore?.toUpperCase() || 'UNKNOWN'}
                 </span>
               </div>
 

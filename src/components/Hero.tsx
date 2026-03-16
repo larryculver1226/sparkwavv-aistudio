@@ -39,15 +39,15 @@ export const Hero: React.FC = () => {
       id: 2,
       title: "Placeholder Panel 2",
       description: "This is a placeholder for the second hero panel. We will add specific content here in the next step.",
-      icon: <Zap className="w-6 h-6 text-purple-500" />,
-      color: "from-purple-500/20 to-transparent"
+      icon: <Zap className="w-6 h-6 text-neon-magenta" />,
+      color: "from-neon-magenta/20 to-transparent"
     },
     {
       id: 3,
       title: "Placeholder Panel 3",
       description: "This is a placeholder for the third hero panel. We will add specific content here in the next step.",
-      icon: <Target className="w-6 h-6 text-emerald-500" />,
-      color: "from-emerald-500/20 to-transparent"
+      icon: <Target className="w-6 h-6 text-neon-lime" />,
+      color: "from-neon-lime/20 to-transparent"
     }
   ];
 
@@ -60,7 +60,7 @@ export const Hero: React.FC = () => {
             Our <span className="text-neon-cyan italic">Vision</span>
           </h2>
           <p className="text-xl text-white/60 max-w-3xl mx-auto leading-relaxed">
-            Sparkwavv redefines job search into a Career Happiness Journey, focusing on what truly matters.
+            SPARKWavv redefines job search into a Career Happiness Journey, focusing on what truly matters.
           </p>
         </div>
 
@@ -95,14 +95,14 @@ export const Hero: React.FC = () => {
       {/* Experience Section */}
       <div className="text-center space-y-6">
         <h2 className="text-5xl md:text-6xl font-display font-bold text-white tracking-tight">
-          The <span className="text-neon-cyan italic">Sparkwavv-Skylar</span> Experience
+          The <span className="text-neon-cyan italic">SPARKWavv-Skylar</span> Experience
         </h2>
         <p className="text-xl text-white/60 max-w-3xl mx-auto leading-relaxed">
-          A visual walkthrough of your journey to career happiness with Sparkwavv's AI-powered platform and secure Wavvault data storage.
+          A visual walkthrough of your journey to career happiness with SPARKWavv's AI-powered platform and secure Wavvault data storage.
         </p>
         
         <div className="pt-12">
-          <div className="max-h-[700px] overflow-y-auto pr-4 no-scrollbar scroll-smooth rounded-3xl border-2 border-blue-500/40 p-6 bg-white/[0.02]">
+          <div className="max-h-[700px] overflow-y-auto pr-4 no-scrollbar scroll-smooth rounded-3xl border-2 border-neon-cyan/40 p-6 bg-white/[0.02]">
             {/* Phase 1: Dive In Phase */}
             <div className="w-full">
               <div className="w-full rounded-3xl border border-white/10 bg-black/60 overflow-hidden relative p-8 md:p-12">

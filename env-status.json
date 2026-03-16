@@ -1,0 +1,12 @@
+{
+  "VITE_FIREBASE_API_KEY": "AIzaSyD-BgjCPNV0qSA6m9OEm31cyXSurvyhSsM",
+  "VITE_FIREBASE_AUTH_DOMAIN": "gen-lang-client-0981029715.firebaseapp.com",
+  "VITE_FIREBASE_PROJECT_ID": "gen-lang-client-0981029715",
+  "VITE_FIREBASE_STORAGE_BUCKET": "gen-lang-client-0981029715.firebasestorage.app",
+  "VITE_FIREBASE_MESSAGING_SENDER_ID": "1065181149020",
+  "VITE_FIREBASE_APP_ID": "1:1065181149020:web:12f7871f27982cd426f399",
+  "FIREBASE_PROJECT_ID": "gen-lang-client-0883822731",
+  "FIREBASE_CLIENT_EMAIL": "firebase-adminsdk-fbsvc@gen-lang-client-0883822731.iam.gserviceaccount.com",
+  "FIREBASE_PRIVATE_KEY": "PRESENT",
+  "USER_COUNT": 1
+}
