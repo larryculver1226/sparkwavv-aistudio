@@ -14,6 +14,14 @@ service cloud.firestore {
     //   - brand: string (required) - sparkwavv or kwieri
     //   - description: string (optional)
     //
+    // Collection: admins
+    // Document ID: {uid}
+    // Fields:
+    //   - uid: string (required)
+    //   - email: string (required)
+    //   - role: string (required) - admin, operator, viewer
+    //   - createdAt: timestamp (required)
+    //
     // Collection: users
     // Document ID: {uid}
     // Fields:
@@ -147,12 +155,16 @@ service cloud.firestore {
 
     function isAdmin() {
       return isAuthenticated() && 
-        (get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin' ||
-         (request.auth.token.email == "larry.culver1226@gmail.com" && request.auth.token.email_verified == true));
+        (get(/databases/$(database)/documents/admins/$(request.auth.uid)).data.role == 'admin' ||
+         get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin' ||
+         (request.auth.token.email.lower() == "larry.culver1226@gmail.com" && (request.auth.token.email_verified == true || request.auth.token.firebase.sign_in_provider == "google.com")));
     }
 
     function isOperator() {
-      return isAuthenticated() && isAdmin();
+      return isAuthenticated() && 
+        (isAdmin() || 
+         get(/databases/$(database)/documents/admins/$(request.auth.uid)).data.role == 'operator' ||
+         get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'operator');
     }
 
     function isRecent(time) {
@@ -188,21 +200,42 @@ service cloud.firestore {
     // Domain Validators
     // ===============================================================
 
+    function isValidAdmin(data) {
+      let allowedFields = ['uid', 'email', 'role', 'createdAt'];
+      return hasRequiredFields(allowedFields) &&
+             hasOnlyAllowedFields(allowedFields) &&
+             data.uid == request.auth.uid &&
+             isValidEmail(data.email) &&
+             data.role in ['admin', 'operator', 'viewer'] &&
+             isRecent(data.createdAt);
+    }
+
     function isValidUser(data) {
-      let allowedFields = ['uid', 'sparkwavvId', 'email', 'displayName', 'role', 'tenantId', 'generationalPersona', 'careerStageRole', 'hierarchicalRole', 'brandPersona', 'brandDNAAttributes', 'journeyStage', 'onboardingComplete', 'linkedinId', 'linkedinProfile'];
+      let allowedFields = [
+        'uid', 'sparkwavvId', 'email', 'displayName', 'role', 'tenantId', 
+        'generationalPersona', 'careerStageRole', 'hierarchicalRole', 'brandPersona', 
+        'brandDNAAttributes', 'journeyStage', 'onboardingComplete', 'linkedinId', 'linkedinProfile',
+        'firstName', 'lastName', 'jobTitle', 'companyOrg', 'phone', 'programTrack', 
+        'lifecycleStage', 'outcomesAttributes', 'feedbackQuote', 'userId', 'createdAt',
+        'userData', 'currentStep', 'summary', 'updatedAt'
+      ];
       return hasRequiredFields(['uid', 'email', 'role', 'tenantId']) &&
              hasOnlyAllowedFields(allowedFields) &&
              data.uid is string && data.uid.size() < 128 &&
              isValidEmail(data.email) && data.email.size() < 256 &&
              data.role in ['admin', 'user', 'operator', 'mentor', 'agent'] &&
              data.tenantId is string && data.tenantId.size() < 64 &&
-             (!('sparkwavvId' in data) || (data.sparkwavvId is string && data.sparkwavvId.size() < 64)) &&
-             (!('displayName' in data) || (data.displayName is string && data.displayName.size() < 100)) &&
-             (!('generationalPersona' in data) || data.generationalPersona in ["Gen Z", "Millennial", "Gen X", "Baby Boomer", "Silent Generation", "Alpha", "Beta"]) &&
-             (!('careerStageRole' in data) || data.careerStageRole in ["Wave Rider", "Explorer", "Career Switcher"]) &&
-             (!('hierarchicalRole' in data) || data.hierarchicalRole in ["Owner", "C-suite", "Vice President", "Director or Manager", "Consultant", "Independent Contractor"]) &&
-             (!('brandPersona' in data) || data.brandPersona in ["Left Brain (Kick/Yin)", "Right Brain (Spark/Yang)"]) &&
-             (!('journeyStage' in data) || data.journeyStage in ["Dive-In", "Ignition", "Discovery", "Branding", "Outreach", "NONE"]);
+             (!('firstName' in data) || (data.firstName is string && data.firstName.size() < 100)) &&
+             (!('lastName' in data) || (data.lastName is string && data.lastName.size() < 100)) &&
+             (!('jobTitle' in data) || (data.jobTitle is string && data.jobTitle.size() < 100)) &&
+             (!('companyOrg' in data) || (data.companyOrg is string && data.companyOrg.size() < 100)) &&
+             (!('phone' in data) || (data.phone is string && data.phone.size() < 32)) &&
+             (!('programTrack' in data) || (data.programTrack is string && data.programTrack.size() < 100)) &&
+             (!('lifecycleStage' in data) || (data.lifecycleStage is string && data.lifecycleStage.size() < 100)) &&
+             (!('outcomesAttributes' in data) || (data.outcomesAttributes is string && data.outcomesAttributes.size() < 500)) &&
+             (!('feedbackQuote' in data) || (data.feedbackQuote is string && data.feedbackQuote.size() < 1000)) &&
+             (!('userId' in data) || (data.userId is string && data.userId.size() < 128)) &&
+             (!('updatedAt' in data) || isRecent(data.updatedAt));
     }
 
     function isValidDashboard(data) {
@@ -348,6 +381,13 @@ service cloud.firestore {
     // Default deny
     match /{path=**} {
       allow read, write: if false;
+    }
+
+    match /admins/{uid} {
+      allow read: if isOwner(uid) || isAdmin();
+      allow create: if isAdmin() && isValidAdmin(request.resource.data);
+      allow update: if isAdmin() && isValidAdmin(request.resource.data) && unchanged('uid') && unchanged('email');
+      allow delete: if isAdmin() && uid != request.auth.uid; // Prevent self-deletion
     }
 
     match /tenants/{tenantId} {

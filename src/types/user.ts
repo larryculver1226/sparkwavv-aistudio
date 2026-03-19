@@ -8,6 +8,7 @@ export interface UserProfile {
   displayName?: string;
   photoURL?: string;
   role: UserRole;
+  jobTitle?: string;
   tenantId: string;
   generationalPersona?: string;
   careerStageRole?: string;

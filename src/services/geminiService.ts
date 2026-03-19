@@ -1,10 +1,23 @@
 import { GoogleGenAI, Type } from "@google/genai";
+import { getGeminiApiKey } from './aiConfig';
 
-const getApiKey = () => {
-  return process.env.GEMINI_API_KEY || process.env.API_KEY || (import.meta as any).env?.VITE_GEMINI_API_KEY || "";
+// Lazy initialization of Gemini
+let aiInstance: GoogleGenAI | null = null;
+
+const getAI = () => {
+  if (!aiInstance) {
+    const apiKey = getGeminiApiKey();
+    if (!apiKey) {
+      console.error("GeminiService: GEMINI_API_KEY is missing.");
+      throw new Error("GEMINI_API_KEY is not configured in the environment variables. Please check your AI Studio settings.");
+    } else {
+      const maskedKey = apiKey.length > 8 ? `${apiKey.substring(0, 4) }...${apiKey.substring(apiKey.length - 4)}` : "****";
+      console.log(`GeminiService: Initializing GoogleGenAI with key: ${maskedKey} (length: ${apiKey.length})`);
+    }
+    aiInstance = new GoogleGenAI({ apiKey });
+  }
+  return aiInstance;
 };
-
-const ai = new GoogleGenAI({ apiKey: getApiKey() });
 
 export interface UserData {
   onboarding: {
@@ -46,7 +59,7 @@ export async function generateBrandImage(
   mimeType?: string,
   size: "1K" | "2K" | "4K" = "1K"
 ) {
-  const ai = new GoogleGenAI({ apiKey: getApiKey() });
+  const ai = getAI();
   
   const parts: any[] = [{ text: prompt }];
   if (base64Image && mimeType) {
@@ -113,6 +126,7 @@ export async function generateDiscoverySummary(userData: UserData) {
   `;
 
   try {
+    const ai = getAI();
     const response = await ai.models.generateContent({
       model: "gemini-3-flash-preview",
       contents: prompt,
@@ -166,6 +180,7 @@ export async function parseResume(fileData: string, mimeType: string) {
   `;
 
   try {
+    const ai = getAI();
     const response = await ai.models.generateContent({
       model: "gemini-3-flash-preview",
       contents: [

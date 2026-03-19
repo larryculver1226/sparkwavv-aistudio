@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { X, Send, UserPlus, Mail, ShieldCheck, Loader2 } from 'lucide-react';
 import { Button } from './Button';
-import { useAuthContext } from '../contexts/AuthContext';
+import { useIdentity } from '../contexts/IdentityContext';
 
 interface InvitationModalProps {
   isOpen: boolean;
@@ -10,7 +10,7 @@ interface InvitationModalProps {
 }
 
 export const InvitationModal: React.FC<InvitationModalProps> = ({ isOpen, onClose }) => {
-  const { user } = useAuthContext();
+  const { user } = useIdentity();
   const [email, setEmail] = useState('');
   const [name, setName] = useState('');
   const [relationship, setRelationship] = useState('Mentor');

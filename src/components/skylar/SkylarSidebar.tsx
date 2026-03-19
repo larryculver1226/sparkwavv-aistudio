@@ -13,22 +13,44 @@ import {
   Zap,
   Award,
   Compass,
-  Briefcase
+  Briefcase,
+  BrainCircuit,
+  Settings2,
+  CheckCircle2,
+  AlertCircle,
+  Lock
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { skylar, ChatMessage, SkylarPersona, PERSONA_CONFIG } from '../../services/skylarService';
-import { useAuthContext } from '../../contexts/AuthContext';
+import { useIdentity } from '../../contexts/IdentityContext';
 import { useLocation } from 'react-router-dom';
 
-export const SkylarSidebar: React.FC = () => {
+type Methodology = 'lobkowicz' | 'feynman';
+
+interface SkylarProposal {
+  type: 'PROPOSAL';
+  action: 'update_dashboard' | 'add_milestone';
+  data: any;
+  reasoning: string;
+}
+
+interface SkylarSidebarProps {
+  onLogin?: () => void;
+}
+
+export const SkylarSidebar: React.FC<SkylarSidebarProps> = ({ onLogin }) => {
   const [isOpen, setIsOpen] = useState(false);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [isSpeaking, setIsSpeaking] = useState(false);
   const [persona, setPersona] = useState<SkylarPersona>('discovery');
+  const [methodology, setMethodology] = useState<Methodology>('lobkowicz');
   const [isListening, setIsListening] = useState(false);
-  const { user, mockUser } = useAuthContext();
+  const [proposals, setProposals] = useState<Record<number, SkylarProposal>>({});
+  const [executedActions, setExecutedActions] = useState<Record<number, boolean>>({});
+  const [error, setError] = useState<string | null>(null);
+  const { user } = useIdentity();
   const location = useLocation();
   const scrollRef = useRef<HTMLDivElement>(null);
   const audioRef = useRef<HTMLAudioElement>(null);
@@ -98,16 +120,16 @@ export const SkylarSidebar: React.FC = () => {
   // Load chat history
   useEffect(() => {
     const loadHistory = async () => {
-      const uid = user?.uid || mockUser?.uid;
+      const uid = user?.uid;
       if (uid) {
         const history = await skylar.getChatHistory(uid);
         setMessages(history);
       }
     };
-    if (isOpen && (user || mockUser)) {
+    if (isOpen && user) {
       loadHistory();
     }
-  }, [isOpen, user, mockUser]);
+  }, [isOpen, user]);
 
   // Scroll to bottom on new message
   useEffect(() => {
@@ -117,7 +139,12 @@ export const SkylarSidebar: React.FC = () => {
   }, [messages]);
 
   const handleSend = async () => {
-    if (!input.trim() || (!user && !mockUser)) return;
+    if (!input.trim()) return;
+
+    if (!user) {
+      setError("Authentication required. Please login to chat with Skylar.");
+      return;
+    }
 
     const userMessage: ChatMessage = {
       role: 'user',
@@ -125,29 +152,89 @@ export const SkylarSidebar: React.FC = () => {
     };
 
     setMessages(prev => [...prev, userMessage]);
+    const currentInput = input;
     setInput('');
     setIsLoading(true);
+    setError(null);
 
     try {
-      const response = await skylar.generateResponse(persona, input, messages);
+      const uid = user.uid;
+      const token = await user.getIdToken();
+      
+      // Convert history to Vertex format
+      const vertexHistory = messages.map(msg => ({
+        role: msg.role,
+        parts: msg.parts
+      }));
+
+      const response = await skylar.chatWithVertex(uid, currentInput, vertexHistory, methodology, token);
+      
+      const modelParts = response.candidates[0].content.parts;
+      const textPart = modelParts.find((p: any) => p.text);
+      const functionCallPart = modelParts.find((p: any) => p.functionCall);
+
+      let responseText = textPart?.text || "";
+      
+      if (functionCallPart && functionCallPart.functionCall.name.startsWith('propose_')) {
+        const { name, args } = functionCallPart.functionCall;
+        const proposal: SkylarProposal = {
+          type: 'PROPOSAL',
+          action: name === 'propose_dashboard_update' ? 'update_dashboard' : 'add_milestone',
+          data: args,
+          reasoning: (args as any).reasoning || "Skylar suggests this based on your conversation."
+        };
+        
+        const messageIndex = messages.length + 1;
+        setProposals(prev => ({ ...prev, [messageIndex]: proposal }));
+      }
+
       const modelMessage: ChatMessage = {
         role: 'model',
-        parts: [{ text: response }]
+        parts: [{ text: responseText || "I've processed your request. How else can I help?" }]
       };
       
       setMessages(prev => {
         const updatedMessages = [...prev, modelMessage];
-        // Save to Wavvault
-        skylar.saveChatToWavvault(user?.uid || mockUser?.uid || '', updatedMessages);
+        skylar.saveChatToWavvault(uid, updatedMessages);
         return updatedMessages;
       });
       
-      // Auto-speak if it's a short response or a proactive nudge
-      if (response.length < 200) {
-        handleSpeak(response);
+      if (responseText && responseText.length < 200) {
+        handleSpeak(responseText);
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error generating response:", error);
+      setError(error.message || "Skylar is currently unavailable.");
+      // Put the input back if it failed
+      setInput(currentInput);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleExecuteAction = async (index: number) => {
+    const proposal = proposals[index];
+    if (!proposal || !user) return;
+
+    const uid = user.uid;
+    setIsLoading(true);
+    setError(null);
+
+    try {
+      const token = await user.getIdToken();
+      
+      await skylar.executeAction(uid, proposal.action, proposal.data, token);
+      setExecutedActions(prev => ({ ...prev, [index]: true }));
+      
+      // Add a confirmation message from Skylar
+      const confirmationMsg: ChatMessage = {
+        role: 'model',
+        parts: [{ text: `✅ Action confirmed: ${proposal.action === 'update_dashboard' ? 'Dashboard updated' : 'Milestone added'}.` }]
+      };
+      setMessages(prev => [...prev, confirmationMsg]);
+    } catch (error: any) {
+      console.error("Action execution failed:", error);
+      setError(error.message || "Failed to execute action.");
     } finally {
       setIsLoading(false);
     }
@@ -215,7 +302,17 @@ export const SkylarSidebar: React.FC = () => {
                 </div>
                 <div>
                   <h3 className="text-sm font-bold text-white">{PERSONA_CONFIG[persona].name}</h3>
-                  <p className="text-[10px] text-white/40 uppercase font-bold tracking-widest">Voice: {PERSONA_CONFIG[persona].voice}</p>
+                  <div className="flex items-center gap-2 mt-1">
+                    <Settings2 className="w-3 h-3 text-white/20" />
+                    <select 
+                      value={methodology}
+                      onChange={(e) => setMethodology(e.target.value as Methodology)}
+                      className="bg-transparent text-[10px] text-white/40 uppercase font-bold tracking-widest outline-none cursor-pointer hover:text-neon-cyan transition-colors"
+                    >
+                      <option value="lobkowicz" className="bg-[#0a0a0a]">Philip Lobkowicz</option>
+                      <option value="feynman" disabled className="bg-[#0a0a0a]">Richard Feynman (Coming Soon)</option>
+                    </select>
+                  </div>
                 </div>
               </div>
               <button 
@@ -244,23 +341,80 @@ export const SkylarSidebar: React.FC = () => {
               )}
 
               {messages.map((msg, i) => (
-                <div key={i} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
-                  <div className={`max-w-[85%] p-4 rounded-2xl text-sm leading-relaxed ${
-                    msg.role === 'user' 
-                      ? 'bg-neon-cyan text-black font-medium' 
-                      : 'bg-white/5 text-white/80 border border-white/10'
-                  }`}>
-                    {msg.parts[0].text}
-                    {msg.role === 'model' && (
-                      <button 
-                        onClick={() => handleSpeak(msg.parts[0].text)}
-                        className="mt-2 flex items-center gap-1 text-[10px] uppercase font-bold text-white/40 hover:text-neon-cyan transition-colors"
-                      >
-                        {isSpeaking ? <VolumeX className="w-3 h-3" /> : <Volume2 className="w-3 h-3" />}
-                        {isSpeaking ? 'Stop' : 'Listen'}
-                      </button>
-                    )}
+                <div key={i} className="space-y-4">
+                  <div className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
+                    <div className={`max-w-[85%] p-4 rounded-2xl text-sm leading-relaxed ${
+                      msg.role === 'user' 
+                        ? 'bg-neon-cyan text-black font-medium' 
+                        : 'bg-white/5 text-white/80 border border-white/10'
+                    }`}>
+                      {msg.parts[0].text}
+                      {msg.role === 'model' && msg.parts[0].text && (
+                        <button 
+                          onClick={() => handleSpeak(msg.parts[0].text)}
+                          className="mt-2 flex items-center gap-1 text-[10px] uppercase font-bold text-white/40 hover:text-neon-cyan transition-colors"
+                        >
+                          {isSpeaking ? <VolumeX className="w-3 h-3" /> : <Volume2 className="w-3 h-3" />}
+                          {isSpeaking ? 'Stop' : 'Listen'}
+                        </button>
+                      )}
+                    </div>
                   </div>
+
+                  {/* Proposal Widget */}
+                  {msg.role === 'model' && proposals[i] && (
+                    <motion.div 
+                      initial={{ opacity: 0, y: 10 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      className="ml-4 mr-12 p-4 rounded-2xl bg-white/[0.02] border border-neon-cyan/20 space-y-3"
+                    >
+                      <div className="flex items-center gap-2 text-neon-cyan">
+                        <BrainCircuit className="w-4 h-4" />
+                        <span className="text-[10px] font-bold uppercase tracking-widest">Skylar Proposal</span>
+                      </div>
+                      
+                      <div className="space-y-1">
+                        <p className="text-xs font-bold text-white">
+                          {proposals[i].action === 'update_dashboard' 
+                            ? `Update ${proposals[i].data.field} to "${proposals[i].data.value}"`
+                            : `Add Milestone: ${proposals[i].data.title}`
+                          }
+                        </p>
+                        <p className="text-[10px] text-white/60 leading-relaxed italic">
+                          "{proposals[i].reasoning}"
+                        </p>
+                      </div>
+
+                      <div className="flex items-center gap-2 pt-2">
+                        {executedActions[i] ? (
+                          <div className="flex items-center gap-2 text-emerald-400 text-[10px] font-bold uppercase">
+                            <CheckCircle2 className="w-3 h-3" />
+                            Executed
+                          </div>
+                        ) : (
+                          <>
+                            <button 
+                              onClick={() => handleExecuteAction(i)}
+                              disabled={isLoading}
+                              className="flex-1 py-2 bg-neon-cyan/10 hover:bg-neon-cyan text-neon-cyan hover:text-black border border-neon-cyan/20 rounded-lg text-[10px] font-bold uppercase transition-all flex items-center justify-center gap-2"
+                            >
+                              Confirm
+                            </button>
+                            <button 
+                              onClick={() => setProposals(prev => {
+                                const next = { ...prev };
+                                delete next[i];
+                                return next;
+                              })}
+                              className="px-3 py-2 text-white/20 hover:text-white text-[10px] font-bold uppercase transition-colors"
+                            >
+                              Dismiss
+                            </button>
+                          </>
+                        )}
+                      </div>
+                    </motion.div>
+                  )}
                 </div>
               ))}
               {isLoading && (
@@ -270,36 +424,63 @@ export const SkylarSidebar: React.FC = () => {
                   </div>
                 </div>
               )}
+
+              {error && (
+                <div className="flex justify-center">
+                  <div className="bg-red-500/10 border border-red-500/20 p-3 rounded-xl flex items-center gap-3 max-w-[90%]">
+                    <AlertCircle className="w-4 h-4 text-red-500 shrink-0" />
+                    <p className="text-[10px] text-red-200">{error}</p>
+                    <button onClick={() => setError(null)} className="text-white/40 hover:text-white">
+                      <X className="w-3 h-3" />
+                    </button>
+                  </div>
+                </div>
+              )}
             </div>
 
             {/* Input */}
             <div className="p-6 border-t border-white/10 bg-white/[0.02]">
-              <div className="relative">
-                <input 
-                  type="text" 
-                  placeholder="Ask Skylar anything..."
-                  className="w-full bg-black/40 border border-white/10 rounded-2xl px-6 py-4 text-sm focus:border-neon-cyan outline-none pr-24"
-                  value={input}
-                  onChange={e => setInput(e.target.value)}
-                  onKeyPress={e => e.key === 'Enter' && handleSend()}
-                />
-                <div className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-2">
+              {!user ? (
+                <div className="flex flex-col items-center gap-4 py-2">
+                  <div className="flex items-center gap-2 text-white/40 text-[10px] uppercase font-bold tracking-wider">
+                    <Lock className="w-3 h-3" />
+                    <span>Authentication Required</span>
+                  </div>
                   <button 
-                    onClick={toggleListening}
-                    className={`p-2 transition-colors ${isListening ? 'text-neon-cyan animate-pulse' : 'text-white/20 hover:text-neon-cyan'}`}
-                    title={isListening ? 'Listening...' : 'Start Voice-to-Text'}
+                    onClick={onLogin}
+                    className="w-full py-3 bg-neon-cyan text-black rounded-xl font-bold text-sm hover:shadow-[0_0_20px_rgba(0,255,255,0.3)] transition-all"
                   >
-                    <Mic className="w-5 h-5" />
-                  </button>
-                  <button 
-                    onClick={handleSend}
-                    disabled={!input.trim() || isLoading}
-                    className="p-2 bg-neon-cyan text-black rounded-xl hover:scale-105 transition-transform disabled:opacity-50 disabled:scale-100"
-                  >
-                    <Send className="w-5 h-5" />
+                    Login to Chat
                   </button>
                 </div>
-              </div>
+              ) : (
+                <div className="relative">
+                  <input 
+                    type="text" 
+                    placeholder="Ask Skylar anything..."
+                    className="w-full bg-black/40 border border-white/10 rounded-2xl px-6 py-4 text-sm focus:border-neon-cyan outline-none pr-24"
+                    value={input}
+                    onChange={e => setInput(e.target.value)}
+                    onKeyPress={e => e.key === 'Enter' && handleSend()}
+                  />
+                  <div className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-2">
+                    <button 
+                      onClick={toggleListening}
+                      className={`p-2 transition-colors ${isListening ? 'text-neon-cyan animate-pulse' : 'text-white/20 hover:text-neon-cyan'}`}
+                      title={isListening ? 'Listening...' : 'Start Voice-to-Text'}
+                    >
+                      <Mic className="w-5 h-5" />
+                    </button>
+                    <button 
+                      onClick={handleSend}
+                      disabled={!input.trim() || isLoading}
+                      className="p-2 bg-neon-cyan text-black rounded-xl hover:scale-105 transition-transform disabled:opacity-50 disabled:scale-100"
+                    >
+                      <Send className="w-5 h-5" />
+                    </button>
+                  </div>
+                </div>
+              )}
               <p className="text-[10px] text-white/20 mt-4 text-center">
                 Skylar uses the entire Wavvault as a semantic index for your career.
               </p>

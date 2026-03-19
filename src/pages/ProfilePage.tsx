@@ -12,7 +12,7 @@ import {
   ShieldCheck,
   Check
 } from 'lucide-react';
-import { useAuthContext } from '../contexts/AuthContext';
+import { useIdentity } from '../contexts/IdentityContext';
 import { useNavigate } from 'react-router-dom';
 import { Button } from '../components/Button';
 import { ProfilePhotoUpload } from '../components/profile/ProfilePhotoUpload';
@@ -20,13 +20,13 @@ import { doc, updateDoc } from 'firebase/firestore';
 import { db } from '../lib/firebase';
 
 export const ProfilePage: React.FC = () => {
-  const { user, profile, status } = useAuthContext();
+  const { user, profile, status, updateProfile } = useIdentity();
   const navigate = useNavigate();
   const [isSaving, setIsSaving] = useState(false);
   const [showSuccess, setShowSuccess] = useState(false);
   const [formData, setFormData] = useState({
     displayName: '',
-    role: '',
+    jobTitle: '',
     location: '',
     website: '',
     bio: ''
@@ -36,7 +36,7 @@ export const ProfilePage: React.FC = () => {
     if (profile) {
       setFormData({
         displayName: profile.displayName || '',
-        role: profile.role || '',
+        jobTitle: profile.jobTitle || '',
         location: profile.location || '',
         website: profile.website || '',
         bio: profile.bio || ''
@@ -63,11 +63,7 @@ export const ProfilePage: React.FC = () => {
 
     try {
       setIsSaving(true);
-      const userRef = doc(db, 'users', user.uid);
-      await updateDoc(userRef, {
-        ...formData,
-        updatedAt: new Date().toISOString()
-      });
+      await updateProfile(formData);
       setShowSuccess(true);
       setTimeout(() => setShowSuccess(false), 3000);
     } catch (error) {
@@ -87,11 +83,7 @@ export const ProfilePage: React.FC = () => {
       reader.readAsDataURL(blob);
       reader.onloadend = async () => {
         const base64data = reader.result as string;
-        const userRef = doc(db, 'users', user.uid);
-        await updateDoc(userRef, {
-          photoURL: base64data,
-          updatedAt: new Date().toISOString()
-        });
+        await updateProfile({ photoURL: base64data });
         setShowSuccess(true);
         setTimeout(() => setShowSuccess(false), 3000);
       };
@@ -138,7 +130,7 @@ export const ProfilePage: React.FC = () => {
               />
               <div>
                 <h3 className="text-xl font-bold">{formData.displayName || 'User'}</h3>
-                <p className="text-neon-cyan text-xs uppercase tracking-widest font-bold mt-1">{formData.role || 'Member'}</p>
+                <p className="text-neon-cyan text-xs uppercase tracking-widest font-bold mt-1">{formData.jobTitle || 'Member'}</p>
               </div>
               <div className="w-full pt-6 border-t border-white/5 space-y-4">
                 <div className="flex items-center gap-3 text-white/40 text-sm">
@@ -187,8 +179,8 @@ export const ProfilePage: React.FC = () => {
                     <Briefcase className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-white/20" />
                     <input 
                       type="text"
-                      value={formData.role}
-                      onChange={(e) => setFormData({ ...formData, role: e.target.value })}
+                      value={formData.jobTitle}
+                      onChange={(e) => setFormData({ ...formData, jobTitle: e.target.value })}
                       className="w-full bg-white/5 border border-white/10 rounded-2xl py-4 pl-12 pr-4 focus:border-neon-cyan/50 focus:bg-white/10 outline-none transition-all font-medium"
                       placeholder="e.g. Product Designer"
                     />

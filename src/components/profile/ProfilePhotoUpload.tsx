@@ -102,21 +102,21 @@ export const ProfilePhotoUpload: React.FC<ProfilePhotoUploadProps> = ({ currentP
 
       <AnimatePresence>
         {showCropper && (
-          <div className="fixed inset-0 z-[100] flex items-center justify-center p-6 bg-black/90 backdrop-blur-md">
+          <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 sm:p-6 bg-black/90 backdrop-blur-md overflow-y-auto">
             <motion.div 
-              initial={{ opacity: 0, scale: 0.9 }}
-              animate={{ opacity: 1, scale: 1 }}
-              exit={{ opacity: 0, scale: 0.9 }}
-              className="glass-panel max-w-2xl w-full p-8 space-y-8 border-neon-cyan/20"
+              initial={{ opacity: 0, scale: 0.9, y: 20 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.9, y: 20 }}
+              className="glass-panel w-full max-w-lg sm:max-w-2xl p-6 sm:p-8 space-y-6 sm:space-y-8 border-neon-cyan/20 my-auto"
             >
               <div className="flex items-center justify-between">
-                <h3 className="text-2xl font-display font-bold">Crop Profile Photo</h3>
-                <button onClick={() => setShowCropper(false)} className="text-white/40 hover:text-white">
+                <h3 className="text-xl sm:text-2xl font-display font-bold">Crop Profile Photo</h3>
+                <button onClick={() => setShowCropper(false)} className="text-white/40 hover:text-white transition-colors">
                   <X className="w-6 h-6" />
                 </button>
               </div>
 
-              <div className="relative h-[400px] w-full bg-black rounded-2xl overflow-hidden border border-white/10">
+              <div className="relative h-[300px] sm:h-[400px] w-full bg-black rounded-2xl overflow-hidden border border-white/10">
                 <Cropper
                   image={image!}
                   crop={crop}
@@ -130,9 +130,9 @@ export const ProfilePhotoUpload: React.FC<ProfilePhotoUploadProps> = ({ currentP
                 />
               </div>
 
-              <div className="space-y-4">
+              <div className="space-y-6">
                 <div className="flex items-center gap-4">
-                  <span className="text-xs text-white/40 uppercase tracking-widest font-bold">Zoom</span>
+                  <span className="text-[10px] text-white/40 uppercase tracking-[0.2em] font-bold">Zoom</span>
                   <input
                     type="range"
                     value={zoom}
@@ -141,21 +141,21 @@ export const ProfilePhotoUpload: React.FC<ProfilePhotoUploadProps> = ({ currentP
                     step={0.1}
                     aria-labelledby="Zoom"
                     onChange={(e) => setZoom(Number(e.target.value))}
-                    className="flex-1 accent-neon-cyan"
+                    className="flex-1 h-1.5 bg-white/10 rounded-lg appearance-none cursor-pointer accent-neon-cyan"
                   />
                 </div>
 
-                <div className="flex gap-4">
+                <div className="flex flex-col sm:flex-row gap-3 sm:gap-4">
                   <Button 
                     variant="secondary" 
-                    className="flex-1"
+                    className="flex-1 py-4"
                     onClick={() => setShowCropper(false)}
                   >
                     Cancel
                   </Button>
                   <Button 
                     variant="neon" 
-                    className="flex-1"
+                    className="flex-1 py-4"
                     onClick={handleSave}
                     disabled={isUploading}
                   >

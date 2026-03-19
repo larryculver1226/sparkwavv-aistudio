@@ -1,19 +1,19 @@
 import { render, screen, fireEvent } from '@testing-library/react';
 import { NavBar } from './NavBar';
-import { AuthProvider } from '../contexts/AuthContext';
+import { IdentityProvider } from '../contexts/IdentityContext';
 import { vi, describe, it, expect, beforeEach } from 'vitest';
 import { BrowserRouter } from 'react-router-dom';
 import React from 'react';
 
-// Mock useAuthContext
-vi.mock('../contexts/AuthContext', () => ({
-  useAuthContext: vi.fn(() => ({
+// Mock useIdentity
+vi.mock('../contexts/IdentityContext', () => ({
+  useIdentity: vi.fn(() => ({
     user: null,
     profile: null,
     loading: false,
-    isConfirmed: false
+    status: 'unauthenticated'
   })),
-  AuthProvider: ({ children }: { children: React.ReactNode }) => <div>{children}</div>
+  IdentityProvider: ({ children }: { children: React.ReactNode }) => <div>{children}</div>
 }));
 
 // Mock useNavigate
@@ -61,12 +61,12 @@ describe('NavBar', () => {
   });
 
   it('shows user dashboard and settings when authenticated', async () => {
-    const { useAuthContext } = await import('../contexts/AuthContext');
-    (useAuthContext as any).mockReturnValue({
+    const { useIdentity } = await import('../contexts/IdentityContext');
+    (useIdentity as any).mockReturnValue({
       user: { uid: '123' },
       profile: { uid: '123' },
       loading: false,
-      isConfirmed: true
+      status: 'authenticated'
     });
 
     render(

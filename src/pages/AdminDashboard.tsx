@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { useNavigate } from 'react-router-dom';
+import { useIdentity } from '../contexts/IdentityContext';
+import { ROLES } from '../constants';
 import { 
   LayoutDashboard, 
   Users, 
@@ -57,7 +59,7 @@ import {
   Cell
 } from 'recharts';
 import { AuthDiagnostics } from './AuthDiagnostics';
-import { auth, db } from '../lib/firebase';
+import { auth, db, adminDb } from '../lib/firebase';
 import { FirebaseSetup } from './FirebaseSetup';
 import { 
   JOURNEY_STAGES, 
@@ -123,6 +125,9 @@ interface StorageMetrics {
 
 export const AdminDashboard: React.FC<{ onLogout: () => void }> = ({ onLogout }) => {
   const navigate = useNavigate();
+  const { role: adminRole, logout } = useIdentity();
+  const isReadOnly = adminRole === 'viewer';
+  const isSuperAdmin = adminRole === 'super_admin' || adminRole === 'admin';
   const [stats, setStats] = useState<AdminStats | null>(null);
   const [users, setUsers] = useState<any[]>([]);
   const [programs, setPrograms] = useState<any[]>([]);
@@ -149,7 +154,7 @@ export const AdminDashboard: React.FC<{ onLogout: () => void }> = ({ onLogout })
 
   useEffect(() => {
     const q = query(
-      collection(db, 'system_logs'),
+      collection(adminDb, 'system_logs'),
       orderBy('timestamp', 'desc'),
       limit(50)
     );
@@ -305,6 +310,33 @@ export const AdminDashboard: React.FC<{ onLogout: () => void }> = ({ onLogout })
     }
   };
 
+  const [showDiagnostics, setShowDiagnostics] = useState(false);
+  const [diagnosticsData, setDiagnosticsData] = useState<any>(null);
+  const [loadingDiagnostics, setLoadingDiagnostics] = useState(false);
+
+  const fetchDiagnostics = async () => {
+    setLoadingDiagnostics(true);
+    try {
+      const idToken = auth?.currentUser ? await auth.currentUser.getIdToken() : null;
+      const response = await fetch('/api/admin/diagnostics', {
+        headers: idToken ? { 'Authorization': `Bearer ${idToken}` } : {}
+      });
+      if (response.ok) {
+        const data = await response.json();
+        setDiagnosticsData(data);
+        setShowDiagnostics(true);
+      } else {
+        const text = await response.text();
+        alert(`Failed to fetch diagnostics: ${text}`);
+      }
+    } catch (error: any) {
+      console.error("Diagnostics error:", error);
+      alert(`Diagnostics error: ${error.message}`);
+    } finally {
+      setLoadingDiagnostics(false);
+    }
+  };
+
   const fetchUsers = async () => {
     console.log("[ADMIN] Fetching users...");
     setFetchingUsers(true);
@@ -418,6 +450,7 @@ export const AdminDashboard: React.FC<{ onLogout: () => void }> = ({ onLogout })
 
   const handleLogout = async () => {
     await fetch('/api/admin/logout', { method: 'POST' });
+    await logout();
     onLogout();
   };
 
@@ -489,9 +522,25 @@ export const AdminDashboard: React.FC<{ onLogout: () => void }> = ({ onLogout })
         },
         body: JSON.stringify({
           uid: editingUser.uid,
+          email: editingUser.email,
           displayName: editingUser.displayName,
           role: editingUser.role,
-          journeyStage: editingUser.journeyStage
+          journeyStage: editingUser.journeyStage,
+          tenantId: editingUser.tenantId,
+          generationalPersona: editingUser.generationalPersona,
+          careerStageRole: editingUser.careerStageRole,
+          hierarchicalRole: editingUser.hierarchicalRole,
+          brandPersona: editingUser.brandPersona,
+          brandDNAAttributes: editingUser.brandDNAAttributes,
+          firstName: editingUser.firstName,
+          lastName: editingUser.lastName,
+          jobTitle: editingUser.jobTitle,
+          companyOrg: editingUser.companyOrg,
+          phone: editingUser.phone,
+          programTrack: editingUser.programTrack,
+          lifecycleStage: editingUser.lifecycleStage,
+          outcomesAttributes: editingUser.outcomesAttributes,
+          feedbackQuote: editingUser.feedbackQuote
         }),
       });
       if (response.ok) {
@@ -591,15 +640,18 @@ export const AdminDashboard: React.FC<{ onLogout: () => void }> = ({ onLogout })
   const userActivityData = (() => {
     const activityMap = new Map();
     
-    const start = new Date(activityStartDate);
-    const end = new Date(activityEndDate);
+    const start = activityStartDate ? new Date(activityStartDate) : new Date();
+    const end = activityEndDate ? new Date(activityEndDate) : new Date();
     
     // Normalize to midnight for comparison
+    if (isNaN(start.getTime())) start.setTime(new Date().getTime() - 7 * 24 * 60 * 60 * 1000);
+    if (isNaN(end.getTime())) end.setTime(new Date().getTime());
+
     start.setHours(0, 0, 0, 0);
     end.setHours(23, 59, 59, 999);
 
     const diffTime = Math.abs(end.getTime() - start.getTime());
-    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24)) || 0;
     const isQuarterly = diffDays > 30;
 
     const getQuarterLabel = (date: Date) => {
@@ -752,15 +804,15 @@ export const AdminDashboard: React.FC<{ onLogout: () => void }> = ({ onLogout })
 
                 <nav className="space-y-2">
                   {[
-                    { id: 'overview', label: 'Overview', icon: LayoutDashboard },
-                    { id: 'users', label: 'Users & Roles', icon: Users },
-                    { id: 'cloud', label: 'Cloud Resources', icon: Cloud },
-                    { id: 'content', label: 'Content Monitor', icon: AlertTriangle },
-                    { id: 'security', label: 'Security', icon: ShieldCheck },
-                    { id: 'logs', label: 'System Logs', icon: Activity },
-                    { id: 'diagnostics', label: 'Diagnostics', icon: ShieldCheck },
-                    { id: 'firebase-setup', label: 'Firebase Setup', icon: Database },
-                  ].map((item) => (
+                    { id: 'overview', label: 'Overview', icon: LayoutDashboard, roles: [ROLES.SUPER_ADMIN, ROLES.ADMIN, ROLES.EDITOR, ROLES.VIEWER] },
+                    { id: 'users', label: 'Users & Roles', icon: Users, roles: [ROLES.SUPER_ADMIN, ROLES.ADMIN, ROLES.EDITOR, ROLES.VIEWER] },
+                    { id: 'cloud', label: 'Cloud Resources', icon: Cloud, roles: [ROLES.SUPER_ADMIN, ROLES.ADMIN] },
+                    { id: 'content', label: 'Content Monitor', icon: AlertTriangle, roles: [ROLES.SUPER_ADMIN, ROLES.ADMIN, ROLES.EDITOR, ROLES.VIEWER] },
+                    { id: 'security', label: 'Security', icon: ShieldCheck, roles: [ROLES.SUPER_ADMIN, ROLES.ADMIN] },
+                    { id: 'logs', label: 'System Logs', icon: Activity, roles: [ROLES.SUPER_ADMIN, ROLES.ADMIN] },
+                    { id: 'diagnostics', label: 'Diagnostics', icon: ShieldCheck, roles: [ROLES.SUPER_ADMIN, ROLES.ADMIN] },
+                    { id: 'firebase-setup', label: 'Firebase Setup', icon: Database, roles: [ROLES.SUPER_ADMIN, ROLES.ADMIN] },
+                  ].filter(item => item.roles.includes(adminRole as any)).map((item) => (
                     <button
                       key={item.id}
                       onClick={() => {
@@ -809,15 +861,15 @@ export const AdminDashboard: React.FC<{ onLogout: () => void }> = ({ onLogout })
 
           <nav className="space-y-2">
             {[
-              { id: 'overview', label: 'Overview', icon: LayoutDashboard },
-              { id: 'users', label: 'Users & Roles', icon: Users },
-              { id: 'cloud', label: 'Cloud Resources', icon: Cloud },
-              { id: 'content', label: 'Content Monitor', icon: AlertTriangle },
-              { id: 'security', label: 'Security', icon: ShieldCheck },
-              { id: 'logs', label: 'System Logs', icon: Activity },
-              { id: 'diagnostics', label: 'Diagnostics', icon: ShieldCheck },
-              { id: 'firebase-setup', label: 'Firebase Setup', icon: Database },
-            ].map((item) => (
+              { id: 'overview', label: 'Overview', icon: LayoutDashboard, roles: [ROLES.SUPER_ADMIN, ROLES.ADMIN, ROLES.EDITOR, ROLES.VIEWER] },
+              { id: 'users', label: 'Users & Roles', icon: Users, roles: [ROLES.SUPER_ADMIN, ROLES.ADMIN, ROLES.EDITOR, ROLES.VIEWER] },
+              { id: 'cloud', label: 'Cloud Resources', icon: Cloud, roles: [ROLES.SUPER_ADMIN, ROLES.ADMIN] },
+              { id: 'content', label: 'Content Monitor', icon: AlertTriangle, roles: [ROLES.SUPER_ADMIN, ROLES.ADMIN, ROLES.EDITOR, ROLES.VIEWER] },
+              { id: 'security', label: 'Security', icon: ShieldCheck, roles: [ROLES.SUPER_ADMIN, ROLES.ADMIN] },
+              { id: 'logs', label: 'System Logs', icon: Activity, roles: [ROLES.SUPER_ADMIN, ROLES.ADMIN] },
+              { id: 'diagnostics', label: 'Diagnostics', icon: ShieldCheck, roles: [ROLES.SUPER_ADMIN, ROLES.ADMIN] },
+              { id: 'firebase-setup', label: 'Firebase Setup', icon: Database, roles: [ROLES.SUPER_ADMIN, ROLES.ADMIN] },
+            ].filter(item => item.roles.includes(adminRole as any)).map((item) => (
               <button
                 key={item.id}
                 onClick={() => setActiveTab(item.id)}
@@ -877,7 +929,7 @@ export const AdminDashboard: React.FC<{ onLogout: () => void }> = ({ onLogout })
             </button>
             <div className="flex items-center gap-2 px-4 py-2 rounded-xl bg-white/5 border border-white/10">
               <div className="w-2 h-2 rounded-full bg-neon-cyan animate-pulse" />
-              <span className="text-sm font-medium text-neon-cyan uppercase tracking-widest">{stats?.system.status}</span>
+              <span className="text-sm font-medium text-neon-cyan uppercase tracking-widest">{stats?.system?.status}</span>
             </div>
             <button 
               onClick={fetchStats}
@@ -933,10 +985,10 @@ export const AdminDashboard: React.FC<{ onLogout: () => void }> = ({ onLogout })
           ) : activeTab === 'content' ? (
             <>
               {[
-                { label: 'Avg Session', value: stats?.engagement.avgSessionDuration, trend: '+2m', icon: Activity, color: 'text-neon-cyan' },
-                { label: 'Retention', value: stats?.engagement.retentionRate, trend: '+4%', icon: Users, color: 'text-neon-magenta' },
-                { label: 'Positive Sentiment', value: `${stats?.sentiment.positive}%`, trend: '+8%', icon: Heart, color: 'text-neon-lime' },
-                { label: 'Bounce Rate', value: stats?.engagement.bounceRate, trend: '-3%', icon: ArrowDownRight, color: 'text-neon-magenta' },
+                { label: 'Avg Session', value: stats?.engagement?.avgSessionDuration, trend: '+2m', icon: Activity, color: 'text-neon-cyan' },
+                { label: 'Retention', value: stats?.engagement?.retentionRate, trend: '+4%', icon: Users, color: 'text-neon-magenta' },
+                { label: 'Positive Sentiment', value: `${stats?.sentiment?.positive || 0}%`, trend: '+8%', icon: Heart, color: 'text-neon-lime' },
+                { label: 'Bounce Rate', value: stats?.engagement?.bounceRate, trend: '-3%', icon: ArrowDownRight, color: 'text-neon-magenta' },
               ].map((stat, i) => (
                 <div key={i} className="glass-panel p-6 rounded-3xl border border-white/5 bg-black/40 relative overflow-hidden group">
                   <div className="absolute top-0 right-0 p-4 opacity-10 group-hover:opacity-20 transition-opacity">
@@ -1151,6 +1203,14 @@ export const AdminDashboard: React.FC<{ onLogout: () => void }> = ({ onLogout })
                   </button>
                 )}
                 <button 
+                  onClick={fetchDiagnostics}
+                  className="p-2 rounded-xl bg-white/5 border border-white/10 hover:bg-white/10 transition-all text-white/50 hover:text-white"
+                  title="Firebase Diagnostics"
+                  disabled={loadingDiagnostics}
+                >
+                  <Activity className={`w-4 h-4 ${loadingDiagnostics ? 'animate-pulse' : ''}`} />
+                </button>
+                <button 
                   onClick={fetchUsers}
                   className="p-2 rounded-xl bg-white/5 border border-white/10 hover:bg-white/10 transition-all"
                   disabled={fetchingUsers}
@@ -1230,13 +1290,15 @@ export const AdminDashboard: React.FC<{ onLogout: () => void }> = ({ onLogout })
                           <td className="px-6 py-4">
                             {currentUserRole === 'admin' ? (
                               <div className="flex items-center gap-2">
-                                <button 
-                                  onClick={() => navigate(`/dashboard/${user.uid}`)}
-                                  className="p-2 rounded-lg bg-white/5 border border-white/10 hover:bg-white/10 text-white/60 hover:text-neon-cyan transition-all"
-                                  title="View User Dashboard"
-                                >
-                                  <ArrowUpRight className="w-4 h-4" />
-                                </button>
+                                {user.role !== 'admin' && (
+                                  <button 
+                                    onClick={() => navigate(`/dashboard/${user.uid}`)}
+                                    className="p-2 rounded-lg bg-white/5 border border-white/10 hover:bg-white/10 text-white/60 hover:text-neon-cyan transition-all"
+                                    title="View User Dashboard"
+                                  >
+                                    <ArrowUpRight className="w-4 h-4" />
+                                  </button>
+                                )}
                                 <button 
                                   onClick={() => {
                                     const url = `${window.location.origin}/dashboard/${user.uid}`;
@@ -1600,7 +1662,7 @@ export const AdminDashboard: React.FC<{ onLogout: () => void }> = ({ onLogout })
                 </div>
                 <div className="h-[300px] w-full">
                   <ResponsiveContainer width="100%" height="100%">
-                    <AreaChart data={stats?.sentiment.trends}>
+                    <AreaChart data={stats?.sentiment?.trends || []}>
                       <CartesianGrid strokeDasharray="3 3" stroke="#ffffff10" vertical={false} />
                       <XAxis dataKey="day" stroke="#ffffff40" fontSize={12} tickLine={false} axisLine={false} />
                       <YAxis stroke="#ffffff40" fontSize={12} tickLine={false} axisLine={false} />
@@ -1726,7 +1788,7 @@ export const AdminDashboard: React.FC<{ onLogout: () => void }> = ({ onLogout })
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-white/5">
-                    {stats?.engagement.topModules.map((module, i) => (
+                    {stats?.engagement?.topModules?.map((module, i) => (
                       <tr key={i} className="hover:bg-white/[0.02] transition-colors">
                         <td className="px-6 py-4 font-medium">{module.name}</td>
                         <td className="px-6 py-4 text-white/60">{module.views.toLocaleString()}</td>
@@ -1978,10 +2040,10 @@ export const AdminDashboard: React.FC<{ onLogout: () => void }> = ({ onLogout })
                     <select 
                       value={newUser.tenantId}
                       onChange={e => setNewUser({...newUser, tenantId: e.target.value})}
-                      className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 focus:outline-none focus:border-neon-cyan transition-all"
+                      className="w-full bg-[#111] border border-white/10 rounded-xl px-4 py-3 focus:outline-none focus:border-neon-cyan transition-all text-white"
                     >
                       {TENANTS.map(t => (
-                        <option key={t.id} value={t.id}>{t.name}</option>
+                        <option key={t.id} value={t.id} className="bg-[#111] text-white">{t.name}</option>
                       ))}
                     </select>
                   </div>
@@ -1993,13 +2055,13 @@ export const AdminDashboard: React.FC<{ onLogout: () => void }> = ({ onLogout })
                     <select 
                       value={newUser.role}
                       onChange={e => setNewUser({...newUser, role: e.target.value})}
-                      className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 focus:outline-none focus:border-neon-cyan transition-all"
+                      className="w-full bg-[#111] border border-white/10 rounded-xl px-4 py-3 focus:outline-none focus:border-neon-cyan transition-all text-white"
                     >
-                      <option value="user">User</option>
-                      <option value="admin">Admin</option>
-                      <option value="operator">Operator</option>
-                      <option value="mentor">Mentor</option>
-                      <option value="agent">Agent</option>
+                      <option value="user" className="bg-[#111] text-white">User</option>
+                      <option value="admin" className="bg-[#111] text-white">Admin</option>
+                      <option value="operator" className="bg-[#111] text-white">Operator</option>
+                      <option value="mentor" className="bg-[#111] text-white">Mentor</option>
+                      <option value="agent" className="bg-[#111] text-white">Agent</option>
                     </select>
                   </div>
                   <div>
@@ -2007,10 +2069,10 @@ export const AdminDashboard: React.FC<{ onLogout: () => void }> = ({ onLogout })
                     <select 
                       value={newUser.journeyStage}
                       onChange={e => setNewUser({...newUser, journeyStage: e.target.value})}
-                      className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 focus:outline-none focus:border-neon-cyan transition-all"
+                      className="w-full bg-[#111] border border-white/10 rounded-xl px-4 py-3 focus:outline-none focus:border-neon-cyan transition-all text-white"
                     >
                       {JOURNEY_STAGES.map(s => (
-                        <option key={s} value={s}>{s}</option>
+                        <option key={s} value={s} className="bg-[#111] text-white">{s}</option>
                       ))}
                     </select>
                   </div>
@@ -2024,11 +2086,11 @@ export const AdminDashboard: React.FC<{ onLogout: () => void }> = ({ onLogout })
                       <select 
                         value={newUser.generationalPersona}
                         onChange={e => setNewUser({...newUser, generationalPersona: e.target.value})}
-                        className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 focus:outline-none focus:border-neon-cyan transition-all"
+                        className="w-full bg-[#111] border border-white/10 rounded-xl px-4 py-3 focus:outline-none focus:border-neon-cyan transition-all text-white"
                       >
-                        <option value="">Select Persona</option>
+                        <option value="" className="bg-[#111] text-white">Select Persona</option>
                         {GENERATIONAL_PERSONAS.map(p => (
-                          <option key={p} value={p}>{p}</option>
+                          <option key={p} value={p} className="bg-[#111] text-white">{p}</option>
                         ))}
                       </select>
                     </div>
@@ -2037,11 +2099,11 @@ export const AdminDashboard: React.FC<{ onLogout: () => void }> = ({ onLogout })
                       <select 
                         value={newUser.careerStageRole}
                         onChange={e => setNewUser({...newUser, careerStageRole: e.target.value})}
-                        className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 focus:outline-none focus:border-neon-cyan transition-all"
+                        className="w-full bg-[#111] border border-white/10 rounded-xl px-4 py-3 focus:outline-none focus:border-neon-cyan transition-all text-white"
                       >
-                        <option value="">Select Role</option>
+                        <option value="" className="bg-[#111] text-white">Select Role</option>
                         {CAREER_STAGE_ROLES.map(r => (
-                          <option key={r} value={r}>{r}</option>
+                          <option key={r} value={r} className="bg-[#111] text-white">{r}</option>
                         ))}
                       </select>
                     </div>
@@ -2054,11 +2116,11 @@ export const AdminDashboard: React.FC<{ onLogout: () => void }> = ({ onLogout })
                     <select 
                       value={newUser.hierarchicalRole}
                       onChange={e => setNewUser({...newUser, hierarchicalRole: e.target.value})}
-                      className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 focus:outline-none focus:border-neon-cyan transition-all"
+                      className="w-full bg-[#111] border border-white/10 rounded-xl px-4 py-3 focus:outline-none focus:border-neon-cyan transition-all text-white"
                     >
-                      <option value="">Select Level</option>
+                      <option value="" className="bg-[#111] text-white">Select Level</option>
                       {HIERARCHICAL_ROLES.map(r => (
-                        <option key={r} value={r}>{r}</option>
+                        <option key={r} value={r} className="bg-[#111] text-white">{r}</option>
                       ))}
                     </select>
                   </div>
@@ -2067,11 +2129,11 @@ export const AdminDashboard: React.FC<{ onLogout: () => void }> = ({ onLogout })
                     <select 
                       value={newUser.brandPersona}
                       onChange={e => setNewUser({...newUser, brandPersona: e.target.value})}
-                      className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 focus:outline-none focus:border-neon-cyan transition-all"
+                      className="w-full bg-[#111] border border-white/10 rounded-xl px-4 py-3 focus:outline-none focus:border-neon-cyan transition-all text-white"
                     >
-                      <option value="">Select Persona</option>
+                      <option value="" className="bg-[#111] text-white">Select Persona</option>
                       {BRAND_PERSONAS.map(p => (
-                        <option key={p} value={p}>{p}</option>
+                        <option key={p} value={p} className="bg-[#111] text-white">{p}</option>
                       ))}
                     </select>
                   </div>
@@ -2116,6 +2178,104 @@ export const AdminDashboard: React.FC<{ onLogout: () => void }> = ({ onLogout })
             >
               <h3 className="text-2xl font-display font-bold mb-6">Edit User</h3>
               <form onSubmit={handleUpdateUser} className="space-y-6">
+                <div className="space-y-2">
+                  <label className="block text-[10px] uppercase tracking-widest font-bold text-white/40 mb-2">Email Address</label>
+                  <input 
+                    type="email" 
+                    value={editingUser.email || ''}
+                    onChange={e => setEditingUser({...editingUser, email: e.target.value})}
+                    className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 focus:outline-none focus:border-neon-cyan transition-all text-white"
+                    placeholder="user@example.com"
+                  />
+                </div>
+
+                <div className="grid grid-cols-2 gap-6">
+                  <div>
+                    <label className="block text-[10px] uppercase tracking-widest font-bold text-white/40 mb-2">First Name</label>
+                    <input 
+                      type="text" 
+                      value={editingUser.firstName || ''}
+                      onChange={e => setEditingUser({...editingUser, firstName: e.target.value})}
+                      className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 focus:outline-none focus:border-neon-cyan transition-all"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[10px] uppercase tracking-widest font-bold text-white/40 mb-2">Last Name</label>
+                    <input 
+                      type="text" 
+                      value={editingUser.lastName || ''}
+                      onChange={e => setEditingUser({...editingUser, lastName: e.target.value})}
+                      className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 focus:outline-none focus:border-neon-cyan transition-all"
+                    />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-6">
+                  <div>
+                    <label className="block text-[10px] uppercase tracking-widest font-bold text-white/40 mb-2">Job Title</label>
+                    <input 
+                      type="text" 
+                      value={editingUser.jobTitle || ''}
+                      onChange={e => setEditingUser({...editingUser, jobTitle: e.target.value})}
+                      className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 focus:outline-none focus:border-neon-cyan transition-all"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[10px] uppercase tracking-widest font-bold text-white/40 mb-2">Company/Org</label>
+                    <input 
+                      type="text" 
+                      value={editingUser.companyOrg || ''}
+                      onChange={e => setEditingUser({...editingUser, companyOrg: e.target.value})}
+                      className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 focus:outline-none focus:border-neon-cyan transition-all"
+                    />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-6">
+                  <div>
+                    <label className="block text-[10px] uppercase tracking-widest font-bold text-white/40 mb-2">Phone</label>
+                    <input 
+                      type="text" 
+                      value={editingUser.phone || ''}
+                      onChange={e => setEditingUser({...editingUser, phone: e.target.value})}
+                      className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 focus:outline-none focus:border-neon-cyan transition-all"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[10px] uppercase tracking-widest font-bold text-white/40 mb-2">Program/Track</label>
+                    <input 
+                      type="text" 
+                      value={editingUser.programTrack || ''}
+                      onChange={e => setEditingUser({...editingUser, programTrack: e.target.value})}
+                      className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 focus:outline-none focus:border-neon-cyan transition-all"
+                    />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-6">
+                  <div>
+                    <label className="block text-[10px] uppercase tracking-widest font-bold text-white/40 mb-2">Lifecycle Stage</label>
+                    <input 
+                      type="text" 
+                      value={editingUser.lifecycleStage || ''}
+                      onChange={e => setEditingUser({...editingUser, lifecycleStage: e.target.value})}
+                      className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 focus:outline-none focus:border-neon-cyan transition-all"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[10px] uppercase tracking-widest font-bold text-white/40 mb-2">Tenant</label>
+                    <select 
+                      value={editingUser.tenantId || 'sparkwavv'}
+                      onChange={e => setEditingUser({...editingUser, tenantId: e.target.value})}
+                      className="w-full bg-[#111] border border-white/10 rounded-xl px-4 py-3 focus:outline-none focus:border-neon-cyan transition-all text-white"
+                    >
+                      {TENANTS.map(t => (
+                        <option key={t.id} value={t.id} className="bg-[#111] text-white">{t.name}</option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+
                 <div className="grid grid-cols-2 gap-6">
                   <div>
                     <label className="block text-[10px] uppercase tracking-widest font-bold text-white/40 mb-2">Display Name</label>
@@ -2127,18 +2287,24 @@ export const AdminDashboard: React.FC<{ onLogout: () => void }> = ({ onLogout })
                       className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 focus:outline-none focus:border-neon-cyan transition-all"
                     />
                   </div>
-                  <div>
-                    <label className="block text-[10px] uppercase tracking-widest font-bold text-white/40 mb-2">Tenant</label>
-                    <select 
-                      value={editingUser.tenantId || 'sparkwavv'}
-                      onChange={e => setEditingUser({...editingUser, tenantId: e.target.value})}
-                      className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 focus:outline-none focus:border-neon-cyan transition-all"
-                    >
-                      {TENANTS.map(t => (
-                        <option key={t.id} value={t.id}>{t.name}</option>
-                      ))}
-                    </select>
-                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  <label className="block text-[10px] uppercase tracking-widest font-bold text-white/40">Outcomes & Attributes</label>
+                  <textarea 
+                    value={editingUser.outcomesAttributes || ''}
+                    onChange={e => setEditingUser({...editingUser, outcomesAttributes: e.target.value})}
+                    className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 focus:outline-none focus:border-neon-cyan transition-all h-24 resize-none"
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <label className="block text-[10px] uppercase tracking-widest font-bold text-white/40">Feedback / Quote</label>
+                  <textarea 
+                    value={editingUser.feedbackQuote || ''}
+                    onChange={e => setEditingUser({...editingUser, feedbackQuote: e.target.value})}
+                    className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 focus:outline-none focus:border-neon-cyan transition-all h-24 resize-none"
+                  />
                 </div>
 
                 <div className="grid grid-cols-2 gap-6">
@@ -2147,13 +2313,13 @@ export const AdminDashboard: React.FC<{ onLogout: () => void }> = ({ onLogout })
                     <select 
                       value={editingUser.role}
                       onChange={e => setEditingUser({...editingUser, role: e.target.value})}
-                      className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 focus:outline-none focus:border-neon-cyan transition-all"
+                      className="w-full bg-[#111] border border-white/10 rounded-xl px-4 py-3 focus:outline-none focus:border-neon-cyan transition-all text-white"
                     >
-                      <option value="user">User</option>
-                      <option value="admin">Admin</option>
-                      <option value="operator">Operator</option>
-                      <option value="mentor">Mentor</option>
-                      <option value="agent">Agent</option>
+                      <option value="user" className="bg-[#111] text-white">User</option>
+                      <option value="admin" className="bg-[#111] text-white">Admin</option>
+                      <option value="operator" className="bg-[#111] text-white">Operator</option>
+                      <option value="mentor" className="bg-[#111] text-white">Mentor</option>
+                      <option value="agent" className="bg-[#111] text-white">Agent</option>
                     </select>
                   </div>
                   <div>
@@ -2161,10 +2327,10 @@ export const AdminDashboard: React.FC<{ onLogout: () => void }> = ({ onLogout })
                     <select 
                       value={editingUser.journeyStage}
                       onChange={e => setEditingUser({...editingUser, journeyStage: e.target.value})}
-                      className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 focus:outline-none focus:border-neon-cyan transition-all"
+                      className="w-full bg-[#111] border border-white/10 rounded-xl px-4 py-3 focus:outline-none focus:border-neon-cyan transition-all text-white"
                     >
                       {JOURNEY_STAGES.map(s => (
-                        <option key={s} value={s}>{s}</option>
+                        <option key={s} value={s} className="bg-[#111] text-white">{s}</option>
                       ))}
                     </select>
                   </div>
@@ -2178,11 +2344,11 @@ export const AdminDashboard: React.FC<{ onLogout: () => void }> = ({ onLogout })
                       <select 
                         value={editingUser.generationalPersona || ''}
                         onChange={e => setEditingUser({...editingUser, generationalPersona: e.target.value})}
-                        className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 focus:outline-none focus:border-neon-cyan transition-all"
+                        className="w-full bg-[#111] border border-white/10 rounded-xl px-4 py-3 focus:outline-none focus:border-neon-cyan transition-all text-white"
                       >
-                        <option value="">Select Persona</option>
+                        <option value="" className="bg-[#111] text-white">Select Persona</option>
                         {GENERATIONAL_PERSONAS.map(p => (
-                          <option key={p} value={p}>{p}</option>
+                          <option key={p} value={p} className="bg-[#111] text-white">{p}</option>
                         ))}
                       </select>
                     </div>
@@ -2191,11 +2357,11 @@ export const AdminDashboard: React.FC<{ onLogout: () => void }> = ({ onLogout })
                       <select 
                         value={editingUser.careerStageRole || ''}
                         onChange={e => setEditingUser({...editingUser, careerStageRole: e.target.value})}
-                        className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 focus:outline-none focus:border-neon-cyan transition-all"
+                        className="w-full bg-[#111] border border-white/10 rounded-xl px-4 py-3 focus:outline-none focus:border-neon-cyan transition-all text-white"
                       >
-                        <option value="">Select Role</option>
+                        <option value="" className="bg-[#111] text-white">Select Role</option>
                         {CAREER_STAGE_ROLES.map(r => (
-                          <option key={r} value={r}>{r}</option>
+                          <option key={r} value={r} className="bg-[#111] text-white">{r}</option>
                         ))}
                       </select>
                     </div>
@@ -2208,11 +2374,11 @@ export const AdminDashboard: React.FC<{ onLogout: () => void }> = ({ onLogout })
                     <select 
                       value={editingUser.hierarchicalRole || ''}
                       onChange={e => setEditingUser({...editingUser, hierarchicalRole: e.target.value})}
-                      className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 focus:outline-none focus:border-neon-cyan transition-all"
+                      className="w-full bg-[#111] border border-white/10 rounded-xl px-4 py-3 focus:outline-none focus:border-neon-cyan transition-all text-white"
                     >
-                      <option value="">Select Level</option>
+                      <option value="" className="bg-[#111] text-white">Select Level</option>
                       {HIERARCHICAL_ROLES.map(r => (
-                        <option key={r} value={r}>{r}</option>
+                        <option key={r} value={r} className="bg-[#111] text-white">{r}</option>
                       ))}
                     </select>
                   </div>
@@ -2221,11 +2387,11 @@ export const AdminDashboard: React.FC<{ onLogout: () => void }> = ({ onLogout })
                     <select 
                       value={editingUser.brandPersona || ''}
                       onChange={e => setEditingUser({...editingUser, brandPersona: e.target.value})}
-                      className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 focus:outline-none focus:border-neon-cyan transition-all"
+                      className="w-full bg-[#111] border border-white/10 rounded-xl px-4 py-3 focus:outline-none focus:border-neon-cyan transition-all text-white"
                     >
-                      <option value="">Select Persona</option>
+                      <option value="" className="bg-[#111] text-white">Select Persona</option>
                       {BRAND_PERSONAS.map(p => (
-                        <option key={p} value={p}>{p}</option>
+                        <option key={p} value={p} className="bg-[#111] text-white">{p}</option>
                       ))}
                     </select>
                   </div>
@@ -2311,6 +2477,113 @@ export const AdminDashboard: React.FC<{ onLogout: () => void }> = ({ onLogout })
                   {confirmModal.confirmText || 'Confirm'}
                 </button>
               </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* Diagnostics Modal */}
+      <AnimatePresence>
+        {showDiagnostics && diagnosticsData && (
+          <div className="fixed inset-0 z-[110] flex items-center justify-center p-4">
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => setShowDiagnostics(false)}
+              className="absolute inset-0 bg-black/90 backdrop-blur-md"
+            />
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95, y: 20 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: 20 }}
+              className="relative w-full max-w-2xl glass-panel p-8 rounded-3xl border border-white/10 shadow-2xl bg-[#0a0a0a] max-h-[80vh] overflow-y-auto"
+            >
+              <div className="flex justify-between items-center mb-6">
+                <h3 className="text-2xl font-display font-bold text-neon-cyan flex items-center gap-3">
+                  <Activity className="w-6 h-6" />
+                  Firebase Diagnostics
+                </h3>
+                <button onClick={() => setShowDiagnostics(false)} className="p-2 hover:bg-white/5 rounded-lg transition-all">
+                  <X className="w-6 h-6" />
+                </button>
+              </div>
+
+              <div className="space-y-6">
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="p-4 rounded-2xl bg-white/5 border border-white/10">
+                    <p className="text-xs text-white/40 uppercase tracking-widest mb-1">Admin Configured</p>
+                    <p className={`text-lg font-bold ${diagnosticsData.isFirebaseAdminConfigured ? 'text-neon-lime' : 'text-neon-magenta'}`}>
+                      {diagnosticsData.isFirebaseAdminConfigured ? 'YES' : 'NO'}
+                    </p>
+                  </div>
+                  <div className="p-4 rounded-2xl bg-white/5 border border-white/10">
+                    <p className="text-xs text-white/40 uppercase tracking-widest mb-1">Node Env</p>
+                    <p className="text-lg font-bold text-white">{diagnosticsData.env.NODE_ENV}</p>
+                  </div>
+                </div>
+
+                <div className="p-4 rounded-2xl bg-white/5 border border-white/10">
+                  <p className="text-xs text-white/40 uppercase tracking-widest mb-2">Project IDs</p>
+                  <div className="space-y-2">
+                    <div className="flex justify-between">
+                      <span className="text-sm text-white/60">Config/Env:</span>
+                      <span className="text-sm font-mono text-neon-cyan">{diagnosticsData.env.FIREBASE_PROJECT_ID}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-sm text-white/60">Vite (Build):</span>
+                      <span className="text-sm font-mono text-neon-cyan">{diagnosticsData.env.VITE_FIREBASE_PROJECT_ID}</span>
+                    </div>
+                    {diagnosticsData.env.FIREBASE_PROJECT_ID !== diagnosticsData.env.VITE_FIREBASE_PROJECT_ID && (
+                      <div className="p-2 mt-2 rounded-lg bg-neon-magenta/10 border border-neon-magenta/20 text-neon-magenta text-xs flex items-center gap-2">
+                        <AlertTriangle className="w-4 h-4" />
+                        Project ID Mismatch Detected!
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                <div className="p-4 rounded-2xl bg-white/5 border border-white/10">
+                  <p className="text-xs text-white/40 uppercase tracking-widest mb-2">User Counts (Sample)</p>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <p className="text-2xl font-bold text-white">{diagnosticsData.counts.authUsers}</p>
+                      <p className="text-xs text-white/40">Auth Users</p>
+                    </div>
+                    <div>
+                      <p className="text-2xl font-bold text-white">{diagnosticsData.counts.firestoreUsers}</p>
+                      <p className="text-xs text-white/40">Firestore Users</p>
+                    </div>
+                  </div>
+                </div>
+
+                {diagnosticsData.sampleUsers && diagnosticsData.sampleUsers.length > 0 && (
+                  <div className="p-4 rounded-2xl bg-white/5 border border-white/10">
+                    <p className="text-xs text-white/40 uppercase tracking-widest mb-2">Sample Auth Users</p>
+                    <div className="space-y-2">
+                      {diagnosticsData.sampleUsers.map((u: any) => (
+                        <div key={u.uid} className="text-xs font-mono text-white/60 bg-black/40 p-2 rounded">
+                          {u.email} <span className="opacity-30">({u.uid})</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                <div className="p-4 rounded-2xl bg-white/5 border border-white/10">
+                  <p className="text-xs text-white/40 uppercase tracking-widest mb-2">Firestore Database ID</p>
+                  <p className="text-sm font-mono text-neon-cyan">
+                    {diagnosticsData.firebaseAppletConfig.firestoreDatabaseId || '(default)'}
+                  </p>
+                </div>
+              </div>
+
+              <button
+                onClick={() => setShowDiagnostics(false)}
+                className="w-full mt-8 py-4 rounded-xl bg-white/5 border border-white/10 hover:bg-white/10 transition-all font-bold uppercase tracking-widest text-xs"
+              >
+                Close Diagnostics
+              </button>
             </motion.div>
           </div>
         )}

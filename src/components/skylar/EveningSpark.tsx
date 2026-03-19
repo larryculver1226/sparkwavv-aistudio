@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Sparkles, Volume2, VolumeX, X, Zap, Clock, RefreshCw, Heart, Brain, Coffee } from 'lucide-react';
 import { skylar, SkylarPersona } from '../../services/skylarService';
-import { useAuthContext } from '../../contexts/AuthContext';
+import { useIdentity } from '../../contexts/IdentityContext';
 
 interface EveningSparkProps {
   energyTrough?: { start: string; end: string };
@@ -15,7 +15,7 @@ export const EveningSpark: React.FC<EveningSparkProps> = ({ energyTrough, onClos
   const [autoplayFailed, setAutoplayFailed] = useState(false);
   const [currentPhase, setCurrentPhase] = useState<'relax' | 'refresh' | 'review' | 'reflect'>('relax');
   const audioRef = useRef<HTMLAudioElement>(null);
-  const { user } = useAuthContext();
+  const { user } = useIdentity();
 
   useEffect(() => {
     if (!energyTrough) return;

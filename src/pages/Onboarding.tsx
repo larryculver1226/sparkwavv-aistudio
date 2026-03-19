@@ -1,10 +1,10 @@
 import React, { useState } from 'react';
 import { motion } from 'framer-motion';
 import { Sparkles, ArrowRight, Brain, Target, Rocket, ShieldCheck } from 'lucide-react';
-import { useAuthContext } from '../contexts/AuthContext';
+import { useIdentity } from '../contexts/IdentityContext';
 
 export default function Onboarding() {
-  const { user, profile, refreshProfile } = useAuthContext();
+  const { user, profile, refreshProfile } = useIdentity();
   const [step, setStep] = useState(1);
   const [loading, setLoading] = useState(false);
   const [formData, setFormData] = useState({

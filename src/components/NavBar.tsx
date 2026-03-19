@@ -6,7 +6,7 @@ import { Menu, X, Sparkles, ChevronDown, LayoutDashboard, LogOut, Settings } fro
 import { motion, AnimatePresence } from 'motion/react';
 import { onAuthStateChanged, User as FirebaseUser, signOut } from 'firebase/auth';
 import { auth } from '../lib/firebase';
-import { useAuthContext } from '../contexts/AuthContext';
+import { useIdentity } from '../contexts/IdentityContext';
 
 interface NavItem {
   label: string;
@@ -58,7 +58,8 @@ export const NavBar: React.FC<NavBarProps> = ({ onNavigate }) => {
   const [isOpen, setIsOpen] = useState(false);
   const [scrolled, setScrolled] = useState(false);
   const [activeDropdown, setActiveDropdown] = useState<string | null>(null);
-  const { user, profile, loading, isConfirmed } = useAuthContext();
+  const { user, profile, loading, status } = useIdentity();
+  const isConfirmed = status === 'authenticated';
 
   useEffect(() => {
     const handleScroll = () => {
@@ -164,37 +165,52 @@ export const NavBar: React.FC<NavBarProps> = ({ onNavigate }) => {
           {/* Auth Button */}
           <div className="flex justify-end items-center gap-3">
             {!loading && (
-              user && isConfirmed ? (
-                <>
-                  <button 
-                    onClick={() => navigate(`/dashboard/${profile?.uid || user.uid}`)}
-                    className="flex items-center gap-2 px-4 py-2 rounded-full bg-white/5 border border-white/10 text-white text-sm font-bold hover:bg-white/10 hover:border-white/20 transition-all duration-300 group"
-                  >
-                    <LayoutDashboard className="w-3.5 h-3.5 text-neon-cyan" />
-                    <span>Dashboard</span>
-                  </button>
-                  <button 
-                    onClick={() => onNavigate('settings')}
-                    className="p-2 rounded-full bg-white/5 border border-white/10 text-white/60 hover:text-neon-cyan hover:border-neon-cyan/30 transition-all duration-300"
-                    title="Settings"
-                  >
-                    <Settings className="w-4 h-4" />
-                  </button>
-                  <button 
-                    onClick={() => auth && signOut(auth)}
-                    className="p-2 rounded-full bg-white/5 border border-white/10 text-white/60 hover:text-neon-magenta hover:border-neon-magenta/30 transition-all duration-300"
-                    title="Sign Out"
-                  >
-                    <LogOut className="w-4 h-4" />
-                  </button>
-                </>
+              user ? (
+                isConfirmed ? (
+                  <>
+                    <button 
+                      onClick={() => navigate(`/dashboard/${profile?.uid || user.uid}`)}
+                      className="flex items-center gap-2 px-4 py-2 rounded-full bg-white/5 border border-white/10 text-white text-sm font-bold hover:bg-white/10 hover:border-white/20 transition-all duration-300 group"
+                    >
+                      <LayoutDashboard className="w-3.5 h-3.5 text-neon-cyan" />
+                      <span>SPARKWavv Dashboard</span>
+                    </button>
+                    <button 
+                      onClick={() => onNavigate('settings')}
+                      className="p-2 rounded-full bg-white/5 border border-white/10 text-white/60 hover:text-neon-cyan hover:border-neon-cyan/30 transition-all duration-300"
+                      title="Settings"
+                    >
+                      <Settings className="w-4 h-4" />
+                    </button>
+                    <button 
+                      onClick={() => auth && signOut(auth)}
+                      className="p-2 rounded-full bg-white/5 border border-white/10 text-white/60 hover:text-neon-magenta hover:border-neon-magenta/30 transition-all duration-300"
+                      title="Sign Out"
+                    >
+                      <LogOut className="w-4 h-4" />
+                    </button>
+                  </>
+                ) : (
+                  <div className="flex items-center gap-3">
+                    <span className="text-xs text-white/40 italic">Awaiting Verification</span>
+                    <button 
+                      onClick={() => auth && signOut(auth)}
+                      className="p-2 rounded-full bg-white/5 border border-white/10 text-white/60 hover:text-neon-magenta hover:border-neon-magenta/30 transition-all duration-300"
+                      title="Sign Out"
+                    >
+                      <LogOut className="w-4 h-4" />
+                    </button>
+                  </div>
+                )
               ) : (
-                <button 
-                  onClick={() => onNavigate('login')}
-                  className="px-4 py-2 rounded-full bg-neon-cyan text-black text-sm font-bold hover:shadow-[0_0_25px_rgba(0,255,255,0.5)] hover:scale-105 transition-all duration-300"
-                >
-                  Dashboard
-                </button>
+                <div className="flex items-center gap-3">
+                  <button 
+                    onClick={() => onNavigate('login')}
+                    className="px-4 py-2 rounded-full bg-white/5 border border-white/10 text-white text-sm font-bold hover:bg-white/10 transition-all duration-300"
+                  >
+                    SPARKWavv Dashboard
+                  </button>
+                </div>
               )
             )}
           </div>
@@ -255,27 +271,48 @@ export const NavBar: React.FC<NavBarProps> = ({ onNavigate }) => {
               
               <div className="pt-8 border-t border-white/10">
                 {!loading && (
-                  user && isConfirmed ? (
-                    <button 
-                      onClick={() => {
-                        navigate(`/dashboard/${profile?.uid || user.uid}`);
-                        setIsOpen(false);
-                      }}
-                      className="w-full py-5 rounded-2xl bg-white/5 border border-white/10 text-white font-bold text-2xl flex items-center justify-center gap-3"
-                    >
-                      <LayoutDashboard className="w-7 h-7 text-neon-cyan" />
-                      Dashboard
-                    </button>
+                  user ? (
+                    isConfirmed ? (
+                      <button 
+                        onClick={() => {
+                          navigate(`/dashboard/${profile?.uid || user.uid}`);
+                          setIsOpen(false);
+                        }}
+                        className="w-full py-5 rounded-2xl bg-white/5 border border-white/10 text-white font-bold text-2xl flex items-center justify-center gap-3"
+                      >
+                        <LayoutDashboard className="w-7 h-7 text-neon-cyan" />
+                        SPARKWavv Dashboard
+                      </button>
+                    ) : (
+                      <div className="flex flex-col gap-4">
+                        <div className="text-center py-4 px-6 rounded-2xl bg-neon-cyan/10 border border-neon-cyan/20">
+                          <p className="text-neon-cyan font-bold text-xl">Awaiting Verification</p>
+                          <p className="text-white/40 text-sm mt-1">Please check your email to activate your account.</p>
+                        </div>
+                        <button 
+                          onClick={() => {
+                            auth && signOut(auth);
+                            setIsOpen(false);
+                          }}
+                          className="w-full py-5 rounded-2xl bg-white/5 border border-white/10 text-white font-bold text-2xl flex items-center justify-center gap-3"
+                        >
+                          <LogOut className="w-7 h-7 text-neon-magenta" />
+                          Sign Out
+                        </button>
+                      </div>
+                    )
                   ) : (
-                    <button 
-                      onClick={() => {
-                        onNavigate('login');
-                        setIsOpen(false);
-                      }}
-                      className="w-full py-5 rounded-2xl bg-neon-cyan text-black font-bold text-2xl shadow-[0_0_30px_rgba(0,255,255,0.3)]"
-                    >
-                      Dashboard
-                    </button>
+                    <div className="flex flex-col gap-4">
+                      <button 
+                        onClick={() => {
+                          onNavigate('login');
+                          setIsOpen(false);
+                        }}
+                        className="w-full py-5 rounded-2xl bg-white/5 border border-white/10 text-white font-bold text-2xl"
+                      >
+                        SPARKWavv Dashboard
+                      </button>
+                    </div>
                   )
                 )}
               </div>

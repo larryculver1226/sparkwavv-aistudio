@@ -5,6 +5,7 @@ import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { logEvent } from './loggingService';
+import { getGeminiApiKey } from './aiConfig';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -35,8 +36,26 @@ const getDb = () => {
  * 2. Cloud Storage Artifact Mapping
  */
 
-// Initialize Gemini for embeddings
-const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY || '' });
+// Lazy initialization of Gemini
+let aiInstance: GoogleGenAI | null = null;
+
+const getAI = () => {
+  if (!aiInstance) {
+    const apiKey = getGeminiApiKey();
+    
+    if (!apiKey) {
+      console.error("WavvaultService: Gemini API key is missing.");
+      throw new Error("GEMINI_API_KEY is not configured in the environment variables. Please check your AI Studio settings.");
+    }
+
+    // Mask the key for logging
+    const maskedKey = apiKey.length > 8 ? `${apiKey.substring(0, 4)}...${apiKey.substring(apiKey.length - 4)}` : "****";
+    console.log(`WavvaultService: Initializing GoogleGenAI with key: ${maskedKey} (length: ${apiKey.length})`);
+    
+    aiInstance = new GoogleGenAI({ apiKey });
+  }
+  return aiInstance;
+};
 
 export interface UserWavvaultData {
   userId: string;
@@ -151,10 +170,12 @@ export const writeUserWavvault = async (data: UserWavvaultData) => {
   `.trim();
   
   try {
+    const ai = getAI();
     // Generate vector embedding using Gemini
     const result = await ai.models.embedContent({
-      model: "text-embedding-004",
-      contents: { parts: [{ text: combinedText }] }
+      model: "gemini-embedding-2-preview",
+      contents: { parts: [{ text: combinedText }] },
+      config: { outputDimensionality: 768 }
     });
     const embeddingValues = result.embeddings[0].values;
     
@@ -240,10 +261,12 @@ export const searchSimilarWavvaults = async (queryText: string, limit: number = 
   const db = getDb();
   
   try {
+    const ai = getAI();
     // Generate embedding for the query
     const result = await ai.models.embedContent({
-      model: "text-embedding-004",
-      contents: { parts: [{ text: queryText }] }
+      model: "gemini-embedding-2-preview",
+      contents: { parts: [{ text: queryText }] },
+      config: { outputDimensionality: 768 }
     });
     const queryVector = result.embeddings[0].values;
     

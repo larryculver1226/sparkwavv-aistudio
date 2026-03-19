@@ -57,7 +57,20 @@
           "enum": ["Dive-In", "Ignition", "Discovery", "Branding", "Outreach", "NONE"],
           "description": "Current stage in the SPARKWavv journey" 
         },
-        "onboardingComplete": { "type": "boolean" }
+        "onboardingComplete": { "type": "boolean" },
+        "firstName": { "type": "string" },
+        "lastName": { "type": "string" },
+        "jobTitle": { "type": "string" },
+        "companyOrg": { "type": "string" },
+        "phone": { "type": "string" },
+        "programTrack": { "type": "string" },
+        "lifecycleStage": { "type": "string" },
+        "outcomesAttributes": { "type": "string" },
+        "feedbackQuote": { "type": "string" },
+        "userData": { "type": "object", "description": "Full onboarding and progress data" },
+        "currentStep": { "type": "string", "description": "Current step in the onboarding flow" },
+        "summary": { "type": "object", "description": "Generated career discovery summary" },
+        "updatedAt": { "type": "string", "format": "date-time" }
       },
       "required": ["uid", "email", "tenantId"]
     },

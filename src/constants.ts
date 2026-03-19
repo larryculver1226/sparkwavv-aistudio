@@ -15,7 +15,7 @@ export const CAREER_STAGE_ROLES = [
 ] as const;
 
 export const HIERARCHICAL_ROLES = [
-  'Owner', 'C-suite', 'Vice President', 'Director or Manager', 'Consultant', 'Independent Contractor'
+  'Owner', 'C-suite', 'Vice President', 'Director or Manager', 'Employee', 'Consultant', 'Independent Contractor'
 ] as const;
 
 export const BRAND_PERSONAS = [
@@ -28,6 +28,9 @@ export const BRAND_DNA_ATTRIBUTES = [
 
 export const ROLES = {
   ADMIN: 'admin',
+  SUPER_ADMIN: 'super_admin',
+  EDITOR: 'editor',
+  VIEWER: 'viewer',
   USER: 'user',
   OPERATOR: 'operator',
   MENTOR: 'mentor',

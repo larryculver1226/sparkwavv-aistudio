@@ -14,6 +14,7 @@ import {
   ArrowRight, 
   ChevronRight,
   Loader2,
+  RefreshCw,
   CheckCircle2,
   Trophy,
   Compass,
@@ -48,19 +49,61 @@ import {
   query,
   where,
   getDocs,
-  onSnapshot
+  onSnapshot,
+  serverTimestamp
 } from 'firebase/firestore';
 import { auth, isFirebaseConfigured, googleProvider, linkedinProvider, db } from './lib/firebase';
-import { useAuthContext } from './contexts/AuthContext';
-import { CONFIRMED_USERS } from './mockDatabase';
-import { generateDiscoverySummary, parseResume, generateBrandImage, UserData } from './services/geminiService';
-import { NavBar } from './components/NavBar';
-import { Footer } from './components/Footer';
-import { Hero } from './components/Hero';
+import { IdentityProvider, useIdentity } from './contexts/IdentityContext';
+import { AccessDenied } from './components/AccessDenied';
+import { OperationsDashboard } from './pages/OperationsDashboard';
 import { AdminLogin } from './pages/AdminLogin';
 import { AdminDashboard } from './pages/AdminDashboard';
 import { UserDashboard } from './pages/UserDashboard';
 import { PartnerDashboard } from './pages/PartnerDashboard';
+import { generateDiscoverySummary, parseResume, generateBrandImage, UserData } from './services/geminiService';
+import { NavBar } from './components/NavBar';
+import { Footer } from './components/Footer';
+import { Hero } from './components/Hero';
+
+class ErrorBoundary extends React.Component<{ children: React.ReactNode }, { hasError: boolean; error: any }> {
+  constructor(props: any) {
+    super(props);
+    this.state = { hasError: false, error: null };
+  }
+
+  static getDerivedStateFromError(error: any) {
+    return { hasError: true, error };
+  }
+
+  componentDidCatch(error: any, errorInfo: any) {
+    console.error("ErrorBoundary caught an error:", error, errorInfo);
+  }
+
+  render() {
+    if (this.state.hasError) {
+      return (
+        <div className="min-h-screen bg-black text-white flex items-center justify-center p-8">
+          <div className="max-w-md w-full space-y-4 text-center">
+            <ShieldAlert className="w-16 h-16 text-red-500 mx-auto" />
+            <h1 className="text-2xl font-bold">Something went wrong</h1>
+            <p className="text-gray-400">The application encountered an unexpected error.</p>
+            <div className="bg-gray-900 p-4 rounded-lg text-left overflow-auto max-h-40">
+              <code className="text-xs text-red-400">{this.state.error?.toString()}</code>
+            </div>
+            <button 
+              onClick={() => window.location.reload()}
+              className="px-6 py-2 bg-blue-600 rounded-lg hover:bg-blue-700 transition-colors"
+            >
+              Reload Application
+            </button>
+          </div>
+        </div>
+      );
+    }
+
+    return this.props.children;
+  }
+}
 import { AcceptInvitation } from './pages/AcceptInvitation';
 import { ProfilePage } from './pages/ProfilePage';
 import { Button } from './components/Button';
@@ -246,11 +289,16 @@ export function SPARKWavvApp({ isAdmin = false }: { isAdmin?: boolean }) {
   const [isRegistering, setIsRegistering] = useState(false);
   const [userId, setUserId] = useState<string | null>(null);
   const [dashboardData, setDashboardData] = useState<DashboardData | null>(null);
-  const { user, profile, status: authStatus, loading: authLoading, isConfirmed, refreshProfile, loginAsMockUser, logout } = useAuthContext();
+  const { user, profile, status: authStatus, loading: authLoading, isConfirmed, refreshProfile, logout } = useIdentity();
 
   // Auto-redirect to dashboard when ready
   useEffect(() => {
     if (authStatus === 'ready' && profile) {
+      if (profile.role === 'admin') {
+        console.log('🛡️ Admin detected in SPARKWavvApp, redirecting to admin portal');
+        navigate('/sparkwavv-admin');
+        return;
+      }
       console.log('🚀 Auth ready, redirecting to dashboard:', profile.uid);
       navigate(`/dashboard/${profile.uid}`);
     }
@@ -463,15 +511,18 @@ export function SPARKWavvApp({ isAdmin = false }: { isAdmin?: boolean }) {
         localStorage.setItem('sparkwavv_current_step', step);
         setHasSavedProgress(true);
 
-        // Sync to Firestore if logged in
-        if (user && db) {
+        // Sync to Firestore if logged in and profile is ready
+        if (user && db && profile) {
           const syncProgress = async () => {
             try {
-              await setDoc(doc(db, 'users', user.uid), {
-                userData,
-                currentStep: step,
-                updatedAt: new Date().toISOString()
-              }, { merge: true });
+              // Only sync if we have a valid user document with required fields
+              if (profile.role && profile.tenantId) {
+                await setDoc(doc(db, 'users', user.uid), {
+                  userData,
+                  currentStep: step,
+                  updatedAt: serverTimestamp()
+                }, { merge: true });
+              }
             } catch (e) {
               console.error("Error syncing to Firestore:", e);
             }
@@ -484,14 +535,16 @@ export function SPARKWavvApp({ isAdmin = false }: { isAdmin?: boolean }) {
       localStorage.setItem('sparkwavv_summary', JSON.stringify(summary));
       setHasSavedProgress(true);
 
-      // Sync results to Firestore
-      if (user && db) {
+      // Sync results to Firestore if profile is ready
+      if (user && db && profile) {
         const syncResults = async () => {
           try {
-            await setDoc(doc(db, 'users', user.uid), {
-              summary,
-              updatedAt: new Date().toISOString()
-            }, { merge: true });
+            if (profile.role && profile.tenantId) {
+              await setDoc(doc(db, 'users', user.uid), {
+                summary,
+                updatedAt: serverTimestamp()
+              }, { merge: true });
+            }
           } catch (e) {
             console.error("Error syncing results to Firestore:", e);
           }
@@ -499,19 +552,20 @@ export function SPARKWavvApp({ isAdmin = false }: { isAdmin?: boolean }) {
         syncResults();
       }
     }
-  }, [userData, step, summary, uploadedFileName, isConfirmed, user]);
+  }, [userData, step, summary, uploadedFileName, isConfirmed, user, db, profile]);
 
   const validateOnboarding = () => {
     const newErrors: Record<string, string> = {};
     const isResumeUploaded = !!uploadedFileName;
 
     if (!userData.onboarding.email.trim()) newErrors.email = 'Email is required';
-
-    if (!isResumeUploaded) {
-      if (!userData.onboarding.firstName.trim()) newErrors.firstName = 'First Name is required';
-      if (!userData.onboarding.lastName.trim()) newErrors.lastName = 'Last Name is required';
-      if (!userData.onboarding.jobTitle.trim()) newErrors.jobTitle = 'Job Title is required';
-    }
+    if (!userData.onboarding.firstName.trim()) newErrors.firstName = 'First Name is required';
+    if (!userData.onboarding.lastName.trim()) newErrors.lastName = 'Last Name is required';
+    if (!userData.onboarding.jobTitle.trim()) newErrors.jobTitle = 'Job Title is required';
+    if (!userData.onboarding.companyOrg.trim()) newErrors.companyOrg = 'Company/Org is required';
+    if (!userData.onboarding.phone.trim()) newErrors.phone = 'Phone is required';
+    if (!userData.onboarding.programTrack.trim()) newErrors.programTrack = 'Program/Track is required';
+    if (!userData.onboarding.lifecycleStage.trim()) newErrors.lifecycleStage = 'Lifecycle Stage is required';
 
     if (userData.onboarding.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(userData.onboarding.email)) {
       newErrors.email = 'Please enter a valid email address';
@@ -563,7 +617,7 @@ export function SPARKWavvApp({ isAdmin = false }: { isAdmin?: boolean }) {
 
       // Initialize role in backend
       const idToken = await userCredential.user.getIdToken();
-      await fetch('/api/user/init-role', {
+      const initRoleResponse = await fetch('/api/user/init-role', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ 
@@ -571,17 +625,29 @@ export function SPARKWavvApp({ isAdmin = false }: { isAdmin?: boolean }) {
           userId: finalUserId,
           email: updatedUserData.onboarding.email,
           firstName: updatedUserData.onboarding.firstName,
-          lastName: updatedUserData.onboarding.lastName
+          lastName: updatedUserData.onboarding.lastName,
+          jobTitle: updatedUserData.onboarding.jobTitle,
+          companyOrg: updatedUserData.onboarding.companyOrg,
+          phone: updatedUserData.onboarding.phone,
+          programTrack: updatedUserData.onboarding.programTrack,
+          lifecycleStage: updatedUserData.onboarding.lifecycleStage,
+          outcomesAttributes: updatedUserData.onboarding.outcomesAttributes,
+          feedbackQuote: updatedUserData.onboarding.feedbackQuote
         }),
       });
 
+      if (!initRoleResponse.ok) {
+        const errorData = await initRoleResponse.json();
+        throw new Error(errorData.error || "Failed to initialize user role. Please contact support.");
+      }
+
       await refreshProfile();
 
-      setRegistrationMessage("Registration Confirmed! Please reply to the confirmation email to activate your SPARKWavv account.");
+      setRegistrationMessage("Registration successful! A verification email has been sent to your address. Please verify your email to activate your account.");
       
-      // Redirect to landing after 5 seconds
+      // Redirect to login after 5 seconds
       setTimeout(() => {
-        setStep('landing');
+        setStep('login');
         setRegistrationMessage(null);
       }, 5000);
     } catch (err: any) {
@@ -593,6 +659,8 @@ export function SPARKWavvApp({ isAdmin = false }: { isAdmin?: boolean }) {
         message = "Invalid email address.";
       } else if (err.code === 'auth/weak-password') {
         message = "Password is too weak.";
+      } else if (err.code === 'auth/operation-not-allowed') {
+        message = "Email/Password registration is not enabled in the Firebase Console. Please enable it under Authentication > Sign-in method.";
       }
       setErrors({ ...errors, general: message });
     } finally {
@@ -613,11 +681,13 @@ export function SPARKWavvApp({ isAdmin = false }: { isAdmin?: boolean }) {
 
     setIsRegistering(true);
     try {
-      await signInWithEmailAndPassword(auth, userData.onboarding.email, userData.onboarding.password);
+      const userCredential = await signInWithEmailAndPassword(auth, userData.onboarding.email, userData.onboarding.password);
       
-      // For industry standards, we check verified status but might allow entry with a banner
-      // However, the user specifically asked for "confirmed account user" logic previously
-      // Let's keep the verification check but make it cleaner
+      if (!userCredential.user.emailVerified) {
+        setErrors({ general: "Please verify your email address before logging in. Check your inbox for the activation link." });
+        await signOut(auth);
+        return;
+      }
       
       setStep('landing');
       setErrors({});
@@ -630,6 +700,8 @@ export function SPARKWavvApp({ isAdmin = false }: { isAdmin?: boolean }) {
         message = "Too many failed attempts. Please try again later.";
       } else if (err.code === 'auth/invalid-email') {
         message = "Invalid email address.";
+      } else if (err.code === 'auth/operation-not-allowed') {
+        message = "Email/Password login is not enabled in the Firebase Console. Please enable it under Authentication > Sign-in method.";
       }
       setErrors({ general: message });
     } finally {
@@ -644,6 +716,12 @@ export function SPARKWavvApp({ isAdmin = false }: { isAdmin?: boolean }) {
       setIsRegistering(true);
       try {
         const result = await signInWithPopup(auth, googleProvider);
+        
+        if (!result.user.emailVerified) {
+          setErrors({ general: "Your Google account email is not verified. Please verify it in your Google settings before logging in." });
+          await signOut(auth);
+          return;
+        }
         
         // Initialize role if new user
         const idToken = await result.user.getIdToken();
@@ -668,7 +746,11 @@ export function SPARKWavvApp({ isAdmin = false }: { isAdmin?: boolean }) {
         setErrors({});
       } catch (err: any) {
         console.error(`${provider} login error:`, err);
-        setErrors({ general: `Failed to login with ${provider}.` });
+        let message = `Failed to login with ${provider}.`;
+        if (err.code === 'auth/operation-not-allowed') {
+          message = `${provider} login is not enabled in the Firebase Console. Please enable it under Authentication > Sign-in method.`;
+        }
+        setErrors({ general: message });
       } finally {
         setIsRegistering(false);
       }
@@ -1038,16 +1120,6 @@ export function SPARKWavvApp({ isAdmin = false }: { isAdmin?: boolean }) {
             <BrainModel />
             <Roadmap />
 
-            <div className="py-24 text-center">
-              <Button 
-                onClick={nextStep} 
-                variant="neon" 
-                className="text-xl px-16 py-6 rounded-full shadow-[0_0_30px_rgba(0,255,255,0.3)]"
-              >
-                Start Your Dive-In Now
-              </Button>
-            </div>
-
             {/* Start Over Confirmation Modal */}
             <AnimatePresence>
               {showStartOverConfirm && (
@@ -1352,35 +1424,6 @@ export function SPARKWavvApp({ isAdmin = false }: { isAdmin?: boolean }) {
                       </button>
                     </div>
 
-                    <div className="relative py-4">
-                      <div className="absolute inset-0 flex items-center"><div className="w-full border-t border-white/10"></div></div>
-                      <div className="relative flex justify-center text-xs uppercase"><span className="bg-black px-2 text-white/40">Demo Accounts (Evaluation)</span></div>
-                    </div>
-
-                    <div className="grid grid-cols-1 gap-2">
-                      {CONFIRMED_USERS.slice(0, 3).map((mock) => (
-                        <button
-                          key={mock.userId}
-                          disabled={isRegistering}
-                          onClick={() => {
-                            setIsRegistering(true);
-                            setErrors({});
-                            loginAsMockUser(mock);
-                          }}
-                          className="flex items-center justify-between px-4 py-3 rounded-xl bg-neon-cyan/5 border border-neon-cyan/20 hover:bg-neon-cyan/10 transition-all group disabled:opacity-50 disabled:cursor-not-allowed"
-                        >
-                          <div className="text-left">
-                            <p className="text-sm font-bold text-white group-hover:text-neon-cyan transition-colors">{mock.firstName} {mock.lastName}</p>
-                            <p className="text-[10px] text-white/40 uppercase tracking-wider">{mock.jobTitle}</p>
-                          </div>
-                          <div className="flex items-center gap-2">
-                            <span className="text-[10px] px-2 py-0.5 rounded-full bg-neon-cyan/10 text-neon-cyan border border-neon-cyan/20">{mock.journeyStage}</span>
-                            <ArrowRight className="w-4 h-4 text-neon-cyan opacity-0 group-hover:opacity-100 transition-all transform translate-x-[-10px] group-hover:translate-x-0" />
-                          </div>
-                        </button>
-                      ))}
-                    </div>
-
                     <div className="flex justify-between items-center pt-4">
                       <button 
                         onClick={() => setStep('forgot-password')}
@@ -1390,9 +1433,9 @@ export function SPARKWavvApp({ isAdmin = false }: { isAdmin?: boolean }) {
                       </button>
                       <button 
                         onClick={() => setStep('onboarding')}
-                        className="text-white/40 text-sm hover:text-white transition-colors"
+                        className="text-neon-cyan text-sm font-bold hover:underline transition-all"
                       >
-                        Don't have an account? Start Dive-In
+                        Don't have an account? Sign Up
                       </button>
                     </div>
                   </div>
@@ -1631,7 +1674,7 @@ export function SPARKWavvApp({ isAdmin = false }: { isAdmin?: boolean }) {
                   <div className="space-y-6">
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                       <div className="space-y-2">
-                        <label className="text-sm font-medium text-white/40 uppercase tracking-wider">First Name</label>
+                        <label className="text-sm font-medium text-white/40 uppercase tracking-wider">First Name <span className="text-neon-magenta">*</span></label>
                         <input 
                           type="text" 
                           className={`w-full bg-white/5 border rounded-xl px-4 py-3 focus:outline-none transition-colors ${errors.firstName ? 'border-red-500' : 'border-white/10 focus:border-neon-cyan'}`}
@@ -1642,7 +1685,7 @@ export function SPARKWavvApp({ isAdmin = false }: { isAdmin?: boolean }) {
                         {errors.firstName && <p className="text-xs text-red-500 mt-1">{errors.firstName}</p>}
                       </div>
                       <div className="space-y-2">
-                        <label className="text-sm font-medium text-white/40 uppercase tracking-wider">Last Name</label>
+                        <label className="text-sm font-medium text-white/40 uppercase tracking-wider">Last Name <span className="text-neon-magenta">*</span></label>
                         <input 
                           type="text" 
                           className={`w-full bg-white/5 border rounded-xl px-4 py-3 focus:outline-none transition-colors ${errors.lastName ? 'border-red-500' : 'border-white/10 focus:border-neon-cyan'}`}
@@ -1656,7 +1699,7 @@ export function SPARKWavvApp({ isAdmin = false }: { isAdmin?: boolean }) {
 
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                       <div className="space-y-2">
-                        <label className="text-sm font-medium text-white/40 uppercase tracking-wider">Job Title</label>
+                        <label className="text-sm font-medium text-white/40 uppercase tracking-wider">Job Title <span className="text-neon-magenta">*</span></label>
                         <input 
                           type="text" 
                           className={`w-full bg-white/5 border rounded-xl px-4 py-3 focus:outline-none transition-colors ${errors.jobTitle ? 'border-red-500' : 'border-white/10 focus:border-neon-cyan'}`}
@@ -1667,7 +1710,7 @@ export function SPARKWavvApp({ isAdmin = false }: { isAdmin?: boolean }) {
                         {errors.jobTitle && <p className="text-xs text-red-500 mt-1">{errors.jobTitle}</p>}
                       </div>
                       <div className="space-y-2">
-                        <label className="text-sm font-medium text-white/40 uppercase tracking-wider">Company/Org</label>
+                        <label className="text-sm font-medium text-white/40 uppercase tracking-wider">Company/Org <span className="text-neon-magenta">*</span></label>
                         <input 
                           type="text" 
                           className={`w-full bg-white/5 border rounded-xl px-4 py-3 focus:outline-none transition-colors ${errors.companyOrg ? 'border-red-500' : 'border-white/10 focus:border-neon-cyan'}`}
@@ -1681,7 +1724,7 @@ export function SPARKWavvApp({ isAdmin = false }: { isAdmin?: boolean }) {
 
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                       <div className="space-y-2">
-                        <label className="text-sm font-medium text-white/40 uppercase tracking-wider">Email Address</label>
+                        <label className="text-sm font-medium text-white/40 uppercase tracking-wider">Email Address <span className="text-neon-magenta">*</span></label>
                         <input 
                           type="email" 
                           className={`w-full bg-white/5 border rounded-xl px-4 py-3 focus:outline-none transition-colors ${errors.email ? 'border-red-500' : 'border-white/10 focus:border-neon-cyan'}`}
@@ -1692,7 +1735,7 @@ export function SPARKWavvApp({ isAdmin = false }: { isAdmin?: boolean }) {
                         {errors.email && <p className="text-xs text-red-500 mt-1">{errors.email}</p>}
                       </div>
                       <div className="space-y-2">
-                        <label className="text-sm font-medium text-white/40 uppercase tracking-wider">Phone</label>
+                        <label className="text-sm font-medium text-white/40 uppercase tracking-wider">Phone <span className="text-neon-magenta">*</span></label>
                         <input 
                           type="tel" 
                           className={`w-full bg-white/5 border rounded-xl px-4 py-3 focus:outline-none transition-colors ${errors.phone ? 'border-red-500' : 'border-white/10 focus:border-neon-cyan'}`}
@@ -1706,7 +1749,7 @@ export function SPARKWavvApp({ isAdmin = false }: { isAdmin?: boolean }) {
 
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                       <div className="space-y-2">
-                        <label className="text-sm font-medium text-white/40 uppercase tracking-wider">Program/Track</label>
+                        <label className="text-sm font-medium text-white/40 uppercase tracking-wider">Program/Track <span className="text-neon-magenta">*</span></label>
                         <input 
                           type="text" 
                           className={`w-full bg-white/5 border rounded-xl px-4 py-3 focus:outline-none transition-colors ${errors.programTrack ? 'border-red-500' : 'border-white/10 focus:border-neon-cyan'}`}
@@ -1717,7 +1760,7 @@ export function SPARKWavvApp({ isAdmin = false }: { isAdmin?: boolean }) {
                         {errors.programTrack && <p className="text-xs text-red-500 mt-1">{errors.programTrack}</p>}
                       </div>
                       <div className="space-y-2">
-                        <label className="text-sm font-medium text-white/40 uppercase tracking-wider">Lifecycle Stage</label>
+                        <label className="text-sm font-medium text-white/40 uppercase tracking-wider">Lifecycle Stage <span className="text-neon-magenta">*</span></label>
                         <input 
                           type="text" 
                           className={`w-full bg-white/5 border rounded-xl px-4 py-3 focus:outline-none transition-colors ${errors.lifecycleStage ? 'border-red-500' : 'border-white/10 focus:border-neon-cyan'}`}
@@ -1764,7 +1807,7 @@ export function SPARKWavvApp({ isAdmin = false }: { isAdmin?: boolean }) {
                         <p className="text-[10px] text-white/30 italic">This will be your unique dashboard URL</p>
                       </div>
                       <div className="space-y-2">
-                        <label className="text-sm font-medium text-white/40 uppercase tracking-wider">Password</label>
+                        <label className="text-sm font-medium text-white/40 uppercase tracking-wider">Password <span className="text-neon-magenta">*</span></label>
                         <input 
                           type="password" 
                           className={`w-full bg-white/5 border rounded-xl px-4 py-3 focus:outline-none transition-colors ${errors.password ? 'border-red-500' : 'border-white/10 focus:border-neon-cyan'}`}
@@ -1773,47 +1816,6 @@ export function SPARKWavvApp({ isAdmin = false }: { isAdmin?: boolean }) {
                           onChange={(e) => setUserData({...userData, onboarding: {...userData.onboarding, password: e.target.value}})}
                         />
                         {errors.password && <p className="text-xs text-red-500 mt-1">{errors.password}</p>}
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="space-y-4">
-                    <div className="relative flex items-center py-4">
-                      <div className="flex-grow border-t border-white/10"></div>
-                      <span className="flex-shrink mx-4 text-white/20 text-xs uppercase tracking-widest">Optional: Upload Resume</span>
-                      <div className="flex-grow border-t border-white/10"></div>
-                    </div>
-
-                    {uploadedFileName && (
-                      <div className="flex items-center gap-2 px-4 py-2 rounded-lg bg-neon-cyan/10 border border-neon-cyan/20 text-neon-cyan text-sm w-fit mx-auto">
-                        <FileUp className="w-4 h-4" />
-                        <span className="font-medium">{uploadedFileName}</span>
-                      </div>
-                    )}
-                    <div className="glass-panel p-8 border-dashed border-2 border-white/10 hover:border-neon-cyan/40 transition-all group relative">
-                      <input 
-                        type="file" 
-                        className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10" 
-                        accept=".pdf,.doc,.docx,text/plain"
-                        onChange={handleFileUpload}
-                      />
-                      <div className="flex flex-col items-center justify-center space-y-4 py-4">
-                        {parsingResume ? (
-                          <>
-                            <Loader2 className="w-10 h-10 text-neon-cyan animate-spin" />
-                            <p className="text-neon-cyan font-medium animate-pulse">Analyzing Resume...</p>
-                          </>
-                        ) : (
-                          <>
-                            <div className="w-16 h-16 rounded-full bg-white/5 flex items-center justify-center group-hover:bg-neon-cyan/10 transition-colors">
-                              <Upload className="w-8 h-8 text-white/40 group-hover:text-neon-cyan transition-colors" />
-                            </div>
-                            <div className="text-center">
-                              <p className="text-lg font-medium">Upload Resume</p>
-                              <p className="text-sm text-white/40">PDF, DOCX or TXT (Max 5MB)</p>
-                            </div>
-                          </>
-                        )}
                       </div>
                     </div>
                   </div>
@@ -2388,7 +2390,7 @@ export function SPARKWavvApp({ isAdmin = false }: { isAdmin?: boolean }) {
       <Footer onNavigate={(s) => setStep(s as Step)} />
       
       {/* Skylar AI Integration */}
-      {!isAdmin && <SkylarSidebar />}
+      {!isAdmin && <SkylarSidebar onLogin={() => setStep('login')} />}
       {!isAdmin && (
         <EveningSpark 
           energyTrough={dashboardData?.energyTrough} 
@@ -2410,32 +2412,152 @@ const UserDashboardWrapper = ({ isAdmin }: { isAdmin: boolean }) => {
   );
 };
 
-export default function App() {
-  const [isAdmin, setIsAdmin] = useState<boolean | null>(null);
+const AdminRoute = ({ 
+  children, 
+  requiredRoles = ['admin', 'operator'],
+  requiredEntryPoint
+}: { 
+  children: React.ReactNode; 
+  requiredRoles?: string[];
+  requiredEntryPoint?: 'admin' | 'operations';
+}) => {
+  const { user, role, status, loading } = useIdentity();
+  
+  useEffect(() => {
+    if (!loading) {
+      console.log('🛡️ [AdminRoute] Check:', { 
+        hasUser: !!user, 
+        role, 
+        requiredRoles, 
+        status,
+        requiredEntryPoint 
+      });
+    }
+  }, [loading, user, role, status, requiredRoles, requiredEntryPoint]);
+
+  if (loading || status === 'initializing') {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gray-900">
+        <Loader2 className="w-12 h-12 text-blue-500 animate-spin" />
+      </div>
+    );
+  }
+
+  // Not logged in -> Redirect to login
+  if (!user || status === 'unauthenticated') {
+    const loginPath = requiredEntryPoint === 'operations' ? '/operations/login' : '/admin/login';
+    return <Navigate to={loginPath} replace />;
+  }
+
+  // Logged in but wrong role -> Access Denied (don't redirect to login)
+  if (!role || !requiredRoles.includes(role)) {
+    return <AccessDenied requiredRole={requiredRoles[0]} />;
+  }
+
+  // Entry point check (Operators strictly locked to operations)
+  if (role === 'operator' && requiredEntryPoint === 'admin') {
+    return <AccessDenied requiredRole="admin" />;
+  }
+
+  return <>{children}</>;
+};
+
+export default function Root() {
+  return (
+    <ErrorBoundary>
+      <IdentityProvider>
+        <App />
+      </IdentityProvider>
+    </ErrorBoundary>
+  );
+}
+
+function App() {
+  const { user, role, status, loading, error, refreshIdentity } = useIdentity();
+  const [showRetry, setShowRetry] = useState(false);
 
   useEffect(() => {
-    const checkAdmin = async () => {
-      try {
-        const response = await fetch('/api/admin/check');
-        const data = await response.json();
-        setIsAdmin(data.isAdmin);
-      } catch (error) {
-        setIsAdmin(false);
-      }
-    };
-    checkAdmin();
-  }, []);
+    let timer: NodeJS.Timeout;
+    if (status === 'authenticated' || status === 'initializing') {
+      timer = setTimeout(() => setShowRetry(true), 5000);
+    } else {
+      setShowRetry(false);
+    }
+    return () => clearTimeout(timer);
+  }, [status]);
 
-  if (isAdmin === null) return null;
+  if (loading || status === 'initializing' || (status === 'authenticated' && !role)) {
+    return (
+      <div className="min-h-screen flex flex-col items-center justify-center bg-[#050505] text-white p-6">
+        <div className="relative mb-8">
+          <div className="absolute inset-0 bg-blue-500/20 blur-3xl rounded-full animate-pulse" />
+          <Loader2 className="w-16 h-16 text-blue-500 animate-spin relative z-10" />
+        </div>
+        
+        <div className="text-center space-y-4 max-w-md relative z-10">
+          <h2 className="text-2xl font-display font-bold tracking-tight">
+            {status === 'initializing' ? 'Initializing Identity...' : 'Loading Profile...'}
+          </h2>
+          <p className="text-white/40 text-sm uppercase tracking-[0.2em]">
+            Securing Stateless Identity Engine
+          </p>
+          
+          {showRetry && (
+            <motion.div 
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="pt-8 space-y-4"
+            >
+              {error && (
+                <p className="text-red-400 text-xs bg-red-500/10 border border-red-500/20 p-3 rounded-xl italic">
+                  {error}
+                </p>
+              )}
+              <button 
+                onClick={() => {
+                  setShowRetry(false);
+                  refreshIdentity();
+                }}
+                className="px-6 py-3 bg-white/5 hover:bg-white/10 border border-white/10 rounded-xl transition-all text-sm font-bold uppercase tracking-widest flex items-center gap-2 mx-auto"
+              >
+                <RefreshCw className="w-4 h-4" />
+                Retry Connection
+              </button>
+              <p className="text-[10px] text-white/20">
+                If the error persists, please check your internet connection or try again later.
+              </p>
+            </motion.div>
+          )}
+        </div>
+      </div>
+    );
+  }
+
+  const isAdmin = role === 'admin' || role === 'super_admin' || role === 'editor';
 
   return (
     <Router>
       <Routes>
+        <Route path="/admin/login" element={<AdminLogin vibe="technical" onLogin={() => window.location.href = '/admin'} />} />
+        <Route path="/operations/login" element={<AdminLogin vibe="vibrant" onLogin={() => window.location.href = '/operations'} />} />
+        
+        <Route path="/admin" element={
+          <AdminRoute requiredRoles={['super_admin', 'admin', 'editor', 'viewer']} requiredEntryPoint="admin">
+            <AdminDashboard onLogout={() => window.location.href = '/admin/login'} />
+          </AdminRoute>
+        } />
+        
+        <Route path="/operations" element={
+          <AdminRoute requiredRoles={['super_admin', 'admin', 'editor', 'viewer', 'operator']} requiredEntryPoint="operations">
+            <OperationsDashboard onLogout={() => window.location.href = '/operations/login'} />
+          </AdminRoute>
+        } />
+
         <Route 
           path="/" 
           element={
             isAdmin ? (
-              <Navigate to="/sparkwavv-admin" replace />
+              <Navigate to="/admin" replace />
             ) : (
               <SPARKWavvApp isAdmin={false} />
             )
@@ -2443,13 +2565,7 @@ export default function App() {
         />
         <Route 
           path="/sparkwavv-admin" 
-          element={
-            isAdmin ? (
-              <AdminDashboard onLogout={() => setIsAdmin(false)} />
-            ) : (
-              <AdminLogin onLogin={() => setIsAdmin(true)} />
-            )
-          } 
+          element={<Navigate to="/admin" replace />}
         />
         <Route path="/dashboard/:userId" element={<UserDashboardWrapper isAdmin={!!isAdmin} />} />
         <Route path="/partner-dashboard" element={<PartnerDashboard />} />

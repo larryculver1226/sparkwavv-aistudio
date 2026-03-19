@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import { motion } from 'motion/react';
 import { ShieldCheck, ShieldAlert, Loader2, ArrowRight, UserPlus } from 'lucide-react';
-import { useAuthContext } from '../contexts/AuthContext';
+import { useIdentity } from '../contexts/IdentityContext';
 import { Button } from '../components/Button';
 import { signInWithPopup } from 'firebase/auth';
 import { auth, googleProvider } from '../lib/firebase';
@@ -11,7 +11,7 @@ export const AcceptInvitation: React.FC = () => {
   const { token } = useParams<{ token: string }>();
   const [searchParams] = useSearchParams();
   const email = searchParams.get('email');
-  const { user, status } = useAuthContext();
+  const { user, status } = useIdentity();
   const navigate = useNavigate();
   
   const [loading, setLoading] = useState(false);

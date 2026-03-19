@@ -1,146 +1,54 @@
 import React, { useState } from 'react';
-import { motion, AnimatePresence } from 'motion/react';
-import { ShieldCheck, Lock, ArrowRight, Loader2, Mail, UserPlus, Send } from 'lucide-react';
-import { signInWithEmailAndPassword, signInWithPopup, sendPasswordResetEmail } from 'firebase/auth';
-import { auth, googleProvider } from '../lib/firebase';
+import { motion } from 'motion/react';
+import { ShieldCheck, Loader2, AlertCircle } from 'lucide-react';
+import { useIdentity } from '../contexts/IdentityContext';
 
-export const AdminLogin: React.FC<{ onLogin: () => void }> = ({ onLogin }) => {
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-  const [adminPassword, setAdminPassword] = useState('');
+export const AdminLogin: React.FC<{ 
+  onLogin: () => void;
+  vibe?: 'technical' | 'vibrant';
+}> = ({ onLogin, vibe = 'technical' }) => {
+  const { loginWithGoogle, loading: identityLoading, error: identityError } = useIdentity();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
-  const [success, setSuccess] = useState('');
-  const [showPromote, setShowPromote] = useState(false);
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!auth) return;
-    
-    setLoading(true);
-    setError('');
-    setSuccess('');
-
-    try {
-      // 1. Sign in with Firebase
-      const userCredential = await signInWithEmailAndPassword(auth, email, password);
-      const idToken = await userCredential.user.getIdToken();
-
-      // 2. Verify admin role on server
-      const response = await fetch('/api/admin/login-v2', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ idToken }),
-      });
-
-      if (response.ok) {
-        onLogin();
-      } else if (response.status === 403) {
-        setError('Your account does not have administrative privileges.');
-        setShowPromote(true);
-      } else {
-        setError('Invalid administrative credentials');
-      }
-    } catch (err: any) {
-      console.error("Login error:", err);
-      let message = 'Authentication failed. Please check your credentials.';
-      if (err.code === 'auth/user-not-found' || err.code === 'auth/wrong-password' || err.code === 'auth/invalid-credential') {
-        message = "Invalid email or password.";
-      } else if (err.code === 'auth/too-many-requests') {
-        message = "Too many failed attempts. Please try again later.";
-      } else if (err.code === 'auth/invalid-email') {
-        message = "Invalid email address.";
-      }
-      setError(message);
-    } finally {
-      setLoading(false);
-    }
-  };
 
   const handleGoogleLogin = async () => {
-    if (!auth || !googleProvider) return;
     setLoading(true);
     setError('');
-    setSuccess('');
-
     try {
-      const result = await signInWithPopup(auth, googleProvider);
-      const idToken = await result.user.getIdToken();
-
-      const response = await fetch('/api/admin/login-v2', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ idToken }),
-      });
-
-      if (response.ok) {
-        onLogin();
-      } else if (response.status === 403) {
-        setError('Your Google account does not have administrative privileges.');
-        setShowPromote(true);
-      } else {
-        setError('Admin verification failed.');
-      }
-    } catch (err: any) {
-      console.error("Google login error:", err);
-      setError("Google authentication failed.");
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleForgotPassword = async () => {
-    if (!auth || !email) {
-      setError('Please enter your admin email first.');
-      return;
-    }
-    setLoading(true);
-    setError('');
-    setSuccess('');
-
-    try {
-      await sendPasswordResetEmail(auth, email);
-      setSuccess('Password reset email sent! Check your inbox.');
-    } catch (err: any) {
-      console.error("Reset error:", err);
-      setError('Failed to send reset email. Verify the address.');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handlePromote = async () => {
-    if (!auth?.currentUser) return;
-    setLoading(true);
-    setError('');
-    setSuccess('');
-
-    try {
-      const idToken = await auth.currentUser.getIdToken();
-      const response = await fetch('/api/admin/promote', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ idToken, password: adminPassword }),
-      });
-
-      if (response.ok) {
+      console.log('🚀 [AdminLogin] Starting Google Login...');
+      const result = await loginWithGoogle();
+      
+      if (result.success) {
+        console.log('✅ [AdminLogin] Login successful, redirecting...');
         onLogin();
       } else {
-        const data = await response.json();
-        setError(data.error || 'Promotion failed. Invalid admin password.');
+        setError(result.error || 'Authentication failed');
       }
-    } catch (err) {
-      setError('Connection failed. Please try again.');
+    } catch (err: any) {
+      console.error('❌ [AdminLogin] Login error:', err);
+      setError(err.message || 'An unexpected error occurred');
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <div className="min-h-screen bg-[#050505] flex items-center justify-center p-6">
+    <div className={`min-h-screen flex items-center justify-center p-6 transition-colors duration-1000 ${
+      vibe === 'technical' ? 'bg-[#050505]' : 'bg-gradient-to-br from-[#050505] via-[#0a0a0a] to-[#001a1a]'
+    }`}>
       <div className="absolute inset-0 overflow-hidden pointer-events-none">
-        <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-neon-cyan/5 blur-[120px] rounded-full" />
-        <div className="absolute bottom-1/4 right-1/4 w-96 h-96 bg-neon-magenta/5 blur-[120px] rounded-full" />
+        {vibe === 'technical' ? (
+          <>
+            <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-neon-cyan/5 blur-[120px] rounded-full" />
+            <div className="absolute bottom-1/4 right-1/4 w-96 h-96 bg-neon-magenta/5 blur-[120px] rounded-full" />
+          </>
+        ) : (
+          <>
+            <div className="absolute top-0 left-0 w-full h-full opacity-20 atmosphere" />
+            <div className="absolute top-1/4 left-1/4 w-[500px] h-[500px] bg-neon-cyan/10 blur-[150px] rounded-full animate-pulse" />
+            <div className="absolute bottom-1/4 right-1/4 w-[500px] h-[500px] bg-neon-magenta/10 blur-[150px] rounded-full animate-pulse" style={{ animationDelay: '2s' }} />
+          </>
+        )}
       </div>
 
       <motion.div 
@@ -149,148 +57,73 @@ export const AdminLogin: React.FC<{ onLogin: () => void }> = ({ onLogin }) => {
         className="max-w-md w-full relative z-10"
       >
         <div className="text-center space-y-4 mb-12">
-          <div className="inline-flex items-center justify-center w-20 h-20 rounded-3xl bg-neon-cyan/10 border border-neon-cyan/20 mb-4">
-            <ShieldCheck className="w-10 h-10 text-neon-cyan" />
+          <div className={`inline-flex items-center justify-center w-20 h-20 rounded-3xl border mb-4 transition-all duration-500 ${
+            vibe === 'technical' 
+              ? 'bg-neon-cyan/10 border-neon-cyan/20' 
+              : 'bg-neon-cyan/20 border-neon-cyan/40 shadow-[0_0_30px_rgba(0,243,255,0.2)]'
+          }`}>
+            <ShieldCheck className={`w-10 h-10 ${vibe === 'technical' ? 'text-neon-cyan' : 'text-white'}`} />
           </div>
-          <h1 className="text-4xl font-display font-bold tracking-tight">Admin Portal</h1>
-          <p className="text-white/40 uppercase tracking-[0.2em] text-xs font-bold">SPARKWavv Environment Control</p>
+          <h1 className="text-4xl font-display font-bold tracking-tight">
+            {vibe === 'technical' ? 'Admin Portal' : 'Operations Control'}
+          </h1>
+          <p className="text-white/40 uppercase tracking-[0.2em] text-xs font-bold">
+            {vibe === 'technical' ? 'SPARKWavv Environment Control' : 'Igniting Human Potential'}
+          </p>
         </div>
 
-        <div className="glass-panel p-8 rounded-3xl border border-white/10 bg-black/40 backdrop-blur-xl">
-          <AnimatePresence mode="wait">
-            {!showPromote ? (
-              <motion.div 
-                key="login"
-                initial={{ opacity: 0, x: -20 }}
-                animate={{ opacity: 1, x: 0 }}
-                exit={{ opacity: 0, x: 20 }}
-                className="space-y-6"
-              >
-                <form onSubmit={handleSubmit} className="space-y-6">
-                  <div className="space-y-2">
-                    <label className="text-xs font-bold text-white/40 uppercase tracking-widest">Admin Email</label>
-                    <div className="relative">
-                      <Mail className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-white/20" />
-                      <input 
-                        type="email" 
-                        value={email}
-                        onChange={(e) => setEmail(e.target.value)}
-                        className="w-full bg-white/5 border border-white/10 rounded-2xl px-12 py-4 focus:outline-none focus:border-neon-cyan transition-colors text-lg"
-                        placeholder="admin@sparkwavv.com"
-                        required
-                      />
-                    </div>
-                  </div>
+        <div className={`glass-panel p-8 rounded-3xl border backdrop-blur-xl transition-all duration-500 ${
+          vibe === 'technical' 
+            ? 'border-white/10 bg-black/40' 
+            : 'border-neon-cyan/20 bg-dark-surface/60 shadow-2xl'
+        }`}>
+          <div className="space-y-8">
+            <div className="text-center space-y-2">
+              <p className="text-sm text-white/60">
+                Please authenticate using your authorized Google account to access the {vibe === 'technical' ? 'Admin Portal' : 'Operations Control'}.
+              </p>
+            </div>
 
-                  <div className="space-y-2">
-                    <div className="flex items-center justify-between">
-                      <label className="text-xs font-bold text-white/40 uppercase tracking-widest">Password</label>
-                      <button 
-                        type="button"
-                        onClick={handleForgotPassword}
-                        className="text-[10px] text-neon-cyan uppercase tracking-widest font-bold hover:underline"
-                      >
-                        Forgot?
-                      </button>
-                    </div>
-                    <div className="relative">
-                      <Lock className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-white/20" />
-                      <input 
-                        type="password" 
-                        value={password}
-                        onChange={(e) => setPassword(e.target.value)}
-                        className="w-full bg-white/5 border border-white/10 rounded-2xl px-12 py-4 focus:outline-none focus:border-neon-cyan transition-colors text-lg"
-                        placeholder="••••••••••••"
-                        required
-                      />
-                    </div>
-                  </div>
-
-                  {error && (
-                    <p className="text-neon-magenta text-sm font-medium text-center">{error}</p>
-                  )}
-                  {success && (
-                    <p className="text-neon-lime text-sm font-medium text-center flex items-center justify-center gap-2">
-                      <Send className="w-4 h-4" /> {success}
-                    </p>
-                  )}
-
-                  <button 
-                    type="submit"
-                    disabled={loading}
-                    className="w-full bg-neon-cyan text-black font-bold py-4 rounded-2xl flex items-center justify-center gap-2 hover:scale-[1.02] active:scale-[0.98] transition-all shadow-[0_0_30px_rgba(0,243,255,0.2)] disabled:opacity-50"
-                  >
-                    {loading ? <Loader2 className="w-6 h-6 animate-spin" /> : <>Authenticate <ArrowRight className="w-5 h-5" /></>}
-                  </button>
-                </form>
-
-                <div className="relative py-4">
-                  <div className="absolute inset-0 flex items-center"><div className="w-full border-t border-white/10"></div></div>
-                  <div className="relative flex justify-center text-[10px] uppercase tracking-widest"><span className="bg-black px-2 text-white/40">Or continue with</span></div>
-                </div>
-
-                <button 
-                  onClick={handleGoogleLogin}
-                  disabled={loading}
-                  className="w-full bg-white/5 border border-white/10 text-white font-bold py-4 rounded-2xl flex items-center justify-center gap-3 hover:bg-white/10 transition-all disabled:opacity-50"
-                >
+            <button 
+              onClick={handleGoogleLogin}
+              disabled={loading}
+              className={`w-full py-5 rounded-2xl flex items-center justify-center gap-4 hover:scale-[1.02] active:scale-[0.98] transition-all disabled:opacity-50 font-bold text-lg ${
+                vibe === 'technical' 
+                  ? 'bg-white text-black shadow-[0_0_30px_rgba(255,255,255,0.1)]' 
+                  : 'bg-gradient-to-r from-neon-cyan to-neon-magenta text-white shadow-[0_0_40px_rgba(0,243,255,0.3)]'
+              }`}
+            >
+              {loading ? (
+                <Loader2 className="w-6 h-6 animate-spin" />
+              ) : (
+                <>
                   <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" className="w-6 h-6" alt="Google" />
                   Sign in with Google
-                </button>
-              </motion.div>
-            ) : (
+                </>
+              )}
+            </button>
+
+            {error && (
               <motion.div 
-                key="promote"
-                initial={{ opacity: 0, x: 20 }}
-                animate={{ opacity: 1, x: 0 }}
-                exit={{ opacity: 0, x: -20 }}
-                className="space-y-6"
+                initial={{ opacity: 0, y: -10 }}
+                animate={{ opacity: 1, y: 0 }}
+                className="p-4 bg-red-500/10 border border-red-500/20 rounded-xl flex items-center gap-3 text-red-400 text-sm"
               >
-                <div className="p-4 rounded-2xl bg-neon-cyan/10 border border-neon-cyan/20 text-neon-cyan text-sm">
-                  Your account is authenticated but lacks admin privileges. Enter the master administrative key to promote this account.
-                </div>
-
-                <div className="space-y-2">
-                  <label className="text-xs font-bold text-white/40 uppercase tracking-widest">Master Admin Key</label>
-                  <div className="relative">
-                    <Lock className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-white/20" />
-                    <input 
-                      type="password" 
-                      value={adminPassword}
-                      onChange={(e) => setAdminPassword(e.target.value)}
-                      className="w-full bg-white/5 border border-white/10 rounded-2xl px-12 py-4 focus:outline-none focus:border-neon-cyan transition-colors text-lg"
-                      placeholder="••••••••••••"
-                      required
-                    />
-                  </div>
-                </div>
-
-                {error && (
-                  <p className="text-neon-magenta text-sm font-medium text-center">{error}</p>
-                )}
-
-                <div className="flex flex-col gap-3">
-                  <button 
-                    onClick={handlePromote}
-                    disabled={loading}
-                    className="w-full bg-neon-magenta text-white font-bold py-4 rounded-2xl flex items-center justify-center gap-2 hover:scale-[1.02] active:scale-[0.98] transition-all shadow-[0_0_30px_rgba(255,0,255,0.2)] disabled:opacity-50"
-                  >
-                    {loading ? <Loader2 className="w-6 h-6 animate-spin" /> : <>Promote to Admin <UserPlus className="w-5 h-5" /></>}
-                  </button>
-                  <button 
-                    onClick={() => setShowPromote(false)}
-                    className="w-full bg-white/5 text-white/60 font-bold py-4 rounded-2xl hover:bg-white/10 transition-all"
-                  >
-                    Back to Login
-                  </button>
-                </div>
+                <AlertCircle className="w-5 h-5 shrink-0" />
+                <p>{error}</p>
               </motion.div>
             )}
-          </AnimatePresence>
+
+            <div className="pt-4 border-t border-white/5">
+              <p className="text-[10px] text-center text-white/20 uppercase tracking-[0.2em]">
+                Secure Stateless Identity Engine v2.0
+              </p>
+            </div>
+          </div>
         </div>
 
         <p className="text-center mt-8 text-white/20 text-xs uppercase tracking-widest">
-          Authorized Personnel Only
+          {vibe === 'technical' ? 'Authorized Personnel Only' : 'Sparkwavv Operations Environment'}
         </p>
       </motion.div>
     </div>

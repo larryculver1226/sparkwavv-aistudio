@@ -1,8 +1,17 @@
 import React from 'react';
 import { motion } from 'motion/react';
-import { Search, Palette, Send, ArrowRight } from 'lucide-react';
+import { Search, Palette, Send, ArrowRight, Zap } from 'lucide-react';
 
 const steps = [
+  {
+    id: 'ignition',
+    title: 'Ignition: Onboarding',
+    description: 'Begin your journey with a streamlined onboarding process and secure your spot via our premium paywall.',
+    icon: <Zap className="w-8 h-8" />,
+    color: 'text-orange-400',
+    bgColor: 'bg-orange-500/10',
+    borderColor: 'border-orange-500/20'
+  },
   {
     id: 'discovery',
     title: 'Discovery: Launchpad',
@@ -36,13 +45,13 @@ export const Roadmap: React.FC = () => {
   return (
     <section className="py-24 px-6 max-w-7xl mx-auto">
       <div className="text-center mb-16 space-y-4">
-        <h2 className="text-4xl md:text-5xl font-display font-bold">The Three-Step Framework</h2>
+        <h2 className="text-4xl md:text-5xl font-display font-bold">The Four-Step Framework</h2>
         <p className="text-white/60 max-w-2xl mx-auto uppercase tracking-[0.2em] text-sm">
           A linear progression from internal assessment to external market engagement.
         </p>
       </div>
 
-      <div className="relative grid md:grid-cols-3 gap-8">
+      <div className="relative grid md:grid-cols-4 gap-8">
         {/* Connection Line */}
         <div className="hidden md:block absolute top-1/2 left-0 w-full h-px bg-gradient-to-r from-transparent via-white/10 to-transparent -translate-y-1/2 z-0" />
 

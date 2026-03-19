@@ -10,7 +10,7 @@ import {
   ArrowLeft,
   ShieldCheck as Shield
 } from 'lucide-react';
-import { useAuthContext } from '../contexts/AuthContext';
+import { useIdentity } from '../contexts/IdentityContext';
 import { db } from '../lib/firebase';
 import { collection, query, where, onSnapshot } from 'firebase/firestore';
 import { Button } from '../components/Button';
@@ -33,7 +33,7 @@ interface UserProgress {
 }
 
 export const PartnerDashboard: React.FC = () => {
-  const { user } = useAuthContext();
+  const { user } = useIdentity();
   const [accessRecords, setAccessRecords] = useState<PartnerAccess[]>([]);
   const [selectedUser, setSelectedUser] = useState<UserProgress | null>(null);
   const [loading, setLoading] = useState(true);

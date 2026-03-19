@@ -2,8 +2,9 @@ import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Sparkles, Moon, RefreshCw, ChevronRight, Loader2, Quote } from 'lucide-react';
 import { Button } from './Button';
-import { useAuthContext } from '../contexts/AuthContext';
+import { useIdentity } from '../contexts/IdentityContext';
 import { GoogleGenAI } from "@google/genai";
+import { getGeminiApiKey } from '../services/aiConfig';
 
 interface SparkPrompt {
   title: string;
@@ -13,7 +14,7 @@ interface SparkPrompt {
 }
 
 export const EveningSpark: React.FC<{ currentStage: string }> = ({ currentStage }) => {
-  const { user, profile } = useAuthContext();
+  const { user, profile } = useIdentity();
   const [loading, setLoading] = useState(false);
   const [sparkData, setSparkData] = useState<SparkPrompt | null>(null);
   const [mood, setMood] = useState('reflective');
@@ -21,11 +22,12 @@ export const EveningSpark: React.FC<{ currentStage: string }> = ({ currentStage 
   const generateSpark = async () => {
     setLoading(true);
     try {
-      if (!process.env.GEMINI_API_KEY) {
-        throw new Error("Gemini API key is missing");
+      const apiKey = getGeminiApiKey();
+      if (!apiKey) {
+        throw new Error("Gemini API key is missing. Please check your AI Studio settings.");
       }
 
-      const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
+      const ai = new GoogleGenAI({ apiKey });
       const model = "gemini-3-flash-preview";
       
       const prompt = `

@@ -28,11 +28,14 @@ import {
   Search as SearchIcon,
   UserPlus,
   Send,
-  CheckCircle2
+  CheckCircle2,
+  LogOut
 } from 'lucide-react';
 import { DashboardData, Expense, Milestone } from '../types/dashboard';
-import { useAuthContext } from '../contexts/AuthContext';
+import { useIdentity } from '../contexts/IdentityContext';
 import { Navigate, useNavigate } from 'react-router-dom';
+import { signOut } from 'firebase/auth';
+import { auth } from '../lib/firebase';
 import { v4 as uuidv4 } from 'uuid';
 import { InvitationModal } from '../components/InvitationModal';
 import { EveningSpark } from '../components/EveningSpark';
@@ -42,28 +45,28 @@ import { X } from 'lucide-react';
 
 const MiniGauge: React.FC<{ value: number; label: string; color: string }> = ({ value, label, color }) => {
   const normalizedValue = Math.min(Math.max(value, 0), 100);
-  const circumference = 2 * Math.PI * 24;
+  const circumference = 2 * Math.PI * 32;
   const offset = circumference - (normalizedValue / 100) * circumference;
 
   return (
     <div className="flex flex-col items-center gap-3">
-      <div className="relative w-14 h-14">
+      <div className="relative w-20 h-20">
         <svg className="w-full h-full transform -rotate-90">
           <circle
-            cx="28"
-            cy="28"
-            r="24"
+            cx="40"
+            cy="40"
+            r="32"
             stroke="currentColor"
-            strokeWidth="3"
+            strokeWidth="4"
             fill="transparent"
             className="text-white/5"
           />
           <motion.circle
-            cx="28"
-            cy="28"
-            r="24"
+            cx="40"
+            cy="40"
+            r="32"
             stroke={color}
-            strokeWidth="3"
+            strokeWidth="4"
             fill="transparent"
             strokeDasharray={circumference}
             initial={{ strokeDashoffset: circumference }}
@@ -72,11 +75,11 @@ const MiniGauge: React.FC<{ value: number; label: string; color: string }> = ({ 
             strokeLinecap="round"
           />
         </svg>
-        <div className="absolute inset-0 flex items-center justify-center text-[10px] font-bold text-white">
+        <div className="absolute inset-0 flex items-center justify-center text-xs font-bold text-white">
           {value}%
         </div>
       </div>
-      <span className="text-[8px] uppercase tracking-[0.2em] text-white/40 font-bold text-center leading-tight max-w-[60px]">
+      <span className="text-[10px] uppercase tracking-[0.15em] text-white/40 font-bold text-center leading-tight max-w-[90px]">
         {label}
       </span>
     </div>
@@ -92,63 +95,50 @@ const GaugeChart: React.FC<{ value: number; matrix?: DashboardData['alignmentMat
 
   return (
     <div className="w-full flex flex-col items-center">
-      <div className="flex flex-col lg:flex-row items-center justify-center gap-12 w-full">
+      <div className="flex flex-col lg:flex-row items-center justify-center gap-6 xl:gap-12 w-full">
         {/* Main Gauge */}
         <div className="relative flex flex-col items-center justify-center">
-          <svg width="240" height="140" viewBox="0 0 240 140">
-            {/* Background Arc */}
-            <path
-              d="M 30 120 A 90 90 0 0 1 210 120"
-              fill="none"
-              stroke="#ffffff08"
-              strokeWidth={stroke}
-              strokeLinecap="round"
-            />
-            {/* Value Arc */}
-            <path
-              d="M 30 120 A 90 90 0 0 1 210 120"
-              fill="none"
-              stroke="url(#cyanNeonGradient)"
-              strokeWidth={stroke}
-              strokeLinecap="round"
-              strokeDasharray={`${(normalizedValue / 100) * 283} 283`}
-              className="drop-shadow-[0_0_8px_rgba(0,243,255,0.5)]"
-            />
-            <defs>
-              <linearGradient id="cyanNeonGradient" x1="0%" y1="0%" x2="100%" y2="0%">
-                <stop offset="0%" stopColor="#0088ff" />
-                <stop offset="50%" stopColor="#00f3ff" />
-                <stop offset="100%" stopColor="#00ffff" />
-              </linearGradient>
-            </defs>
-            {/* Needle */}
-            <motion.line
-              initial={{ rotate: -90 }}
-              animate={{ rotate: rotation }}
-              transition={{ duration: 1.5, ease: "easeOut" }}
-              x1="120"
-              y1="120"
-              x2="120"
-              y2="40"
-              stroke="#fff"
-              strokeWidth="4"
-              strokeLinecap="round"
-              style={{
-                transformOrigin: '120px 120px',
-              }}
-            />
-            <circle cx="120" cy="120" r="6" fill="#fff" className="drop-shadow-[0_0_5px_rgba(255,255,255,0.5)]" />
-          </svg>
-          <div className="mt-4 text-center">
-            <div className="text-5xl font-display font-bold text-neon-cyan neon-text-cyan mb-2">
-              {value}
+          <div className="relative">
+            <svg width="220" height="130" viewBox="0 0 240 140">
+              {/* Background Arc */}
+              <path
+                d="M 30 120 A 90 90 0 0 1 210 120"
+                fill="none"
+                stroke="#ffffff08"
+                strokeWidth={stroke}
+                strokeLinecap="round"
+              />
+              {/* Value Arc */}
+              <path
+                d="M 30 120 A 90 90 0 0 1 210 120"
+                fill="none"
+                stroke="url(#cyanNeonGradient)"
+                strokeWidth={stroke}
+                strokeLinecap="round"
+                strokeDasharray={`${(normalizedValue / 100) * 283} 283`}
+                className="drop-shadow-[0_0_8px_rgba(0,243,255,0.5)]"
+              />
+              <defs>
+                <linearGradient id="cyanNeonGradient" x1="0%" y1="0%" x2="100%" y2="0%">
+                  <stop offset="0%" stopColor="#0088ff" />
+                  <stop offset="50%" stopColor="#00f3ff" />
+                  <stop offset="100%" stopColor="#00ffff" />
+                </linearGradient>
+              </defs>
+            </svg>
+            
+            {/* Centered Value */}
+            <div className="absolute inset-0 flex flex-col items-center justify-end pb-4">
+              <div className="text-5xl font-display font-bold text-neon-cyan neon-text-cyan">
+                {value}
+              </div>
+              <p className="text-[10px] uppercase tracking-[0.2em] text-neon-cyan/80 font-bold neon-text-cyan whitespace-nowrap">Happiness Meter</p>
             </div>
-            <p className="text-[11px] uppercase tracking-[0.3em] text-neon-cyan/80 font-bold neon-text-cyan">Career Happiness Meter</p>
           </div>
         </div>
 
         {/* Alignment Matrix */}
-        <div className="flex gap-8 lg:border-l lg:border-white/10 lg:pl-12">
+        <div className="flex gap-4 sm:gap-8 lg:border-l lg:border-white/10 lg:pl-6 xl:pl-12">
           <MiniGauge 
             value={matrix?.identityClarity || 0} 
             label="Identity Clarity" 
@@ -287,7 +277,8 @@ export const getTimelineStage = (s: string) => {
 };
 
 export const UserDashboard: React.FC<{ userId: string; isAdmin?: boolean }> = ({ userId, isAdmin = false }) => {
-  const { user, mockUser, profile, status, isConfirmed, error: authError } = useAuthContext();
+  const { user, profile, status, error: authError } = useIdentity();
+  const isConfirmed = status === 'authenticated';
   const navigate = useNavigate();
   const [data, setData] = useState<DashboardData | null>(null);
   const [loading, setLoading] = useState(true);
@@ -296,20 +287,27 @@ export const UserDashboard: React.FC<{ userId: string; isAdmin?: boolean }> = ({
   const [isInvitationModalOpen, setIsInvitationModalOpen] = useState(false);
   const [showRoadmap, setShowRoadmap] = useState(false);
 
+  // Prevent admins from viewing their own user dashboard
+  useEffect(() => {
+    if (status === 'ready' && profile?.role === 'admin' && userId === profile.uid) {
+      console.log('🛡️ Admin attempting to view own user dashboard, redirecting to admin portal');
+      navigate('/sparkwavv-admin', { replace: true });
+    }
+  }, [status, profile, userId, navigate]);
+
   useEffect(() => {
     const fetchData = async () => {
-      if (!user && !mockUser) return;
+      if (!user) return;
       
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), 8000); // 8s timeout
 
       try {
         setLoading(true);
-        const idToken = mockUser ? 'mock-token' : await user?.getIdToken();
+        const idToken = await user.getIdToken();
         const response = await fetch(`/api/user/dashboard?userId=${userId}`, {
           headers: { 
-            'Authorization': `Bearer ${idToken}`,
-            'X-Mock-User': mockUser ? 'true' : 'false'
+            'Authorization': `Bearer ${idToken}`
           },
           signal: controller.signal
         });
@@ -337,10 +335,10 @@ export const UserDashboard: React.FC<{ userId: string; isAdmin?: boolean }> = ({
       }
     };
 
-    if (status !== 'initializing' && (user || mockUser)) {
+    if (status !== 'initializing' && user) {
       fetchData();
     }
-  }, [userId, user, mockUser, status]);
+  }, [userId, user, status]);
 
   const toggleSkylar = () => {
     window.dispatchEvent(new CustomEvent('toggle-skylar-sidebar'));
@@ -357,19 +355,16 @@ export const UserDashboard: React.FC<{ userId: string; isAdmin?: boolean }> = ({
     setData({ ...data, milestones: updatedMilestones });
 
     try {
-      const idToken = mockUser ? 'mock-token' : await user?.getIdToken();
+      const idToken = await user.getIdToken();
       const milestone = updatedMilestones.find(m => m.id === milestoneId);
       
-      const url = mockUser 
-        ? `/api/user/milestones?userId=${userId}` 
-        : '/api/user/milestones';
+      const url = '/api/user/milestones';
 
       await fetch(url, {
         method: 'POST',
         headers: { 
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${idToken}`,
-          ...(mockUser && { 'x-mock-user': 'true' })
+          'Authorization': `Bearer ${idToken}`
         },
         body: JSON.stringify({ 
           milestoneId, 
@@ -385,17 +380,14 @@ export const UserDashboard: React.FC<{ userId: string; isAdmin?: boolean }> = ({
     if (!data || !user) return;
 
     try {
-      const idToken = mockUser ? 'mock-token' : await user?.getIdToken();
-      const url = mockUser 
-        ? `/api/user/stage?userId=${userId}` 
-        : '/api/user/stage';
+      const idToken = await user.getIdToken();
+      const url = '/api/user/stage';
 
       const response = await fetch(url, {
         method: 'POST',
         headers: { 
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${idToken}`,
-          ...(mockUser && { 'x-mock-user': 'true' })
+          'Authorization': `Bearer ${idToken}`
         },
         body: JSON.stringify({ nextStage })
       });
@@ -408,6 +400,13 @@ export const UserDashboard: React.FC<{ userId: string; isAdmin?: boolean }> = ({
       }
     } catch (err) {
       console.error("Error completing phase:", err);
+    }
+  };
+
+  const handleLogout = async () => {
+    if (auth) {
+      await signOut(auth);
+      navigate('/');
     }
   };
 
@@ -479,7 +478,15 @@ export const UserDashboard: React.FC<{ userId: string; isAdmin?: boolean }> = ({
           ))}
         </nav>
 
-        <div className="mt-auto">
+        <div className="mt-auto space-y-4">
+          <button 
+            onClick={handleLogout}
+            className="w-full flex items-center gap-4 px-5 py-4 rounded-2xl text-neon-magenta hover:bg-neon-magenta/10 transition-all group"
+          >
+            <LogOut className="w-5 h-5 group-hover:scale-110 transition-transform" />
+            <span className="text-sm font-bold tracking-wide">Logout</span>
+          </button>
+
           <button 
             onClick={toggleSkylar}
             className="w-full glass-panel p-6 rounded-[2rem] border border-neon-cyan/20 bg-neon-cyan/5 hover:bg-neon-cyan/10 transition-all text-center group relative overflow-hidden"
@@ -528,6 +535,13 @@ export const UserDashboard: React.FC<{ userId: string; isAdmin?: boolean }> = ({
             <button className="p-3 rounded-2xl bg-white/5 border border-white/10 text-white/40 hover:text-white hover:border-neon-cyan/40 transition-all">
               <Bell className="w-6 h-6" />
             </button>
+            <button 
+              onClick={handleLogout}
+              className="p-3 rounded-2xl bg-white/5 border border-white/10 text-white/40 hover:text-neon-magenta hover:border-neon-magenta/40 transition-all lg:hidden"
+              title="Logout"
+            >
+              <LogOut className="w-6 h-6" />
+            </button>
             <div className="flex items-center gap-4 pl-6 border-l border-white/10">
               <div className="text-right">
                 <p className="text-base font-bold text-white">{profile?.displayName || user?.displayName || 'User'}</p>
@@ -545,13 +559,32 @@ export const UserDashboard: React.FC<{ userId: string; isAdmin?: boolean }> = ({
         </div>
 
         {/* Top Row: Happiness & Summary Cards */}
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 mb-12">
-          <div className="lg:col-span-5 glass-panel p-10 rounded-[2.5rem] border border-white/5 bg-black/40 flex items-center justify-center relative overflow-hidden">
+        <div className="grid grid-cols-1 xl:grid-cols-3 gap-8 mb-12">
+          <div className="xl:col-span-2 glass-panel p-6 lg:p-10 rounded-[2.5rem] border border-white/5 bg-black/40 flex flex-col items-center justify-center relative overflow-hidden min-h-[400px]">
             <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,rgba(0,243,255,0.05),transparent_70%)]" />
-            <GaugeChart value={data?.careerHappiness || 0} matrix={data?.alignmentMatrix} />
+            
+            <div className="relative z-10 w-full flex flex-col items-center">
+              <div className="mb-8 text-center">
+                <h2 className="text-xl font-display font-bold text-white/90 uppercase tracking-[0.2em]">Systemic Alignment</h2>
+                <div className="h-px w-12 bg-neon-cyan/30 mx-auto mt-2" />
+              </div>
+
+              <GaugeChart value={data?.careerHappiness || 0} matrix={data?.alignmentMatrix} />
+
+              <div className="mt-12 grid grid-cols-1 md:grid-cols-2 gap-6 text-[10px] text-white/30 font-medium leading-relaxed max-w-2xl text-center md:text-left border-t border-white/5 pt-8">
+                <p>
+                  <span className="text-neon-cyan/60 font-bold uppercase tracking-wider block mb-1">Happiness Calculation</span>
+                  Weighted aggregate of your Milestone Progress (40%), Journey Phase (40%), and Profile Completeness (20%).
+                </p>
+                <p>
+                  <span className="text-neon-cyan/60 font-bold uppercase tracking-wider block mb-1">Alignment Matrix</span>
+                  Identity Clarity tracks profile depth, Strengths Alignment reflects Gallup integration, and Market Resonance averages your top job match scores.
+                </p>
+              </div>
+            </div>
           </div>
 
-          <div className="lg:col-span-7 grid grid-cols-1 md:grid-cols-3 gap-6">
+          <div className="grid grid-cols-1 sm:grid-cols-3 xl:grid-cols-1 gap-6">
             {[
               { label: 'Strengths', desc: 'AI Companion for emotional intelligence', icon: Brain, path: '/strengths', stage: 'Discovery' },
               { label: 'Revvault', desc: 'Persistent data layer (credentials)', icon: Database, path: '/wavvault', stage: 'Branding' },

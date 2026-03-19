@@ -1,5 +1,5 @@
 import React from 'react';
-import { useAuthContext } from '../contexts/AuthContext';
+import { useIdentity } from '../contexts/IdentityContext';
 import Onboarding from '../pages/Onboarding';
 
 interface OnboardingGateProps {
@@ -7,7 +7,7 @@ interface OnboardingGateProps {
 }
 
 export default function OnboardingGate({ children }: OnboardingGateProps) {
-  const { user, profile, hasWavvault, status } = useAuthContext();
+  const { user, profile, hasWavvault, status } = useIdentity();
 
   if (status === 'initializing') {
     return (
