@@ -59,6 +59,9 @@ export interface DashboardData {
     strengthsAlignment: number;
     marketResonance: number;
   };
+  mentorNote?: string;
+  mentorNoteTimestamp?: string;
+  validationPending?: boolean;
   _persistenceStatus?: 'active' | 'fallback';
 }
 
@@ -74,4 +77,16 @@ export interface UserProfile {
   bio?: string;
   journeyStage?: string;
   brandDNAAttributes?: string[];
+}
+
+export interface UserInsight {
+  id: string;
+  userId: string;
+  type: 'pivot' | 'core_value' | 'primary_goal' | 'strength';
+  content: string;
+  status: 'pending' | 'confirmed' | 'superseded';
+  timestamp: string;
+  evidence?: string;
+  conflictWith?: string; // ID of the insight it replaces
+  tags?: string[]; // For thematic mapping
 }

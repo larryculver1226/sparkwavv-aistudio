@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { BrowserRouter as Router, Routes, Route, Navigate, useParams, useNavigate } from 'react-router-dom';
+import { BrowserRouter as Router, Routes, Route, Navigate, useParams, useNavigate, useLocation } from 'react-router-dom';
 import { motion, AnimatePresence } from 'motion/react';
 import { 
   Sparkles, 
@@ -19,6 +19,9 @@ import {
   Trophy,
   Compass,
   Lightbulb,
+  Cpu,
+  Globe,
+  Activity,
   FileUp,
   Upload,
   ExternalLink,
@@ -26,7 +29,16 @@ import {
   Image as ImageIcon,
   Camera,
   Settings,
-  Lock
+  Lock,
+  Database,
+  HardDrive,
+  Users,
+  Award,
+  TrendingUp,
+  BarChart3,
+  Briefcase,
+  Quote,
+  Star
 } from 'lucide-react';
 import { 
   createUserWithEmailAndPassword, 
@@ -60,6 +72,9 @@ import { AdminLogin } from './pages/AdminLogin';
 import { AdminDashboard } from './pages/AdminDashboard';
 import { UserDashboard } from './pages/UserDashboard';
 import { PartnerDashboard } from './pages/PartnerDashboard';
+import PrivacyPolicy from './pages/PrivacyPolicy';
+import TermsOfService from './pages/TermsOfService';
+import CookieSettings from './pages/CookieSettings';
 import { generateDiscoverySummary, parseResume, generateBrandImage, UserData } from './services/geminiService';
 import { NavBar } from './components/NavBar';
 import { Footer } from './components/Footer';
@@ -116,7 +131,7 @@ import { BrainModel } from './components/landing/BrainModel';
 import { Roadmap } from './components/landing/Roadmap';
 
 // --- Types ---
-type Step = 'landing' | 'login' | 'onboarding' | 'forgot-password' | 'settings' | 'module1' | 'module2' | 'module3' | 'module4' | 'module5' | 'processing' | 'results' | 'product-skylar' | 'product-features' | 'product-technology' | 'product-wavvault' | 'company-vision' | 'company-about' | 'company-investors' | 'company-give' | 'company-testimonials';
+type Step = 'landing' | 'login' | 'onboarding' | 'forgot-password' | 'settings' | 'module1' | 'module2' | 'module3' | 'module4' | 'module5' | 'processing' | 'results' | 'product-skylar' | 'product-features' | 'product-technology' | 'product-wavvault' | 'company-vision' | 'company-about' | 'company-investors' | 'company-give' | 'pricing';
 
 // --- Constants ---
 const INDUSTRIES = [
@@ -152,18 +167,28 @@ const ProtectedRoute = ({ user, children, onRedirect }: { user: any; children: R
   return <>{children}</>;
 };
 
-const VerificationBanner = ({ user, onResend }: { user: any; onResend: () => void }) => {
+const VerificationBanner = ({ user, onResend, onRefresh }: { user: any; onResend: () => void; onRefresh: () => void }) => {
   if (!user || user.emailVerified) return null;
   return (
-    <div className="bg-neon-cyan/10 border-b border-neon-cyan/20 py-2 px-4 flex items-center justify-center gap-4 text-xs md:text-sm">
+    <div className="bg-neon-cyan/10 border-b border-neon-cyan/20 py-2 px-4 flex items-center justify-center gap-4 text-xs md:text-sm relative z-[60]">
       <ShieldAlert className="w-4 h-4 text-neon-cyan" />
       <span className="text-white/80">Your email is not verified. Please check your inbox.</span>
-      <button 
-        onClick={onResend}
-        className="text-neon-cyan font-bold hover:underline"
-      >
-        Resend Verification
-      </button>
+      <div className="flex items-center gap-3">
+        <button 
+          onClick={onResend}
+          className="text-neon-cyan font-bold hover:underline"
+        >
+          Resend Verification
+        </button>
+        <span className="text-white/20">|</span>
+        <button 
+          onClick={onRefresh}
+          className="flex items-center gap-1 text-white/60 hover:text-white transition-colors"
+        >
+          <RefreshCw className="w-3 h-3" />
+          Check Status
+        </button>
+      </div>
     </div>
   );
 };
@@ -259,7 +284,6 @@ export function SPARKWavvApp({ isAdmin = false }: { isAdmin?: boolean }) {
   const navigate = useNavigate();
   const [step, setStep] = useState<Step>('landing');
   const [posterVibe, setPosterVibe] = useState<'Minimalist' | 'Brutalist' | 'Corporate' | 'Creative'>('Creative');
-  const [lastSaved, setLastSaved] = useState<string | null>(null);
   const [showToast, setShowToast] = useState<{ message: string, type: 'success' | 'error' } | null>(null);
   const [forgotPasswordEmail, setForgotPasswordEmail] = useState('');
   const [userData, setUserData] = useState<UserData>({
@@ -282,19 +306,33 @@ export function SPARKWavvApp({ isAdmin = false }: { isAdmin?: boolean }) {
   const [parsingResume, setParsingResume] = useState(false);
   const [uploadedFileName, setUploadedFileName] = useState<string | null>(null);
   const [errors, setErrors] = useState<Record<string, string>>({});
-  const [hasSavedProgress, setHasSavedProgress] = useState(false);
+  const [discoveryUnlocked, setDiscoveryUnlocked] = useState(() => {
+    return localStorage.getItem('sparkwavv_discovery_unlocked') === 'true';
+  });
+
+  useEffect(() => {
+    localStorage.setItem('sparkwavv_discovery_unlocked', discoveryUnlocked.toString());
+    (window as any).DISCOVERY_UNLOCKED = discoveryUnlocked;
+    // Dispatch event to notify components
+    window.dispatchEvent(new CustomEvent('discovery-status-changed', { detail: { unlocked: discoveryUnlocked } }));
+  }, [discoveryUnlocked]);
   const [showStartOverConfirm, setShowStartOverConfirm] = useState(false);
   const [hasApiKey, setHasApiKey] = useState(false);
   const [registrationMessage, setRegistrationMessage] = useState<string | null>(null);
   const [isRegistering, setIsRegistering] = useState(false);
   const [userId, setUserId] = useState<string | null>(null);
   const [dashboardData, setDashboardData] = useState<DashboardData | null>(null);
-  const { user, profile, status: authStatus, loading: authLoading, isConfirmed, refreshProfile, logout } = useIdentity();
+  const { user, profile, status: authStatus, loading: authLoading, emailVerified, onboardingComplete, refreshProfile, logout } = useIdentity();
+
+  // Scroll to top on step change
+  useEffect(() => {
+    window.scrollTo(0, 0);
+  }, [step]);
 
   // Auto-redirect to dashboard when ready
   useEffect(() => {
     if (authStatus === 'ready' && profile) {
-      if (profile.role === 'admin') {
+      if (profile.role === 'admin' || profile.role === 'super_admin') {
         console.log('🛡️ Admin detected in SPARKWavvApp, redirecting to admin portal');
         navigate('/sparkwavv-admin');
         return;
@@ -383,91 +421,8 @@ export function SPARKWavvApp({ isAdmin = false }: { isAdmin?: boolean }) {
     }
   };
 
-  // Load progress on mount
-  useEffect(() => {
-    const checkSavedProgress = async () => {
-      const savedData = localStorage.getItem('sparkwavv_user_data');
-      const savedStep = localStorage.getItem('sparkwavv_current_step');
-      const savedSummary = localStorage.getItem('sparkwavv_summary');
+  // Load progress on mount removed as per user request to remove Resume Journey button
 
-      if (savedData || savedStep || savedSummary) {
-        if (savedStep && savedStep !== 'onboarding') {
-          setHasSavedProgress(true);
-        } else if (savedData) {
-          try {
-            const parsed = JSON.parse(savedData);
-            if (parsed.onboarding?.name || parsed.onboarding?.email) {
-              setHasSavedProgress(true);
-            }
-          } catch (e) {
-            console.error("Error parsing saved data:", e);
-          }
-        } else if (savedSummary) {
-          setHasSavedProgress(true);
-        }
-      } else if (user && db) {
-        try {
-          const docRef = doc(db, 'users', user.uid);
-          const docSnap = await getDoc(docRef);
-          if (docSnap.exists()) {
-            const data = docSnap.data();
-            if (data.updatedAt) {
-              setLastSaved(new Date(data.updatedAt).toLocaleString());
-            }
-            setHasSavedProgress(true);
-          }
-        } catch (e) {
-          console.error("Error checking Firestore for progress:", e);
-        }
-      }
-    };
-    checkSavedProgress();
-  }, [user]);
-
-  const resumeJourney = async () => {
-    const savedData = localStorage.getItem('sparkwavv_user_data');
-    const savedStep = localStorage.getItem('sparkwavv_current_step');
-    const savedSummary = localStorage.getItem('sparkwavv_summary');
-
-    if (savedData) {
-      const parsed = JSON.parse(savedData);
-      // Migrate accomplishments if they are in the old string format
-      if (parsed.accomplishments && parsed.accomplishments.length > 0 && typeof parsed.accomplishments[0] === 'string') {
-        parsed.accomplishments = parsed.accomplishments.map((acc: string) => ({
-          title: acc,
-          description: ''
-        }));
-        // Ensure we have exactly 3 slots
-        while (parsed.accomplishments.length < 3) {
-          parsed.accomplishments.push({ title: '', description: '' });
-        }
-      }
-      setUserData(parsed);
-      if (savedStep) setStep(savedStep as Step);
-      if (savedSummary) setSummary(JSON.parse(savedSummary));
-      setShowToast({ message: "Welcome back! Journey resumed.", type: 'success' });
-      return;
-    }
-
-    // If not in localStorage, try Firestore
-    if (user && db) {
-      setLoading(true);
-      try {
-        const docRef = doc(db, 'users', user.uid);
-        const docSnap = await getDoc(docRef);
-        if (docSnap.exists()) {
-          const data = docSnap.data();
-          if (data.userData) setUserData(data.userData);
-          if (data.currentStep) setStep(data.currentStep);
-          if (data.summary) setSummary(data.summary);
-        }
-      } catch (e) {
-        console.error("Error loading from Firestore:", e);
-      } finally {
-        setLoading(false);
-      }
-    }
-  };
 
   const startOver = () => {
     localStorage.removeItem('sparkwavv_user_data');
@@ -490,7 +445,6 @@ export function SPARKWavvApp({ isAdmin = false }: { isAdmin?: boolean }) {
     });
     setSummary(null);
     setStep('onboarding');
-    setHasSavedProgress(false);
   };
 
   // Save progress whenever state changes
@@ -498,7 +452,7 @@ export function SPARKWavvApp({ isAdmin = false }: { isAdmin?: boolean }) {
     const steps: Step[] = ['landing', 'onboarding', 'module1', 'module2', 'module3', 'module4', 'module5', 'processing', 'results'];
     const currentIndex = steps.indexOf(step);
     
-    if (currentIndex > 1 && !isConfirmed && process.env.NODE_ENV !== 'development') {
+    if (currentIndex > 1 && !emailVerified && process.env.NODE_ENV !== 'development') {
       setStep('landing');
       setErrors({ general: "Please confirm your registration via email before continuing." });
     }
@@ -509,7 +463,6 @@ export function SPARKWavvApp({ isAdmin = false }: { isAdmin?: boolean }) {
       if (hasData || currentIndex > 1) {
         localStorage.setItem('sparkwavv_user_data', JSON.stringify(userData));
         localStorage.setItem('sparkwavv_current_step', step);
-        setHasSavedProgress(true);
 
         // Sync to Firestore if logged in and profile is ready
         if (user && db && profile) {
@@ -520,6 +473,7 @@ export function SPARKWavvApp({ isAdmin = false }: { isAdmin?: boolean }) {
                 await setDoc(doc(db, 'users', user.uid), {
                   userData,
                   currentStep: step,
+                  emailVerified: user.emailVerified,
                   updatedAt: serverTimestamp()
                 }, { merge: true });
               }
@@ -533,7 +487,6 @@ export function SPARKWavvApp({ isAdmin = false }: { isAdmin?: boolean }) {
     }
     if (step === 'results' && summary) {
       localStorage.setItem('sparkwavv_summary', JSON.stringify(summary));
-      setHasSavedProgress(true);
 
       // Sync results to Firestore if profile is ready
       if (user && db && profile) {
@@ -552,7 +505,7 @@ export function SPARKWavvApp({ isAdmin = false }: { isAdmin?: boolean }) {
         syncResults();
       }
     }
-  }, [userData, step, summary, uploadedFileName, isConfirmed, user, db, profile]);
+  }, [userData, step, summary, uploadedFileName, emailVerified, user, db, profile]);
 
   const validateOnboarding = () => {
     const newErrors: Record<string, string> = {};
@@ -683,10 +636,20 @@ export function SPARKWavvApp({ isAdmin = false }: { isAdmin?: boolean }) {
     try {
       const userCredential = await signInWithEmailAndPassword(auth, userData.onboarding.email, userData.onboarding.password);
       
+      /* 
       if (!userCredential.user.emailVerified) {
         setErrors({ general: "Please verify your email address before logging in. Check your inbox for the activation link." });
         await signOut(auth);
         return;
+      }
+      */
+      
+      // Update Firestore to reflect verification status
+      if (db) {
+        await setDoc(doc(db, 'users', userCredential.user.uid), {
+          emailVerified: userCredential.user.emailVerified,
+          updatedAt: serverTimestamp()
+        }, { merge: true });
       }
       
       setStep('landing');
@@ -717,11 +680,13 @@ export function SPARKWavvApp({ isAdmin = false }: { isAdmin?: boolean }) {
       try {
         const result = await signInWithPopup(auth, googleProvider);
         
+        /*
         if (!result.user.emailVerified) {
           setErrors({ general: "Your Google account email is not verified. Please verify it in your Google settings before logging in." });
           await signOut(auth);
           return;
         }
+        */
         
         // Initialize role if new user
         const idToken = await result.user.getIdToken();
@@ -934,7 +899,7 @@ export function SPARKWavvApp({ isAdmin = false }: { isAdmin?: boolean }) {
     
     let isValid = true;
     if (step === 'onboarding') {
-      if (!isConfirmed) {
+      if (!emailVerified) {
         setErrors({ ...errors, general: "Please confirm your registration via email before continuing." });
         return;
       }
@@ -1027,10 +992,11 @@ export function SPARKWavvApp({ isAdmin = false }: { isAdmin?: boolean }) {
 
       <header className="relative z-10">
         <NavBar onNavigate={(s) => {
+          window.scrollTo(0, 0);
           if (s === 'login') {
             setStep('login');
           } else if (s === 'onboarding') {
-            if (isConfirmed) {
+            if (emailVerified) {
               setStep('module1');
             } else {
               setStep('onboarding');
@@ -1048,6 +1014,17 @@ export function SPARKWavvApp({ isAdmin = false }: { isAdmin?: boolean }) {
               setTimeout(() => setRegistrationMessage(null), 3000);
             }
           }} 
+          onRefresh={async () => {
+            if (user) {
+              await user.reload();
+              await refreshProfile();
+              if (user.emailVerified) {
+                setShowToast({ message: "Email verified! Welcome aboard.", type: 'success' });
+              } else {
+                setShowToast({ message: "Email still not verified. Please check your inbox.", type: 'error' });
+              }
+            }
+          }}
         />
       </header>
       <ProgressBar current={['landing', 'onboarding', 'module1', 'module2', 'module3', 'module4', 'module5', 'processing', 'results'].indexOf(step)} total={8} />
@@ -1088,7 +1065,7 @@ export function SPARKWavvApp({ isAdmin = false }: { isAdmin?: boolean }) {
                 A meticulously engineered career branding framework. Move from "overwhelmed" to "market dominant" through cinematic self-discovery.
               </p>
               <div className="flex flex-col sm:flex-row items-center justify-center gap-4 pt-8">
-                {!isConfirmed && (
+                {!emailVerified && (
                   <div className="flex flex-col sm:flex-row gap-4 w-full sm:w-auto">
                     <Button 
                       onClick={nextStep} 
@@ -1097,20 +1074,6 @@ export function SPARKWavvApp({ isAdmin = false }: { isAdmin?: boolean }) {
                     >
                       Dive-In <ArrowRight className="w-5 h-5" />
                     </Button>
-                    {hasSavedProgress && (
-                      <div className="flex flex-col items-center gap-2">
-                        <Button 
-                          onClick={resumeJourney} 
-                          variant="outline" 
-                          className="w-full sm:w-auto text-lg px-12 py-4 border-neon-cyan/20 text-neon-cyan/60 hover:text-neon-cyan"
-                        >
-                          Resume Journey
-                        </Button>
-                        {lastSaved && (
-                          <p className="text-[10px] text-white/30 italic">Last saved: {lastSaved}</p>
-                        )}
-                      </div>
-                    )}
                   </div>
                 )}
                 <p className="text-sm text-white/40">2-4 weeks to total clarity</p>
@@ -1171,16 +1134,149 @@ export function SPARKWavvApp({ isAdmin = false }: { isAdmin?: boolean }) {
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: -20 }}
-              className="max-w-4xl mx-auto px-6 space-y-12 text-center pb-24"
+              className="max-w-6xl mx-auto px-6 space-y-16 pb-24"
             >
-              <header className="space-y-4">
-                <h2 className="text-5xl font-bold">Skylar</h2>
-                <p className="text-neon-cyan font-display uppercase tracking-widest">Your AI Career Guide</p>
+              <header className="space-y-6 text-center">
+                <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-neon-cyan/10 border border-neon-cyan/20 text-neon-cyan text-xs font-bold uppercase tracking-widest">
+                  <Sparkles className="w-4 h-4" />
+                  The Future of Guidance
+                </div>
+                <h2 className="text-6xl md:text-7xl font-display font-bold tracking-tighter">Meet <span className="text-neon-cyan italic">Skylar</span></h2>
+                <p className="text-xl text-white/60 max-w-2xl mx-auto leading-relaxed">
+                  Beyond a chatbot. Skylar is a high-fidelity intelligence designed to decode your professional DNA and architect your market dominance.
+                </p>
               </header>
-              <div className="glass-panel p-12 border-neon-cyan/20">
-                <p className="text-xl text-white/60">Placeholder for Skylar's deep-dive experience. Coming soon.</p>
+
+              <div className="grid md:grid-cols-3 gap-8">
+                {[
+                  {
+                    title: "Deep Contextual Mapping",
+                    description: "Skylar doesn't just read your resume; it understands the narrative arc of your career, identifying patterns you might have missed.",
+                    icon: Fingerprint,
+                    color: "text-neon-cyan"
+                  },
+                  {
+                    title: "Market Dominance Strategy",
+                    description: "Real-time analysis of industry trends to position you at the forefront of your field with surgical precision.",
+                    icon: Target,
+                    color: "text-neon-magenta"
+                  },
+                  {
+                    title: "Emotional Intelligence",
+                    description: "Built with advanced NLP to understand your aspirations, fears, and the 'why' behind your work.",
+                    icon: Heart,
+                    color: "text-neon-lime"
+                  }
+                ].map((feature, i) => (
+                  <div key={i} className="glass-panel p-8 space-y-6 group hover:border-white/20 transition-all duration-500">
+                    <div className={`w-12 h-12 rounded-xl bg-white/5 border border-white/10 flex items-center justify-center ${feature.color}`}>
+                      <feature.icon className="w-6 h-6" />
+                    </div>
+                    <h3 className="text-xl font-bold">{feature.title}</h3>
+                    <p className="text-white/40 leading-relaxed text-sm">{feature.description}</p>
+                  </div>
+                ))}
               </div>
-              <Button onClick={() => setStep('landing')} variant="outline">Back to Home</Button>
+
+              <div className="glass-panel p-12 border-neon-cyan/20 relative overflow-hidden group">
+                <div className="absolute inset-0 bg-gradient-to-br from-neon-cyan/5 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-1000" />
+                <div className="relative z-10 grid md:grid-cols-2 gap-12 items-center">
+                  <div className="space-y-8">
+                    <h3 className="text-3xl font-bold leading-tight">The Skylar Experience: <br/><span className="text-neon-cyan">From History to Legacy</span></h3>
+                    <div className="space-y-6">
+                      {[
+                        { step: "01", title: "The Ignition", desc: "A deep-dive dialogue to uncover hidden strengths and core motivations." },
+                        { step: "02", title: "The Discovery", desc: "Skylar scans the global market landscape to find the precise intersection of your skills and high-value opportunities." },
+                        { step: "03", title: "The Branding", desc: "Your professional narrative is transformed into a cinematic identity that commands attention and establishes authority." },
+                        { step: "04", title: "The Outreach", desc: "Automated, high-impact engagement strategies that put your brand directly in front of key decision-makers." }
+                      ].map((item, i) => (
+                        <div key={i} className="flex gap-6">
+                          <span className="text-neon-cyan font-display font-bold text-xl opacity-40">{item.step}</span>
+                          <div className="space-y-1">
+                            <h4 className="font-bold text-white">{item.title}</h4>
+                            <p className="text-sm text-white/40">{item.desc}</p>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                  <div className="relative aspect-square rounded-3xl overflow-hidden border border-white/10 bg-black/40 flex items-center justify-center group-hover:border-neon-cyan/30 transition-all duration-700">
+                    <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,_var(--tw-gradient-stops))] from-neon-cyan/10 via-transparent to-transparent animate-pulse" />
+                    
+                    {/* Visual representation of Neural Processing */}
+                    <div className="absolute inset-0 flex items-center justify-center opacity-20">
+                      <div className="w-full h-full relative">
+                        {[...Array(5)].map((_, i) => (
+                          <motion.div
+                            key={i}
+                            animate={{ 
+                              opacity: [0.1, 0.5, 0.1],
+                              scale: [1, 1.2, 1],
+                            }}
+                            transition={{ 
+                              duration: 3, 
+                              delay: i * 0.5, 
+                              repeat: Infinity 
+                            }}
+                            className="absolute border border-neon-cyan/30 rounded-full"
+                            style={{
+                              top: '50%',
+                              left: '50%',
+                              width: `${(i + 1) * 20}%`,
+                              height: `${(i + 1) * 20}%`,
+                              transform: 'translate(-50%, -50%)'
+                            }}
+                          />
+                        ))}
+                      </div>
+                    </div>
+
+                    <Sparkles className="w-24 h-24 text-neon-cyan opacity-20 group-hover:scale-110 group-hover:opacity-40 transition-all duration-1000" />
+                    
+                    <div className="absolute bottom-8 left-8 right-8 p-6 rounded-2xl bg-black/60 backdrop-blur-md border border-white/10">
+                      <div className="flex items-center justify-between mb-3">
+                        <p className="text-[10px] font-mono text-neon-cyan uppercase tracking-widest">Neural Synthesis Core</p>
+                        <div className="flex gap-1">
+                          <div className="w-1 h-1 rounded-full bg-neon-cyan animate-ping" />
+                          <div className="w-1 h-1 rounded-full bg-neon-cyan/40" />
+                        </div>
+                      </div>
+                      
+                      {/* Clarified Processing Bar */}
+                      <div className="space-y-2">
+                        <div className="h-1.5 w-full bg-white/5 rounded-full overflow-hidden relative">
+                          <motion.div 
+                            animate={{ x: ["-100%", "100%"] }}
+                            transition={{ duration: 2.5, repeat: Infinity, ease: "easeInOut" }}
+                            className="absolute inset-0 w-1/2 bg-gradient-to-r from-transparent via-neon-cyan to-transparent shadow-[0_0_15px_#00f3ff]"
+                          />
+                        </div>
+                        <div className="flex justify-between items-center">
+                          <span className="text-[8px] text-white/40 uppercase font-mono">Analyzing Career DNA</span>
+                          <span className="text-[8px] text-neon-cyan font-mono">ACTIVE</span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div className="flex flex-col items-center gap-8">
+                <Button 
+                  onClick={() => setStep('landing')} 
+                  variant="neon"
+                  className="px-12 py-6 text-lg"
+                >
+                  Experience the Ignition
+                </Button>
+                <button 
+                  onClick={() => setStep('landing')}
+                  className="text-white/40 hover:text-white transition-colors flex items-center gap-2 text-sm font-bold uppercase tracking-widest"
+                >
+                  <ArrowRight className="w-4 h-4 rotate-180" />
+                  Back to Home
+                </button>
+              </div>
             </motion.div>
           )}
 
@@ -1190,16 +1286,112 @@ export function SPARKWavvApp({ isAdmin = false }: { isAdmin?: boolean }) {
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: -20 }}
-              className="max-w-4xl mx-auto px-6 space-y-12 text-center pb-24"
+              className="max-w-6xl mx-auto px-6 space-y-16 pb-24"
             >
-              <header className="space-y-4">
-                <h2 className="text-5xl font-bold">Features</h2>
-                <p className="text-neon-cyan font-display uppercase tracking-widest">The SPARKWavv Toolkit</p>
+              <header className="space-y-6 text-center">
+                <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-neon-magenta/10 border border-neon-magenta/20 text-neon-magenta text-xs font-bold uppercase tracking-widest">
+                  <Zap className="w-4 h-4" />
+                  The SPARKWavv Toolkit
+                </div>
+                <h2 className="text-6xl md:text-7xl font-display font-bold tracking-tighter">Engineered for <span className="text-neon-magenta italic">Impact</span></h2>
+                <p className="text-xl text-white/60 max-w-2xl mx-auto leading-relaxed">
+                  A comprehensive suite of AI-powered tools designed to amplify your professional presence and streamline your career trajectory.
+                </p>
               </header>
-              <div className="glass-panel p-12 border-neon-cyan/20">
-                <p className="text-xl text-white/60">Placeholder for SPARKWavv's feature showcase. Coming soon.</p>
+
+              <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-6">
+                {[
+                  {
+                    title: "Cinematic Branding",
+                    desc: "Transform your history into a high-impact visual narrative that captures attention in seconds.",
+                    icon: Film,
+                    color: "text-neon-cyan"
+                  },
+                  {
+                    title: "Wavvault Storage",
+                    desc: "Secure, encrypted repository for your professional assets, achievements, and career DNA.",
+                    icon: ShieldCheck,
+                    color: "text-neon-magenta"
+                  },
+                  {
+                    title: "Precision Matching",
+                    desc: "Advanced algorithms that align your unique profile with high-value market opportunities.",
+                    icon: Target,
+                    color: "text-neon-lime"
+                  },
+                  {
+                    title: "Real-time Analytics",
+                    desc: "Track your market value and engagement metrics with a live professional dashboard.",
+                    icon: Zap,
+                    color: "text-neon-cyan"
+                  }
+                ].map((feature, i) => (
+                  <div key={i} className="glass-panel p-8 space-y-6 group hover:border-white/20 transition-all duration-500">
+                    <div className={`w-12 h-12 rounded-xl bg-white/5 border border-white/10 flex items-center justify-center ${feature.color}`}>
+                      <feature.icon className="w-6 h-6" />
+                    </div>
+                    <h3 className="text-xl font-bold">{feature.title}</h3>
+                    <p className="text-white/40 leading-relaxed text-sm">{feature.desc}</p>
+                  </div>
+                ))}
               </div>
-              <Button onClick={() => setStep('landing')} variant="outline">Back to Home</Button>
+
+              <div className="grid md:grid-cols-2 gap-8">
+                <div className="glass-panel p-10 border-white/5 space-y-8">
+                  <h3 className="text-2xl font-bold">The Career Engine</h3>
+                  <div className="space-y-6">
+                    {[
+                      "Automated Resume Optimization",
+                      "AI-Powered Interview Simulation",
+                      "Dynamic Portfolio Generation",
+                      "Market Value Benchmarking"
+                    ].map((item, i) => (
+                      <div key={i} className="flex items-center gap-4">
+                        <div className="w-5 h-5 rounded-full bg-neon-magenta/20 flex items-center justify-center">
+                          <CheckCircle2 className="w-3 h-3 text-neon-magenta" />
+                        </div>
+                        <span className="text-white/60">{item}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="glass-panel p-10 border-white/5 space-y-8">
+                  <h3 className="text-2xl font-bold">Strategic Outreach</h3>
+                  <div className="space-y-6">
+                    {[
+                      "Automated Network Engagement",
+                      "Personalized Outreach Sequences",
+                      "Decision-Maker Identification",
+                      "Engagement Performance Tracking"
+                    ].map((item, i) => (
+                      <div key={i} className="flex items-center gap-4">
+                        <div className="w-5 h-5 rounded-full bg-neon-cyan/20 flex items-center justify-center">
+                          <CheckCircle2 className="w-3 h-3 text-neon-cyan" />
+                        </div>
+                        <span className="text-white/60">{item}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+
+              <div className="flex flex-col items-center gap-8">
+                <Button 
+                  onClick={() => setStep('landing')} 
+                  variant="neon"
+                  className="px-12 py-6 text-lg"
+                >
+                  Explore the Full Suite
+                </Button>
+                <button 
+                  onClick={() => setStep('landing')}
+                  className="text-white/40 hover:text-white transition-colors flex items-center gap-2 text-sm font-bold uppercase tracking-widest"
+                >
+                  <ArrowRight className="w-4 h-4 rotate-180" />
+                  Back to Home
+                </button>
+              </div>
             </motion.div>
           )}
 
@@ -1209,16 +1401,103 @@ export function SPARKWavvApp({ isAdmin = false }: { isAdmin?: boolean }) {
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: -20 }}
-              className="max-w-4xl mx-auto px-6 space-y-12 text-center pb-24"
+              className="max-w-6xl mx-auto px-6 space-y-16 pb-24"
             >
-              <header className="space-y-4">
-                <h2 className="text-5xl font-bold">Technology</h2>
-                <p className="text-neon-cyan font-display uppercase tracking-widest">The Engine Behind the Wave</p>
+              <header className="space-y-6 text-center">
+                <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-neon-lime/10 border border-neon-lime/20 text-neon-lime text-xs font-bold uppercase tracking-widest">
+                  <Cpu className="w-4 h-4" />
+                  The Engine Behind the Wave
+                </div>
+                <h2 className="text-6xl md:text-7xl font-display font-bold tracking-tighter">Engineered for the <span className="text-neon-lime italic">Future</span></h2>
+                <p className="text-xl text-white/60 max-w-2xl mx-auto leading-relaxed">
+                  SPARKWavv is built on a proprietary stack of advanced neural networks and real-time market intelligence engines.
+                </p>
               </header>
-              <div className="glass-panel p-12 border-neon-cyan/20">
-                <p className="text-xl text-white/60">Placeholder for SPARKWavv's technology deep-dive. Coming soon.</p>
+
+              <div className="grid md:grid-cols-2 gap-8">
+                <div className="glass-panel p-10 space-y-8 relative overflow-hidden group">
+                  <div className="absolute top-0 right-0 p-8 opacity-10 group-hover:opacity-20 transition-opacity">
+                    <Cpu className="w-32 h-32 text-neon-lime" />
+                  </div>
+                  <div className="space-y-4 relative z-10">
+                    <h3 className="text-3xl font-bold">Neural Synthesis Engine</h3>
+                    <p className="text-white/40 leading-relaxed">
+                      Our core AI architecture utilizes multi-modal transformers to process resumes, portfolios, and interview transcripts into a unified "Career DNA" profile. This engine identifies latent skills and cross-industry potential that traditional systems miss.
+                    </p>
+                    <ul className="space-y-3 pt-4">
+                      {["Multi-modal Data Processing", "Latent Skill Identification", "Semantic Career Mapping"].map((item, i) => (
+                        <li key={i} className="flex items-center gap-3 text-sm text-white/60">
+                          <div className="w-1.5 h-1.5 rounded-full bg-neon-lime" />
+                          {item}
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                </div>
+
+                <div className="glass-panel p-10 space-y-8 relative overflow-hidden group">
+                  <div className="absolute top-0 right-0 p-8 opacity-10 group-hover:opacity-20 transition-opacity">
+                    <Globe className="w-32 h-32 text-neon-cyan" />
+                  </div>
+                  <div className="space-y-4 relative z-10">
+                    <h3 className="text-3xl font-bold">Market Intelligence Grid</h3>
+                    <p className="text-white/40 leading-relaxed">
+                      A global network of real-time data crawlers monitors industry shifts, hiring trends, and skill demand across 50+ sectors. This intelligence allows Skylar to provide adaptive guidance that evolves as the market does.
+                    </p>
+                    <ul className="space-y-3 pt-4">
+                      {["Real-time Trend Analysis", "Predictive Demand Modeling", "Global Sector Monitoring"].map((item, i) => (
+                        <li key={i} className="flex items-center gap-3 text-sm text-white/60">
+                          <div className="w-1.5 h-1.5 rounded-full bg-neon-cyan" />
+                          {item}
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                </div>
               </div>
-              <Button onClick={() => setStep('landing')} variant="outline">Back to Home</Button>
+
+              <div className="glass-panel p-12 border-white/5">
+                <div className="grid md:grid-cols-3 gap-12">
+                  <div className="space-y-4 text-center">
+                    <div className="w-16 h-16 rounded-2xl bg-white/5 border border-white/10 flex items-center justify-center mx-auto text-neon-magenta">
+                      <ShieldCheck className="w-8 h-8" />
+                    </div>
+                    <h4 className="text-xl font-bold">Zero-Knowledge Privacy</h4>
+                    <p className="text-sm text-white/40">Your data is encrypted at rest and in transit. We utilize zero-knowledge architecture to ensure you remain the sole owner of your professional DNA.</p>
+                  </div>
+                  <div className="space-y-4 text-center">
+                    <div className="w-16 h-16 rounded-2xl bg-white/5 border border-white/10 flex items-center justify-center mx-auto text-neon-lime">
+                      <Activity className="w-8 h-8" />
+                    </div>
+                    <h4 className="text-xl font-bold">Adaptive Learning</h4>
+                    <p className="text-sm text-white/40">The system learns from every interaction, refining its understanding of your goals and the market to provide increasingly precise guidance.</p>
+                  </div>
+                  <div className="space-y-4 text-center">
+                    <div className="w-16 h-16 rounded-2xl bg-white/5 border border-white/10 flex items-center justify-center mx-auto text-neon-cyan">
+                      <Zap className="w-8 h-8" />
+                    </div>
+                    <h4 className="text-xl font-bold">High-Fidelity Synthesis</h4>
+                    <p className="text-sm text-white/40">Our synthesis engine generates high-fidelity assets, from cinematic brand portraits to optimized outreach sequences, in seconds.</p>
+                  </div>
+                </div>
+              </div>
+
+              <div className="flex flex-col items-center gap-8">
+                <Button 
+                  onClick={() => setStep('landing')} 
+                  variant="neon"
+                  className="px-12 py-6 text-lg"
+                >
+                  Experience the Tech
+                </Button>
+                <button 
+                  onClick={() => setStep('landing')}
+                  className="text-white/40 hover:text-white transition-colors flex items-center gap-2 text-sm font-bold uppercase tracking-widest"
+                >
+                  <ArrowRight className="w-4 h-4 rotate-180" />
+                  Back to Home
+                </button>
+              </div>
             </motion.div>
           )}
 
@@ -1228,16 +1507,108 @@ export function SPARKWavvApp({ isAdmin = false }: { isAdmin?: boolean }) {
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: -20 }}
-              className="max-w-4xl mx-auto px-6 space-y-12 text-center pb-24"
+              className="max-w-6xl mx-auto px-6 space-y-16 pb-24"
             >
-              <header className="space-y-4">
-                <h2 className="text-5xl font-bold">Wavvault</h2>
-                <p className="text-neon-cyan font-display uppercase tracking-widest">Secure Career Asset Storage</p>
+              <header className="space-y-6 text-center">
+                <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-neon-cyan/10 border border-neon-cyan/20 text-neon-cyan text-xs font-bold uppercase tracking-widest">
+                  <ShieldCheck className="w-4 h-4" />
+                  Fortified Career Assets
+                </div>
+                <h2 className="text-6xl md:text-7xl font-display font-bold tracking-tighter">The <span className="text-neon-cyan italic">Wavvault</span></h2>
+                <p className="text-xl text-white/60 max-w-2xl mx-auto leading-relaxed">
+                  Your professional DNA deserves a fortress. Wavvault is the industry's first zero-knowledge repository for high-fidelity career assets.
+                </p>
               </header>
-              <div className="glass-panel p-12 border-neon-cyan/20 bg-black/40 backdrop-blur-xl rounded-3xl">
-                <p className="text-xl text-white/60">Placeholder for Wavvault's secure storage features. Coming soon.</p>
+
+              <div className="grid md:grid-cols-3 gap-8">
+                {[
+                  {
+                    title: "Immutable Storage",
+                    desc: "Every version of your resume, portfolio, and cinematic brand portrait is stored with blockchain-grade integrity.",
+                    icon: Database,
+                    color: "text-neon-cyan"
+                  },
+                  {
+                    title: "Zero-Knowledge Encryption",
+                    desc: "We don't just encrypt your data; we ensure we can't even see it. Your keys, your assets, your future.",
+                    icon: Lock,
+                    color: "text-neon-magenta"
+                  },
+                  {
+                    title: "Instant Retrieval",
+                    desc: "Deploy your assets to any opportunity in milliseconds with our high-speed global delivery network.",
+                    icon: Zap,
+                    color: "text-neon-lime"
+                  }
+                ].map((feature, i) => (
+                  <div key={i} className="glass-panel p-8 space-y-6 group hover:border-white/20 transition-all duration-500">
+                    <div className={`w-12 h-12 rounded-xl bg-white/5 border border-white/10 flex items-center justify-center ${feature.color}`}>
+                      <feature.icon className="w-6 h-6" />
+                    </div>
+                    <h3 className="text-xl font-bold">{feature.title}</h3>
+                    <p className="text-white/40 leading-relaxed text-sm">{feature.desc}</p>
+                  </div>
+                ))}
               </div>
-              <Button onClick={() => setStep('landing')} variant="outline">Back to Home</Button>
+
+              <div className="glass-panel p-12 border-white/5 relative overflow-hidden group">
+                <div className="absolute inset-0 bg-gradient-to-br from-neon-cyan/5 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-1000" />
+                <div className="relative z-10 grid md:grid-cols-2 gap-12 items-center">
+                  <div className="space-y-8">
+                    <h3 className="text-3xl font-bold leading-tight">Beyond a Cloud Drive: <br/><span className="text-neon-cyan">A Dynamic Asset Engine</span></h3>
+                    <div className="space-y-6">
+                      {[
+                        { title: "Smart Versioning", desc: "Skylar automatically tracks and optimizes every iteration of your professional profile." },
+                        { title: "Secure Sharing", desc: "Generate time-limited, encrypted links for recruiters and decision-makers." },
+                        { title: "Asset Synthesis", desc: "Wavvault works with Skylar to dynamically generate new assets based on your stored DNA." }
+                      ].map((item, i) => (
+                        <div key={i} className="flex gap-4">
+                          <div className="mt-1">
+                            <CheckCircle2 className="w-5 h-5 text-neon-cyan" />
+                          </div>
+                          <div className="space-y-1">
+                            <h4 className="font-bold text-white">{item.title}</h4>
+                            <p className="text-sm text-white/40">{item.desc}</p>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                  <div className="relative aspect-video rounded-3xl overflow-hidden border border-white/10 bg-black/40 flex items-center justify-center group-hover:border-neon-cyan/30 transition-all duration-700">
+                    <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,_var(--tw-gradient-stops))] from-neon-cyan/10 via-transparent to-transparent animate-pulse" />
+                    <HardDrive className="w-24 h-24 text-neon-cyan opacity-20 group-hover:scale-110 group-hover:opacity-40 transition-all duration-1000" />
+                    <div className="absolute inset-0 flex flex-col items-center justify-center p-8 text-center space-y-4">
+                      <div className="w-full max-w-xs space-y-2">
+                        <div className="h-1 w-full bg-white/5 rounded-full overflow-hidden">
+                          <motion.div 
+                            animate={{ width: ["0%", "100%"] }}
+                            transition={{ duration: 4, repeat: Infinity, ease: "easeInOut" }}
+                            className="h-full bg-neon-cyan shadow-[0_0_10px_#00f3ff]"
+                          />
+                        </div>
+                        <p className="text-[10px] font-mono text-neon-cyan uppercase tracking-widest">Encrypting Career DNA...</p>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div className="flex flex-col items-center gap-8">
+                <Button 
+                  onClick={() => setStep('landing')} 
+                  variant="neon"
+                  className="px-12 py-6 text-lg"
+                >
+                  Secure Your Future
+                </Button>
+                <button 
+                  onClick={() => setStep('landing')}
+                  className="text-white/40 hover:text-white transition-colors flex items-center gap-2 text-sm font-bold uppercase tracking-widest"
+                >
+                  <ArrowRight className="w-4 h-4 rotate-180" />
+                  Back to Home
+                </button>
+              </div>
             </motion.div>
           )}
 
@@ -1247,16 +1618,113 @@ export function SPARKWavvApp({ isAdmin = false }: { isAdmin?: boolean }) {
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: -20 }}
-              className="max-w-4xl mx-auto px-6 space-y-12 text-center pb-24"
+              className="max-w-6xl mx-auto px-6 space-y-16 pb-24"
             >
-              <header className="space-y-4">
-                <h2 className="text-5xl font-bold">Vision</h2>
-                <p className="text-neon-cyan font-display uppercase tracking-widest">The Future of Career Wellness</p>
+              <header className="space-y-6 text-center">
+                <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-neon-cyan/10 border border-neon-cyan/20 text-neon-cyan text-xs font-bold uppercase tracking-widest">
+                  <Compass className="w-4 h-4" />
+                  The Future of Career Wellness
+                </div>
+                <h2 className="text-6xl md:text-7xl font-display font-bold tracking-tighter">A New <span className="text-neon-cyan italic">Paradigm</span></h2>
+                <p className="text-xl text-white/60 max-w-2xl mx-auto leading-relaxed">
+                  We envision a world where every professional is empowered by their own history, navigating the market with absolute clarity and cinematic authority.
+                </p>
               </header>
-              <div className="glass-panel p-12 border-neon-cyan/20">
-                <p className="text-xl text-white/60">Placeholder for SPARKWavv's vision. Coming soon.</p>
+
+              <div className="grid md:grid-cols-3 gap-8">
+                {[
+                  {
+                    title: "Human-Centric Intelligence",
+                    desc: "We believe AI should amplify human potential, not replace it. Skylar is designed to be a partner in your self-discovery journey.",
+                    icon: Heart,
+                    color: "text-neon-cyan"
+                  },
+                  {
+                    title: "Universal Opportunity",
+                    desc: "Our mission is to democratize high-level career strategy, making elite-level branding and guidance accessible to everyone.",
+                    icon: Globe,
+                    color: "text-neon-magenta"
+                  },
+                  {
+                    title: "Data Sovereignty",
+                    desc: "In the age of information, your professional DNA is your most valuable asset. We are committed to absolute privacy and user ownership.",
+                    icon: ShieldCheck,
+                    color: "text-neon-lime"
+                  }
+                ].map((feature, i) => (
+                  <div key={i} className="glass-panel p-8 space-y-6 group hover:border-white/20 transition-all duration-500">
+                    <div className={`w-12 h-12 rounded-xl bg-white/5 border border-white/10 flex items-center justify-center ${feature.color}`}>
+                      <feature.icon className="w-6 h-6" />
+                    </div>
+                    <h3 className="text-xl font-bold">{feature.title}</h3>
+                    <p className="text-white/40 leading-relaxed text-sm">{feature.desc}</p>
+                  </div>
+                ))}
               </div>
-              <Button onClick={() => setStep('landing')} variant="outline">Back to Home</Button>
+
+              <div className="glass-panel p-12 border-white/5 relative overflow-hidden group">
+                <div className="absolute inset-0 bg-gradient-to-br from-neon-cyan/5 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-1000" />
+                <div className="relative z-10 space-y-12">
+                  <div className="max-w-3xl">
+                    <h3 className="text-4xl font-bold leading-tight mb-6">Redefining the <span className="text-neon-cyan">Professional Journey</span></h3>
+                    <p className="text-lg text-white/60 leading-relaxed">
+                      Traditional career development is broken. It's reactive, fragmented, and often ignores the human element. SPARKWavv is building the infrastructure for a proactive, unified, and cinematic career experience.
+                    </p>
+                  </div>
+                  
+                  <div className="grid md:grid-cols-2 gap-12">
+                    <div className="space-y-6">
+                      <h4 className="text-xl font-bold text-white flex items-center gap-3">
+                        <div className="w-8 h-8 rounded-lg bg-neon-cyan/10 flex items-center justify-center">
+                          <Target className="w-4 h-4 text-neon-cyan" />
+                        </div>
+                        Strategic Pillars
+                      </h4>
+                      <ul className="space-y-4">
+                        {[
+                          "Cinematic Self-Discovery as a standard",
+                          "Real-time market alignment engines",
+                          "Zero-knowledge professional DNA storage",
+                          "High-fidelity brand synthesis for all"
+                        ].map((item, i) => (
+                          <li key={i} className="flex items-center gap-3 text-white/40">
+                            <div className="w-1.5 h-1.5 rounded-full bg-neon-cyan" />
+                            {item}
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                    <div className="space-y-6">
+                      <h4 className="text-xl font-bold text-white flex items-center gap-3">
+                        <div className="w-8 h-8 rounded-lg bg-neon-magenta/10 flex items-center justify-center">
+                          <Sparkles className="w-4 h-4 text-neon-magenta" />
+                        </div>
+                        The SPARKWavv Impact
+                      </h4>
+                      <p className="text-white/40 leading-relaxed italic">
+                        "By 2030, we aim to have empowered 100 million professionals to reclaim their narrative and dominate their chosen markets through the power of cinematic intelligence."
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div className="flex flex-col items-center gap-8">
+                <Button 
+                  onClick={() => setStep('landing')} 
+                  variant="neon"
+                  className="px-12 py-6 text-lg"
+                >
+                  Join the Vision
+                </Button>
+                <button 
+                  onClick={() => setStep('landing')}
+                  className="text-white/40 hover:text-white transition-colors flex items-center gap-2 text-sm font-bold uppercase tracking-widest"
+                >
+                  <ArrowRight className="w-4 h-4 rotate-180" />
+                  Back to Home
+                </button>
+              </div>
             </motion.div>
           )}
 
@@ -1266,16 +1734,96 @@ export function SPARKWavvApp({ isAdmin = false }: { isAdmin?: boolean }) {
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: -20 }}
-              className="max-w-4xl mx-auto px-6 space-y-12 text-center pb-24"
+              className="max-w-6xl mx-auto px-6 space-y-16 pb-24"
             >
-              <header className="space-y-4">
-                <h2 className="text-5xl font-bold">About Us</h2>
-                <p className="text-neon-cyan font-display uppercase tracking-widest">The Team Behind the Engine</p>
+              <header className="space-y-6 text-center">
+                <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-neon-magenta/10 border border-neon-magenta/20 text-neon-magenta text-xs font-bold uppercase tracking-widest">
+                  <Users className="w-4 h-4" />
+                  The Team Behind the Engine
+                </div>
+                <h2 className="text-6xl md:text-7xl font-display font-bold tracking-tighter">Our <span className="text-neon-magenta italic">Story</span></h2>
+                <p className="text-xl text-white/60 max-w-2xl mx-auto leading-relaxed">
+                  Born from the intersection of cinematic storytelling and advanced neural science, SPARKWavv is on a mission to redefine the professional narrative.
+                </p>
               </header>
-              <div className="glass-panel p-12 border-neon-cyan/20">
-                <p className="text-xl text-white/60">Placeholder for the About Us page. Coming soon.</p>
+
+              <div className="grid md:grid-cols-2 gap-12 items-center">
+                <div className="space-y-8">
+                  <h3 className="text-3xl font-bold">Pioneering Cinematic Intelligence</h3>
+                  <p className="text-lg text-white/40 leading-relaxed">
+                    Founded in 2024, SPARKWavv began as a research project focused on how high-fidelity visual narratives impact professional perception. Today, we are a global team of engineers, designers, and career strategists building the future of professional identity.
+                  </p>
+                  <div className="grid grid-cols-2 gap-6">
+                    <div className="p-6 rounded-2xl bg-white/5 border border-white/10 space-y-2">
+                      <div className="text-3xl font-bold text-neon-magenta">50+</div>
+                      <div className="text-xs text-white/40 uppercase tracking-widest">Global Experts</div>
+                    </div>
+                    <div className="p-6 rounded-2xl bg-white/5 border border-white/10 space-y-2">
+                      <div className="text-3xl font-bold text-neon-cyan">2024</div>
+                      <div className="text-xs text-white/40 uppercase tracking-widest">Year Founded</div>
+                    </div>
+                  </div>
+                </div>
+                <div className="relative aspect-square rounded-3xl overflow-hidden border border-white/10 glass-panel p-2">
+                  <img 
+                    src="https://picsum.photos/seed/team/800/800" 
+                    alt="SPARKWavv Team" 
+                    className="w-full h-full object-cover rounded-2xl opacity-60 grayscale hover:grayscale-0 transition-all duration-700"
+                    referrerPolicy="no-referrer"
+                  />
+                  <div className="absolute inset-0 bg-gradient-to-t from-black via-transparent to-transparent" />
+                  <div className="absolute bottom-8 left-8 right-8">
+                    <p className="text-sm text-white/60 italic font-serif">"We're not just building a platform; we're building a movement to reclaim the professional narrative."</p>
+                  </div>
+                </div>
               </div>
-              <Button onClick={() => setStep('landing')} variant="outline">Back to Home</Button>
+
+              <div className="space-y-12">
+                <h3 className="text-3xl font-bold text-center">Our Leadership</h3>
+                <div className="grid md:grid-cols-3 gap-8">
+                  {[
+                    { name: "Alex Rivers", role: "CEO & Founder", bio: "Former cinematic director turned AI architect.", icon: Sparkles },
+                    { name: "Dr. Sarah Chen", role: "Chief Science Officer", bio: "Expert in neural synthesis and behavioral data.", icon: Cpu },
+                    { name: "Marcus Thorne", role: "Head of Strategy", bio: "Veteran career strategist for Fortune 500 executives.", icon: Target }
+                  ].map((member, i) => (
+                    <div key={i} className="glass-panel p-8 space-y-6 group hover:border-white/20 transition-all duration-500 text-center">
+                      <div className="w-20 h-20 rounded-full bg-white/5 border border-white/10 flex items-center justify-center mx-auto mb-4 group-hover:border-neon-magenta/30 transition-all">
+                        <member.icon className="w-10 h-10 text-neon-magenta" />
+                      </div>
+                      <div className="space-y-2">
+                        <h4 className="text-xl font-bold">{member.name}</h4>
+                        <p className="text-neon-magenta text-xs font-bold uppercase tracking-widest">{member.role}</p>
+                      </div>
+                      <p className="text-sm text-white/40 leading-relaxed">{member.bio}</p>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              <div className="glass-panel p-12 border-white/5 text-center space-y-8">
+                <Award className="w-12 h-12 text-neon-lime mx-auto" />
+                <h3 className="text-3xl font-bold">Our Commitment</h3>
+                <p className="text-lg text-white/60 max-w-3xl mx-auto leading-relaxed">
+                  We are committed to building technology that is ethical, transparent, and profoundly human. Every line of code we write is dedicated to helping you find your voice and dominate your market.
+                </p>
+              </div>
+
+              <div className="flex flex-col items-center gap-8">
+                <Button 
+                  onClick={() => setStep('landing')} 
+                  variant="neon"
+                  className="px-12 py-6 text-lg"
+                >
+                  Meet the Team
+                </Button>
+                <button 
+                  onClick={() => setStep('landing')}
+                  className="text-white/40 hover:text-white transition-colors flex items-center gap-2 text-sm font-bold uppercase tracking-widest"
+                >
+                  <ArrowRight className="w-4 h-4 rotate-180" />
+                  Back to Home
+                </button>
+              </div>
             </motion.div>
           )}
 
@@ -1285,16 +1833,104 @@ export function SPARKWavvApp({ isAdmin = false }: { isAdmin?: boolean }) {
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: -20 }}
-              className="max-w-4xl mx-auto px-6 space-y-12 text-center pb-24"
+              className="max-w-6xl mx-auto px-6 space-y-16 pb-24"
             >
-              <header className="space-y-4">
-                <h2 className="text-5xl font-bold">Investors</h2>
-                <p className="text-neon-cyan font-display uppercase tracking-widest">Partnering for the Future</p>
+              <header className="space-y-6 text-center">
+                <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-neon-cyan/10 border border-neon-cyan/20 text-neon-cyan text-xs font-bold uppercase tracking-widest">
+                  <TrendingUp className="w-4 h-4" />
+                  Partnering for the Future
+                </div>
+                <h2 className="text-6xl md:text-7xl font-display font-bold tracking-tighter">Investor <span className="text-neon-cyan italic">Relations</span></h2>
+                <p className="text-xl text-white/60 max-w-2xl mx-auto leading-relaxed">
+                  SPARKWavv is scaling the next generation of professional identity. We are backed by visionary partners who believe in the power of cinematic intelligence.
+                </p>
               </header>
-              <div className="glass-panel p-12 border-neon-cyan/20">
-                <p className="text-xl text-white/60">Placeholder for Investor relations. Coming soon.</p>
+
+              <div className="grid md:grid-cols-3 gap-8">
+                {[
+                  {
+                    title: "Market Opportunity",
+                    desc: "The global career development and AI market is projected to reach $500B by 2030. SPARKWavv is positioned at the epicenter of this shift.",
+                    icon: BarChart3,
+                    color: "text-neon-cyan"
+                  },
+                  {
+                    title: "Strategic Growth",
+                    desc: "With a 300% YoY growth in user engagement and a proprietary technology stack, we are defining a new category of professional wellness.",
+                    icon: TrendingUp,
+                    color: "text-neon-magenta"
+                  },
+                  {
+                    title: "Global Scale",
+                    desc: "Our infrastructure is designed for universal accessibility, supporting professionals across 50+ sectors and 120 countries.",
+                    icon: Globe,
+                    color: "text-neon-lime"
+                  }
+                ].map((feature, i) => (
+                  <div key={i} className="glass-panel p-8 space-y-6 group hover:border-white/20 transition-all duration-500">
+                    <div className={`w-12 h-12 rounded-xl bg-white/5 border border-white/10 flex items-center justify-center ${feature.color}`}>
+                      <feature.icon className="w-6 h-6" />
+                    </div>
+                    <h3 className="text-xl font-bold">{feature.title}</h3>
+                    <p className="text-white/40 leading-relaxed text-sm">{feature.desc}</p>
+                  </div>
+                ))}
               </div>
-              <Button onClick={() => setStep('landing')} variant="outline">Back to Home</Button>
+
+              <div className="glass-panel p-12 border-white/5 relative overflow-hidden group">
+                <div className="absolute inset-0 bg-gradient-to-br from-neon-cyan/5 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-1000" />
+                <div className="relative z-10 grid md:grid-cols-2 gap-12 items-center">
+                  <div className="space-y-8">
+                    <h3 className="text-3xl font-bold leading-tight">Investment <span className="text-neon-cyan">Philosophy</span></h3>
+                    <div className="space-y-6">
+                      {[
+                        { title: "Long-term Value", desc: "We focus on building sustainable, high-impact technology that creates lasting value for our users and partners." },
+                        { title: "Ethical AI", desc: "Our commitment to zero-knowledge privacy and ethical data usage is a core competitive advantage." },
+                        { title: "Category Leadership", desc: "We don't just compete; we define the cinematic intelligence category for the professional market." }
+                      ].map((item, i) => (
+                        <div key={i} className="flex gap-4">
+                          <div className="mt-1">
+                            <CheckCircle2 className="w-5 h-5 text-neon-cyan" />
+                          </div>
+                          <div className="space-y-1">
+                            <h4 className="font-bold text-white">{item.title}</h4>
+                            <p className="text-sm text-white/40">{item.desc}</p>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                  <div className="space-y-6">
+                    <div className="p-8 rounded-3xl bg-white/5 border border-white/10 space-y-4">
+                      <Briefcase className="w-8 h-8 text-neon-cyan mb-2" />
+                      <h4 className="text-xl font-bold">Inquiries</h4>
+                      <p className="text-sm text-white/40 leading-relaxed">
+                        For institutional investor inquiries, please contact our relations team at <span className="text-neon-cyan">investors@sparkwavv.com</span>.
+                      </p>
+                      <Button variant="outline" className="w-full border-neon-cyan/20 text-neon-cyan hover:bg-neon-cyan/10">
+                        Download Pitch Deck
+                      </Button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div className="flex flex-col items-center gap-8">
+                <Button 
+                  onClick={() => setStep('landing')} 
+                  variant="neon"
+                  className="px-12 py-6 text-lg"
+                >
+                  Partner with Us
+                </Button>
+                <button 
+                  onClick={() => setStep('landing')}
+                  className="text-white/40 hover:text-white transition-colors flex items-center gap-2 text-sm font-bold uppercase tracking-widest"
+                >
+                  <ArrowRight className="w-4 h-4 rotate-180" />
+                  Back to Home
+                </button>
+              </div>
             </motion.div>
           )}
 
@@ -1317,22 +1953,151 @@ export function SPARKWavvApp({ isAdmin = false }: { isAdmin?: boolean }) {
             </motion.div>
           )}
 
-          {step === 'company-testimonials' && (
+          {step === 'pricing' && (
             <motion.div 
-              key="company-testimonials"
+              key="pricing"
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: -20 }}
-              className="max-w-4xl mx-auto px-6 space-y-12 text-center pb-24"
+              className="max-w-6xl mx-auto px-6 space-y-16 pb-24"
             >
-              <header className="space-y-4">
-                <h2 className="text-5xl font-bold">Testimonials</h2>
-                <p className="text-neon-cyan font-display uppercase tracking-widest">Success Stories</p>
+              <header className="space-y-6 text-center">
+                <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-neon-cyan/10 border border-neon-cyan/20 text-neon-cyan text-xs font-bold uppercase tracking-widest">
+                  <Trophy className="w-4 h-4" />
+                  Investment in Your Future
+                </div>
+                <h2 className="text-6xl md:text-7xl font-display font-bold tracking-tighter">Choose Your <span className="text-neon-cyan italic">Trajectory</span></h2>
+                <p className="text-xl text-white/60 max-w-2xl mx-auto leading-relaxed">
+                  Transparent pricing for professionals ready to dominate their market. No hidden fees, just pure cinematic intelligence.
+                </p>
               </header>
-              <div className="glass-panel p-12 border-neon-cyan/20">
-                <p className="text-xl text-white/60">Placeholder for user success stories and testimonials. Coming soon.</p>
+
+              <div className="grid md:grid-cols-3 gap-8">
+                {[
+                  {
+                    name: "Spark",
+                    price: "0",
+                    period: "Free Forever",
+                    desc: "Perfect for exploring your Career DNA and starting your narrative journey.",
+                    features: [
+                      "Basic Career DNA Mapping",
+                      "1 Cinematic Profile Snapshot",
+                      "3 Skylar AI Interactions/mo",
+                      "Standard Wavvault (5 assets)",
+                      "Community Support"
+                    ],
+                    cta: "Start for Free",
+                    variant: "outline",
+                    color: "text-white/60"
+                  },
+                  {
+                    name: "Wavv Pro",
+                    price: "19",
+                    period: "per month",
+                    desc: "The complete engine for active job seekers and career architects.",
+                    features: [
+                      "Full DNA Synthesis",
+                      "Unlimited Cinematic Updates",
+                      "Priority Skylar Access",
+                      "Unlimited Wavvault Storage",
+                      "Precision Market Matching",
+                      "Advanced Analytics"
+                    ],
+                    cta: "Go Pro Now",
+                    variant: "neon",
+                    color: "text-neon-cyan",
+                    popular: true
+                  },
+                  {
+                    name: "Supernova",
+                    price: "49",
+                    period: "per month",
+                    desc: "Executive-level intelligence for high-stakes professional dominance.",
+                    features: [
+                      "All Pro Features",
+                      "Quarterly Strategy Reviews",
+                      "Market Dominance Analytics",
+                      "Early Access to New Modules",
+                      "White-glove Profile Optimization",
+                      "Dedicated Success Manager"
+                    ],
+                    cta: "Contact Sales",
+                    variant: "outline",
+                    color: "text-neon-magenta"
+                  }
+                ].map((plan, i) => (
+                  <div key={i} className={`glass-panel p-8 space-y-8 flex flex-col justify-between relative group hover:border-white/20 transition-all duration-500 ${plan.popular ? 'border-neon-cyan/50 shadow-[0_0_30px_rgba(0,243,255,0.1)]' : ''}`}>
+                    {plan.popular && (
+                      <div className="absolute -top-4 left-1/2 -translate-x-1/2 px-4 py-1 rounded-full bg-neon-cyan text-black text-[10px] font-bold uppercase tracking-widest">
+                        Most Popular
+                      </div>
+                    )}
+                    <div className="space-y-6">
+                      <div className="space-y-2">
+                        <h3 className={`text-2xl font-bold ${plan.color}`}>{plan.name}</h3>
+                        <div className="flex items-baseline gap-1">
+                          <span className="text-4xl font-bold text-white">${plan.price}</span>
+                          <span className="text-sm text-white/40">{plan.period}</span>
+                        </div>
+                        <p className="text-sm text-white/60 leading-relaxed">{plan.desc}</p>
+                      </div>
+                      <div className="space-y-4">
+                        {plan.features.map((feature, j) => (
+                          <div key={j} className="flex items-center gap-3">
+                            <CheckCircle2 className={`w-4 h-4 ${plan.popular ? 'text-neon-cyan' : 'text-white/20'}`} />
+                            <span className="text-sm text-white/80">{feature}</span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                    <Button 
+                      onClick={() => setStep('login')} 
+                      variant={plan.variant as any}
+                      className="w-full py-4"
+                    >
+                      {plan.cta}
+                    </Button>
+                  </div>
+                ))}
               </div>
-              <Button onClick={() => setStep('landing')} variant="outline">Back to Home</Button>
+
+              <div className="glass-panel p-12 border-neon-cyan/20 relative overflow-hidden group text-center space-y-8">
+                <div className="absolute inset-0 bg-gradient-to-br from-neon-cyan/5 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-1000" />
+                <div className="relative z-10 space-y-6">
+                  <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-neon-lime/10 border border-neon-lime/20 text-neon-lime text-[10px] font-bold uppercase tracking-widest">
+                    <Zap className="w-3 h-3" />
+                    Limited Time Launch Offer
+                  </div>
+                  <h3 className="text-4xl font-bold">The Founder's <span className="text-neon-lime italic">Lifetime Pass</span></h3>
+                  <p className="text-lg text-white/60 max-w-2xl mx-auto leading-relaxed">
+                    Be one of the first 500 professionals to join the movement. Get lifetime access to all Pro features for a single one-time investment.
+                  </p>
+                  <div className="flex flex-col items-center gap-4">
+                    <div className="flex items-baseline gap-2">
+                      <span className="text-5xl font-bold text-neon-lime">$199</span>
+                      <span className="text-white/40 line-through text-xl">$999 Value</span>
+                    </div>
+                    <Button 
+                      onClick={() => setStep('login')} 
+                      variant="neon"
+                      className="px-12 py-6 text-lg bg-neon-lime border-neon-lime text-black shadow-[0_0_30px_rgba(0,255,0,0.2)]"
+                    >
+                      Secure Your Legacy
+                    </Button>
+                    <p className="text-xs text-white/40 uppercase tracking-widest">Only 142 slots remaining</p>
+                  </div>
+                </div>
+              </div>
+
+              <div className="flex flex-col items-center gap-8">
+                <button 
+                  onClick={() => setStep('landing')}
+                  className="text-white/40 hover:text-white transition-colors flex items-center gap-2 text-sm font-bold uppercase tracking-widest"
+                >
+                  <ArrowRight className="w-4 h-4 rotate-180" />
+                  Back to Home
+                </button>
+              </div>
             </motion.div>
           )}
 
@@ -1631,6 +2396,27 @@ export function SPARKWavvApp({ isAdmin = false }: { isAdmin?: boolean }) {
                     >
                       Delete Account
                     </Button>
+                  </section>
+
+                  <section className="glass-panel p-8 border-neon-cyan/20 space-y-6">
+                    <h3 className="text-xl font-bold text-neon-cyan flex items-center gap-2">
+                      <Zap className="w-5 h-5" /> Developer Tools
+                    </h3>
+                    <div className="flex items-center justify-between p-4 rounded-xl bg-white/5 border border-white/10">
+                      <div>
+                        <p className="font-bold">Simulate Discovery Upgrade</p>
+                        <p className="text-xs text-white/40">Unlock the Neural Synthesis Engine manually for testing.</p>
+                      </div>
+                      <button 
+                        onClick={() => setDiscoveryUnlocked(!discoveryUnlocked)}
+                        className={`w-12 h-6 rounded-full transition-colors relative ${discoveryUnlocked ? 'bg-neon-cyan' : 'bg-white/10'}`}
+                      >
+                        <motion.div 
+                          animate={{ x: discoveryUnlocked ? 24 : 4 }}
+                          className="absolute top-1 w-4 h-4 bg-white rounded-full"
+                        />
+                      </button>
+                    </div>
                   </section>
                 </div>
               </div>
@@ -2387,10 +3173,16 @@ export function SPARKWavvApp({ isAdmin = false }: { isAdmin?: boolean }) {
         </AnimatePresence>
       </main>
 
-      <Footer onNavigate={(s) => setStep(s as Step)} />
+      <Footer onNavigate={(s) => {
+        window.scrollTo(0, 0);
+        setStep(s as Step);
+      }} />
       
       {/* Skylar AI Integration */}
-      {!isAdmin && <SkylarSidebar onLogin={() => setStep('login')} />}
+      {!isAdmin && <SkylarSidebar onLogin={() => {
+        window.scrollTo(0, 0);
+        setStep('login');
+      }} />}
       {!isAdmin && (
         <EveningSpark 
           energyTrough={dashboardData?.energyTrough} 
@@ -2472,6 +3264,14 @@ export default function Root() {
   );
 }
 
+function ScrollToTop() {
+  const { pathname } = useLocation();
+  useEffect(() => {
+    window.scrollTo(0, 0);
+  }, [pathname]);
+  return null;
+}
+
 function App() {
   const { user, role, status, loading, error, refreshIdentity } = useIdentity();
   const [showRetry, setShowRetry] = useState(false);
@@ -2486,7 +3286,7 @@ function App() {
     return () => clearTimeout(timer);
   }, [status]);
 
-  if (loading || status === 'initializing' || (status === 'authenticated' && !role)) {
+  if (loading || status === 'initializing') {
     return (
       <div className="min-h-screen flex flex-col items-center justify-center bg-[#050505] text-white p-6">
         <div className="relative mb-8">
@@ -2537,6 +3337,7 @@ function App() {
 
   return (
     <Router>
+      <ScrollToTop />
       <Routes>
         <Route path="/admin/login" element={<AdminLogin vibe="technical" onLogin={() => window.location.href = '/admin'} />} />
         <Route path="/operations/login" element={<AdminLogin vibe="vibrant" onLogin={() => window.location.href = '/operations'} />} />
@@ -2571,6 +3372,9 @@ function App() {
         <Route path="/partner-dashboard" element={<PartnerDashboard />} />
         <Route path="/accept-invitation/:token" element={<AcceptInvitation />} />
         <Route path="/profile" element={<ProfilePage />} />
+        <Route path="/privacy" element={<PrivacyPolicy />} />
+        <Route path="/terms" element={<TermsOfService />} />
+        <Route path="/cookies" element={<CookieSettings />} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     </Router>

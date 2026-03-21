@@ -34,10 +34,9 @@ const navItems: NavItem[] = [
       { label: 'About Us', href: 'company-about' },
       { label: 'Investors', href: 'company-investors' },
       { label: 'Give a Little', href: 'company-give' },
-      { label: 'Testimonials', href: 'company-testimonials' },
     ]
   },
-  { label: 'Pricing', href: '#pricing' },
+  { label: 'Pricing', href: 'pricing' },
 ];
 
 interface NavBarProps {

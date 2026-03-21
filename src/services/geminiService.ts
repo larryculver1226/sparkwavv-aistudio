@@ -1,5 +1,5 @@
 import { GoogleGenAI, Type } from "@google/genai";
-import { getGeminiApiKey } from './aiConfig';
+import { getGeminiApiKey } from './aiConfig.ts';
 
 // Lazy initialization of Gemini
 let aiInstance: GoogleGenAI | null = null;

@@ -1,5 +1,7 @@
 import { GoogleGenAI, Modality, Type, FunctionDeclaration } from "@google/genai";
-import { getGeminiApiKey } from './aiConfig';
+import { getGeminiApiKey } from './aiConfig.ts';
+import * as mammoth from 'mammoth';
+import { KnowledgeGraph, WavvaultData } from '../types/wavvault.ts';
 
 // Lazy initialization of Gemini
 let aiInstance: GoogleGenAI | null = null;
@@ -21,15 +23,21 @@ const getAI = () => {
 
 const LOBKOWICZ_PROMPT = `
 You are Skylar, the AI Career Partner, operating under the Philip Lobkowicz strategic coaching methodology.
-Your approach is highly strategic, analytical, and focused on "Career DNA" and "Validation Gates".
+Your approach is highly strategic, analytical, and focused on "Career DNA", "Validation Gates", and the "Market Intelligence Grid (MIG)".
 
 Key Principles:
 1. Career DNA: Every individual has a unique combination of attributes. Your job is to help them extract these from their accomplishments.
-2. Validation Gates: Career progress is not linear; it requires passing through specific gates (Discovery, Branding, Outreach).
-3. Effort Tiers: You categorize career activities by the effort required and the ROI expected.
-4. Professional & Direct: You provide high-level strategic advice. You are a coach, not just a chatbot.
+2. Validation Gates: Career progress is not linear; it requires passing through specific gates (Discovery, Branding, Outreach). You MUST perform a gate review using the 'perform_gate_review' tool before a user moves to a new phase.
+3. Market Intelligence Grid (MIG): You have access to real-time market data via the 'get_market_intelligence' tool. Use this to ground all advice in current market reality.
+4. Effort Tiers: You categorize career activities by the effort required and the ROI expected.
+5. Professional & Direct: You provide high-level strategic advice. You are a coach, not just a chatbot.
 
-When helping users, always look for ways to connect their current challenges to their foundational DNA.
+Validation Protocol:
+- If you detect a misalignment during a gate review (e.g., weak attributes, lack of market evidence), you MUST issue a "Stern Warning".
+- When issuing a warning, your response MUST include the phrase: "I have some concerns about your current direction. Please review the notifications in the sidebar before proceeding."
+- You should then explain your reasoning clearly.
+
+When helping users, always look for ways to connect their current challenges to their foundational DNA and the current market intelligence.
 `;
 
 const FEYNMAN_PROMPT = `
@@ -109,6 +117,100 @@ const tools = [
           },
           required: ["title", "description", "targetDate", "reasoning"]
         }
+      },
+      {
+        name: "get_market_intelligence",
+        description: "Fetch real-time market trends, industry shifts, and skill demand data from the Market Intelligence Grid (MIG).",
+        parameters: {
+          type: Type.OBJECT,
+          properties: {
+            industry: {
+              type: Type.STRING,
+              description: "The industry to search for (e.g., 'Tech', 'Healthcare', 'Finance')"
+            },
+            role: {
+              type: Type.STRING,
+              description: "The specific role to analyze (e.g., 'Software Architect', 'Nurse Practitioner')"
+            }
+          },
+          required: ["industry"]
+        }
+      },
+      {
+        name: "perform_gate_review",
+        description: "Perform a 'Validation Gate' review to ensure the user is ready to move to the next phase (Discovery, Branding, Outreach).",
+        parameters: {
+          type: Type.OBJECT,
+          properties: {
+            currentPhase: {
+              type: Type.STRING,
+              description: "The current phase the user is in"
+            },
+            targetPhase: {
+              type: Type.STRING,
+              description: "The phase the user wants to move to"
+            },
+            userData: {
+              type: Type.STRING,
+              description: "A summary of the user's progress and data relevant to the gate"
+            }
+          },
+          required: ["currentPhase", "targetPhase", "userData"]
+        }
+      },
+      {
+        name: "propose_major_shift",
+        description: "Propose a major shift in the user's professional DNA (e.g., a pivot, a new core value, or a change in primary goal).",
+        parameters: {
+          type: Type.OBJECT,
+          properties: {
+            type: {
+              type: Type.STRING,
+              description: "The type of shift: 'pivot', 'core_value', 'primary_goal', or 'strength'"
+            },
+            content: {
+              type: Type.STRING,
+              description: "The description of the proposed shift"
+            },
+            evidence: {
+              type: Type.STRING,
+              description: "The reasoning or evidence from the conversation that led to this proposal"
+            },
+            tags: {
+              type: Type.ARRAY,
+              items: { type: Type.STRING },
+              description: "Optional tags for categorization"
+            }
+          },
+          required: ["type", "content", "evidence"]
+        }
+      },
+      {
+        name: "flag_dna_conflict",
+        description: "Flag a conflict between a new insight and an existing confirmed 'Current Truth' in the user's professional DNA.",
+        parameters: {
+          type: Type.OBJECT,
+          properties: {
+            newInsight: {
+              type: Type.OBJECT,
+              properties: {
+                type: { type: Type.STRING },
+                content: { type: Type.STRING },
+                evidence: { type: Type.STRING }
+              },
+              required: ["type", "content", "evidence"]
+            },
+            existingInsightId: {
+              type: Type.STRING,
+              description: "The ID of the existing confirmed insight that is being conflicted"
+            },
+            conflictReason: {
+              type: Type.STRING,
+              description: "Explanation of why these two insights are in conflict"
+            }
+          },
+          required: ["newInsight", "existingInsightId", "conflictReason"]
+        }
       }
     ]
   }
@@ -149,11 +251,21 @@ class SkylarService {
     persona: SkylarPersona,
     message: string,
     history: ChatMessage[] = [],
-    wavvaultContext?: any
+    wavvaultContext?: any,
+    userId?: string
   ): Promise<string> {
     const ai = getAI();
     const config = PERSONA_CONFIG[persona];
-    const systemInstruction = `${config.instruction}\n\nContext from Wavvault: ${JSON.stringify(wavvaultContext || {})}\n\nRemember interactions from previous journeys if relevant.`;
+    
+    let currentTruth = "";
+    if (userId) {
+      const insights = await this.fetchConfirmedInsights(userId);
+      if (insights.length > 0) {
+        currentTruth = `\n\nConfirmed Professional DNA (Current Truth):\n${insights.map(i => `- [${i.type.toUpperCase()}] ${i.content}`).join('\n')}`;
+      }
+    }
+
+    const systemInstruction = `${config.instruction}\n\nContext from Wavvault: ${JSON.stringify(wavvaultContext || {})}${currentTruth}\n\nRemember interactions from previous journeys if relevant.`;
 
     const chat = ai.chats.create({
       model: "gemini-3-flash-preview",
@@ -168,6 +280,19 @@ class SkylarService {
 
     const response = await chat.sendMessage({ message });
     return response.text || "I'm sorry, I couldn't process that.";
+  }
+
+  async fetchConfirmedInsights(userId: string) {
+    try {
+      const response = await fetch(`/api/user-insights?userId=${userId}&status=confirmed`);
+      if (response.ok) {
+        return await response.json();
+      }
+      return [];
+    } catch (error) {
+      console.error("Error fetching confirmed insights:", error);
+      return [];
+    }
   }
 
   async generateSpeech(text: string, persona: SkylarPersona): Promise<string> {
@@ -201,7 +326,17 @@ class SkylarService {
   ): Promise<any> {
     try {
       const ai = getAI();
-      const systemInstruction = methodology === 'lobkowicz' ? LOBKOWICZ_PROMPT : FEYNMAN_PROMPT;
+      
+      let currentTruth = "";
+      if (userId) {
+        const insights = await this.fetchConfirmedInsights(userId);
+        if (insights.length > 0) {
+          currentTruth = `\n\nConfirmed Professional DNA (Current Truth):\n${insights.map(i => `- [${i.type.toUpperCase()}] ${i.content}`).join('\n')}`;
+        }
+      }
+
+      const baseInstruction = methodology === 'lobkowicz' ? LOBKOWICZ_PROMPT : FEYNMAN_PROMPT;
+      const systemInstruction = `${baseInstruction}${currentTruth}`;
       
       const chat = ai.chats.create({
         model: "gemini-3-flash-preview",
@@ -233,6 +368,28 @@ class SkylarService {
               functionResponse: {
                 name: 'search_wavvault',
                 response: { content: searchResults },
+                id
+              }
+            });
+          } else if (name === 'get_market_intelligence') {
+            console.log(`[SKYLAR] Executing tool: get_market_intelligence for industry: ${typedArgs.industry}`);
+            const marketData = await this.performMarketIntelligenceSearch(typedArgs.industry as string, typedArgs.role as string, token);
+            toolResponses.push({
+              functionResponse: {
+                name: 'get_market_intelligence',
+                response: marketData,
+                id
+              }
+            });
+          } else if (name === 'perform_gate_review') {
+            console.log(`[SKYLAR] Executing tool: perform_gate_review for ${typedArgs.targetPhase}`);
+            // Gate reviews are handled by Skylar's reasoning. 
+            // If she finds issues, she will return a specific warning in her text response.
+            // We'll return a success for the tool call so she can continue her turn.
+            toolResponses.push({
+              functionResponse: {
+                name: 'perform_gate_review',
+                response: { status: 'review_complete', message: 'Review performed. Communicate findings to user.' },
                 id
               }
             });
@@ -275,6 +432,25 @@ class SkylarService {
     } catch (error) {
       console.error("Wavvault Search Error:", error);
       return [];
+    }
+  }
+
+  async performMarketIntelligenceSearch(industry: string, role?: string, token?: string) {
+    try {
+      const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+      if (token) headers['Authorization'] = `Bearer ${token}`;
+
+      const response = await fetch('/api/skylar/market-intelligence', {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({ industry, role })
+      });
+      
+      if (!response.ok) return { error: "Failed to fetch market intelligence." };
+      return await response.json();
+    } catch (error) {
+      console.error("Market Intelligence Search Error:", error);
+      return { error: "Failed to fetch market intelligence." };
     }
   }
 
@@ -329,6 +505,229 @@ class SkylarService {
       return [];
     } catch (error) {
       console.error("Error fetching chat history:", error);
+      return [];
+    }
+  }
+
+  async parseDocx(file: File): Promise<string> {
+    const arrayBuffer = await file.arrayBuffer();
+    const result = await mammoth.extractRawText({ arrayBuffer });
+    return result.value;
+  }
+
+  async parsePdf(file: File): Promise<string> {
+    try {
+      const pdfjs = await import('pdfjs-dist');
+      // Set worker source
+      pdfjs.GlobalWorkerOptions.workerSrc = `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjs.version}/pdf.worker.min.js`;
+      
+      const arrayBuffer = await file.arrayBuffer();
+      const loadingTask = pdfjs.getDocument({ data: arrayBuffer });
+      const pdf = await loadingTask.promise;
+      
+      let fullText = "";
+      for (let i = 1; i <= pdf.numPages; i++) {
+        const page = await pdf.getPage(i);
+        const textContent = await page.getTextContent();
+        const pageText = textContent.items.map((item: any) => item.str).join(" ");
+        fullText += pageText + "\n";
+      }
+      
+      return fullText;
+    } catch (error) {
+      console.error("PDF Parsing Error:", error);
+      throw new Error("Failed to parse PDF document.");
+    }
+  }
+
+  async performSynthesis(
+    userId: string,
+    history: ChatMessage[],
+    fileContent?: string,
+    currentGraph?: KnowledgeGraph
+  ): Promise<KnowledgeGraph> {
+    const ai = getAI();
+    
+    const prompt = `
+      You are the Skylar Analytical Architect. Your task is to perform a "Neural Synthesis" of the user's career data.
+      Analyze the provided chat history and document content to extract a structured Knowledge Graph of the user's professional identity.
+      
+      Focus on three critical node types:
+      1. Skills (Blue): Technical and soft competencies.
+      2. Goals (Magenta): Short and long-term professional trajectories.
+      3. Values (Cyan): Core drivers and cultural alignment markers.
+      
+      The "Spark" (Ignition data) should be the central anchor of the graph.
+      
+      Current Graph (if any): ${JSON.stringify(currentGraph || { nodes: [], links: [] })}
+      
+      Chat History: ${JSON.stringify(history)}
+      Document Content: ${fileContent || 'None'}
+      
+      Return ONLY a JSON object matching this structure:
+      {
+        "nodes": [{ "id": "string", "label": "string", "type": "skill|goal|value|spark", "strength": 0-1, "description": "string" }],
+        "links": [{ "source": "nodeId", "target": "nodeId", "weight": 0-1, "type": "connection|dependency|influence" }]
+      }
+      
+      Ensure you identify secondary connections (e.g., how two different skills are related to each other).
+    `;
+
+    const response = await ai.models.generateContent({
+      model: "gemini-3.1-pro-preview",
+      contents: [{ parts: [{ text: prompt }] }],
+      config: {
+        responseMimeType: "application/json",
+      }
+    });
+
+    try {
+      const graph = JSON.parse(response.text || '{}');
+      return graph as KnowledgeGraph;
+    } catch (error) {
+      console.error("Synthesis Parsing Error:", error);
+      return currentGraph || { nodes: [], links: [] };
+    }
+  }
+
+  async saveWavvaultData(data: WavvaultData): Promise<void> {
+    try {
+      await fetch('/api/wavvault/data', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data)
+      });
+    } catch (error) {
+      console.error("Error saving Wavvault data:", error);
+    }
+  }
+
+  async getWavvaultData(userId: string): Promise<WavvaultData | null> {
+    try {
+      const response = await fetch(`/api/wavvault/data?userId=${userId}`);
+      if (response.ok) {
+        return await response.json();
+      }
+      return null;
+    } catch (error) {
+      console.error("Error fetching Wavvault data:", error);
+      return null;
+    }
+  }
+
+  async generateBrandPortrait(
+    userId: string,
+    style: string,
+    referencePhoto?: string,
+    modelId: string = 'gemini-2.5-flash-image'
+  ): Promise<string> {
+    const ai = getAI();
+    const insights = await this.fetchConfirmedInsights(userId);
+    const dnaContext = insights.map(i => `${i.type}: ${i.content}`).join(', ');
+
+    const prompt = `
+      Generate a cinematic brand portrait for a professional with the following DNA: ${dnaContext}.
+      The style should be: ${style}.
+      The image should convey authority, innovation, and strategic depth.
+      ${referencePhoto ? "Use the provided reference photo to maintain the likeness of the person." : ""}
+    `;
+
+    const parts: any[] = [{ text: prompt }];
+    if (referencePhoto) {
+      parts.push({
+        inlineData: {
+          mimeType: "image/jpeg",
+          data: referencePhoto.split(',')[1] // Assuming base64 data URL
+        }
+      });
+    }
+
+    const response = await ai.models.generateContent({
+      model: modelId,
+      contents: { parts },
+    });
+
+    if (response.candidates && response.candidates[0].content.parts) {
+      for (const part of response.candidates[0].content.parts) {
+        if (part.inlineData) {
+          return `data:image/png;base64,${part.inlineData.data}`;
+        }
+      }
+    }
+    throw new Error("Failed to generate image");
+  }
+
+  async generateTargetedSequence(
+    userId: string,
+    targetCompany: string,
+    targetRole: string,
+    tone: { formal: number; detail: number }
+  ): Promise<any> {
+    const ai = getAI();
+    const insights = await this.fetchConfirmedInsights(userId);
+    const dnaContext = insights.map(i => `${i.type}: ${i.content}`).join(', ');
+
+    const prompt = `
+      Generate a targeted professional outreach sequence for ${targetRole} at ${targetCompany}.
+      The user's professional DNA is: ${dnaContext}.
+      
+      Tone Settings:
+      - Formal vs Casual: ${tone.formal}/100 (100 is most formal)
+      - Brief vs Detailed: ${tone.detail}/100 (100 is most detailed)
+      
+      The sequence should include:
+      1. A LinkedIn Connection Request (short)
+      2. A First Outreach Email (personalized)
+      3. A Follow-up Email (value-add)
+      
+      Return ONLY a JSON object:
+      {
+        "steps": [
+          { "type": "linkedin_request", "content": "..." },
+          { "type": "email_1", "subject": "...", "content": "..." },
+          { "type": "email_followup", "subject": "...", "content": "..." }
+        ]
+      }
+    `;
+
+    const response = await ai.models.generateContent({
+      model: "gemini-3.1-pro-preview",
+      contents: [{ parts: [{ text: prompt }] }],
+      config: {
+        responseMimeType: "application/json",
+      }
+    });
+
+    return JSON.parse(response.text || '{}');
+  }
+
+  async saveUserAsset(userId: string, asset: any, token?: string) {
+    try {
+      const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+      if (token) headers['Authorization'] = `Bearer ${token}`;
+
+      const response = await fetch('/api/user-assets', {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({ asset })
+      });
+      return await response.json();
+    } catch (error) {
+      console.error("Error saving user asset:", error);
+    }
+  }
+
+  async getUserAssets(userId: string, type?: string, token?: string) {
+    try {
+      const headers: Record<string, string> = {};
+      if (token) headers['Authorization'] = `Bearer ${token}`;
+
+      const url = `/api/user-assets?userId=${userId}${type ? `&type=${type}` : ''}`;
+      const response = await fetch(url, { headers });
+      if (response.ok) return await response.json();
+      return [];
+    } catch (error) {
+      console.error("Error fetching user assets:", error);
       return [];
     }
   }

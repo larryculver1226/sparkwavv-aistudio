@@ -28,8 +28,8 @@ import { useLocation } from 'react-router-dom';
 type Methodology = 'lobkowicz' | 'feynman';
 
 interface SkylarProposal {
-  type: 'PROPOSAL';
-  action: 'update_dashboard' | 'add_milestone';
+  type: 'PROPOSAL' | 'CONFLICT';
+  action: 'update_dashboard' | 'add_milestone' | 'propose_major_shift' | 'flag_dna_conflict';
   data: any;
   reasoning: string;
 }
@@ -50,6 +50,8 @@ export const SkylarSidebar: React.FC<SkylarSidebarProps> = ({ onLogin }) => {
   const [proposals, setProposals] = useState<Record<number, SkylarProposal>>({});
   const [executedActions, setExecutedActions] = useState<Record<number, boolean>>({});
   const [error, setError] = useState<string | null>(null);
+  const [activeTab, setActiveTab] = useState<'chat' | 'alerts'>('chat');
+  const [alerts, setAlerts] = useState<any[]>([]);
   const { user } = useIdentity();
   const location = useLocation();
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -175,17 +177,20 @@ export const SkylarSidebar: React.FC<SkylarSidebarProps> = ({ onLogin }) => {
 
       let responseText = textPart?.text || "";
       
-      if (functionCallPart && functionCallPart.functionCall.name.startsWith('propose_')) {
+      if (functionCallPart) {
         const { name, args } = functionCallPart.functionCall;
-        const proposal: SkylarProposal = {
-          type: 'PROPOSAL',
-          action: name === 'propose_dashboard_update' ? 'update_dashboard' : 'add_milestone',
-          data: args,
-          reasoning: (args as any).reasoning || "Skylar suggests this based on your conversation."
-        };
         
-        const messageIndex = messages.length + 1;
-        setProposals(prev => ({ ...prev, [messageIndex]: proposal }));
+        if (name.startsWith('propose_') || name === 'flag_dna_conflict') {
+          const proposal: SkylarProposal = {
+            type: name === 'flag_dna_conflict' ? 'CONFLICT' : 'PROPOSAL',
+            action: name as any,
+            data: args,
+            reasoning: (args as any).reasoning || (args as any).conflictReason || "Skylar suggests this based on your conversation."
+          };
+          
+          const messageIndex = messages.length + 1;
+          setProposals(prev => ({ ...prev, [messageIndex]: proposal }));
+        }
       }
 
       const modelMessage: ChatMessage = {
@@ -199,7 +204,25 @@ export const SkylarSidebar: React.FC<SkylarSidebarProps> = ({ onLogin }) => {
         return updatedMessages;
       });
       
-      if (responseText && responseText.length < 200) {
+      // Check for warning phrase
+      const warningPhrase = "I have some concerns about your current direction. Please review the notifications in the sidebar before proceeding.";
+      if (responseText.includes(warningPhrase)) {
+        // 1. Trigger TTS automatically
+        handleSpeak(warningPhrase);
+        
+        // 2. Add to alerts
+        const newAlert = {
+          id: Date.now(),
+          type: 'validation_warning',
+          message: responseText.split(warningPhrase)[1]?.trim() || "Validation Gate misalignment detected. Skylar recommends a strategic review.",
+          timestamp: new Date().toISOString(),
+          status: 'pending'
+        };
+        setAlerts(prev => [newAlert, ...prev]);
+        
+        // 3. Switch to alerts tab
+        setActiveTab('alerts');
+      } else if (responseText && responseText.length < 200) {
         handleSpeak(responseText);
       }
     } catch (error: any) {
@@ -223,18 +246,110 @@ export const SkylarSidebar: React.FC<SkylarSidebarProps> = ({ onLogin }) => {
     try {
       const token = await user.getIdToken();
       
-      await skylar.executeAction(uid, proposal.action, proposal.data, token);
+      if (proposal.action === 'propose_major_shift') {
+        const insight = {
+          type: proposal.data.type,
+          content: proposal.data.content,
+          evidence: proposal.data.evidence,
+          tags: proposal.data.tags || [],
+          status: 'confirmed',
+          timestamp: new Date().toISOString()
+        };
+        await fetch('/api/user-insights', {
+          method: 'POST',
+          headers: { 
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`
+          },
+          body: JSON.stringify({ insight })
+        });
+      } else if (proposal.action === 'flag_dna_conflict') {
+        // 1. Mark existing as superseded
+        const existingInsightId = proposal.data.existingInsightId;
+        const existingResponse = await fetch(`/api/user-insights`, {
+          headers: { 'Authorization': `Bearer ${token}` }
+        });
+        const allInsights = await existingResponse.json();
+        const existing = allInsights.find((i: any) => i.id === existingInsightId);
+        
+        if (existing) {
+          await fetch('/api/user-insights', {
+            method: 'POST',
+            headers: { 
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${token}`
+            },
+            body: JSON.stringify({ 
+              insight: { ...existing, status: 'superseded' } 
+            })
+          });
+        }
+
+        // 2. Add new insight as confirmed
+        const newInsight = {
+          ...proposal.data.newInsight,
+          status: 'confirmed',
+          timestamp: new Date().toISOString(),
+          conflictWith: existingInsightId
+        };
+        await fetch('/api/user-insights', {
+          method: 'POST',
+          headers: { 
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`
+          },
+          body: JSON.stringify({ insight: newInsight })
+        });
+      } else {
+        await skylar.executeAction(uid, proposal.action, proposal.data, token);
+      }
+      
       setExecutedActions(prev => ({ ...prev, [index]: true }));
       
       // Add a confirmation message from Skylar
       const confirmationMsg: ChatMessage = {
         role: 'model',
-        parts: [{ text: `✅ Action confirmed: ${proposal.action === 'update_dashboard' ? 'Dashboard updated' : 'Milestone added'}.` }]
+        parts: [{ text: `✅ Action confirmed: ${
+          proposal.action === 'update_dashboard' ? 'Dashboard updated' : 
+          proposal.action === 'add_milestone' ? 'Milestone added' :
+          proposal.action === 'propose_major_shift' ? 'New insight confirmed' :
+          'Conflict resolved and insight updated'
+        }.` }]
       };
       setMessages(prev => [...prev, confirmationMsg]);
     } catch (error: any) {
       console.error("Action execution failed:", error);
       setError(error.message || "Failed to execute action.");
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleBypass = async (alertId: number) => {
+    if (!user) return;
+    setIsLoading(true);
+    try {
+      const token = await user.getIdToken();
+      await fetch('/api/skylar/request-validation', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({ userId: user.uid, reason: 'User bypassed soft gate warning.' })
+      });
+      
+      setAlerts(prev => prev.map(a => a.id === alertId ? { ...a, status: 'bypassed' } : a));
+      
+      // Add a confirmation message from Skylar
+      const confirmationMsg: ChatMessage = {
+        role: 'model',
+        parts: [{ text: "⚠️ Validation bypassed. A human mentor has been notified to review your progress. You may continue, but please check the 'Human Mentor' section on your dashboard for feedback later." }]
+      };
+      setMessages(prev => [...prev, confirmationMsg]);
+      setActiveTab('chat');
+    } catch (error) {
+      console.error("Bypass failed:", error);
     } finally {
       setIsLoading(false);
     }
@@ -295,40 +410,67 @@ export const SkylarSidebar: React.FC<SkylarSidebarProps> = ({ onLogin }) => {
             className="fixed top-0 right-0 z-40 w-full sm:w-[400px] h-full bg-[#0a0a0a] border-l border-white/10 flex flex-col shadow-2xl"
           >
             {/* Header */}
-            <div className="p-6 border-b border-white/10 bg-white/[0.02] flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${isSpeaking ? 'bg-neon-cyan text-black animate-pulse' : 'bg-white/5 text-neon-cyan'}`}>
-                  {getPersonaIcon()}
-                </div>
-                <div>
-                  <h3 className="text-sm font-bold text-white">{PERSONA_CONFIG[persona].name}</h3>
-                  <div className="flex items-center gap-2 mt-1">
-                    <Settings2 className="w-3 h-3 text-white/20" />
-                    <select 
-                      value={methodology}
-                      onChange={(e) => setMethodology(e.target.value as Methodology)}
-                      className="bg-transparent text-[10px] text-white/40 uppercase font-bold tracking-widest outline-none cursor-pointer hover:text-neon-cyan transition-colors"
-                    >
-                      <option value="lobkowicz" className="bg-[#0a0a0a]">Philip Lobkowicz</option>
-                      <option value="feynman" disabled className="bg-[#0a0a0a]">Richard Feynman (Coming Soon)</option>
-                    </select>
+            <div className="p-6 border-b border-white/10 bg-white/[0.02] flex flex-col gap-4">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${isSpeaking ? 'bg-neon-cyan text-black animate-pulse' : 'bg-white/5 text-neon-cyan'}`}>
+                    {getPersonaIcon()}
+                  </div>
+                  <div>
+                    <h3 className="text-sm font-bold text-white">{PERSONA_CONFIG[persona].name}</h3>
+                    <div className="flex items-center gap-2 mt-1">
+                      <Settings2 className="w-3 h-3 text-white/20" />
+                      <select 
+                        value={methodology}
+                        onChange={(e) => setMethodology(e.target.value as Methodology)}
+                        className="bg-transparent text-[10px] text-white/40 uppercase font-bold tracking-widest outline-none cursor-pointer hover:text-neon-cyan transition-colors"
+                      >
+                        <option value="lobkowicz" className="bg-[#0a0a0a]">Philip Lobkowicz</option>
+                        <option value="feynman" disabled className="bg-[#0a0a0a]">Richard Feynman (Coming Soon)</option>
+                      </select>
+                    </div>
                   </div>
                 </div>
+                <button 
+                  onClick={() => setIsOpen(false)} 
+                  className="w-10 h-10 rounded-full flex items-center justify-center text-white/40 hover:text-white hover:bg-white/5 transition-all"
+                  title="Close Chat"
+                >
+                  <X className="w-6 h-6" />
+                </button>
               </div>
-              <button 
-                onClick={() => setIsOpen(false)} 
-                className="w-10 h-10 rounded-full flex items-center justify-center text-white/40 hover:text-white hover:bg-white/5 transition-all"
-                title="Close Chat"
-              >
-                <X className="w-6 h-6" />
-              </button>
+
+              {/* Tabs */}
+              <div className="flex p-1 bg-white/5 rounded-lg">
+                <button 
+                  onClick={() => setActiveTab('chat')}
+                  className={`flex-1 flex items-center justify-center gap-2 py-2 text-xs font-medium rounded-md transition-all ${activeTab === 'chat' ? 'bg-white/10 text-white shadow-lg' : 'text-white/40 hover:text-white/60'}`}
+                >
+                  <MessageSquare className="w-4 h-4" />
+                  Chat
+                </button>
+                <button 
+                  onClick={() => setActiveTab('alerts')}
+                  className={`flex-1 flex items-center justify-center gap-2 py-2 text-xs font-medium rounded-md transition-all relative ${activeTab === 'alerts' ? 'bg-white/10 text-white shadow-lg' : 'text-white/40 hover:text-white/60'}`}
+                >
+                  <AlertCircle className="w-4 h-4" />
+                  Alerts
+                  {alerts.some(a => a.status === 'pending') && (
+                    <span className="absolute top-1 right-2 w-2 h-2 bg-neon-magenta rounded-full animate-pulse" />
+                  )}
+                </button>
+              </div>
             </div>
 
-            {/* Messages */}
-            <div 
-              ref={scrollRef}
-              className="flex-1 overflow-y-auto p-6 space-y-6 custom-scrollbar"
-            >
+            {/* Content Area */}
+            <div className="flex-1 overflow-hidden flex flex-col">
+              {activeTab === 'chat' ? (
+                <>
+                  {/* Messages */}
+                  <div 
+                    ref={scrollRef}
+                    className="flex-1 overflow-y-auto p-6 space-y-6 custom-scrollbar"
+                  >
               {messages.length === 0 && (
                 <div className="text-center py-12 space-y-4">
                   <div className="w-16 h-16 rounded-full bg-neon-cyan/10 flex items-center justify-center mx-auto">
@@ -377,9 +519,19 @@ export const SkylarSidebar: React.FC<SkylarSidebarProps> = ({ onLogin }) => {
                         <p className="text-xs font-bold text-white">
                           {proposals[i].action === 'update_dashboard' 
                             ? `Update ${proposals[i].data.field} to "${proposals[i].data.value}"`
-                            : `Add Milestone: ${proposals[i].data.title}`
+                            : proposals[i].action === 'add_milestone'
+                            ? `Add Milestone: ${proposals[i].data.title}`
+                            : proposals[i].action === 'propose_major_shift'
+                            ? `New Insight: ${proposals[i].data.content}`
+                            : `Resolve Conflict: ${proposals[i].data.newInsight.content}`
                           }
                         </p>
+                        {proposals[i].action === 'flag_dna_conflict' && (
+                          <div className="p-2 bg-red-500/10 border border-red-500/20 rounded-lg mb-2">
+                            <p className="text-[10px] text-red-400 font-bold uppercase mb-1">Conflict Detected</p>
+                            <p className="text-[10px] text-white/40 line-through">Old: {proposals[i].data.existingInsightContent}</p>
+                          </div>
+                        )}
                         <p className="text-[10px] text-white/60 leading-relaxed italic">
                           "{proposals[i].reasoning}"
                         </p>
@@ -437,48 +589,127 @@ export const SkylarSidebar: React.FC<SkylarSidebarProps> = ({ onLogin }) => {
                 </div>
               )}
             </div>
-
-            {/* Input */}
-            <div className="p-6 border-t border-white/10 bg-white/[0.02]">
-              {!user ? (
-                <div className="flex flex-col items-center gap-4 py-2">
-                  <div className="flex items-center gap-2 text-white/40 text-[10px] uppercase font-bold tracking-wider">
-                    <Lock className="w-3 h-3" />
-                    <span>Authentication Required</span>
+          </>
+        ) : (
+            /* Alerts Tab */
+            <div className="flex-1 overflow-y-auto p-6 space-y-4 custom-scrollbar">
+              <div className="flex items-center justify-between mb-2">
+                <h4 className="text-xs font-bold text-white/40 uppercase tracking-widest font-mono">System Alerts</h4>
+                <span className="text-[10px] text-white/20">{alerts.length} total</span>
+              </div>
+              
+              {alerts.length === 0 ? (
+                <div className="h-full flex flex-col items-center justify-center text-center p-8">
+                  <div className="w-12 h-12 rounded-full bg-white/5 flex items-center justify-center mb-4">
+                    <CheckCircle2 className="w-6 h-6 text-white/20" />
                   </div>
-                  <button 
-                    onClick={onLogin}
-                    className="w-full py-3 bg-neon-cyan text-black rounded-xl font-bold text-sm hover:shadow-[0_0_20px_rgba(0,255,255,0.3)] transition-all"
-                  >
-                    Login to Chat
-                  </button>
+                  <p className="text-sm text-white/40">No active alerts. Your career path is currently aligned.</p>
                 </div>
               ) : (
-                <div className="relative">
-                  <input 
-                    type="text" 
-                    placeholder="Ask Skylar anything..."
-                    className="w-full bg-black/40 border border-white/10 rounded-2xl px-6 py-4 text-sm focus:border-neon-cyan outline-none pr-24"
-                    value={input}
-                    onChange={e => setInput(e.target.value)}
-                    onKeyPress={e => e.key === 'Enter' && handleSend()}
-                  />
-                  <div className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-2">
+                alerts.map((alert) => (
+                  <div 
+                    key={alert.id}
+                    className={`p-4 rounded-xl border ${alert.status === 'pending' ? 'bg-neon-magenta/5 border-neon-magenta/20' : 'bg-white/5 border-white/10 opacity-60'}`}
+                  >
+                    <div className="flex items-start gap-3">
+                      <div className={`mt-1 p-1.5 rounded-lg ${alert.status === 'pending' ? 'bg-neon-magenta text-white' : 'bg-white/10 text-white/40'}`}>
+                        <AlertCircle className="w-4 h-4" />
+                      </div>
+                      <div className="flex-1">
+                        <div className="flex items-center justify-between mb-1">
+                          <span className={`text-[10px] font-bold uppercase tracking-wider ${alert.status === 'pending' ? 'text-neon-magenta' : 'text-white/40'}`}>
+                            {alert.type.replace('_', ' ')}
+                          </span>
+                          <span className="text-[10px] text-white/20">
+                            {new Date(alert.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                          </span>
+                        </div>
+                        <p className="text-sm text-white/80 mb-3 leading-relaxed">
+                          {alert.message}
+                        </p>
+                        
+                        {alert.status === 'pending' && (
+                          <div className="flex gap-2">
+                            <button 
+                              onClick={() => setActiveTab('chat')}
+                              className="flex-1 py-2 bg-white/10 hover:bg-white/20 text-white text-[10px] font-bold uppercase tracking-wider rounded-lg transition-colors"
+                            >
+                              Review in Chat
+                            </button>
+                            <button 
+                              onClick={() => handleBypass(alert.id)}
+                              className="flex-1 py-2 bg-neon-magenta/20 hover:bg-neon-magenta/30 text-neon-magenta text-[10px] font-bold uppercase tracking-wider rounded-lg transition-colors border border-neon-magenta/30"
+                            >
+                              Proceed Anyway
+                            </button>
+                          </div>
+                        )}
+                        
+                        {alert.status === 'bypassed' && (
+                          <div className="flex items-center gap-2 text-[10px] text-neon-magenta font-bold uppercase tracking-wider">
+                            <CheckCircle2 className="w-3 h-3" />
+                            Validation Pending (Human Review)
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
+          )}
+        </div>
+
+        {/* Input */}
+        <div className="p-6 border-t border-white/10 bg-white/[0.02]">
+              {activeTab === 'chat' ? (
+                !user ? (
+                  <div className="flex flex-col items-center gap-4 py-2">
+                    <div className="flex items-center gap-2 text-white/40 text-[10px] uppercase font-bold tracking-wider">
+                      <Lock className="w-3 h-3" />
+                      <span>Authentication Required</span>
+                    </div>
                     <button 
-                      onClick={toggleListening}
-                      className={`p-2 transition-colors ${isListening ? 'text-neon-cyan animate-pulse' : 'text-white/20 hover:text-neon-cyan'}`}
-                      title={isListening ? 'Listening...' : 'Start Voice-to-Text'}
+                      onClick={onLogin}
+                      className="w-full py-3 bg-neon-cyan text-black rounded-xl font-bold text-sm hover:shadow-[0_0_20px_rgba(0,255,255,0.3)] transition-all"
                     >
-                      <Mic className="w-5 h-5" />
-                    </button>
-                    <button 
-                      onClick={handleSend}
-                      disabled={!input.trim() || isLoading}
-                      className="p-2 bg-neon-cyan text-black rounded-xl hover:scale-105 transition-transform disabled:opacity-50 disabled:scale-100"
-                    >
-                      <Send className="w-5 h-5" />
+                      Login to Chat
                     </button>
                   </div>
+                ) : (
+                  <div className="relative">
+                    <input 
+                      type="text" 
+                      placeholder="Ask Skylar anything..."
+                      className="w-full bg-black/40 border border-white/10 rounded-2xl px-6 py-4 text-sm focus:border-neon-cyan outline-none pr-24"
+                      value={input}
+                      onChange={e => setInput(e.target.value)}
+                      onKeyPress={e => e.key === 'Enter' && handleSend()}
+                    />
+                    <div className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-2">
+                      <button 
+                        onClick={toggleListening}
+                        className={`p-2 transition-colors ${isListening ? 'text-neon-cyan animate-pulse' : 'text-white/20 hover:text-neon-cyan'}`}
+                        title={isListening ? 'Listening...' : 'Start Voice-to-Text'}
+                      >
+                        <Mic className="w-5 h-5" />
+                      </button>
+                      <button 
+                        onClick={handleSend}
+                        disabled={!input.trim() || isLoading}
+                        className="p-2 bg-neon-cyan text-black rounded-xl hover:scale-105 transition-transform disabled:opacity-50 disabled:scale-100"
+                      >
+                        <Send className="w-5 h-5" />
+                      </button>
+                    </div>
+                  </div>
+                )
+              ) : (
+                /* Alerts Tab Footer */
+                <div className="text-center py-2">
+                  <p className="text-[10px] text-white/20">
+                    Validation Gates ensure your career DNA aligns with market reality.
+                  </p>
                 </div>
               )}
               <p className="text-[10px] text-white/20 mt-4 text-center">

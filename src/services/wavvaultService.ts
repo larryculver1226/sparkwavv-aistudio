@@ -4,8 +4,8 @@ import { GoogleGenAI } from "@google/genai";
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
-import { logEvent } from './loggingService';
-import { getGeminiApiKey } from './aiConfig';
+import { logEvent } from './loggingService.ts';
+import { getGeminiApiKey } from './aiConfig.ts';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);

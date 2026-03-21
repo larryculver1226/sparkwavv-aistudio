@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
+import ReactMarkdown from 'react-markdown';
 import { 
   LayoutDashboard, 
   User as UserIcon, 
@@ -29,7 +30,9 @@ import {
   UserPlus,
   Send,
   CheckCircle2,
-  LogOut
+  LogOut,
+  History,
+  Camera
 } from 'lucide-react';
 import { DashboardData, Expense, Milestone } from '../types/dashboard';
 import { useIdentity } from '../contexts/IdentityContext';
@@ -39,9 +42,13 @@ import { auth } from '../lib/firebase';
 import { v4 as uuidv4 } from 'uuid';
 import { InvitationModal } from '../components/InvitationModal';
 import { EveningSpark } from '../components/EveningSpark';
+import { NeuralSynthesisEngine } from '../components/dashboard/NeuralSynthesisEngine';
+import { HighFidelitySynthesisLab } from '../components/skylar/HighFidelitySynthesisLab';
 import { PhaseDetails } from '../components/kickspark/PhaseDetails';
 import { MilestoneRoadmap } from '../components/kickspark/MilestoneRoadmap';
-import { X } from 'lucide-react';
+import { EvolutionVisualizer } from '../components/EvolutionVisualizer';
+import { UserInsight } from '../types/dashboard';
+import { X, Eye, EyeOff } from 'lucide-react';
 
 const MiniGauge: React.FC<{ value: number; label: string; color: string }> = ({ value, label, color }) => {
   const normalizedValue = Math.min(Math.max(value, 0), 100);
@@ -85,6 +92,27 @@ const MiniGauge: React.FC<{ value: number; label: string; color: string }> = ({ 
     </div>
   );
 };
+
+const MentorNote: React.FC<{ note: string; timestamp: string }> = ({ note, timestamp }) => (
+  <motion.div 
+    initial={{ opacity: 0, y: 20 }}
+    animate={{ opacity: 1, y: 0 }}
+    className="p-6 rounded-2xl bg-neon-cyan/5 border border-neon-cyan/20 space-y-4 mb-12"
+  >
+    <div className="flex items-center justify-between">
+      <div className="flex items-center gap-2 text-neon-cyan">
+        <Users className="w-5 h-5" />
+        <h3 className="font-display font-bold text-sm tracking-tight uppercase">Human Mentor Feedback</h3>
+      </div>
+      <span className="text-[10px] text-white/40 font-mono">
+        {new Date(timestamp).toLocaleDateString()} • {new Date(timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+      </span>
+    </div>
+    <div className="prose prose-invert prose-sm max-w-none text-white/80 leading-relaxed">
+      <ReactMarkdown>{note}</ReactMarkdown>
+    </div>
+  </motion.div>
+);
 
 const GaugeChart: React.FC<{ value: number; matrix?: DashboardData['alignmentMatrix'] }> = ({ value, matrix }) => {
   const radius = 85;
@@ -281,11 +309,18 @@ export const UserDashboard: React.FC<{ userId: string; isAdmin?: boolean }> = ({
   const isConfirmed = status === 'authenticated';
   const navigate = useNavigate();
   const [data, setData] = useState<DashboardData | null>(null);
+  const [insights, setInsights] = useState<UserInsight[]>([]);
+  const [showEvolution, setShowEvolution] = useState(false);
+  const [transparencyMode, setTransparencyMode] = useState<'under-the-hood' | 'full'>(
+    (localStorage.getItem('skylar_transparency') as any) || 'under-the-hood'
+  );
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   const [isInvitationModalOpen, setIsInvitationModalOpen] = useState(false);
   const [showRoadmap, setShowRoadmap] = useState(false);
+
+  const [activeView, setActiveView] = useState<'dashboard' | 'synthesis'>('dashboard');
 
   // Prevent admins from viewing their own user dashboard
   useEffect(() => {
@@ -337,8 +372,75 @@ export const UserDashboard: React.FC<{ userId: string; isAdmin?: boolean }> = ({
 
     if (status !== 'initializing' && user) {
       fetchData();
+      fetchInsights();
     }
   }, [userId, user, status]);
+
+  const fetchInsights = async () => {
+    if (!user) return;
+    try {
+      const idToken = await user.getIdToken();
+      const response = await fetch(`/api/user-insights?userId=${userId}`, {
+        headers: { 'Authorization': `Bearer ${idToken}` }
+      });
+      if (response.ok) {
+        const insightsData = await response.json();
+        setInsights(insightsData);
+        
+        // Seed initial DNA if no insights exist
+        if (insightsData.length === 0 && profile) {
+          seedInitialDNA();
+        }
+      }
+    } catch (err) {
+      console.error("Error fetching insights:", err);
+    }
+  };
+
+  const seedInitialDNA = async () => {
+    if (!user || !profile) return;
+    
+    const initialInsights: Partial<UserInsight>[] = [
+      {
+        type: 'primary_goal',
+        content: profile.careerStageRole || 'Defining career trajectory',
+        status: 'confirmed',
+        evidence: 'Initial profile setup',
+        tags: ['initial-dna', 'career-stage']
+      },
+      {
+        type: 'strength',
+        content: profile.brandDNAAttributes?.join(', ') || 'General professional strengths',
+        status: 'confirmed',
+        evidence: 'Initial profile setup',
+        tags: ['initial-dna', 'strengths']
+      }
+    ];
+
+    try {
+      const idToken = await user.getIdToken();
+      for (const insight of initialInsights) {
+        await fetch('/api/user-insights', {
+          method: 'POST',
+          headers: { 
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${idToken}`
+          },
+          body: JSON.stringify({ ...insight, userId })
+        });
+      }
+      // Refresh insights after seeding
+      fetchInsights();
+    } catch (err) {
+      console.error("Error seeding initial DNA:", err);
+    }
+  };
+
+  const toggleTransparency = () => {
+    const newMode = transparencyMode === 'under-the-hood' ? 'full' : 'under-the-hood';
+    setTransparencyMode(newMode);
+    localStorage.setItem('skylar_transparency', newMode);
+  };
 
   const toggleSkylar = () => {
     window.dispatchEvent(new CustomEvent('toggle-skylar-sidebar'));
@@ -456,7 +558,8 @@ export const UserDashboard: React.FC<{ userId: string; isAdmin?: boolean }> = ({
 
         <nav className="flex flex-col gap-3">
           {[
-            { icon: LayoutDashboard, label: 'Dashboard', active: true, path: `/dashboard/${userId}` },
+            { icon: LayoutDashboard, label: 'Dashboard', active: activeView === 'dashboard', onClick: () => setActiveView('dashboard') },
+            { icon: Camera, label: 'Synthesis Lab', active: activeView === 'synthesis', onClick: () => setActiveView('synthesis') },
             { icon: UserIcon, label: 'Profile', path: '/profile' },
             { icon: Award, label: 'My Strengths', path: '/strengths' },
             { icon: Briefcase, label: 'Job Matches', path: '/matches' },
@@ -465,7 +568,7 @@ export const UserDashboard: React.FC<{ userId: string; isAdmin?: boolean }> = ({
           ].map((item, i) => (
             <button 
               key={i}
-              onClick={() => navigate(item.path)}
+              onClick={() => item.onClick ? item.onClick() : navigate(item.path!)}
               className={`flex items-center gap-4 px-5 py-4 rounded-2xl transition-all ${
                 item.active 
                   ? 'bg-neon-cyan/10 text-neon-cyan border border-neon-cyan/20 neon-border-cyan' 
@@ -520,7 +623,11 @@ export const UserDashboard: React.FC<{ userId: string; isAdmin?: boolean }> = ({
 
       {/* Main Content */}
       <main className="flex-1 p-10 overflow-y-auto bg-[radial-gradient(circle_at_top_right,rgba(0,243,255,0.05),transparent_40%)]">
-        <header className="flex items-center justify-between mb-12">
+        {activeView === 'synthesis' ? (
+          <HighFidelitySynthesisLab />
+        ) : (
+          <>
+            <header className="flex items-center justify-between mb-12">
           <h1 className="text-4xl font-display font-bold tracking-tight">
             {isAdmin ? `Viewing: ${data?.displayName || 'User'}` : 'Your Sparkwavv Career Journey'}
           </h1>
@@ -557,6 +664,93 @@ export const UserDashboard: React.FC<{ userId: string; isAdmin?: boolean }> = ({
         <div className="mb-12">
           <EveningSpark currentStage={timelineStage as any} />
         </div>
+
+        {data?.validationPending && (
+          <div className="mb-8 flex items-center gap-3 px-4 py-3 rounded-2xl bg-neon-magenta/10 border border-neon-magenta/20 text-neon-magenta text-xs font-bold uppercase tracking-widest animate-pulse">
+            <ShieldAlert className="w-5 h-5" />
+            <span>Status: Human Mentor Reviewing Progress</span>
+          </div>
+        )}
+
+        {data?.mentorNote && (
+          <MentorNote note={data.mentorNote} timestamp={data.mentorNoteTimestamp || new Date().toISOString()} />
+        )}
+
+        {/* Neural Synthesis Engine - Prominent Module */}
+        <div className="mb-12 grid grid-cols-1 lg:grid-cols-3 gap-8">
+          <div className="lg:col-span-2">
+            <NeuralSynthesisEngine userId={userId} currentStage={currentStage} />
+          </div>
+          
+          <div className="flex flex-col gap-6">
+            {/* Transparency Toggle & Evolution Access */}
+            <div className="glass-panel p-8 rounded-[2rem] border border-white/5 bg-black/40 flex flex-col justify-between h-full">
+              <div>
+                <div className="flex items-center justify-between mb-6">
+                  <div className="flex items-center gap-2 text-neon-cyan">
+                    <Brain className="w-5 h-5" />
+                    <h3 className="font-display font-bold text-sm tracking-tight uppercase">Skylar Learning</h3>
+                  </div>
+                  <button 
+                    onClick={toggleTransparency}
+                    className={`p-2 rounded-lg border transition-all ${
+                      transparencyMode === 'full' 
+                        ? 'bg-neon-cyan/20 border-neon-cyan/40 text-neon-cyan' 
+                        : 'bg-white/5 border-white/10 text-white/40'
+                    }`}
+                    title={transparencyMode === 'full' ? 'Full Transparency' : 'Under the Hood'}
+                  >
+                    {transparencyMode === 'full' ? <Eye className="w-4 h-4" /> : <EyeOff className="w-4 h-4" />}
+                  </button>
+                </div>
+                
+                <p className="text-xs text-white/60 leading-relaxed mb-6">
+                  {transparencyMode === 'full' 
+                    ? "Skylar is operating in Full Transparency mode. You can see her evolving understanding of your professional DNA in real-time."
+                    : "Skylar is learning from your interactions 'under the hood' to provide increasingly precise guidance."}
+                </p>
+              </div>
+
+              <button 
+                onClick={() => setShowEvolution(true)}
+                className="w-full py-4 rounded-2xl bg-neon-cyan/10 border border-neon-cyan/20 text-neon-cyan text-[10px] font-bold uppercase tracking-[0.2em] hover:bg-neon-cyan/20 transition-all flex items-center justify-center gap-2"
+              >
+                <History className="w-4 h-4" />
+                View Evolution DNA
+              </button>
+            </div>
+          </div>
+        </div>
+
+        {/* Evolution Visualizer Modal */}
+        <AnimatePresence>
+          {showEvolution && (
+            <div className="fixed inset-0 z-[110] flex items-center justify-center p-4 md:p-8">
+              <motion.div
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                onClick={() => setShowEvolution(false)}
+                className="absolute inset-0 bg-black/90 backdrop-blur-md"
+              />
+              <motion.div
+                initial={{ opacity: 0, scale: 0.9, y: 40 }}
+                animate={{ opacity: 1, scale: 1, y: 0 }}
+                exit={{ opacity: 0, scale: 0.9, y: 40 }}
+                className="relative w-full max-w-4xl h-[80vh] bg-white rounded-[2.5rem] overflow-hidden shadow-2xl"
+              >
+                <button 
+                  onClick={() => setShowEvolution(false)}
+                  className="absolute top-6 right-6 p-2 rounded-full bg-slate-100 text-slate-400 hover:text-slate-600 transition-colors z-20"
+                >
+                  <X className="w-6 h-6" />
+                </button>
+                
+                <EvolutionVisualizer insights={insights} />
+              </motion.div>
+            </div>
+          )}
+        </AnimatePresence>
 
         {/* Top Row: Happiness & Summary Cards */}
         <div className="grid grid-cols-1 xl:grid-cols-3 gap-8 mb-12">
@@ -682,6 +876,31 @@ export const UserDashboard: React.FC<{ userId: string; isAdmin?: boolean }> = ({
           )}
         </AnimatePresence>
 
+        {/* Synthesis Lab Quick Access */}
+        <div className="mb-12">
+          <button 
+            onClick={() => setActiveView('synthesis')}
+            className="w-full glass-panel p-10 rounded-[2.5rem] border border-neon-cyan/20 bg-neon-cyan/5 hover:bg-neon-cyan/10 transition-all group relative overflow-hidden flex items-center justify-between"
+          >
+            <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,rgba(0,243,255,0.1),transparent_70%)] opacity-0 group-hover:opacity-100 transition-opacity" />
+            <div className="flex items-center gap-8 relative z-10">
+              <div className="w-20 h-20 rounded-3xl bg-neon-cyan/20 border border-neon-cyan/40 flex items-center justify-center group-hover:scale-110 transition-transform">
+                <Camera className="w-10 h-10 text-neon-cyan" />
+              </div>
+              <div className="text-left">
+                <h3 className="text-3xl font-display font-bold text-white mb-2">High-Fidelity Synthesis Lab</h3>
+                <p className="text-sm text-white/60 max-w-xl">
+                  Generate cinematic brand portraits and professional outreach sequences grounded in your unique DNA.
+                </p>
+              </div>
+            </div>
+            <div className="relative z-10 flex items-center gap-3 text-neon-cyan font-bold uppercase tracking-widest text-xs">
+              Enter Lab
+              <ChevronRight className="w-5 h-5 group-hover:translate-x-2 transition-transform" />
+            </div>
+          </button>
+        </div>
+
         {/* Bottom Row: 3 Columns */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
           {/* Column 1: Gallup Strengths */}
@@ -788,7 +1007,9 @@ export const UserDashboard: React.FC<{ userId: string; isAdmin?: boolean }> = ({
             </button>
           </div>
         </div>
-      </main>
+      </>
+    )}
+  </main>
 
       <InvitationModal 
         isOpen={isInvitationModalOpen} 

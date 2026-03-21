@@ -356,6 +356,32 @@ service cloud.firestore {
              isRecent(data.grantedAt);
     }
 
+    function isValidUserInsight(data) {
+      let allowedFields = ['id', 'userId', 'type', 'content', 'status', 'timestamp', 'evidence', 'conflictWith', 'tags'];
+      return hasRequiredFields(['id', 'userId', 'type', 'content', 'status', 'timestamp']) &&
+             hasOnlyAllowedFields(allowedFields) &&
+             data.id is string && data.id.size() < 128 &&
+             data.userId is string && data.userId.size() < 128 &&
+             data.type in ['pivot', 'core_value', 'primary_goal', 'strength'] &&
+             data.content is string && data.content.size() < 2000 &&
+             data.status in ['pending', 'confirmed', 'superseded'] &&
+             isRecent(data.timestamp) &&
+             (!('evidence' in data) || (data.evidence is string && data.evidence.size() < 5000)) &&
+             (!('conflictWith' in data) || (data.conflictWith is string && data.conflictWith.size() < 128)) &&
+             (!('tags' in data) || (data.tags is list && data.tags.size() < 20));
+    }
+
+    function isValidUserAsset(data) {
+      let allowedFields = ['id', 'userId', 'type', 'content', 'metadata', 'createdAt'];
+      return hasRequiredFields(['id', 'userId', 'type', 'content', 'createdAt']) &&
+             hasOnlyAllowedFields(allowedFields) &&
+             data.id is string && data.id.size() < 128 &&
+             data.userId is string && data.userId.size() < 128 &&
+             data.type in ['portrait', 'outreach_sequence'] &&
+             data.content is string && data.content.size() < 1000000 &&
+             isRecent(data.createdAt);
+    }
+
     function isPartnerOf(userId) {
       return isAuthenticated() && 
              exists(/databases/$(database)/documents/partner_access/$(request.auth.uid + '_' + userId));
@@ -495,6 +521,20 @@ service cloud.firestore {
       allow create: if isAuthenticated() && (isOwner(request.resource.data.userUid) || isAdmin()) && isValidPartnerAccess(request.resource.data);
       allow update: if isAdmin();
       allow delete: if isAuthenticated() && (isOwner(resource.data.userUid) || isAdmin());
+    }
+
+    match /user_insights/{insightId} {
+      allow read: if isOwner(resource.data.userId) || isAdmin() || isPartnerOf(resource.data.userId);
+      allow create: if isAuthenticated() && isOwner(request.resource.data.userId) && isValidUserInsight(request.resource.data);
+      allow update: if (isOwner(resource.data.userId) || isAdmin()) && isValidUserInsight(request.resource.data) && unchanged('id') && unchanged('userId');
+      allow delete: if isAdmin();
+    }
+
+    match /user_assets/{assetId} {
+      allow read: if isOwner(resource.data.userId) || isAdmin();
+      allow create: if isAuthenticated() && isOwner(request.resource.data.userId) && isValidUserAsset(request.resource.data);
+      allow update: if (isOwner(resource.data.userId) || isAdmin()) && isValidUserAsset(request.resource.data) && unchanged('id') && unchanged('userId');
+      allow delete: if isOwner(resource.data.userId) || isAdmin();
     }
   }
 }

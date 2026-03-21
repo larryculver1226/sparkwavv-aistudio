@@ -274,6 +274,37 @@
         "grantedAt": { "type": "string", "format": "date-time" }
       },
       "required": ["id", "partnerUid", "userUid", "grantedAt"]
+    },
+    "UserInsight": {
+      "title": "UserInsight",
+      "description": "A major professional DNA shift or insight learned by Skylar",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "userId": { "type": "string" },
+        "type": { "type": "string", "enum": ["pivot", "core_value", "primary_goal", "strength"] },
+        "content": { "type": "string" },
+        "status": { "type": "string", "enum": ["pending", "confirmed", "superseded"] },
+        "timestamp": { "type": "string", "format": "date-time" },
+        "evidence": { "type": "string" },
+        "conflictWith": { "type": "string" },
+        "tags": { "type": "array", "items": { "type": "string" } }
+      },
+      "required": ["id", "userId", "type", "content", "status", "timestamp"]
+    },
+    "UserAsset": {
+      "title": "UserAsset",
+      "description": "High-fidelity assets generated for the user (portraits, outreach sequences)",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "userId": { "type": "string" },
+        "type": { "type": "string", "enum": ["portrait", "outreach_sequence"] },
+        "content": { "type": "string", "description": "The generated text or image URL/base64" },
+        "metadata": { "type": "object", "description": "Generation parameters (model, style, tone, target)" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "userId", "type", "content", "createdAt"]
     }
   },
   "firestore": {
@@ -332,6 +363,14 @@
     "/partner_access/{accessId}": {
       "schema": "PartnerAccess",
       "description": "Partner access permissions"
+    },
+    "/user_insights/{insightId}": {
+      "schema": "UserInsight",
+      "description": "Evolutionary DNA insights"
+    },
+    "/user_assets/{assetId}": {
+      "schema": "UserAsset",
+      "description": "Generated high-fidelity assets"
     }
   }
 }

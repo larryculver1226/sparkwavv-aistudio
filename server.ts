@@ -23,23 +23,33 @@ import admin from "firebase-admin";
 import { getFirestore } from "firebase-admin/firestore";
 import fs from "fs";
 import sgMail from "@sendgrid/mail";
-import { writeUserWavvault, writeArtifact, searchSimilarWavvaults, getStorageMetrics, purgeOldArtifacts } from './src/services/wavvaultService';
-import { logEvent } from './src/services/loggingService';
-import { ROLES, JOURNEY_STAGES, TENANTS } from './src/constants';
-import { getGeminiApiKey } from './src/services/aiConfig';
+import { XMLParser } from "fast-xml-parser";
+import { writeUserWavvault, writeArtifact, searchSimilarWavvaults, getStorageMetrics, purgeOldArtifacts } from './src/services/wavvaultService.ts';
+import { logEvent } from './src/services/loggingService.ts';
+import { ROLES, JOURNEY_STAGES, TENANTS } from './src/constants.ts';
+import { getGeminiApiKey } from './src/services/aiConfig.ts';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 const DASHBOARD_DATA_FILE = path.join(__dirname, 'user-dashboards.json');
 
+const RSS_FEEDS = [
+  { name: 'HBR', url: 'https://hbr.org/feed' },
+  { name: 'TechCrunch', url: 'https://techcrunch.com/feed/' },
+  { name: 'Fast Company', url: 'https://www.fastcompany.com/feed' },
+  { name: 'McKinsey Insights', url: 'https://www.mckinsey.com/insights/rss' },
+  { name: 'The Muse', url: 'https://www.themuse.com/advice/feed' },
+  { name: 'Wired Business', url: 'https://www.wired.com/feed/category/business/latest/rss' }
+];
+
 // RBAC Roles
 // Using imported ROLES from constants
 
 let isFirestoreInitialized = true;
 
-async function getDashboard(db_unused: any, userId: string) {
-  if (!isFirebaseAdminConfigured || !userId || !isFirestoreInitialized) {
+async function getDashboard(db_unused: any, userId: string, sparkwavvId?: string) {
+  if (!isFirebaseAdminConfigured || !userId) {
     return null;
   }
 
@@ -47,16 +57,44 @@ async function getDashboard(db_unused: any, userId: string) {
   if (!db) return null;
 
   try {
-    const doc = (await withTimeout(db.collection('dashboards').doc(userId).get())) as any;
-    return doc.exists ? doc.data() : null;
+    // 1. Try primary lookup by userId (uid)
+    const doc = (await withTimeout(db.collection('dashboards').doc(userId).get(), 5000)) as any;
+    if (doc.exists) {
+      const data = doc.data();
+      // Self-healing: ensure sparkwavvId is synced if we have it
+      if (sparkwavvId && data.sparkwavvId !== sparkwavvId) {
+        await db.collection('dashboards').doc(userId).update({ sparkwavvId });
+      }
+      return data;
+    }
+
+    // 2. Fallback: Lookup by sparkwavvId if provided (Self-healing for UID changes)
+    if (sparkwavvId) {
+      const snapshot = await db.collection('dashboards').where('sparkwavvId', '==', sparkwavvId).limit(1).get();
+      if (!snapshot.empty) {
+        const oldDoc = snapshot.docs[0];
+        const dashboardData = oldDoc.data();
+        const oldUserId = oldDoc.id;
+
+        console.log(`[IDENTITY] Self-healing: Re-anchoring dashboard ${oldUserId} to new UID ${userId} via sparkwavvId ${sparkwavvId}`);
+
+        // Update the dashboard with the new userId and move it to the new document ID
+        const updatedData = { ...dashboardData, userId, updatedAt: new Date().toISOString() };
+        
+        // Use a transaction or batch to ensure atomicity
+        const batch = db.batch();
+        batch.set(db.collection('dashboards').doc(userId), updatedData);
+        batch.delete(db.collection('dashboards').doc(oldUserId));
+        await batch.commit();
+
+        return updatedData;
+      }
+    }
+
+    return null;
   } catch (error: any) {
     if (error.message === 'Firestore operation timed out') {
       console.error(`[FIRESTORE] Timeout getting dashboard for ${userId}`);
-      return null;
-    }
-    if (error.code === 5) {
-      console.warn("Firestore Error 5 (NOT_FOUND): Database not initialized. Falling back to in-memory defaults.");
-      isFirestoreInitialized = false;
       return null;
     }
     console.error(`Error getting dashboard for ${userId}:`, error.message || error);
@@ -65,7 +103,7 @@ async function getDashboard(db_unused: any, userId: string) {
 }
 
 async function saveDashboard(db_unused: any, userId: string, data: any) {
-  if (!isFirebaseAdminConfigured || !isFirestoreInitialized || !userId) {
+  if (!isFirebaseAdminConfigured || !userId) {
     return false;
   }
   const db = getFirestoreDb();
@@ -73,13 +111,13 @@ async function saveDashboard(db_unused: any, userId: string, data: any) {
   
   try {
     // 1. Save to dashboards collection
-    await withTimeout(db.collection('dashboards').doc(userId).set(data, { merge: true }));
+    await withTimeout(db.collection('dashboards').doc(userId).set(data, { merge: true }), 5000);
     
     // 2. If discoveryProgress is provided, sync it to journeyStage in users collection
     if (data.discoveryProgress) {
       await withTimeout(db.collection('users').doc(userId).set({
         journeyStage: data.discoveryProgress
-      }, { merge: true }));
+      }, { merge: true }), 5000);
     }
     
     return true;
@@ -88,13 +126,30 @@ async function saveDashboard(db_unused: any, userId: string, data: any) {
       console.error(`[FIRESTORE] Timeout saving dashboard for ${userId}`);
       return false;
     }
-    if (error.code === 5) {
-      console.warn("Firestore Error 5 (NOT_FOUND): Database not initialized. Persistence disabled.");
-      isFirestoreInitialized = false;
-      return false;
-    }
     console.error(`Error saving dashboard for ${userId}:`, error.message || error);
     return false;
+  }
+}
+
+async function sendSoftCoachEmail(email: string, name: string) {
+  if (!process.env.SENDGRID_API_KEY || !process.env.SKYLAR_FROM_EMAIL) {
+    console.warn("[SENDGRID] Missing API Key or From Email. Skipping email.");
+    return;
+  }
+
+  const msg = {
+    to: email,
+    from: process.env.SKYLAR_FROM_EMAIL,
+    subject: "The wave has slowed down - Skylar is here to help",
+    text: `Hi ${name},\n\nI noticed the wave has slowed down. I'm here to help you reboot. Let's take 5 minutes to align your energy before your next sprint.\n\nBest,\nSkylar`,
+    html: `<p>Hi ${name},</p><p>I noticed the wave has slowed down. I'm here to help you reboot. Let's take 5 minutes to align your energy before your next sprint.</p><p>Best,<br>Skylar</p>`,
+  };
+
+  try {
+    await sgMail.send(msg);
+    console.log(`[SENDGRID] Soft Coach email sent to ${email}`);
+  } catch (error: any) {
+    console.error("[SENDGRID ERROR]", error.response?.body || error.message);
   }
 }
 
@@ -129,11 +184,12 @@ async function logSecurityEvent(
   }
 }
 
-async function createDefaultDashboard(db_unused: any, userId: string, initialStage: string = 'Ignition') {
+async function createDefaultDashboard(db_unused: any, userId: string, initialStage: string = 'Ignition', sparkwavvId?: string) {
   const db = getFirestoreDb();
   if (!db) return;
   const defaultDashboard = {
     userId,
+    sparkwavvId: sparkwavvId || null,
     tenantId: 'sparkwavv', // Default tenant
     careerHappiness: 5,
     strengths: [
@@ -830,6 +886,7 @@ async function startServer() {
           displayName,
           role: role || ROLES.USER,
           journeyStage: journeyStage || 'Dive-In',
+          emailVerified: false,
           tenantId: tenantId || 'sparkwavv',
           generationalPersona,
           careerStageRole,
@@ -840,14 +897,7 @@ async function startServer() {
         });
 
         // Also create a dashboard for the user to ensure 1:1 mapping
-        await db.collection('dashboards').doc(userRecord.uid).set({
-          userId: userRecord.uid,
-          sparkwavvId,
-          tenantId: tenantId || 'sparkwavv',
-          careerHappiness: 50,
-          discoveryProgress: '0%',
-          createdAt: new Date().toISOString(),
-        });
+        await createDefaultDashboard(db, userRecord.uid, journeyStage || 'Dive-In', sparkwavvId);
 
         await logSecurityEvent(db, actor, 'USER_CREATE', 'INFO', { uid: userRecord.uid, email }, { role: role || ROLES.USER }, req.ip);
 
@@ -1082,6 +1132,99 @@ async function startServer() {
       }
     });
 
+    app.get("/api/admin/identity-reconciliation", requireRole([ROLES.SUPER_ADMIN, ROLES.ADMIN]), async (req, res) => {
+      try {
+        const db = getFirestoreDb();
+        if (!db) return res.status(503).json({ error: "Firestore not initialized" });
+
+        const [usersSnapshot, dashboardsSnapshot] = await Promise.all([
+          db.collection('users').get(),
+          db.collection('dashboards').get()
+        ]);
+
+        const users = usersSnapshot.docs.map((d: any) => ({ uid: d.id, ...d.data() }));
+        const dashboards = dashboardsSnapshot.docs.map((d: any) => ({ id: d.id, ...d.data() }));
+
+        const userIds = new Set(users.map(u => u.uid));
+        const dashboardUserIds = new Set(dashboards.map(d => d.userId || d.id));
+
+        const orphanedDashboards = dashboards.filter(d => !userIds.has(d.userId || d.id));
+        const usersWithoutDashboards = users.filter(u => !dashboardUserIds.has(u.uid));
+
+        res.json({
+          orphanedDashboards,
+          usersWithoutDashboards,
+          stats: {
+            totalUsers: users.length,
+            totalDashboards: dashboards.length,
+            orphans: orphanedDashboards.length,
+            missing: usersWithoutDashboards.length
+          }
+        });
+      } catch (error: any) {
+        res.status(500).json({ error: error.message });
+      }
+    });
+
+    app.post("/api/admin/relink-identity", requireRole([ROLES.SUPER_ADMIN, ROLES.ADMIN]), async (req, res) => {
+      const { dashboardId, newUserId, sparkwavvId } = req.body;
+      const actor = (req as any).user;
+
+      try {
+        const db = getFirestoreDb();
+        if (!db) return res.status(503).json({ error: "Firestore not initialized" });
+
+        const dashboardDoc = await db.collection('dashboards').doc(dashboardId).get();
+        if (!dashboardDoc.exists) {
+          return res.status(404).json({ error: "Dashboard not found" });
+        }
+
+        const dashboardData = dashboardDoc.data();
+        const batch = db.batch();
+
+        // 1. Create new dashboard document with new UID
+        batch.set(db.collection('dashboards').doc(newUserId), {
+          ...dashboardData,
+          userId: newUserId,
+          sparkwavvId: sparkwavvId || dashboardData.sparkwavvId,
+          updatedAt: new Date().toISOString(),
+          relinkedBy: actor.email
+        });
+
+        // 2. Delete old dashboard document
+        batch.delete(db.collection('dashboards').doc(dashboardId));
+
+        // 3. Update user document to ensure sparkwavvId matches
+        if (sparkwavvId) {
+          batch.update(db.collection('users').doc(newUserId), { sparkwavvId });
+        }
+
+        await batch.commit();
+        await logSecurityEvent(db, actor, 'IDENTITY_RELINK', 'WARNING', { uid: newUserId, email: '' }, { dashboardId, sparkwavvId }, req.ip);
+
+        res.json({ success: true });
+      } catch (error: any) {
+        res.status(500).json({ error: error.message });
+      }
+    });
+
+    app.delete("/api/admin/dashboards/:id", requireRole([ROLES.SUPER_ADMIN, ROLES.ADMIN]), async (req, res) => {
+      const { id } = req.params;
+      const actor = (req as any).user;
+
+      try {
+        const db = getFirestoreDb();
+        if (!db) return res.status(503).json({ error: "Firestore not initialized" });
+
+        await db.collection('dashboards').doc(id).delete();
+        await logSecurityEvent(db, actor, 'DASHBOARD_DELETE', 'WARNING', { uid: id, email: '' }, { dashboardId: id }, req.ip);
+
+        res.json({ success: true });
+      } catch (error: any) {
+        res.status(500).json({ error: error.message });
+      }
+    });
+
     app.post("/api/admin/disable-user", requireRole([ROLES.SUPER_ADMIN, ROLES.ADMIN, ROLES.EDITOR]), async (req, res) => {
       const { uid, disabled } = req.body;
       try {
@@ -1123,13 +1266,57 @@ async function startServer() {
       const { uid } = req.body;
       const actor = (req as any).user;
       try {
+        if (!isFirebaseAdminConfigured || !sparkwavvAdmin) {
+          return res.status(503).json({ error: "Firebase Admin not configured" });
+        }
+
+        if (uid === actor.uid) {
+          return res.status(400).json({ error: "You cannot delete yourself." });
+        }
+
+        const db = getFirestoreDb();
+        if (!db) {
+          return res.status(503).json({ error: "Firestore not available" });
+        }
+
         const userDoc = await db.collection('users').doc(uid).get();
         const userData = userDoc.data();
-        
-        await sparkwavvAdmin.auth().deleteUser(uid);
-        await db.collection('users').doc(uid).delete();
+        const targetEmail = userData?.email || 'unknown';
+        const targetRole = userData?.role || ROLES.USER;
 
-        await logSecurityEvent(db, actor, 'USER_DELETE', 'CRITICAL', { uid, email: userData?.email || 'unknown' }, {}, req.ip);
+        // Prevent deleting Super Admin
+        if (targetEmail.toLowerCase() === 'larry.culver1226@gmail.com' || targetRole === ROLES.SUPER_ADMIN) {
+          return res.status(403).json({ error: "Super Admins cannot be deleted." });
+        }
+
+        // Prevent Admins from deleting other Admins (only Super Admin can)
+        if (actor.role !== ROLES.SUPER_ADMIN && (targetRole === ROLES.ADMIN || targetRole === ROLES.SUPER_ADMIN)) {
+          return res.status(403).json({ error: "Only Super Admins can delete other Admins." });
+        }
+        
+        // Try to delete from Auth, but don't fail if they don't exist there
+        try {
+          await sparkwavvAdmin.auth().deleteUser(uid);
+        } catch (authError: any) {
+          if (authError.code !== 'auth/user-not-found') {
+            throw authError;
+          }
+          console.warn(`[AUTH] User ${uid} not found in Auth during deletion, proceeding to delete from Firestore.`);
+        }
+
+        // Delete from Firestore users collection
+        await db.collection('users').doc(uid).delete();
+        
+        // Delete from Firestore dashboards collection
+        await db.collection('dashboards').doc(uid).delete();
+
+        // Delete from Firestore wavvault collection
+        await db.collection('wavvault').doc(uid).delete();
+
+        // Delete from Firestore admins collection (if they were an admin)
+        await db.collection('admins').doc(uid).delete();
+
+        await logSecurityEvent(db, actor, 'USER_DELETE', 'CRITICAL', { uid, email: targetEmail }, {}, req.ip);
 
         res.json({ success: true });
       } catch (error: any) {
@@ -1313,6 +1500,42 @@ async function startServer() {
       }
     });
 
+    app.post("/api/admin/flagged-content/:id/approve", requireRole([ROLES.SUPER_ADMIN, ROLES.ADMIN, ROLES.EDITOR]), async (req, res) => {
+      const { id } = req.params;
+      const actor = (req as any).user;
+      try {
+        const db = getAdminDb();
+        if (!db) return res.status(503).json({ error: "Admin database not initialized" });
+        
+        await db.collection('flagged_content').doc(id).update({ status: 'approved', approvedBy: actor.email, approvedAt: new Date().toISOString() });
+        
+        await logSecurityEvent(db, actor, 'CONTENT_APPROVE', 'INFO', { uid: 'N/A', email: 'N/A' }, { contentId: id }, req.ip);
+        
+        res.json({ success: true });
+      } catch (error: any) {
+        console.error("Error approving content:", error);
+        res.status(500).json({ error: error.message });
+      }
+    });
+
+    app.post("/api/admin/flagged-content/:id/delete", requireRole([ROLES.SUPER_ADMIN, ROLES.ADMIN, ROLES.EDITOR]), async (req, res) => {
+      const { id } = req.params;
+      const actor = (req as any).user;
+      try {
+        const db = getAdminDb();
+        if (!db) return res.status(503).json({ error: "Admin database not initialized" });
+        
+        await db.collection('flagged_content').doc(id).delete();
+        
+        await logSecurityEvent(db, actor, 'CONTENT_DELETE', 'WARNING', { uid: 'N/A', email: 'N/A' }, { contentId: id }, req.ip);
+        
+        res.json({ success: true });
+      } catch (error: any) {
+        console.error("Error deleting content:", error);
+        res.status(500).json({ error: error.message });
+      }
+    });
+
     app.get("/api/admin/users-v2", requireRole([ROLES.SUPER_ADMIN, ROLES.ADMIN, ROLES.EDITOR, ROLES.VIEWER, ROLES.OPERATOR]), async (req, res) => {
       try {
         const db = getFirestoreDb();
@@ -1353,7 +1576,7 @@ async function startServer() {
                 displayName: data.displayName || (data.firstName ? `${data.firstName} ${data.lastName}` : (data.email?.split('@')[0] || doc.id)),
                 role: data.role || ROLES.USER,
                 journeyStage: data.journeyStage || 'Dive-In',
-                emailVerified: true,
+                emailVerified: data.emailVerified || false,
                 creationTime: data.createdAt || new Date().toISOString(),
                 source: 'firestore',
                 ...data
@@ -1378,6 +1601,9 @@ async function startServer() {
         // Merge carefully to avoid overwriting with undefined/null
         const merged = { ...existing };
         Object.keys(u).forEach(key => {
+          // Prioritize Auth for emailVerified
+          if (key === 'emailVerified') return;
+          
           if (u[key] !== undefined && u[key] !== null && u[key] !== '') {
             merged[key] = u[key];
           }
@@ -1435,10 +1661,22 @@ async function startServer() {
         const userEmail = email || decodedToken.email;
         const displayName = firstName && lastName ? `${firstName} ${lastName}` : (decodedToken.name || userEmail?.split('@')[0]);
 
+        // Ensure sparkwavvId is generated for new self-registered users
+        let sparkwavvId = null;
+        const existingUser = await db.collection('users').doc(decodedToken.uid).get();
+        if (existingUser.exists) {
+          sparkwavvId = existingUser.data()?.sparkwavvId;
+        }
+        
+        if (!sparkwavvId) {
+          sparkwavvId = await generateSparkwavvId(db);
+        }
+
         await db.collection('users').doc(decodedToken.uid).set({ 
           role: ROLES.USER,
           journeyStage: 'Dive-In',
           userId: userId || decodedToken.email,
+          sparkwavvId,
           email: userEmail,
           tenantId: 'sparkwavv', // Default tenant
           firstName: firstName || '',
@@ -1471,10 +1709,10 @@ async function startServer() {
         if (!db) {
           throw new Error("Firestore not initialized");
         }
-        const decodedToken = await sparkwavvAdmin.auth().verifyIdToken(idToken);
-        const userDoc = await db.collection('users').doc(decodedToken.uid).get();
+        const decodedToken = await withTimeout(sparkwavvAdmin.auth().verifyIdToken(idToken), 5000);
+        const userDoc = (await withTimeout(db.collection('users').doc(decodedToken.uid).get(), 5000)) as any;
         if (userDoc.exists) {
-          res.json({ uid: decodedToken.uid, ...userDoc.data() });
+          res.json({ ...userDoc.data(), uid: decodedToken.uid });
         } else {
           res.status(404).json({ error: "User not found" });
         }
@@ -1483,7 +1721,7 @@ async function startServer() {
           console.error("CRITICAL: Firestore Unauthenticated (Error 16). Check your Service Account credentials.");
         }
         console.error("Error fetching profile:", error);
-        res.status(401).json({ error: "Invalid token" });
+        res.status(401).json({ error: "Invalid token or request timed out" });
       }
     });
 
@@ -1516,11 +1754,12 @@ async function startServer() {
       const idToken = req.headers.authorization?.split('Bearer ')[1];
       if (!idToken) return res.status(401).json({ error: "Unauthorized" });
       try {
-        const decodedToken = await sparkwavvAdmin.auth().verifyIdToken(idToken);
-        const wavvaultDoc = await db.collection('wavvault').doc(decodedToken.uid).get();
+        const decodedToken = await withTimeout(sparkwavvAdmin.auth().verifyIdToken(idToken), 5000);
+        const wavvaultDoc = (await withTimeout(db.collection('wavvault').doc(decodedToken.uid).get(), 5000)) as any;
         res.json({ exists: wavvaultDoc.exists });
       } catch (error) {
-        res.status(401).json({ error: "Invalid token" });
+        console.error("Error fetching wavvault status:", error);
+        res.status(401).json({ error: "Invalid token or request timed out" });
       }
     });
 
@@ -1674,6 +1913,135 @@ async function startServer() {
         res.status(500).json({ error: error.message || "Failed to execute Skylar's proposal." });
       }
     });
+
+    // RSS Sync Endpoint
+    app.post("/api/skylar/rss-sync", requireRole([ROLES.ADMIN, ROLES.OPERATOR]), async (req, res) => {
+      const db = getFirestoreDb();
+      if (!db) return res.status(500).json({ error: "Database unavailable" });
+
+      const parser = new XMLParser();
+      const results = [];
+
+      try {
+        for (const feed of RSS_FEEDS) {
+          const response = await fetch(feed.url);
+          const xmlData = await response.text();
+          const jsonObj = parser.parse(xmlData);
+          
+          // Basic extraction of headlines and snippets
+          const channel = jsonObj.rss?.channel || jsonObj.feed || {};
+          const items = channel.item || channel.entry || [];
+          const topItems = (Array.isArray(items) ? items : [items]).slice(0, 5).map((item: any) => ({
+            title: item.title || item.title?.['#text'] || 'No Title',
+            snippet: item.description || item.summary || item.content?.['#text'] || 'No Snippet',
+            link: item.link || item.link?.['@_href'] || '',
+            pubDate: item.pubDate || item.published || item.updated || new Date().toISOString()
+          }));
+
+          results.push({
+            source: feed.name,
+            items: topItems,
+            updatedAt: new Date().toISOString()
+          });
+        }
+
+        // Store in Firestore
+        const batch = db.batch();
+        const cacheRef = db.collection('market_cache').doc('daily_pulse');
+        batch.set(cacheRef, { feeds: results, lastSync: new Date().toISOString() });
+        await batch.commit();
+
+        res.json({ success: true, message: "RSS feeds synced successfully", data: results });
+      } catch (error: any) {
+        console.error("[RSS SYNC ERROR]", error);
+        res.status(500).json({ error: error.message || "Failed to sync RSS feeds." });
+      }
+    });
+
+    // Validation Request Endpoint
+    app.post("/api/skylar/request-validation", requireRole([ROLES.USER, ROLES.ADMIN]), async (req, res) => {
+      const { userId, gateId, reasoning, userData } = req.body;
+      const authenticatedUser = (req as any).user;
+
+      if (userId !== authenticatedUser.uid && authenticatedUser.role !== ROLES.ADMIN) {
+        return res.status(403).json({ error: "Forbidden" });
+      }
+
+      const db = getFirestoreDb();
+      if (!db) return res.status(500).json({ error: "Database unavailable" });
+
+      try {
+        const validationRequest = {
+          id: uuidv4(),
+          userId,
+          userEmail: authenticatedUser.email,
+          gateId,
+          reasoning,
+          userData,
+          status: 'pending_review',
+          createdAt: new Date().toISOString()
+        };
+
+        await db.collection('validationRequests').doc(validationRequest.id).set(validationRequest);
+        
+        // Update user dashboard status
+        await db.collection('dashboards').doc(userId).set({ 
+          validationStatus: 'Human Mentor Reviewing Progress',
+          pendingGateId: gateId
+        }, { merge: true });
+
+        res.json({ success: true, message: "Validation request submitted to human mentors." });
+      } catch (error: any) {
+        console.error("[VALIDATION REQUEST ERROR]", error);
+        res.status(500).json({ error: error.message || "Failed to submit validation request." });
+      }
+    });
+
+    // Mentor Note Endpoint
+    app.post("/api/user/mentor-note", requireRole([ROLES.ADMIN, ROLES.MENTOR, ROLES.OPERATOR]), async (req, res) => {
+      const { userId, note, status } = req.body;
+      const db = getFirestoreDb();
+      if (!db) return res.status(500).json({ error: "Database unavailable" });
+
+      try {
+        await db.collection('dashboards').doc(userId).set({ 
+          mentorNote: note,
+          validationStatus: status || 'Reviewed by Mentor',
+          updatedAt: new Date().toISOString()
+        }, { merge: true });
+
+        res.json({ success: true, message: "Mentor note saved successfully." });
+      } catch (error: any) {
+        console.error("[MENTOR NOTE ERROR]", error);
+        res.status(500).json({ error: error.message || "Failed to save mentor note." });
+      }
+    });
+
+    // Market Intelligence Endpoint (Hybrid)
+    app.post("/api/skylar/market-intelligence", requireRole([ROLES.USER, ROLES.ADMIN]), async (req, res) => {
+      const { industry, role } = req.body;
+      const db = getFirestoreDb();
+      if (!db) return res.status(500).json({ error: "Database unavailable" });
+
+      try {
+        // 1. Check Cache
+        const cacheDoc = await db.collection('market_cache').doc('daily_pulse').get();
+        let cacheData = cacheDoc.exists ? cacheDoc.data() : null;
+        
+        // Filter cache for relevant industry if possible
+        let relevantCache = cacheData?.feeds?.filter((f: any) => 
+          f.source.toLowerCase().includes(industry.toLowerCase()) || 
+          f.items.some((i: any) => i.title.toLowerCase().includes(industry.toLowerCase()))
+        ) || [];
+
+        res.json({ 
+          cache: relevantCache, 
+          message: relevantCache.length > 0 ? "Found relevant cached data." : "No relevant cached data found. Suggesting live search."
+        });
+      } catch (error: any) {
+        res.status(500).json({ error: error.message });
+      }
+    });
   }
 
   // Registration API
@@ -1736,7 +2104,7 @@ async function startServer() {
     if (!idToken) return res.status(401).json({ error: "Unauthorized" });
 
     try {
-      const decodedToken = await sparkwavvAdmin.auth().verifyIdToken(idToken);
+      const decodedToken = await withTimeout(sparkwavvAdmin.auth().verifyIdToken(idToken), 5000);
       let userId = decodedToken.uid;
       
       if (!isFirebaseAdminConfigured) {
@@ -1746,34 +2114,20 @@ async function startServer() {
       const db = getFirestoreDb();
       if (!db) return res.status(503).json({ error: "Firestore not initialized" });
       
-      // Allow admins to view other user dashboards via query param
-      const requestedUserId = req.query.userId as string;
-      if (requestedUserId && requestedUserId !== userId) {
-        try {
-          // Use a timeout for the role check too
-          const userDoc = (await withTimeout(db.collection('users').doc(userId).get(), 3000)) as any;
-          const role = userDoc.exists ? (userDoc.data()?.role || ROLES.USER) : ROLES.USER;
-          if (role === ROLES.ADMIN) {
-            userId = requestedUserId;
-          } else {
-            return res.status(403).json({ error: "Forbidden" });
-          }
-        } catch (e: any) {
-          console.warn("[API] Dashboard role check failed or timed out:", e.message);
-          if (e.code === 5) isFirestoreInitialized = false;
-          // If firestore fails or times out, we just use the logged in user's ID
-        }
-      }
-
-      // Fetch user profile first to get the authoritative journeyStage and displayName
+      // Fetch user profile first to get the authoritative journeyStage, displayName, and sparkwavvId
       let authoritativeStage = 'Ignition';
       let userDisplayName = '';
+      let userSparkwavvId = '';
+      let userRole: string = ROLES.USER;
+
       try {
         const userDoc = (await withTimeout(db.collection('users').doc(userId).get(), 3000)) as any;
         if (userDoc.exists) {
           const userData = userDoc.data();
           authoritativeStage = userData?.journeyStage || 'Ignition';
           userDisplayName = userData?.displayName || (userData?.firstName ? `${userData.firstName} ${userData.lastName}` : '');
+          userSparkwavvId = userData?.sparkwavvId || '';
+          userRole = userData?.role || ROLES.USER;
         }
         
         // Fallback to decoded token if still empty
@@ -1784,10 +2138,33 @@ async function startServer() {
         console.warn("[API] Failed to fetch user profile for stage sync:", e);
       }
 
-      let dashboard = await getDashboard(db, userId);
+      // Allow admins to view other user dashboards via query param
+      const requestedUserId = req.query.userId as string;
+      if (requestedUserId && requestedUserId !== userId && requestedUserId !== userSparkwavvId) {
+        // Check if current user has permission
+        if (userRole === ROLES.ADMIN || userRole === ROLES.SUPER_ADMIN || userRole === ROLES.EDITOR) {
+          console.log(`🛡️ [Dashboard] Admin ${userId} (${userRole}) accessing dashboard for ${requestedUserId}`);
+          userId = requestedUserId;
+          
+          // Re-fetch target user's sparkwavvId for dashboard lookup
+          try {
+            const targetDoc = (await withTimeout(db.collection('users').doc(userId).get(), 3000)) as any;
+            if (targetDoc.exists) {
+              userSparkwavvId = targetDoc.data()?.sparkwavvId || '';
+            }
+          } catch (e) {
+            console.warn("[API] Failed to fetch target user profile:", e);
+          }
+        } else {
+          console.warn(`🚫 [Dashboard] Unauthorized access attempt by ${userId} to ${requestedUserId}`);
+          return res.status(403).json({ error: "Forbidden" });
+        }
+      }
+
+      let dashboard = await getDashboard(db, userId, userSparkwavvId);
 
       if (!dashboard) {
-        dashboard = await createDefaultDashboard(db, userId, authoritativeStage);
+        dashboard = await createDefaultDashboard(db, userId, authoritativeStage, userSparkwavvId);
       }
 
       const dynamicScores = calculateDynamicScores({ ...dashboard, discoveryProgress: authoritativeStage });
@@ -1830,6 +2207,146 @@ async function startServer() {
       });
     } catch (error) {
       res.status(401).json({ error: "Invalid token" });
+    }
+  });
+
+  // User Insights API
+  app.get("/api/user-insights", async (req, res) => {
+    const idToken = req.headers.authorization?.split('Bearer ')[1];
+    if (!idToken) return res.status(401).json({ error: "Unauthorized" });
+
+    try {
+      const decodedToken = await withTimeout(sparkwavvAdmin.auth().verifyIdToken(idToken), 5000);
+      const userId = decodedToken.uid;
+      
+      const db = getFirestoreDb();
+      if (!db) return res.status(503).json({ error: "Firestore not initialized" });
+
+      let query = db.collection('user_insights').where('userId', '==', userId);
+      
+      const status = req.query.status as string;
+      if (status) {
+        query = query.where('status', '==', status);
+      }
+
+      const snapshot = await query.orderBy('timestamp', 'desc').get();
+
+      const insights = snapshot.docs.map((doc: any) => ({
+        id: doc.id,
+        ...doc.data()
+      }));
+
+      res.json(insights);
+    } catch (error: any) {
+      console.error("[API] Error fetching user insights:", error.message);
+      res.status(500).json({ error: "Failed to fetch insights" });
+    }
+  });
+
+  app.post("/api/user-insights", async (req, res) => {
+    const idToken = req.headers.authorization?.split('Bearer ')[1];
+    if (!idToken) return res.status(401).json({ error: "Unauthorized" });
+
+    try {
+      const decodedToken = await withTimeout(sparkwavvAdmin.auth().verifyIdToken(idToken), 5000);
+      const userId = decodedToken.uid;
+      const { insight } = req.body;
+
+      if (!insight) {
+        return res.status(400).json({ error: "Insight data is required" });
+      }
+
+      const db = getFirestoreDb();
+      if (!db) return res.status(503).json({ error: "Firestore not initialized" });
+
+      const insightData = {
+        ...insight,
+        userId,
+        timestamp: insight.timestamp || new Date().toISOString()
+      };
+
+      let docRef;
+      if (insight.id) {
+        docRef = db.collection('user_insights').doc(insight.id);
+        await docRef.set(insightData, { merge: true });
+      } else {
+        docRef = await db.collection('user_insights').add(insightData);
+      }
+
+      res.json({ success: true, id: docRef.id });
+    } catch (error: any) {
+      console.error("[API] Error saving user insight:", error.message);
+      res.status(500).json({ error: "Failed to save insight" });
+    }
+  });
+
+  // User Assets API
+  app.get("/api/user-assets", async (req, res) => {
+    const idToken = req.headers.authorization?.split('Bearer ')[1];
+    if (!idToken) return res.status(401).json({ error: "Unauthorized" });
+
+    try {
+      const decodedToken = await withTimeout(sparkwavvAdmin.auth().verifyIdToken(idToken), 5000);
+      const userId = decodedToken.uid;
+      
+      const db = getFirestoreDb();
+      if (!db) return res.status(503).json({ error: "Firestore not initialized" });
+
+      const type = req.query.type as string;
+      let query = db.collection('user_assets').where('userId', '==', userId);
+      
+      if (type) {
+        query = query.where('type', '==', type);
+      }
+
+      const snapshot = await query.orderBy('createdAt', 'desc').get();
+
+      const assets = snapshot.docs.map((doc: any) => ({
+        id: doc.id,
+        ...doc.data()
+      }));
+
+      res.json(assets);
+    } catch (error: any) {
+      console.error("[API] Error fetching user assets:", error.message);
+      res.status(500).json({ error: "Failed to fetch assets" });
+    }
+  });
+
+  app.post("/api/user-assets", async (req, res) => {
+    const idToken = req.headers.authorization?.split('Bearer ')[1];
+    if (!idToken) return res.status(401).json({ error: "Unauthorized" });
+
+    try {
+      const decodedToken = await withTimeout(sparkwavvAdmin.auth().verifyIdToken(idToken), 5000);
+      const userId = decodedToken.uid;
+      const { asset } = req.body;
+
+      if (!asset) {
+        return res.status(400).json({ error: "Asset data is required" });
+      }
+
+      const db = getFirestoreDb();
+      if (!db) return res.status(503).json({ error: "Firestore not initialized" });
+
+      const assetData = {
+        ...asset,
+        userId,
+        createdAt: asset.createdAt || new Date().toISOString()
+      };
+
+      let docRef;
+      if (asset.id) {
+        docRef = db.collection('user_assets').doc(asset.id);
+        await docRef.set(assetData, { merge: true });
+      } else {
+        docRef = await db.collection('user_assets').add(assetData);
+      }
+
+      res.json({ success: true, id: docRef.id });
+    } catch (error: any) {
+      console.error("[API] Error saving user asset:", error.message);
+      res.status(500).json({ error: "Failed to save asset" });
     }
   });
 
@@ -1987,14 +2504,30 @@ async function startServer() {
         const listUsersResult = await sparkwavvAdmin.auth().listUsers();
         const authUsers = listUsersResult.users;
         
+        // Fetch Firestore users to get journeyStage
+        const db = getFirestoreDb();
+        let firestoreUsersMap = new Map();
+        if (db) {
+          const fsSnapshot = await db.collection('users').get();
+          fsSnapshot.docs.forEach(doc => firestoreUsersMap.set(doc.id, doc.data()));
+        }
+
         // Count unique users across Auth
         const allUserIds = new Set([
           ...authUsers.map(u => u.uid)
         ]);
 
         const total = allUserIds.size;
-        const verified = authUsers.filter(u => u.emailVerified).length;
-        const pending = Math.max(0, total - verified);
+        
+        // Verified means emailVerified AND not in Dive-In
+        const verified = authUsers.filter(u => {
+          const fsData = firestoreUsersMap.get(u.uid);
+          const journeyStage = fsData?.journeyStage || 'Dive-In';
+          return u.emailVerified && journeyStage !== 'Dive-In';
+        }).length;
+        
+        // Pending means email NOT verified
+        const pending = authUsers.filter(u => !u.emailVerified).length;
         
         const today = new Date();
         today.setHours(0, 0, 0, 0);

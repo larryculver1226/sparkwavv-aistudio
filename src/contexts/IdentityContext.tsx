@@ -15,7 +15,8 @@ interface IdentityContextType {
   isAdmin: boolean;
   isOperator: boolean;
   isSuperAdmin: boolean;
-  isConfirmed: boolean;
+  emailVerified: boolean;
+  onboardingComplete: boolean;
   hasWavvault: boolean;
   error: string | null;
   logout: () => Promise<void>;
@@ -86,11 +87,16 @@ export function IdentityProvider({ children }: { children: React.ReactNode }) {
       const fetchWithRetry = async (url: string, options: RequestInit, retries = 3): Promise<Response> => {
         try {
           const res = await fetch(url, options);
-          if (!res.ok && retries > 0) throw new Error(`Status ${res.status}`);
+          // Only retry on 5xx or network errors, not 4xx
+          if (!res.ok && res.status >= 500 && retries > 0) {
+            console.warn(`Retrying fetch to ${url} due to status ${res.status}... (${retries} left)`);
+            await new Promise(resolve => setTimeout(resolve, 1000));
+            return fetchWithRetry(url, options, retries - 1);
+          }
           return res;
-        } catch (err) {
+        } catch (err: any) {
           if (retries > 0) {
-            console.warn(`Retrying fetch to ${url}... (${retries} left)`);
+            console.warn(`Retrying fetch to ${url} due to network error: ${err.message}... (${retries} left)`);
             await new Promise(resolve => setTimeout(resolve, 1000));
             return fetchWithRetry(url, options, retries - 1);
           }
@@ -110,12 +116,19 @@ export function IdentityProvider({ children }: { children: React.ReactNode }) {
           setRole(pData.role);
         }
         console.log('✅ Profile loaded:', pData.role);
+      } else if (profileRes.status === 404) {
+        console.log('ℹ️ Profile not found (new user)');
+        setProfile(null);
+      } else {
+        throw new Error(`Profile fetch failed: ${profileRes.status}`);
       }
 
       if (wavvaultRes.ok) {
         const { exists } = await wavvaultRes.json();
         setHasWavvault(exists);
         console.log('✅ Wavvault status:', exists);
+      } else {
+        console.warn('⚠️ Wavvault status fetch failed:', wavvaultRes.status);
       }
 
       setStatus('ready');
@@ -178,7 +191,8 @@ export function IdentityProvider({ children }: { children: React.ReactNode }) {
     isAdmin: role === ROLES.ADMIN || role === ROLES.SUPER_ADMIN,
     isOperator: role === ROLES.OPERATOR,
     isSuperAdmin: role === ROLES.SUPER_ADMIN,
-    isConfirmed: profile?.onboardingComplete === true,
+    emailVerified: user?.emailVerified || false,
+    onboardingComplete: profile?.onboardingComplete === true,
     hasWavvault,
     error,
     logout,

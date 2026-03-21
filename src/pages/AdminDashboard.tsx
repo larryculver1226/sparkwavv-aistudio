@@ -30,7 +30,8 @@ import {
   Save,
   Mail,
   GraduationCap,
-  Calendar
+  Calendar,
+  Fingerprint
 } from 'lucide-react';
 import { 
   sendPasswordResetEmail
@@ -61,6 +62,7 @@ import {
 import { AuthDiagnostics } from './AuthDiagnostics';
 import { auth, db, adminDb } from '../lib/firebase';
 import { FirebaseSetup } from './FirebaseSetup';
+import { IdentityReconciliation } from './IdentityReconciliation';
 import { 
   JOURNEY_STAGES, 
   TENANTS, 
@@ -611,6 +613,59 @@ export const AdminDashboard: React.FC<{ onLogout: () => void }> = ({ onLogout })
     });
   };
 
+  const handleApproveContent = async (id: string) => {
+    try {
+      const idToken = auth?.currentUser ? await auth.currentUser.getIdToken() : null;
+      const response = await fetch(`/api/admin/flagged-content/${id}/approve`, {
+        method: 'POST',
+        headers: { 
+          'Content-Type': 'application/json',
+          ...(idToken ? { 'Authorization': `Bearer ${idToken}` } : {})
+        }
+      });
+      if (response.ok) {
+        setNotification({ message: "Content approved successfully", type: 'success' });
+        fetchFlaggedContent();
+      } else {
+        setNotification({ message: "Failed to approve content", type: 'error' });
+      }
+    } catch (error) {
+      console.error("Error approving content:", error);
+      setNotification({ message: "Error approving content", type: 'error' });
+    }
+  };
+
+  const handleDeleteContent = async (id: string) => {
+    setConfirmModal({
+      isOpen: true,
+      title: "Delete Flagged Content",
+      message: "Are you sure you want to permanently delete this content? This action cannot be undone.",
+      onConfirm: async () => {
+        try {
+          const idToken = auth?.currentUser ? await auth.currentUser.getIdToken() : null;
+          const response = await fetch(`/api/admin/flagged-content/${id}/delete`, {
+            method: 'POST',
+            headers: { 
+              'Content-Type': 'application/json',
+              ...(idToken ? { 'Authorization': `Bearer ${idToken}` } : {})
+            }
+          });
+          if (response.ok) {
+            setNotification({ message: "Content deleted successfully", type: 'success' });
+            fetchFlaggedContent();
+          } else {
+            setNotification({ message: "Failed to delete content", type: 'error' });
+          }
+        } catch (error) {
+          console.error("Error deleting content:", error);
+          setNotification({ message: "Error deleting content", type: 'error' });
+        } finally {
+          setConfirmModal(prev => ({ ...prev, isOpen: false }));
+        }
+      }
+    });
+  };
+
   if (loading && !stats) {
     return (
       <div className="min-h-screen bg-dark-bg flex items-center justify-center">
@@ -809,6 +864,7 @@ export const AdminDashboard: React.FC<{ onLogout: () => void }> = ({ onLogout })
                     { id: 'cloud', label: 'Cloud Resources', icon: Cloud, roles: [ROLES.SUPER_ADMIN, ROLES.ADMIN] },
                     { id: 'content', label: 'Content Monitor', icon: AlertTriangle, roles: [ROLES.SUPER_ADMIN, ROLES.ADMIN, ROLES.EDITOR, ROLES.VIEWER] },
                     { id: 'security', label: 'Security', icon: ShieldCheck, roles: [ROLES.SUPER_ADMIN, ROLES.ADMIN] },
+                    { id: 'identity', label: 'Identity Reconciliation', icon: Fingerprint, roles: [ROLES.SUPER_ADMIN, ROLES.ADMIN] },
                     { id: 'logs', label: 'System Logs', icon: Activity, roles: [ROLES.SUPER_ADMIN, ROLES.ADMIN] },
                     { id: 'diagnostics', label: 'Diagnostics', icon: ShieldCheck, roles: [ROLES.SUPER_ADMIN, ROLES.ADMIN] },
                     { id: 'firebase-setup', label: 'Firebase Setup', icon: Database, roles: [ROLES.SUPER_ADMIN, ROLES.ADMIN] },
@@ -866,6 +922,7 @@ export const AdminDashboard: React.FC<{ onLogout: () => void }> = ({ onLogout })
               { id: 'cloud', label: 'Cloud Resources', icon: Cloud, roles: [ROLES.SUPER_ADMIN, ROLES.ADMIN] },
               { id: 'content', label: 'Content Monitor', icon: AlertTriangle, roles: [ROLES.SUPER_ADMIN, ROLES.ADMIN, ROLES.EDITOR, ROLES.VIEWER] },
               { id: 'security', label: 'Security', icon: ShieldCheck, roles: [ROLES.SUPER_ADMIN, ROLES.ADMIN] },
+              { id: 'identity', label: 'Identity Reconciliation', icon: Fingerprint, roles: [ROLES.SUPER_ADMIN, ROLES.ADMIN] },
               { id: 'logs', label: 'System Logs', icon: Activity, roles: [ROLES.SUPER_ADMIN, ROLES.ADMIN] },
               { id: 'diagnostics', label: 'Diagnostics', icon: ShieldCheck, roles: [ROLES.SUPER_ADMIN, ROLES.ADMIN] },
               { id: 'firebase-setup', label: 'Firebase Setup', icon: Database, roles: [ROLES.SUPER_ADMIN, ROLES.ADMIN] },
@@ -908,6 +965,7 @@ export const AdminDashboard: React.FC<{ onLogout: () => void }> = ({ onLogout })
               {activeTab === 'cloud' && 'Cloud Infrastructure'}
               {activeTab === 'content' && 'Content & Sentiment'}
               {activeTab === 'security' && 'Security Audit'}
+              {activeTab === 'identity' && 'Identity Reconciliation'}
               {activeTab === 'logs' && 'System Logs'}
               {activeTab === 'diagnostics' && 'Connectivity Diagnostics'}
               {activeTab === 'firebase-setup' && 'Firebase Configuration'}
@@ -962,9 +1020,9 @@ export const AdminDashboard: React.FC<{ onLogout: () => void }> = ({ onLogout })
                 </div>
               </button>
               {[
-                { label: 'Verified Users', value: stats?.users?.active || 0, trend: 'Verified', icon: Activity, color: 'text-neon-magenta' },
+                { label: 'Verified Users', value: stats?.users?.active || 0, trend: 'Verified', icon: ShieldCheck, color: 'text-neon-lime' },
+                { label: 'Pending Email', value: stats?.users?.pendingVerification || 0, trend: 'Unverified', icon: Mail, color: 'text-neon-magenta' },
                 { label: 'New Today', value: stats?.users?.newToday || 0, trend: 'Today', icon: Heart, color: 'text-neon-lime' },
-                { label: 'Cloud Usage', value: `${stats?.resources?.cpuUsage || 0}%`, trend: 'Normal', icon: Cloud, color: 'text-neon-cyan' },
               ].map((stat, i) => (
                 <div key={i} className="glass-panel p-6 rounded-3xl border border-white/5 bg-black/40 relative overflow-hidden group">
                   <div className="absolute top-0 right-0 p-4 opacity-10 group-hover:opacity-20 transition-opacity">
@@ -1278,11 +1336,18 @@ export const AdminDashboard: React.FC<{ onLogout: () => void }> = ({ onLogout })
                             </span>
                           </td>
                           <td className="px-6 py-4">
-                            <span className={`text-[10px] font-bold uppercase tracking-widest px-2 py-1 rounded-lg ${
-                              user.emailVerified ? 'bg-neon-lime/10 text-neon-lime' : 'bg-neon-magenta/10 text-neon-magenta'
-                            }`}>
-                              {user.emailVerified ? 'VERIFIED' : 'PENDING'}
-                            </span>
+                            <div className="flex flex-col gap-1">
+                              <span className={`text-[10px] font-bold uppercase tracking-widest px-2 py-1 rounded-lg w-fit ${
+                                user.emailVerified ? 'bg-neon-lime/10 text-neon-lime' : 'bg-neon-magenta/10 text-neon-magenta'
+                              }`}>
+                                {user.emailVerified ? 'Email Verified' : 'Email Pending'}
+                              </span>
+                              <span className={`text-[10px] font-bold uppercase tracking-widest px-2 py-1 rounded-lg w-fit ${
+                                (user.emailVerified && user.journeyStage !== 'Dive-In') ? 'bg-neon-cyan/10 text-neon-cyan' : 'bg-white/5 text-white/40'
+                              }`}>
+                                {(user.emailVerified && user.journeyStage !== 'Dive-In') ? 'FULL ACCESS' : 'DIVE-IN ONLY'}
+                              </span>
+                            </div>
                           </td>
                           <td className="px-6 py-4 text-white/40 text-sm">
                             {user.creationTime ? new Date(user.creationTime).toLocaleDateString() : 'N/A'}
@@ -1467,6 +1532,10 @@ export const AdminDashboard: React.FC<{ onLogout: () => void }> = ({ onLogout })
               </div>
             )}
           </div>
+        )}
+
+        {activeTab === 'identity' && (
+          <IdentityReconciliation />
         )}
 
         {activeTab === 'overview' && (
@@ -1751,10 +1820,18 @@ export const AdminDashboard: React.FC<{ onLogout: () => void }> = ({ onLogout })
                           </td>
                           <td className="px-6 py-4">
                             <div className="flex items-center gap-2">
-                              <button className="p-2 rounded-lg bg-neon-lime/10 border border-neon-lime/20 hover:bg-neon-lime/20 text-neon-lime transition-all" title="Approve">
+                              <button 
+                                onClick={() => handleApproveContent(item.id)}
+                                className="p-2 rounded-lg bg-neon-lime/10 border border-neon-lime/20 hover:bg-neon-lime/20 text-neon-lime transition-all" 
+                                title="Approve"
+                              >
                                 <ShieldCheck className="w-4 h-4" />
                               </button>
-                              <button className="p-2 rounded-lg bg-neon-magenta/10 border border-neon-magenta/20 hover:bg-neon-magenta/20 text-neon-magenta transition-all" title="Delete">
+                              <button 
+                                onClick={() => handleDeleteContent(item.id)}
+                                className="p-2 rounded-lg bg-neon-magenta/10 border border-neon-magenta/20 hover:bg-neon-magenta/20 text-neon-magenta transition-all" 
+                                title="Delete"
+                              >
                                 <Trash2 className="w-4 h-4" />
                               </button>
                             </div>
