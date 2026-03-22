@@ -347,13 +347,37 @@ service cloud.firestore {
     }
 
     function isValidPartnerAccess(data) {
-      let allowedFields = ['id', 'partnerUid', 'userUid', 'userName', 'relationship', 'grantedAt'];
-      return hasRequiredFields(['id', 'partnerUid', 'userUid', 'grantedAt']) &&
+      let allowedFields = ['id', 'tenantId', 'userUid', 'userName', 'permissions', 'grantedAt'];
+      return hasRequiredFields(['id', 'tenantId', 'userUid', 'permissions', 'grantedAt']) &&
              hasOnlyAllowedFields(allowedFields) &&
              data.id is string && data.id.size() < 128 &&
-             data.partnerUid is string && data.partnerUid.size() < 128 &&
+             data.tenantId is string && data.tenantId.size() < 64 &&
              data.userUid is string && data.userUid.size() < 128 &&
+             data.permissions is list && data.permissions.size() <= 2 &&
              isRecent(data.grantedAt);
+    }
+
+    function isValidPartnerSuggestion(data) {
+      let allowedFields = ['id', 'userId', 'partnerTenantId', 'partnerUid', 'type', 'content', 'status', 'synthesisNote', 'createdAt', 'updatedAt'];
+      return hasRequiredFields(['id', 'userId', 'partnerTenantId', 'type', 'content', 'status', 'createdAt']) &&
+             hasOnlyAllowedFields(allowedFields) &&
+             data.id is string && data.id.size() < 128 &&
+             data.userId is string && data.userId.size() < 128 &&
+             data.partnerTenantId is string && data.partnerTenantId.size() < 64 &&
+             data.type in ['dna_shift', 'milestone'] &&
+             data.content is map &&
+             data.status in ['pending', 'accepted', 'declined'] &&
+             isRecent(data.createdAt);
+    }
+
+    function isValidPartnerApplication(data) {
+      let allowedFields = ['id', 'companyName', 'contactName', 'contactEmail', 'methodology', 'yearsExperience', 'specialization', 'aiReadiness', 'clientCapacity', 'motivation', 'status', 'createdAt'];
+      return hasRequiredFields(['id', 'companyName', 'contactName', 'contactEmail', 'status', 'createdAt']) &&
+             hasOnlyAllowedFields(allowedFields) &&
+             data.id is string && data.id.size() < 128 &&
+             isValidEmail(data.contactEmail) &&
+             data.status in ['pending', 'reviewed', 'approved', 'rejected'] &&
+             isRecent(data.createdAt);
     }
 
     function isValidUserInsight(data) {
@@ -382,9 +406,22 @@ service cloud.firestore {
              isRecent(data.createdAt);
     }
 
-    function isPartnerOf(userId) {
+    function isCoachOf(tenantId) {
       return isAuthenticated() && 
-             exists(/databases/$(database)/documents/partner_access/$(request.auth.uid + '_' + userId));
+             get(/databases/$(database)/documents/users/$(request.auth.uid)).data.tenantId == tenantId &&
+             get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role in ['mentor', 'admin'];
+    }
+
+    function isPartnerOf(userId) {
+      let userTenantId = get(/databases/$(database)/documents/users/$(request.auth.uid)).data.tenantId;
+      return isAuthenticated() && 
+             exists(/databases/$(database)/documents/partner_access/$(userTenantId + '_' + userId));
+    }
+
+    function hasPartnerPermission(userId, permission) {
+      let userTenantId = get(/databases/$(database)/documents/users/$(request.auth.uid)).data.tenantId;
+      let accessPath = /databases/$(database)/documents/partner_access/$(userTenantId + '_' + userId);
+      return exists(accessPath) && permission in get(accessPath).data.permissions;
     }
 
     function isValidJourney(data) {
@@ -424,7 +461,7 @@ service cloud.firestore {
     }
 
     match /users/{uid} {
-      allow read: if isOwner(uid) || isAdmin();
+      allow read: if isOwner(uid) || isAdmin() || isPartnerOf(uid);
       allow create: if isAuthenticated() && 
                       isValidUser(request.resource.data) && 
                       (isOwner(uid) || isAdmin()) &&
@@ -517,10 +554,29 @@ service cloud.firestore {
     }
 
     match /partner_access/{accessId} {
-      allow read: if isAuthenticated() && (isOwner(resource.data.userUid) || isOwner(resource.data.partnerUid) || isAdmin());
+      allow read: if isAuthenticated() && (isOwner(resource.data.userUid) || isCoachOf(resource.data.tenantId) || isAdmin());
       allow create: if isAuthenticated() && (isOwner(request.resource.data.userUid) || isAdmin()) && isValidPartnerAccess(request.resource.data);
       allow update: if isAdmin();
       allow delete: if isAuthenticated() && (isOwner(resource.data.userUid) || isAdmin());
+    }
+
+    match /partner_suggestions/{suggestionId} {
+      allow read: if isAuthenticated() && (isOwner(resource.data.userId) || isCoachOf(resource.data.partnerTenantId) || isAdmin());
+      allow create: if isAuthenticated() && 
+                      isCoachOf(request.resource.data.partnerTenantId) && 
+                      hasPartnerPermission(request.resource.data.userId, 'propose') &&
+                      isValidPartnerSuggestion(request.resource.data);
+      allow update: if isAuthenticated() && 
+                      (isOwner(resource.data.userId) || isCoachOf(resource.data.partnerTenantId) || isAdmin()) &&
+                      isValidPartnerSuggestion(request.resource.data);
+      allow delete: if isAdmin();
+    }
+
+    match /partner_applications/{applicationId} {
+      allow read: if isAdmin();
+      allow create: if isValidPartnerApplication(request.resource.data);
+      allow update: if isAdmin() && isValidPartnerApplication(request.resource.data);
+      allow delete: if isAdmin();
     }
 
     match /user_insights/{insightId} {

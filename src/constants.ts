@@ -2,8 +2,20 @@ export const JOURNEY_STAGES = ['Dive-In', 'Ignition', 'Discovery', 'Branding', '
 export type JourneyStage = typeof JOURNEY_STAGES[number];
 
 export const TENANTS = [
-  { id: 'sparkwavv', name: 'SPARKWavv', brand: 'sparkwavv' },
-  { id: 'kwieri', name: 'Kwieri', brand: 'kwieri' }
+  { 
+    id: 'sparkwavv', 
+    name: 'SPARKWavv', 
+    brand: 'sparkwavv',
+    logoUrl: '/logo.png',
+    primaryColor: '#00FF00'
+  },
+  { 
+    id: 'kwieri', 
+    name: 'Kwieri', 
+    brand: 'kwieri',
+    logoUrl: 'https://images.leadconnectorhq.com/image/f_webp/q_80/r_1200/u_https://assets.cdn.filesafe.space/3GWNqV7gyYunWoTZF4Vn/media/6794d8d06a58c403bd198b6c.png',
+    primaryColor: '#0F172A'
+  }
 ] as const;
 
 export const GENERATIONAL_PERSONAS = [

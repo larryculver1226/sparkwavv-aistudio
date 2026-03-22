@@ -41,6 +41,7 @@ import { signOut } from 'firebase/auth';
 import { auth } from '../lib/firebase';
 import { v4 as uuidv4 } from 'uuid';
 import { InvitationModal } from '../components/InvitationModal';
+import { PartnerSelectionModal } from '../components/PartnerSelectionModal';
 import { EveningSpark } from '../components/EveningSpark';
 import { NeuralSynthesisEngine } from '../components/dashboard/NeuralSynthesisEngine';
 import { HighFidelitySynthesisLab } from '../components/skylar/HighFidelitySynthesisLab';
@@ -311,6 +312,137 @@ export const UserDashboard: React.FC<{ userId: string; isAdmin?: boolean }> = ({
   const [data, setData] = useState<DashboardData | null>(null);
   const [insights, setInsights] = useState<UserInsight[]>([]);
   const [showEvolution, setShowEvolution] = useState(false);
+  const [isPartnerModalOpen, setIsPartnerModalOpen] = useState(false);
+  const [suggestions, setSuggestions] = useState<any[]>([]);
+  const [activePartners, setActivePartners] = useState<any[]>([]);
+
+  useEffect(() => {
+    const fetchPartnerData = async () => {
+      if (!user) return;
+      try {
+        const idToken = await user.getIdToken();
+        
+        // Fetch suggestions
+        const suggestionsRes = await fetch('/api/user/suggestions', {
+          headers: { 'Authorization': `Bearer ${idToken}` }
+        });
+        if (suggestionsRes.ok) {
+          setSuggestions(await suggestionsRes.json());
+        }
+
+        // Fetch active partners
+        const partnersRes = await fetch('/api/user/partners', {
+          headers: { 'Authorization': `Bearer ${idToken}` }
+        });
+        if (partnersRes.ok) {
+          setActivePartners(await partnersRes.json());
+        }
+      } catch (error) {
+        console.error("Error fetching partner data:", error);
+      }
+    };
+
+    fetchPartnerData();
+  }, [user]);
+
+  const handlePartnerSelect = async (tenantId: string) => {
+    if (!user) return;
+    try {
+      const idToken = await user.getIdToken();
+      await fetch('/api/user/connect-partner', {
+        method: 'POST',
+        headers: { 
+          'Authorization': `Bearer ${idToken}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ tenantId })
+      });
+      setIsPartnerModalOpen(false);
+      // Refresh partners
+      const partnersRes = await fetch('/api/user/partners', {
+        headers: { 'Authorization': `Bearer ${idToken}` }
+      });
+      setActivePartners(await partnersRes.json());
+      alert(`Connected with ${tenantId}! They now have read-only access.`);
+    } catch (error) {
+      console.error("Error connecting partner:", error);
+    }
+  };
+
+  const handleSuggestionResponse = async (suggestionId: string, status: 'accepted' | 'declined') => {
+    if (!user) return;
+    try {
+      const idToken = await user.getIdToken();
+      const suggestion = suggestions.find(s => s.id === suggestionId);
+      let synthesisNote = "";
+
+      if (status === 'accepted' && suggestion) {
+        // Call Gemini for synthesis note
+        const prompt = `As Skylar, the AI Career Engine, generate a brief "Synthesis Note" (max 2 sentences) explaining how this new insight from a Partner integrates with the user's existing DNA. 
+        Suggestion Type: ${suggestion.type}
+        Content: ${JSON.stringify(suggestion.content)}
+        Partner: ${suggestion.partnerName}`;
+        
+        try {
+          const { GoogleGenAI } = await import("@google/genai");
+          const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY || '' });
+          const response = await ai.models.generateContent({
+            model: "gemini-3-flash-preview",
+            contents: prompt,
+          });
+          synthesisNote = response.text || "Insight synthesized into your professional DNA.";
+        } catch (e) {
+          console.error("Gemini synthesis failed:", e);
+          synthesisNote = "Insight synthesized into your professional DNA.";
+        }
+      }
+
+      const res = await fetch(`/api/user/suggestions/${suggestionId}/respond`, {
+        method: 'POST',
+        headers: { 
+          'Authorization': `Bearer ${idToken}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ status, synthesisNote })
+      });
+      
+      if (res.ok) {
+        if (status === 'accepted') {
+          alert(`Suggestion accepted! Skylar Synthesis: ${synthesisNote}`);
+        }
+        // Refresh suggestions
+        setSuggestions(prev => prev.filter(s => s.id !== suggestionId));
+      }
+    } catch (error) {
+      console.error("Error responding to suggestion:", error);
+    }
+  };
+
+  const togglePartnerPermission = async (partnerId: string, currentPermissions: string[]) => {
+    if (!user) return;
+    const newPermissions = currentPermissions.includes('propose') 
+      ? ['read'] 
+      : ['read', 'propose'];
+      
+    try {
+      const idToken = await user.getIdToken();
+      await fetch(`/api/user/partners/${partnerId}/permissions`, {
+        method: 'POST',
+        headers: { 
+          'Authorization': `Bearer ${idToken}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ permissions: newPermissions })
+      });
+      // Refresh partners
+      const partnersRes = await fetch('/api/user/partners', {
+        headers: { 'Authorization': `Bearer ${idToken}` }
+      });
+      setActivePartners(await partnersRes.json());
+    } catch (error) {
+      console.error("Error toggling partner permission:", error);
+    }
+  };
   const [transparencyMode, setTransparencyMode] = useState<'under-the-hood' | 'full'>(
     (localStorage.getItem('skylar_transparency') as any) || 'under-the-hood'
   );
@@ -633,6 +765,13 @@ export const UserDashboard: React.FC<{ userId: string; isAdmin?: boolean }> = ({
           </h1>
           <div className="flex items-center gap-6">
             <button 
+              onClick={() => setIsPartnerModalOpen(true)}
+              className="flex items-center gap-2 px-4 py-2 rounded-xl bg-neon-cyan/10 border border-neon-cyan/20 text-neon-cyan hover:bg-neon-cyan/20 transition-all text-xs font-bold uppercase tracking-wider"
+            >
+              <Handshake className="w-4 h-4" />
+              Find Partner
+            </button>
+            <button 
               onClick={() => setIsInvitationModalOpen(true)}
               className="flex items-center gap-2 px-4 py-2 rounded-xl bg-neon-lime/10 border border-neon-lime/20 text-neon-lime hover:bg-neon-lime/20 transition-all text-xs font-bold uppercase tracking-wider"
             >
@@ -675,6 +814,57 @@ export const UserDashboard: React.FC<{ userId: string; isAdmin?: boolean }> = ({
         {data?.mentorNote && (
           <MentorNote note={data.mentorNote} timestamp={data.mentorNoteTimestamp || new Date().toISOString()} />
         )}
+
+        {/* Partner Suggestions */}
+        <AnimatePresence>
+          {suggestions.length > 0 && (
+            <motion.div 
+              initial={{ opacity: 0, height: 0 }}
+              animate={{ opacity: 1, height: 'auto' }}
+              exit={{ opacity: 0, height: 0 }}
+              className="mb-12 space-y-4"
+            >
+              <div className="flex items-center gap-2 text-amber-400 mb-4">
+                <Sparkles className="w-5 h-5" />
+                <h3 className="font-display font-bold text-sm tracking-tight uppercase">Partner Suggestions</h3>
+              </div>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {suggestions.map((suggestion) => (
+                  <div key={suggestion.id} className="p-6 bg-amber-400/5 border border-amber-400/20 rounded-2xl flex flex-col justify-between">
+                    <div>
+                      <div className="flex items-center justify-between mb-4">
+                        <span className="text-[10px] font-bold uppercase tracking-widest text-amber-400/60">
+                          {suggestion.type === 'dna_shift' ? 'DNA Shift' : 'New Milestone'}
+                        </span>
+                        <span className="text-[10px] font-bold text-white/40">From: {suggestion.partnerName}</span>
+                      </div>
+                      <h4 className="text-lg font-bold text-white mb-2">
+                        {suggestion.type === 'dna_shift' ? `Update ${suggestion.content.field}` : suggestion.content.title}
+                      </h4>
+                      <p className="text-sm text-white/60 mb-6">
+                        {suggestion.type === 'dna_shift' ? `Proposed value: ${suggestion.content.value}` : suggestion.content.description}
+                      </p>
+                    </div>
+                    <div className="flex gap-3">
+                      <button 
+                        onClick={() => handleSuggestionResponse(suggestion.id, 'accepted')}
+                        className="flex-1 py-2 bg-amber-400 text-black text-xs font-bold rounded-xl hover:bg-amber-300 transition-all"
+                      >
+                        Accept
+                      </button>
+                      <button 
+                        onClick={() => handleSuggestionResponse(suggestion.id, 'declined')}
+                        className="flex-1 py-2 bg-white/5 border border-white/10 text-white/60 text-xs font-bold rounded-xl hover:bg-white/10 transition-all"
+                      >
+                        Decline
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
 
         {/* Neural Synthesis Engine - Prominent Module */}
         <div className="mb-12 grid grid-cols-1 lg:grid-cols-3 gap-8">
@@ -1015,6 +1205,55 @@ export const UserDashboard: React.FC<{ userId: string; isAdmin?: boolean }> = ({
         isOpen={isInvitationModalOpen} 
         onClose={() => setIsInvitationModalOpen(false)} 
       />
+
+      <PartnerSelectionModal 
+        isOpen={isPartnerModalOpen}
+        onClose={() => setIsPartnerModalOpen(false)}
+        onSelect={handlePartnerSelect}
+      />
+
+      {/* Active Partners Section */}
+      {activePartners.length > 0 && (
+        <div className="max-w-[1600px] mx-auto px-12 pb-20">
+          <div className="mt-20 pt-20 border-t border-white/5">
+            <div className="flex items-center gap-3 mb-8">
+              <Handshake className="w-6 h-6 text-neon-cyan" />
+              <h3 className="text-2xl font-display font-bold text-white">Active Partners</h3>
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              {activePartners.map((partner) => (
+                <div key={partner.id} className="p-6 bg-white/5 border border-white/10 rounded-2xl">
+                  <div className="flex items-center gap-4 mb-6">
+                    <div className="w-12 h-12 bg-black/40 rounded-xl flex items-center justify-center border border-white/5 overflow-hidden">
+                      {partner.logoUrl ? (
+                        <img src={partner.logoUrl} alt={partner.name} className="w-full h-full object-contain p-2" referrerPolicy="no-referrer" />
+                      ) : (
+                        <ShieldCheck className="w-6 h-6 text-zinc-600" />
+                      )}
+                    </div>
+                    <div>
+                      <h4 className="font-bold text-white">{partner.name}</h4>
+                      <p className="text-xs text-white/40">Connected since {new Date(partner.grantedAt).toLocaleDateString()}</p>
+                    </div>
+                  </div>
+                  <div className="flex items-center justify-between p-3 bg-black/40 rounded-xl border border-white/5">
+                    <span className="text-[10px] font-bold uppercase tracking-widest text-white/40">Propose Access</span>
+                    <button 
+                      onClick={() => togglePartnerPermission(partner.id, partner.permissions)}
+                      className={`relative w-10 h-5 rounded-full transition-all ${partner.permissions.includes('propose') ? 'bg-neon-cyan' : 'bg-white/10'}`}
+                    >
+                      <motion.div 
+                        animate={{ x: partner.permissions.includes('propose') ? 20 : 2 }}
+                        className="absolute top-1 left-0 w-3 h-3 bg-white rounded-full shadow-sm"
+                      />
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

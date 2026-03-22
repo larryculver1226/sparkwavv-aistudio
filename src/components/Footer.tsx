@@ -1,6 +1,7 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Sparkles, Twitter, Linkedin, Github, Mail, ArrowUpRight } from 'lucide-react';
+import { PartnerApplicationForm } from './PartnerApplicationForm';
 
 interface FooterProps {
   onNavigate: (href: string) => void;
@@ -8,6 +9,7 @@ interface FooterProps {
 
 export const Footer: React.FC<FooterProps> = ({ onNavigate }) => {
   const currentYear = new Date().getFullYear();
+  const [isPartnerFormOpen, setIsPartnerFormOpen] = useState(false);
 
   const footerLinks = {
     product: [
@@ -27,7 +29,7 @@ export const Footer: React.FC<FooterProps> = ({ onNavigate }) => {
       { label: 'Documentation', href: '#' },
       { label: 'Help Center', href: '#' },
       { label: 'Community', href: '#' },
-      { label: 'Partners', href: '#' },
+      { label: 'Join the Partner Program', href: 'partner-join' },
     ],
   };
 
@@ -109,7 +111,15 @@ export const Footer: React.FC<FooterProps> = ({ onNavigate }) => {
               <ul className="space-y-4 flex flex-col items-center">
                 {footerLinks.resources.map((link) => (
                   <li key={link.label}>
-                    {link.href.startsWith('#') ? (
+                    {link.href === 'partner-join' ? (
+                      <button 
+                        onClick={() => setIsPartnerFormOpen(true)}
+                        className="text-white/40 hover:text-neon-cyan transition-colors flex items-center gap-2 group"
+                      >
+                        {link.label}
+                        <ArrowUpRight className="w-3 h-3 opacity-0 -translate-y-1 translate-x-1 group-hover:opacity-100 group-hover:translate-y-0 group-hover:translate-x-0 transition-all" />
+                      </button>
+                    ) : link.href.startsWith('#') ? (
                       <a 
                         href={link.href}
                         className="text-white/40 hover:text-neon-cyan transition-colors flex items-center gap-2 group"
@@ -142,9 +152,15 @@ export const Footer: React.FC<FooterProps> = ({ onNavigate }) => {
             <Link to="/privacy" className="text-white/20 hover:text-white text-sm transition-colors">Privacy Policy</Link>
             <Link to="/terms" className="text-white/20 hover:text-white text-sm transition-colors">Terms of Service</Link>
             <Link to="/cookies" className="text-white/20 hover:text-white text-sm transition-colors">Cookie Settings</Link>
+            <Link to="/partner/login" className="text-white/20 hover:text-white text-sm transition-colors">Partner Login</Link>
           </div>
         </div>
       </div>
+
+      <PartnerApplicationForm 
+        isOpen={isPartnerFormOpen} 
+        onClose={() => setIsPartnerFormOpen(false)} 
+      />
 
       {/* Decorative Gradient */}
       <div className="absolute bottom-0 left-1/2 -translate-x-1/2 w-full max-w-4xl h-px bg-gradient-to-r from-transparent via-neon-cyan/20 to-transparent" />

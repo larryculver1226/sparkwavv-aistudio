@@ -72,6 +72,7 @@ import { AdminLogin } from './pages/AdminLogin';
 import { AdminDashboard } from './pages/AdminDashboard';
 import { UserDashboard } from './pages/UserDashboard';
 import { PartnerDashboard } from './pages/PartnerDashboard';
+import { PartnerLogin } from './components/PartnerLogin';
 import PrivacyPolicy from './pages/PrivacyPolicy';
 import TermsOfService from './pages/TermsOfService';
 import CookieSettings from './pages/CookieSettings';
@@ -3375,6 +3376,8 @@ function App() {
         <Route path="/privacy" element={<PrivacyPolicy />} />
         <Route path="/terms" element={<TermsOfService />} />
         <Route path="/cookies" element={<CookieSettings />} />
+        <Route path="/partner/login" element={<PartnerLogin />} />
+        <Route path="/partner/dashboard" element={<PartnerDashboard />} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     </Router>

@@ -545,7 +545,7 @@ async function startServer() {
     // 1. Bootstrap Super Admin
     if (email?.toLowerCase() === 'larry.culver1226@gmail.com') {
       console.log(`[AUTH] Identified Super Admin: ${email}`);
-      return ROLES.SUPER_ADMIN;
+      return { role: ROLES.SUPER_ADMIN, tenantId: 'sparkwavv' };
     }
     
     // 2. Try Admin Project
@@ -555,9 +555,11 @@ async function startServer() {
         if (db) {
           const userDoc = await withTimeout(db.collection('admins').doc(uid).get(), 3000) as any;
           if (userDoc.exists) {
-            const role = userDoc.data()?.role || ROLES.USER;
-            console.log(`[AUTH] Role from Admin Project Firestore: ${role}`);
-            return role;
+            const data = userDoc.data();
+            const role = data?.role || ROLES.USER;
+            const tenantId = data?.tenantId || 'sparkwavv';
+            console.log(`[AUTH] Role from Admin Project Firestore: ${role} (${tenantId})`);
+            return { role, tenantId };
           }
         }
       } catch (e: any) {
@@ -572,9 +574,11 @@ async function startServer() {
         if (db) {
           const userDoc = await withTimeout(db.collection('users').doc(uid).get(), 3000) as any;
           if (userDoc.exists) {
-            const role = userDoc.data()?.role || ROLES.USER;
-            console.log(`[AUTH] Role from Sparkwavv Project Firestore: ${role}`);
-            return role;
+            const data = userDoc.data();
+            const role = data?.role || ROLES.USER;
+            const tenantId = data?.tenantId || 'sparkwavv';
+            console.log(`[AUTH] Role from Sparkwavv Project Firestore: ${role} (${tenantId})`);
+            return { role, tenantId };
           }
         }
       } catch (e: any) {
@@ -583,18 +587,18 @@ async function startServer() {
     }
     
     console.log(`[AUTH] No administrative role found for ${uid}. Defaulting to ${ROLES.USER}`);
-    return ROLES.USER;
+    return { role: ROLES.USER, tenantId: 'sparkwavv' };
   };
 
-  const setUserRole = async (uid: string, role: string) => {
+  const setUserRole = async (uid: string, role: string, tenantId: string = 'sparkwavv') => {
     try {
       // 1. Set Custom Claims
       if (isFirebaseAdminConfigured && sparkwavvAdmin) {
-        await sparkwavvAdmin.auth().setCustomUserClaims(uid, { role });
+        await sparkwavvAdmin.auth().setCustomUserClaims(uid, { role, tenantId });
       }
       
       // 2. Update Firestore
-      await db.collection('users').doc(uid).set({ role }, { merge: true });
+      await db.collection('users').doc(uid).set({ role, tenantId }, { merge: true });
       
       // 3. If it's an admin role, also update admins collection in admindb
       if ([ROLES.ADMIN, ROLES.SUPER_ADMIN, ROLES.EDITOR, ROLES.VIEWER, ROLES.OPERATOR].includes(role as any)) {
@@ -603,6 +607,7 @@ async function startServer() {
           await adminDb.collection('admins').doc(uid).set({ 
             uid, 
             role,
+            tenantId,
             updatedAt: admin.firestore.FieldValue.serverTimestamp()
           }, { merge: true });
         }
@@ -642,21 +647,25 @@ async function startServer() {
       console.log(`[AUTH] requireRole check for ${decodedToken.email}. Roles: ${roles.join(', ')}`);
 
       let role: string = decodedToken.role || ROLES.USER;
+      let tenantId: string = decodedToken.tenantId || 'sparkwavv';
       
       // Bootstrap Super Admin
       if (decodedToken.email?.toLowerCase() === 'larry.culver1226@gmail.com') {
         role = ROLES.SUPER_ADMIN;
+        tenantId = 'sparkwavv';
         // Sync custom claim if not already set
         if (decodedToken.role !== ROLES.SUPER_ADMIN) {
           console.log(`[AUTH] Bootstrapping Super Admin role for ${decodedToken.email}`);
-          await sparkwavvAdmin.auth().setCustomUserClaims(decodedToken.uid, { role: ROLES.SUPER_ADMIN });
+          await sparkwavvAdmin.auth().setCustomUserClaims(decodedToken.uid, { role: ROLES.SUPER_ADMIN, tenantId: 'sparkwavv' });
         }
       } else if (!decodedToken.role) {
         // Fallback to Firestore if no claim
-        role = await getUserRole(decodedToken.uid, decodedToken.email);
+        const result = await getUserRole(decodedToken.uid, decodedToken.email);
+        role = result.role;
+        tenantId = result.tenantId;
         // Sync claim for next time
-        if (role !== ROLES.USER) {
-          await sparkwavvAdmin.auth().setCustomUserClaims(decodedToken.uid, { role });
+        if (role !== ROLES.USER || tenantId !== 'sparkwavv') {
+          await sparkwavvAdmin.auth().setCustomUserClaims(decodedToken.uid, { role, tenantId });
         }
       }
 
@@ -676,7 +685,8 @@ async function startServer() {
       (req as any).user = {
         uid: decodedToken.uid,
         email: decodedToken.email,
-        role: role
+        role: role,
+        tenantId: tenantId
       };
 
       return next();
@@ -738,6 +748,63 @@ async function startServer() {
 
     promoteSpecificUser('larry.culver1226@gmail.com');
 
+    // Bootstrap Kwieri Tenant and Mark Workman
+    const bootstrapPartnerEcosystem = async () => {
+      try {
+        const db = getFirestoreDb();
+        if (!db) return;
+
+        // 1. Create Kwieri Tenant
+        const kwieriTenant = {
+          id: 'kwieri',
+          name: 'Kwieri',
+          brand: 'kwieri',
+          description: 'Strategic Role-Playing Partners for Career Growth',
+          logoUrl: 'https://images.leadconnectorhq.com/image/f_webp/q_80/r_1200/u_https://assets.cdn.filesafe.space/3GWNqV7gyYunWoTZF4Vn/media/6794d8d06a58c403bd198b6c.png',
+          primaryColor: '#0F172A'
+        };
+        await db.collection('tenants').doc('kwieri').set(kwieriTenant, { merge: true });
+        console.log("[BOOTSTRAP] Kwieri tenant initialized.");
+
+        // 2. Create Mark Workman (Kwieri Admin)
+        const markEmail = 'markw@sparkwavv.com';
+        try {
+          let markUser;
+          try {
+            markUser = await sparkwavvAdmin.auth().getUserByEmail(markEmail);
+          } catch (e) {
+            // Create user if not exists
+            markUser = await sparkwavvAdmin.auth().createUser({
+              email: markEmail,
+              password: 'PartnerPassword123!', // Temporary
+              displayName: 'Mark Workman'
+            });
+          }
+
+          const markUid = markUser.uid;
+          await db.collection('users').doc(markUid).set({
+            uid: markUid,
+            email: markEmail,
+            displayName: 'Mark Workman',
+            role: ROLES.MENTOR, // Partners are mentors/coaches
+            tenantId: 'kwieri',
+            onboardingComplete: true,
+            updatedAt: admin.firestore.FieldValue.serverTimestamp()
+          }, { merge: true });
+
+          // Set custom claims
+          await sparkwavvAdmin.auth().setCustomUserClaims(markUid, { role: ROLES.MENTOR, tenantId: 'kwieri' });
+          console.log(`[BOOTSTRAP] Mark Workman (${markEmail}) initialized as Kwieri Mentor.`);
+        } catch (e: any) {
+          console.error("[BOOTSTRAP] Error initializing Mark Workman:", e.message);
+        }
+      } catch (error: any) {
+        console.error("[BOOTSTRAP] Partner ecosystem bootstrap failed:", error.message);
+      }
+    };
+
+    bootstrapPartnerEcosystem();
+
     // Configure SendGrid
     if (process.env.SENDGRID_API_KEY) {
       sgMail.setApiKey(process.env.SENDGRID_API_KEY);
@@ -764,12 +831,12 @@ async function startServer() {
       try {
         if (isFirebaseAdminConfigured && sparkwavvAdmin) {
           const decodedToken = await sparkwavvAdmin.auth().verifyIdToken(idToken);
-          const role = await getUserRole(decodedToken.uid, decodedToken.email);
+          const { role, tenantId } = await getUserRole(decodedToken.uid, decodedToken.email);
           
           const allowedRoles = [ROLES.ADMIN, ROLES.SUPER_ADMIN, ROLES.OPERATOR, ROLES.EDITOR];
           if (allowedRoles.includes(role)) {
             // Set Custom Claims for instant role detection on client
-            await sparkwavvAdmin.auth().setCustomUserClaims(decodedToken.uid, { role });
+            await sparkwavvAdmin.auth().setCustomUserClaims(decodedToken.uid, { role, tenantId });
             
             await logEvent('INFO', 'AUTH', `Admin login successful: ${decodedToken.email}`, { uid: decodedToken.uid, role, entryPoint });
             
@@ -2424,6 +2491,275 @@ async function startServer() {
       res.status(500).json({ error: error.message });
     }
   });
+
+    // --- Partner Ecosystem Routes ---
+
+    // Public: Apply to join the Partner Program
+    app.post("/api/partner/apply", async (req, res) => {
+      try {
+        const db = getFirestoreDb();
+        if (!db) return res.status(503).json({ error: "Database not available" });
+
+        const application = {
+          ...req.body,
+          id: uuidv4(),
+          status: 'pending',
+          createdAt: new Date().toISOString()
+        };
+
+        await db.collection('partner_applications').doc(application.id).set(application);
+        
+        // Notify Sparkwavv Admin (Larry)
+        const adminEmail = 'larry.culver1226@gmail.com';
+        if (process.env.SENDGRID_API_KEY) {
+          const msg = {
+            to: adminEmail,
+            from: process.env.SKYLAR_FROM_EMAIL || 'skylar@sparkwavv.com',
+            subject: `New Partner Application: ${application.companyName}`,
+            text: `A new partner application has been submitted by ${application.contactName} (${application.contactEmail}) from ${application.companyName}.`,
+            html: `<h3>New Partner Application</h3>
+                   <p><strong>Company:</strong> ${application.companyName}</p>
+                   <p><strong>Contact:</strong> ${application.contactName} (${application.contactEmail})</p>
+                   <p><strong>Methodology:</strong> ${application.methodology}</p>
+                   <p>View applications in the Admin Dashboard.</p>`
+          };
+          await sgMail.send(msg);
+        }
+
+        res.json({ success: true, id: application.id });
+      } catch (error: any) {
+        console.error("Error submitting partner application:", error);
+        res.status(500).json({ error: error.message });
+      }
+    });
+
+    // Admin: List partner applications
+    app.get("/api/admin/partner-applications", requireRole([ROLES.ADMIN, ROLES.SUPER_ADMIN]), async (req, res) => {
+      try {
+        const db = getFirestoreDb();
+        if (!db) return res.status(503).json({ error: "Database not available" });
+
+        const snapshot = await db.collection('partner_applications').orderBy('createdAt', 'desc').get();
+        const applications = snapshot.docs.map((doc: any) => doc.data());
+        res.json(applications);
+      } catch (error: any) {
+        res.status(500).json({ error: error.message });
+      }
+    });
+
+    // Partner: Propose a change (DNA shift or Milestone)
+    app.post("/api/partner/suggestions", requireRole([ROLES.MENTOR, ROLES.ADMIN]), async (req, res) => {
+      try {
+        const db = getFirestoreDb();
+        if (!db) return res.status(503).json({ error: "Database not available" });
+
+        const { userId, type, content } = req.body;
+        const partner = (req as any).user;
+
+        // Verify partner has 'propose' permission for this user
+        const accessId = `${partner.tenantId}_${userId}`;
+        const accessDoc = await db.collection('partner_access').doc(accessId).get();
+        
+        if (!accessDoc.exists || !accessDoc.data()?.permissions.includes('propose')) {
+          return res.status(403).json({ error: "You do not have permission to propose changes for this user." });
+        }
+
+        const suggestion = {
+          id: uuidv4(),
+          userId,
+          partnerTenantId: partner.tenantId,
+          partnerUid: partner.uid,
+          type,
+          content,
+          status: 'pending',
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString()
+        };
+
+        await db.collection('partner_suggestions').doc(suggestion.id).set(suggestion);
+
+        // Notify User via Email
+        const userDoc = await db.collection('users').doc(userId).get();
+        const userData = userDoc.data();
+        if (userData?.email && process.env.SENDGRID_API_KEY) {
+          const msg = {
+            to: userData.email,
+            from: process.env.SKYLAR_FROM_EMAIL || 'skylar@sparkwavv.com',
+            subject: `New Suggestion from your Partner at ${partner.tenantId}`,
+            text: `Hi ${userData.displayName || 'there'},\n\nYour partner has proposed a new ${type.replace('_', ' ')} for your journey. Log in to Sparkwavv to review and accept it.\n\nBest,\nSkylar`,
+            html: `<p>Hi ${userData.displayName || 'there'},</p>
+                   <p>Your partner has proposed a new <strong>${type.replace('_', ' ')}</strong> for your journey.</p>
+                   <p>Log in to Sparkwavv to review and accept it.</p>
+                   <p>Best,<br>Skylar</p>`
+          };
+          await sgMail.send(msg);
+        }
+
+        res.json({ success: true, id: suggestion.id });
+      } catch (error: any) {
+        res.status(500).json({ error: error.message });
+      }
+    });
+
+    // User: Get suggestions
+    app.get("/api/user/suggestions", async (req, res) => {
+      try {
+        const idToken = req.headers.authorization?.split('Bearer ')[1];
+        if (!idToken) return res.status(401).json({ error: "Unauthorized" });
+        const decodedToken = await sparkwavvAdmin.auth().verifyIdToken(idToken);
+
+        const db = getFirestoreDb();
+        if (!db) return res.status(503).json({ error: "Database not available" });
+
+        const snapshot = await db.collection('partner_suggestions')
+          .where('userId', '==', decodedToken.uid)
+          .where('status', '==', 'pending')
+          .get();
+        
+        const suggestions = snapshot.docs.map((doc: any) => doc.data());
+        res.json(suggestions);
+      } catch (error: any) {
+        res.status(500).json({ error: error.message });
+      }
+    });
+
+    // User: Respond to suggestion
+    app.post("/api/user/suggestions/:id/respond", async (req, res) => {
+      try {
+        const idToken = req.headers.authorization?.split('Bearer ')[1];
+        if (!idToken) return res.status(401).json({ error: "Unauthorized" });
+        const decodedToken = await sparkwavvAdmin.auth().verifyIdToken(idToken);
+
+        const { status, synthesisNote } = req.body;
+        const suggestionId = req.params.id;
+
+        const db = getFirestoreDb();
+        if (!db) return res.status(503).json({ error: "Database not available" });
+
+        const suggestionRef = db.collection('partner_suggestions').doc(suggestionId);
+        const suggestionDoc = await suggestionRef.get();
+
+        if (!suggestionDoc.exists || suggestionDoc.data()?.userId !== decodedToken.uid) {
+          return res.status(404).json({ error: "Suggestion not found" });
+        }
+
+        const suggestionData = suggestionDoc.data();
+
+        if (status === 'accepted') {
+          // 1. Apply the change
+          if (suggestionData.type === 'dna_shift') {
+            // Update user's DNA attributes or persona
+            const { field, value } = suggestionData.content;
+            await db.collection('users').doc(decodedToken.uid).update({
+              [field]: value,
+              updatedAt: new Date().toISOString()
+            });
+          } else if (suggestionData.type === 'milestone') {
+            // Add or update milestone in dashboard
+            const dashboardRef = db.collection('dashboards').doc(decodedToken.uid);
+            const dashboardDoc = await dashboardRef.get();
+            if (dashboardDoc.exists) {
+              const milestones = dashboardDoc.data()?.milestones || [];
+              const newMilestone = { ...suggestionData.content, id: uuidv4(), completed: false };
+              await dashboardRef.update({
+                milestones: [...milestones, newMilestone],
+                updatedAt: new Date().toISOString()
+              });
+            }
+          }
+        }
+
+        await suggestionRef.update({
+          status,
+          synthesisNote: synthesisNote || null,
+          updatedAt: new Date().toISOString()
+        });
+
+        res.json({ success: true });
+      } catch (error: any) {
+        res.status(500).json({ error: error.message });
+      }
+    });
+
+    // Tenant Branding
+    app.get("/api/tenant/:id", async (req, res) => {
+      try {
+        const db = getFirestoreDb();
+        if (!db) return res.status(503).json({ error: "Database not available" });
+
+        const doc = await db.collection('tenants').doc(req.params.id).get();
+        if (!doc.exists) return res.status(404).json({ error: "Tenant not found" });
+
+        res.json(doc.data());
+      } catch (error: any) {
+        res.status(500).json({ error: error.message });
+      }
+    });
+
+    app.post("/api/tenant/:id/settings", requireRole([ROLES.ADMIN, ROLES.SUPER_ADMIN, ROLES.MENTOR]), async (req, res) => {
+      try {
+        const user = (req as any).user;
+        if (user.tenantId !== req.params.id && user.role !== ROLES.SUPER_ADMIN) {
+          return res.status(403).json({ error: "Unauthorized to manage this tenant" });
+        }
+
+        const db = getFirestoreDb();
+        if (!db) return res.status(503).json({ error: "Database not available" });
+
+        await db.collection('tenants').doc(req.params.id).set(req.body, { merge: true });
+        res.json({ success: true });
+      } catch (error: any) {
+        res.status(500).json({ error: error.message });
+      }
+    });
+
+    // Partner: Get client roster
+    app.get("/api/partner/clients", requireRole([ROLES.MENTOR, ROLES.ADMIN]), async (req, res) => {
+      try {
+        const db = getFirestoreDb();
+        if (!db) return res.status(503).json({ error: "Database not available" });
+
+        const partner = (req as any).user;
+        
+        // Get all users associated with this tenant
+        const snapshot = await db.collection('users')
+          .where('tenantId', '==', partner.tenantId)
+          .get();
+        
+        const clients = snapshot.docs.map((doc: any) => {
+          const data = doc.data();
+          return {
+            uid: data.uid,
+            displayName: data.displayName,
+            email: data.email,
+            journeyStage: data.journeyStage,
+            updatedAt: data.updatedAt
+          };
+        });
+
+        // Also fetch permissions for these clients
+        const accessSnapshot = await db.collection('partner_access')
+          .where('tenantId', '==', partner.tenantId)
+          .get();
+        
+        const accessMap: Record<string, string[]> = {};
+        accessSnapshot.docs.forEach((doc: any) => {
+          const data = doc.data();
+          accessMap[data.userUid] = data.permissions;
+        });
+
+        const clientsWithPermissions = clients.map(client => ({
+          ...client,
+          permissions: accessMap[client.uid] || ['read'] // Default to read
+        }));
+
+        res.json(clientsWithPermissions);
+      } catch (error: any) {
+        res.status(500).json({ error: error.message });
+      }
+    });
+
+    // --- End Partner Ecosystem Routes ---
 
   // Admin Auth API
   app.get("/api/auth/status", async (req, res) => {

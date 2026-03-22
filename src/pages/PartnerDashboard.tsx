@@ -1,282 +1,539 @@
 import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { auth } from '../lib/firebase';
+import { signOut } from 'firebase/auth';
 import { motion, AnimatePresence } from 'motion/react';
 import { 
   Users, 
+  Settings, 
+  LogOut, 
+  Search, 
   ChevronRight, 
-  Target, 
-  TrendingUp, 
-  Award, 
-  Clock,
+  Shield, 
+  LayoutDashboard, 
+  FileText, 
+  Plus, 
+  CheckCircle2, 
+  Clock, 
+  ExternalLink,
+  Sparkles,
   ArrowLeft,
-  ShieldCheck as Shield
+  Save,
+  Palette,
+  Image as ImageIcon
 } from 'lucide-react';
-import { useIdentity } from '../contexts/IdentityContext';
-import { db } from '../lib/firebase';
-import { collection, query, where, onSnapshot } from 'firebase/firestore';
-import { Button } from '../components/Button';
 
-interface PartnerAccess {
-  id: string;
-  userUid: string;
-  userName: string;
-  relationship: string;
-  grantedAt: string;
+interface Client {
+  uid: string;
+  displayName: string;
+  email: string;
+  journeyStage: string;
+  updatedAt: string;
+  permissions: string[];
 }
 
-interface UserProgress {
-  user: {
-    displayName: string;
-    journeyStage: string;
-    role: string;
-  };
-  dashboard: any;
+interface TenantSettings {
+  id: string;
+  name: string;
+  description: string;
+  logoUrl: string;
+  primaryColor: string;
 }
 
 export const PartnerDashboard: React.FC = () => {
-  const { user } = useIdentity();
-  const [accessRecords, setAccessRecords] = useState<PartnerAccess[]>([]);
-  const [selectedUser, setSelectedUser] = useState<UserProgress | null>(null);
+  const [clients, setClients] = useState<Client[]>([]);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const [activeTab, setActiveTab] = useState<'clients' | 'settings' | 'admin'>('clients');
+  const [searchQuery, setSearchQuery] = useState('');
+  const [selectedClient, setSelectedClient] = useState<Client | null>(null);
+  const [tenantSettings, setTenantSettings] = useState<TenantSettings | null>(null);
+  const [partnerInfo, setPartnerInfo] = useState<any>(null);
+  const [applications, setApplications] = useState<any[]>([]);
+  const navigate = useNavigate();
 
   useEffect(() => {
-    if (!user) return;
+    const fetchData = async () => {
+      try {
+        const idToken = await auth.currentUser?.getIdToken();
+        if (!idToken) return;
 
-    const q = query(
-      collection(db, 'partner_access'),
-      where('partnerUid', '==', user.uid)
-    );
+        // Fetch Partner Info (Role/Tenant)
+        const userDoc = await fetch('/api/admin/profile', {
+          headers: { 'Authorization': `Bearer ${idToken}` }
+        }).then(res => res.json());
+        setPartnerInfo(userDoc);
 
-    const unsubscribe = onSnapshot(q, (snapshot) => {
-      const records = snapshot.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data()
-      })) as PartnerAccess[];
-      setAccessRecords(records);
-      setLoading(false);
-    }, (err) => {
-      console.error("Error fetching access records:", err);
-      setError("Failed to load partner access records.");
-      setLoading(false);
-    });
-
-    return () => unsubscribe();
-  }, [user]);
-
-  const viewUserProgress = async (userId: string) => {
-    setLoading(true);
-    try {
-      const idToken = await user?.getIdToken();
-      const response = await fetch(`/api/partner/user-progress/${userId}`, {
-        headers: {
-          'Authorization': `Bearer ${idToken}`
+        // Fetch Tenant Branding
+        if (userDoc.tenantId) {
+          const tenant = await fetch(`/api/tenant/${userDoc.tenantId}`).then(res => res.json());
+          setTenantSettings(tenant);
         }
-      });
 
-      if (!response.ok) {
-        throw new Error("Failed to fetch user progress");
+        // Fetch Clients
+        const clientsData = await fetch('/api/partner/clients', {
+          headers: { 'Authorization': `Bearer ${idToken}` }
+        }).then(res => res.json());
+        setClients(clientsData);
+
+        // If Super Admin, fetch applications
+        if (userDoc.role === 'super_admin' || userDoc.role === 'admin') {
+          const apps = await fetch('/api/admin/partner-applications', {
+            headers: { 'Authorization': `Bearer ${idToken}` }
+          }).then(res => res.json());
+          setApplications(apps);
+        }
+      } catch (error) {
+        console.error("Error fetching dashboard data:", error);
+      } finally {
+        setLoading(false);
       }
+    };
 
-      const data = await response.json();
-      setSelectedUser(data);
-    } catch (err: any) {
-      console.error("Error fetching user progress:", err);
-      setError(err.message);
-    } finally {
-      setLoading(false);
+    fetchData();
+  }, []);
+
+  const handleLogout = async () => {
+    await signOut(auth);
+    navigate('/partner/login');
+  };
+
+  const filteredClients = clients.filter(c => 
+    c.displayName.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    c.email.toLowerCase().includes(searchQuery.toLowerCase())
+  );
+
+  const handleSaveSettings = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!tenantSettings) return;
+    try {
+      const idToken = await auth.currentUser?.getIdToken();
+      await fetch(`/api/tenant/${tenantSettings.id}/settings`, {
+        method: 'POST',
+        headers: { 
+          'Authorization': `Bearer ${idToken}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(tenantSettings)
+      });
+      alert('Settings saved successfully!');
+    } catch (error) {
+      console.error("Error saving settings:", error);
     }
   };
 
-  if (loading && !selectedUser) {
+  const proposeSuggestion = async (type: 'dna_shift' | 'milestone', content: any) => {
+    if (!selectedClient) return;
+    try {
+      const idToken = await auth.currentUser?.getIdToken();
+      await fetch('/api/partner/suggestions', {
+        method: 'POST',
+        headers: { 
+          'Authorization': `Bearer ${idToken}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          userId: selectedClient.uid,
+          type,
+          content
+        })
+      });
+      alert('Suggestion submitted! The user will be notified.');
+    } catch (error) {
+      console.error("Error submitting suggestion:", error);
+    }
+  };
+
+  if (loading) {
     return (
-      <div className="min-h-screen bg-dark-bg flex items-center justify-center">
-        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-neon-cyan"></div>
+      <div className="min-h-screen bg-slate-950 flex items-center justify-center">
+        <div className="w-12 h-12 border-4 border-slate-800 border-t-slate-200 rounded-full animate-spin" />
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-dark-bg text-white p-6 md:p-12">
-      <div className="max-w-7xl mx-auto">
-        <AnimatePresence mode="wait">
-          {!selectedUser ? (
-            <motion.div
-              key="list"
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -20 }}
-            >
-              <div className="flex items-center gap-4 mb-8">
-                <div className="p-3 bg-neon-cyan/10 rounded-xl">
-                  <Users className="w-8 h-8 text-neon-cyan" />
-                </div>
-                <div>
-                  <h1 className="text-3xl font-bold tracking-tight">Partner Dashboard</h1>
-                  <p className="text-zinc-400">View and support your Relational Power Partners</p>
-                </div>
-              </div>
+    <div className="min-h-screen bg-slate-950 text-slate-200 flex">
+      {/* Sidebar */}
+      <div className="w-64 bg-slate-900 border-r border-slate-800 flex flex-col">
+        <div className="p-6">
+          <div className="flex items-center gap-3 mb-8">
+            {tenantSettings?.logoUrl ? (
+              <img src={tenantSettings.logoUrl} alt="Logo" className="h-8 w-auto" referrerPolicy="no-referrer" />
+            ) : (
+              <LayoutDashboard className="w-8 h-8 text-slate-400" />
+            )}
+            <span className="font-bold text-white tracking-tight">Partner Portal</span>
+          </div>
 
-              {accessRecords.length === 0 ? (
-                <div className="glass-panel bg-black/40 border border-white/5 rounded-2xl p-12 text-center">
-                  <Users className="w-12 h-12 text-zinc-600 mx-auto mb-4" />
-                  <h3 className="text-xl font-medium mb-2">No Active Partnerships</h3>
-                  <p className="text-zinc-400 max-w-md mx-auto">
-                    When someone invites you to be their RPP and you accept, their progress will appear here.
-                  </p>
-                </div>
-              ) : (
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                  {accessRecords.map((record) => (
-                    <motion.div
-                      key={record.id}
-                      whileHover={{ scale: 1.02 }}
-                      className="glass-panel bg-black/40 border border-white/5 rounded-2xl p-6 cursor-pointer group"
-                      onClick={() => viewUserProgress(record.userUid)}
-                    >
-                      <div className="flex justify-between items-start mb-4">
-                        <div className="w-12 h-12 bg-neon-cyan/20 rounded-full flex items-center justify-center text-neon-cyan font-bold text-xl">
-                          {record.userName.charAt(0)}
-                        </div>
-                        <span className="px-3 py-1 bg-white/5 rounded-full text-xs font-medium text-zinc-400">
-                          {record.relationship}
-                        </span>
-                      </div>
-                      <h3 className="text-xl font-bold mb-1 group-hover:text-neon-cyan transition-colors">
-                        {record.userName}
-                      </h3>
-                      <p className="text-zinc-500 text-sm mb-6 flex items-center gap-2">
-                        <Clock className="w-4 h-4" />
-                        Partner since {new Date(record.grantedAt).toLocaleDateString()}
-                      </p>
-                      <Button variant="outline" className="w-full justify-between group border-white/10 hover:border-neon-cyan/50">
-                        View Progress
-                        <ChevronRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
-                      </Button>
-                    </motion.div>
-                  ))}
-                </div>
-              )}
-            </motion.div>
-          ) : (
-            <motion.div
-              key="details"
-              initial={{ opacity: 0, x: 20 }}
-              animate={{ opacity: 1, x: 0 }}
-              exit={{ opacity: 0, x: -20 }}
+          <nav className="space-y-1">
+            <button 
+              onClick={() => setActiveTab('clients')}
+              className={`w-full flex items-center gap-3 px-4 py-2 rounded-lg text-sm font-medium transition-all ${activeTab === 'clients' ? 'bg-slate-800 text-white' : 'text-slate-400 hover:text-white hover:bg-slate-800/50'}`}
             >
+              <Users className="w-4 h-4" />
+              Client Roster
+            </button>
+            <button 
+              onClick={() => setActiveTab('settings')}
+              className={`w-full flex items-center gap-3 px-4 py-2 rounded-lg text-sm font-medium transition-all ${activeTab === 'settings' ? 'bg-slate-800 text-white' : 'text-slate-400 hover:text-white hover:bg-slate-800/50'}`}
+            >
+              <Settings className="w-4 h-4" />
+              Tenant Settings
+            </button>
+            {(partnerInfo?.role === 'super_admin' || partnerInfo?.role === 'admin') && (
               <button 
-                onClick={() => setSelectedUser(null)}
-                className="flex items-center gap-2 text-zinc-400 hover:text-white mb-8 transition-colors"
+                onClick={() => setActiveTab('admin')}
+                className={`w-full flex items-center gap-3 px-4 py-2 rounded-lg text-sm font-medium transition-all ${activeTab === 'admin' ? 'bg-slate-800 text-white' : 'text-slate-400 hover:text-white hover:bg-slate-800/50'}`}
               >
-                <ArrowLeft className="w-4 h-4" />
-                Back to Partners
+                <Shield className="w-4 h-4" />
+                Admin View
               </button>
+            )}
+          </nav>
+        </div>
 
-              <div className="flex flex-col md:flex-row md:items-end justify-between gap-6 mb-12">
-                <div>
-                  <div className="flex items-center gap-3 mb-2">
-                    <h1 className="text-4xl font-bold tracking-tight">{selectedUser.user.displayName}'s Journey</h1>
-                    <span className="px-3 py-1 bg-neon-cyan/10 text-neon-cyan rounded-full text-sm font-medium border border-neon-cyan/20">
-                      {selectedUser.user.journeyStage}
-                    </span>
-                  </div>
-                  <p className="text-zinc-400">Supporting their career discovery and brand alignment</p>
-                </div>
-                <div className="flex gap-4">
-                  <div className="glass-panel bg-black/40 border border-white/5 rounded-xl px-6 py-3 text-center">
-                    <div className="text-2xl font-bold text-neon-cyan">{selectedUser.dashboard?.careerHappiness}%</div>
-                    <div className="text-xs text-zinc-500 uppercase tracking-wider">Happiness</div>
-                  </div>
-                </div>
-              </div>
+        <div className="mt-auto p-6 border-t border-slate-800">
+          <div className="flex items-center gap-3 mb-4">
+            <div className="w-8 h-8 rounded-full bg-slate-800 flex items-center justify-center text-xs font-bold text-slate-400 border border-slate-700">
+              {partnerInfo?.displayName?.[0] || 'P'}
+            </div>
+            <div className="flex-1 min-w-0">
+              <p className="text-sm font-medium text-white truncate">{partnerInfo?.displayName || 'Partner'}</p>
+              <p className="text-xs text-slate-500 truncate">{partnerInfo?.email}</p>
+            </div>
+          </div>
+          <button 
+            onClick={handleLogout}
+            className="w-full flex items-center gap-3 px-4 py-2 rounded-lg text-sm font-medium text-red-400 hover:text-red-300 hover:bg-red-400/10 transition-all"
+          >
+            <LogOut className="w-4 h-4" />
+            Sign Out
+          </button>
+        </div>
+      </div>
 
-              <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-                {/* Main Progress */}
-                <div className="lg:col-span-2 space-y-8">
-                  {/* Journey Timeline Summary */}
-                  <div className="glass-panel bg-black/40 border border-white/5 rounded-3xl p-8">
-                    <h3 className="text-xl font-bold mb-6 flex items-center gap-2">
-                      <TrendingUp className="w-5 h-5 text-neon-cyan" />
-                      Milestone Progress
-                    </h3>
-                    <div className="space-y-4">
-                      {selectedUser.dashboard?.milestones?.map((milestone: any) => (
-                        <div key={milestone.id} className="flex items-center gap-4 p-4 bg-white/5 rounded-xl border border-white/5">
-                          <div className={`w-6 h-6 rounded-full flex items-center justify-center ${milestone.completed ? 'bg-neon-cyan text-black' : 'bg-white/10 text-white/20'}`}>
-                            {milestone.completed ? <Award className="w-4 h-4" /> : <div className="w-2 h-2 bg-white/20 rounded-full" />}
+      {/* Main Content */}
+      <div className="flex-1 flex flex-col overflow-hidden">
+        <header className="h-16 bg-slate-900/50 border-bottom border-slate-800 flex items-center justify-between px-8 backdrop-blur-sm">
+          <h2 className="text-lg font-semibold text-white">
+            {activeTab === 'clients' ? 'Client Roster' : activeTab === 'settings' ? 'Tenant Settings' : 'Partner Applications'}
+          </h2>
+          {activeTab === 'clients' && (
+            <div className="relative w-64">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
+              <input 
+                type="text"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                placeholder="Search clients..."
+                className="w-full bg-slate-800 border border-slate-700 rounded-lg py-1.5 pl-10 pr-4 text-sm text-white focus:outline-none focus:ring-2 focus:ring-slate-600 transition-all"
+              />
+            </div>
+          )}
+        </header>
+
+        <main className="flex-1 overflow-y-auto p-8">
+          <AnimatePresence mode="wait">
+            {activeTab === 'clients' && (
+              <motion.div 
+                key="clients"
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -10 }}
+                className="space-y-6"
+              >
+                {selectedClient ? (
+                  <div className="space-y-6">
+                    <button 
+                      onClick={() => setSelectedClient(null)}
+                      className="flex items-center gap-2 text-slate-400 hover:text-white transition-all text-sm mb-4"
+                    >
+                      <ArrowLeft className="w-4 h-4" /> Back to Roster
+                    </button>
+
+                    <div className="bg-slate-900 border border-slate-800 rounded-2xl p-8">
+                      <div className="flex items-center justify-between mb-8">
+                        <div>
+                          <h3 className="text-2xl font-bold text-white">{selectedClient.displayName}</h3>
+                          <p className="text-slate-400">{selectedClient.email}</p>
+                        </div>
+                        <div className="flex gap-2">
+                          <span className="px-3 py-1 bg-slate-800 border border-slate-700 rounded-full text-xs font-medium text-slate-300">
+                            Stage: {selectedClient.journeyStage}
+                          </span>
+                          <span className={`px-3 py-1 rounded-full text-xs font-medium ${selectedClient.permissions.includes('propose') ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20' : 'bg-slate-800 text-slate-400 border border-slate-700'}`}>
+                            {selectedClient.permissions.includes('propose') ? 'Propose Access' : 'Read Only'}
+                          </span>
+                        </div>
+                      </div>
+
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                        {/* DNA Suggestion */}
+                        <div className="bg-slate-800/50 border border-slate-700 rounded-xl p-6">
+                          <div className="flex items-center gap-3 mb-4">
+                            <Sparkles className="w-5 h-5 text-amber-400" />
+                            <h4 className="font-semibold text-white">Propose DNA Shift</h4>
                           </div>
-                          <div className="flex-1">
-                            <div className="font-medium">{milestone.label}</div>
-                            <div className="text-xs text-zinc-500">Week {milestone.week}</div>
-                          </div>
-                          {milestone.completed && (
-                            <span className="text-xs text-neon-cyan font-medium bg-neon-cyan/10 px-2 py-1 rounded">Completed</span>
+                          <p className="text-sm text-slate-400 mb-6">Suggest a new attribute or persona based on your role-playing sessions.</p>
+                          
+                          {!selectedClient.permissions.includes('propose') ? (
+                            <div className="text-xs text-slate-500 italic bg-slate-900/50 p-3 rounded-lg border border-slate-800">
+                              User has not granted "Propose" permissions yet.
+                            </div>
+                          ) : (
+                            <div className="space-y-4">
+                              <button 
+                                onClick={() => proposeSuggestion('dna_shift', { field: 'brandPersona', value: 'Right Brain (Spark/Yang)' })}
+                                className="w-full bg-slate-700 hover:bg-slate-600 text-white py-2 rounded-lg text-sm transition-all flex items-center justify-center gap-2"
+                              >
+                                <Plus className="w-4 h-4" /> Suggest Persona Shift
+                              </button>
+                            </div>
                           )}
                         </div>
-                      ))}
+
+                        {/* Milestone Suggestion */}
+                        <div className="bg-slate-800/50 border border-slate-700 rounded-xl p-6">
+                          <div className="flex items-center gap-3 mb-4">
+                            <CheckCircle2 className="w-5 h-5 text-emerald-400" />
+                            <h4 className="font-semibold text-white">Propose Milestone</h4>
+                          </div>
+                          <p className="text-sm text-slate-400 mb-6">Add a strategic milestone to the user's journey dashboard.</p>
+                          
+                          {!selectedClient.permissions.includes('propose') ? (
+                            <div className="text-xs text-slate-500 italic bg-slate-900/50 p-3 rounded-lg border border-slate-800">
+                              User has not granted "Propose" permissions yet.
+                            </div>
+                          ) : (
+                            <div className="space-y-4">
+                              <button 
+                                onClick={() => proposeSuggestion('milestone', { title: 'Complete Brand Identity Workshop', description: 'Finalize core values and visual direction.' })}
+                                className="w-full bg-slate-700 hover:bg-slate-600 text-white py-2 rounded-lg text-sm transition-all flex items-center justify-center gap-2"
+                              >
+                                <Plus className="w-4 h-4" /> Add Milestone
+                              </button>
+                            </div>
+                          )}
+                        </div>
+                      </div>
                     </div>
                   </div>
+                ) : (
+                  <div className="bg-slate-900 border border-slate-800 rounded-2xl overflow-hidden">
+                    <table className="w-full text-left">
+                      <thead>
+                        <tr className="bg-slate-800/50 border-b border-slate-800">
+                          <th className="px-6 py-4 text-xs font-semibold text-slate-400 uppercase tracking-wider">Client</th>
+                          <th className="px-6 py-4 text-xs font-semibold text-slate-400 uppercase tracking-wider">Stage</th>
+                          <th className="px-6 py-4 text-xs font-semibold text-slate-400 uppercase tracking-wider">Permissions</th>
+                          <th className="px-6 py-4 text-xs font-semibold text-slate-400 uppercase tracking-wider">Last Sync</th>
+                          <th className="px-6 py-4 text-xs font-semibold text-slate-400 uppercase tracking-wider"></th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-800">
+                        {filteredClients.map((client) => (
+                          <tr 
+                            key={client.uid} 
+                            onClick={() => setSelectedClient(client)}
+                            className="hover:bg-slate-800/30 transition-all cursor-pointer group"
+                          >
+                            <td className="px-6 py-4">
+                              <div className="flex items-center gap-3">
+                                <div className="w-8 h-8 rounded-full bg-slate-800 flex items-center justify-center text-xs font-bold text-slate-400 border border-slate-700">
+                                  {client.displayName[0]}
+                                </div>
+                                <div>
+                                  <p className="text-sm font-medium text-white">{client.displayName}</p>
+                                  <p className="text-xs text-slate-500">{client.email}</p>
+                                </div>
+                              </div>
+                            </td>
+                            <td className="px-6 py-4">
+                              <span className="text-xs text-slate-400">{client.journeyStage}</span>
+                            </td>
+                            <td className="px-6 py-4">
+                              <span className={`text-[10px] px-2 py-0.5 rounded-full font-medium ${client.permissions.includes('propose') ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20' : 'bg-slate-800 text-slate-500 border border-slate-700'}`}>
+                                {client.permissions.includes('propose') ? 'PROPOSE' : 'READ'}
+                              </span>
+                            </td>
+                            <td className="px-6 py-4">
+                              <div className="flex items-center gap-1.5 text-xs text-slate-500">
+                                <Clock className="w-3 h-3" />
+                                {new Date(client.updatedAt).toLocaleDateString()}
+                              </div>
+                            </td>
+                            <td className="px-6 py-4 text-right">
+                              <ChevronRight className="w-4 h-4 text-slate-600 group-hover:text-slate-400 transition-all" />
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                    {filteredClients.length === 0 && (
+                      <div className="p-12 text-center">
+                        <Users className="w-12 h-12 text-slate-800 mx-auto mb-4" />
+                        <p className="text-slate-500">No clients found matching your search.</p>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </motion.div>
+            )}
 
-                  {/* Strengths */}
-                  <div className="glass-panel bg-black/40 border border-white/5 rounded-3xl p-8">
-                    <h3 className="text-xl font-bold mb-6 flex items-center gap-2">
-                      <Target className="w-5 h-5 text-neon-cyan" />
-                      Top Strengths
-                    </h3>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      {selectedUser.dashboard?.strengths?.map((strength: any) => (
-                        <div key={strength.name} className="p-4 bg-white/5 rounded-xl border border-white/5">
-                          <div className="flex justify-between items-center mb-2">
-                            <span className="font-medium">{strength.name}</span>
-                            <span className="text-neon-cyan font-bold">{strength.value}%</span>
-                          </div>
-                          <div className="h-2 bg-white/10 rounded-full overflow-hidden">
-                            <motion.div 
-                              initial={{ width: 0 }}
-                              animate={{ width: `${strength.value}%` }}
-                              className="h-full bg-neon-cyan"
+            {activeTab === 'settings' && (
+              <motion.div 
+                key="settings"
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -10 }}
+                className="max-w-2xl"
+              >
+                <div className="bg-slate-900 border border-slate-800 rounded-2xl p-8">
+                  <form onSubmit={handleSaveSettings} className="space-y-6">
+                    <div className="flex items-center gap-4 mb-8">
+                      <div className="w-16 h-16 bg-slate-800 rounded-2xl flex items-center justify-center border border-slate-700 overflow-hidden">
+                        {tenantSettings?.logoUrl ? (
+                          <img src={tenantSettings.logoUrl} alt="Logo" className="w-full h-full object-contain p-2" referrerPolicy="no-referrer" />
+                        ) : (
+                          <ImageIcon className="w-8 h-8 text-slate-600" />
+                        )}
+                      </div>
+                      <div>
+                        <h3 className="text-lg font-bold text-white">Branding Settings</h3>
+                        <p className="text-sm text-slate-400">Customize how your brand appears to your clients.</p>
+                      </div>
+                    </div>
+
+                    <div className="space-y-4">
+                      <div>
+                        <label className="block text-xs font-medium text-slate-500 uppercase tracking-wider mb-1">
+                          Organization Name
+                        </label>
+                        <input
+                          type="text"
+                          value={tenantSettings?.name || ''}
+                          onChange={(e) => setTenantSettings(prev => prev ? { ...prev, name: e.target.value } : null)}
+                          className="w-full bg-slate-800 border border-slate-700 rounded-xl py-3 px-4 text-white focus:outline-none focus:ring-2 focus:ring-slate-600 transition-all"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block text-xs font-medium text-slate-500 uppercase tracking-wider mb-1">
+                          Logo URL
+                        </label>
+                        <div className="relative">
+                          <ImageIcon className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
+                          <input
+                            type="url"
+                            value={tenantSettings?.logoUrl || ''}
+                            onChange={(e) => setTenantSettings(prev => prev ? { ...prev, logoUrl: e.target.value } : null)}
+                            className="w-full bg-slate-800 border border-slate-700 rounded-xl py-3 pl-10 pr-4 text-white focus:outline-none focus:ring-2 focus:ring-slate-600 transition-all"
+                            placeholder="https://example.com/logo.png"
+                          />
+                        </div>
+                      </div>
+
+                      <div>
+                        <label className="block text-xs font-medium text-slate-500 uppercase tracking-wider mb-1">
+                          Primary Brand Color
+                        </label>
+                        <div className="flex gap-3">
+                          <div className="relative flex-1">
+                            <Palette className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
+                            <input
+                              type="text"
+                              value={tenantSettings?.primaryColor || ''}
+                              onChange={(e) => setTenantSettings(prev => prev ? { ...prev, primaryColor: e.target.value } : null)}
+                              className="w-full bg-slate-800 border border-slate-700 rounded-xl py-3 pl-10 pr-4 text-white focus:outline-none focus:ring-2 focus:ring-slate-600 transition-all"
+                              placeholder="#000000"
                             />
                           </div>
+                          <input 
+                            type="color" 
+                            value={tenantSettings?.primaryColor || '#000000'}
+                            onChange={(e) => setTenantSettings(prev => prev ? { ...prev, primaryColor: e.target.value } : null)}
+                            className="w-12 h-12 bg-slate-800 border border-slate-700 rounded-xl p-1 cursor-pointer"
+                          />
                         </div>
+                      </div>
+
+                      <div>
+                        <label className="block text-xs font-medium text-slate-500 uppercase tracking-wider mb-1">
+                          Description
+                        </label>
+                        <textarea
+                          value={tenantSettings?.description || ''}
+                          onChange={(e) => setTenantSettings(prev => prev ? { ...prev, description: e.target.value } : null)}
+                          rows={4}
+                          className="w-full bg-slate-800 border border-slate-700 rounded-xl py-3 px-4 text-white focus:outline-none focus:ring-2 focus:ring-slate-600 transition-all resize-none"
+                          placeholder="Tell your clients about your organization..."
+                        />
+                      </div>
+                    </div>
+
+                    <button
+                      type="submit"
+                      className="w-full bg-slate-100 hover:bg-white text-slate-950 font-semibold py-3 rounded-xl flex items-center justify-center gap-2 transition-all"
+                    >
+                      <Save className="w-4 h-4" /> Save Branding Settings
+                    </button>
+                  </form>
+                </div>
+              </motion.div>
+            )}
+
+            {activeTab === 'admin' && (
+              <motion.div 
+                key="admin"
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -10 }}
+                className="space-y-6"
+              >
+                <div className="bg-slate-900 border border-slate-800 rounded-2xl overflow-hidden">
+                  <table className="w-full text-left">
+                    <thead>
+                      <tr className="bg-slate-800/50 border-b border-slate-800">
+                        <th className="px-6 py-4 text-xs font-semibold text-slate-400 uppercase tracking-wider">Company</th>
+                        <th className="px-6 py-4 text-xs font-semibold text-slate-400 uppercase tracking-wider">Contact</th>
+                        <th className="px-6 py-4 text-xs font-semibold text-slate-400 uppercase tracking-wider">Status</th>
+                        <th className="px-6 py-4 text-xs font-semibold text-slate-400 uppercase tracking-wider">Applied On</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-800">
+                      {applications.map((app) => (
+                        <tr key={app.id} className="hover:bg-slate-800/30 transition-all">
+                          <td className="px-6 py-4">
+                            <p className="text-sm font-medium text-white">{app.companyName}</p>
+                            <p className="text-xs text-slate-500">{app.website}</p>
+                          </td>
+                          <td className="px-6 py-4">
+                            <p className="text-sm text-slate-300">{app.contactName}</p>
+                            <p className="text-xs text-slate-500">{app.contactEmail}</p>
+                          </td>
+                          <td className="px-6 py-4">
+                            <span className={`text-[10px] px-2 py-0.5 rounded-full font-medium ${app.status === 'pending' ? 'bg-amber-500/10 text-amber-400 border border-amber-500/20' : 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20'}`}>
+                              {app.status.toUpperCase()}
+                            </span>
+                          </td>
+                          <td className="px-6 py-4">
+                            <span className="text-xs text-slate-500">{new Date(app.createdAt).toLocaleDateString()}</span>
+                          </td>
+                        </tr>
                       ))}
+                    </tbody>
+                  </table>
+                  {applications.length === 0 && (
+                    <div className="p-12 text-center">
+                      <FileText className="w-12 h-12 text-slate-800 mx-auto mb-4" />
+                      <p className="text-slate-500">No applications found.</p>
                     </div>
-                  </div>
+                  )}
                 </div>
-
-                {/* Sidebar Info */}
-                <div className="space-y-8">
-                  <div className="glass-panel bg-black/40 border border-white/5 rounded-3xl p-8">
-                    <h3 className="text-lg font-bold mb-4">Partner Status</h3>
-                    <div className="space-y-4">
-                      <div className="flex items-center gap-3 text-sm text-zinc-400">
-                        <Shield className="w-4 h-4 text-neon-cyan" />
-                        <span>Verified RPP Access</span>
-                      </div>
-                      <div className="flex items-center gap-3 text-sm text-zinc-400">
-                        <Clock className="w-4 h-4 text-neon-cyan" />
-                        <span>Last updated: {new Date().toLocaleDateString()}</span>
-                      </div>
-                    </div>
-                    <hr className="my-6 border-white/5" />
-                    <p className="text-sm text-zinc-500 italic">
-                      "As an RPP, your role is to encourage and provide perspective. Check in with {selectedUser.user.displayName} about their recent milestones."
-                    </p>
-                  </div>
-
-                  <div className="glass-panel bg-neon-cyan/5 border border-neon-cyan/20 rounded-3xl p-8">
-                    <h3 className="text-lg font-bold text-neon-cyan mb-2">Support Action</h3>
-                    <p className="text-sm text-zinc-400 mb-6">
-                      Send a quick message or schedule a check-in to discuss their progress in the {selectedUser.user.journeyStage} stage.
-                    </p>
-                    <Button className="w-full bg-neon-cyan hover:bg-neon-cyan/90 text-black font-bold uppercase tracking-widest">
-                      Send Encouragement
-                    </Button>
-                  </div>
-                </div>
-              </div>
-            </motion.div>
-          )}
-        </AnimatePresence>
+              </motion.div>
+            )}
+          </AnimatePresence>
+        </main>
       </div>
     </div>
   );

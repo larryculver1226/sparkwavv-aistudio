@@ -8,7 +8,9 @@
         "id": { "type": "string", "description": "Unique identifier for the tenant" },
         "name": { "type": "string", "description": "Display name of the tenant" },
         "brand": { "type": "string", "description": "Brand identifier (sparkwavv or kwieri)" },
-        "description": { "type": "string", "description": "Description of the tenant's focus" }
+        "description": { "type": "string", "description": "Description of the tenant's focus" },
+        "logoUrl": { "type": "string", "description": "URL to the tenant's logo" },
+        "primaryColor": { "type": "string", "description": "Primary brand color (hex)" }
       },
       "required": ["id", "name", "brand"]
     },
@@ -263,17 +265,59 @@
     },
     "PartnerAccess": {
       "title": "PartnerAccess",
-      "description": "Links a Partner to a User's data for shared progress viewing",
+      "description": "Links a Partner Tenant to a User's data for shared progress viewing",
       "type": "object",
       "properties": {
         "id": { "type": "string" },
-        "partnerUid": { "type": "string" },
+        "tenantId": { "type": "string", "description": "The ID of the partner tenant (e.g., kwieri)" },
         "userUid": { "type": "string" },
         "userName": { "type": "string" },
-        "relationship": { "type": "string" },
+        "permissions": { 
+          "type": "array", 
+          "items": { "type": "string", "enum": ["read", "propose"] },
+          "description": "Granted permissions"
+        },
         "grantedAt": { "type": "string", "format": "date-time" }
       },
-      "required": ["id", "partnerUid", "userUid", "grantedAt"]
+      "required": ["id", "tenantId", "userUid", "permissions", "grantedAt"]
+    },
+    "PartnerSuggestion": {
+      "title": "PartnerSuggestion",
+      "description": "A proposed DNA shift or milestone from a Partner",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "userId": { "type": "string" },
+        "partnerTenantId": { "type": "string" },
+        "partnerUid": { "type": "string" },
+        "type": { "type": "string", "enum": ["dna_shift", "milestone"] },
+        "content": { "type": "object", "description": "The actual suggestion data" },
+        "status": { "type": "string", "enum": ["pending", "accepted", "declined"] },
+        "synthesisNote": { "type": "string", "description": "Skylar's synthesis of the accepted suggestion" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "userId", "partnerTenantId", "type", "content", "status", "createdAt"]
+    },
+    "PartnerApplication": {
+      "title": "PartnerApplication",
+      "description": "An application to join the Sparkwavv Partner Program",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "companyName": { "type": "string" },
+        "contactName": { "type": "string" },
+        "contactEmail": { "type": "string" },
+        "methodology": { "type": "string" },
+        "yearsExperience": { "type": "integer" },
+        "specialization": { "type": "array", "items": { "type": "string" } },
+        "aiReadiness": { "type": "string" },
+        "clientCapacity": { "type": "integer" },
+        "motivation": { "type": "string" },
+        "status": { "type": "string", "enum": ["pending", "reviewed", "approved", "rejected"] },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "companyName", "contactName", "contactEmail", "status", "createdAt"]
     },
     "UserInsight": {
       "title": "UserInsight",
@@ -363,6 +407,14 @@
     "/partner_access/{accessId}": {
       "schema": "PartnerAccess",
       "description": "Partner access permissions"
+    },
+    "/partner_suggestions/{suggestionId}": {
+      "schema": "PartnerSuggestion",
+      "description": "Partner proposed changes"
+    },
+    "/partner_applications/{applicationId}": {
+      "schema": "PartnerApplication",
+      "description": "Partner program applications"
     },
     "/user_insights/{insightId}": {
       "schema": "UserInsight",
