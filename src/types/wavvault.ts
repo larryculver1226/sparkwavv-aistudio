@@ -28,10 +28,90 @@ export interface ProcessingLogEntry {
   step: string;
 }
 
+export interface ValidationGateEvent {
+  id: string;
+  phase: string;
+  timestamp: string;
+  status: 'passed' | 'warning' | 'failed';
+  verdict: string;
+  integrityHash: string;
+  previousEventId?: string;
+}
+
+export interface DistilledArtifact {
+  id: string;
+  type: 'spark' | 'pie-of-life' | 'perfect-day' | 'five-stories' | 'brand-pillar' | 'manifesto';
+  title: string;
+  content: any;
+  timestamp: string;
+  sourceGateId?: string;
+  metadata?: Record<string, any>;
+}
+
 export interface WavvaultData {
   userId: string;
+  identity?: string;
+  strengths?: string[];
+  careerStories?: string[];
   graph: KnowledgeGraph;
   logs: ProcessingLogEntry[];
+  journeyEvents: ValidationGateEvent[];
+  artifacts: DistilledArtifact[];
   lastSynthesis: string;
   isDiscoveryUnlocked: boolean;
+  contentHash?: string;
+  previousHash?: string;
+}
+
+export type AssetType = 'narrative' | 'resume' | 'portfolio';
+
+export interface SynthesizedAsset {
+  id: string;
+  userId: string;
+  type: AssetType;
+  title: string;
+  content: any; // Structured data for the asset
+  isLocked: boolean;
+  createdAt: string;
+  versionHash: string;
+}
+
+export interface AssetShare {
+  id: string;
+  userId: string;
+  assetId: string;
+  accessKey: string;
+  expiresAt: string | null;
+  viewCount: number;
+  maxViews: number | null;
+  brandingPersona: string;
+  createdAt: string;
+}
+
+export interface TargetOpportunity {
+  id: string;
+  userId: string;
+  company: string;
+  role: string;
+  url: string;
+  summary: string;
+  marketIntelligence: {
+    demand: 'high' | 'medium' | 'low';
+    salaryRange?: string;
+    keySkills: string[];
+    trends: string[];
+  };
+  dnaResonance: {
+    score: number;
+    matchingAttributes: string[];
+    gapAnalysis: string;
+  };
+  outreachStrategy: {
+    primaryAngle: string;
+    suggestedContacts: string[];
+    nextSteps: string[];
+  };
+  status: 'identified' | 'analyzed' | 'outreach_sent' | 'interviewing' | 'closed';
+  createdAt: string;
+  updatedAt: string;
 }

@@ -3,6 +3,7 @@ import { getFirestore } from 'firebase-admin/firestore';
 import { GoogleGenAI } from "@google/genai";
 import fs from 'fs';
 import path from 'path';
+import crypto from 'crypto';
 import { fileURLToPath } from 'url';
 import { logEvent } from './loggingService.ts';
 import { getGeminiApiKey } from './aiConfig.ts';
@@ -23,10 +24,22 @@ try {
 
 const getDb = () => {
   const databaseId = firebaseAppletConfig.firestoreDatabaseId;
-  if (databaseId) {
-    return getFirestore(admin.app(), databaseId);
+  
+  // Ensure admin is initialized
+  let app;
+  try {
+    app = admin.app();
+  } catch (e) {
+    // If not initialized, try to initialize with default options if possible, 
+    // but usually server.ts handles this. For now, just throw a clearer error.
+    console.error("WavvaultService: Firebase Admin not initialized. admin.initializeApp() must be called before getDb().");
+    throw new Error("Firebase Admin not initialized");
   }
-  return getFirestore(admin.app());
+
+  if (databaseId) {
+    return getFirestore(app, databaseId);
+  }
+  return getFirestore(app);
 };
 
 /**
@@ -62,6 +75,7 @@ export interface UserWavvaultData {
   identity: string;
   strengths: string[];
   careerStories: string[];
+  isCommit?: boolean; // If true, create a permanent snapshot
 }
 
 export interface ArtifactData {
@@ -69,10 +83,43 @@ export interface ArtifactData {
   filename: string;
   type: string;
   description?: string;
+  content?: string | Buffer; // For hashing
 }
 
-const STORAGE_BUCKET_BASE = "gs://gen-lang-client-0981029715.appspot.com";
+const STORAGE_BUCKET_BASE = firebaseAppletConfig.storageBucket 
+  ? `gs://${firebaseAppletConfig.storageBucket}` 
+  : (firebaseAppletConfig.projectId 
+      ? `gs://${firebaseAppletConfig.projectId}.appspot.com` 
+      : "gs://gen-lang-client-0883822731.appspot.com");
 const MAX_STORAGE_QUOTA = 100 * 1024 * 1024; // 100MB in bytes
+const MAX_SNAPSHOTS = 5;
+
+/**
+ * Generates a SHA-256 hash of the content
+ */
+export const generateHash = (content: string | Buffer): string => {
+  return crypto.createHash('sha256').update(content).digest('hex');
+};
+
+/**
+ * Verifies the integrity of a Wavvault document
+ */
+export const verifyWavvaultIntegrity = async (userId: string, data: any): Promise<{ valid: boolean; expectedHash: string; actualHash: string }> => {
+  const combinedText = `
+    Identity: ${data.identity}
+    Strengths: ${data.strengths.join(', ')}
+    Career Stories: ${data.careerStories.join('\n')}
+  `.trim();
+  
+  const expectedHash = generateHash(combinedText);
+  const actualHash = data.contentHash;
+  
+  return {
+    valid: expectedHash === actualHash,
+    expectedHash,
+    actualHash
+  };
+};
 
 /**
  * Updates global storage metrics
@@ -120,18 +167,24 @@ export const getStorageMetrics = async () => {
 /**
  * Purges artifacts older than 30 days
  */
-export const purgeOldArtifacts = async () => {
+export const purgeOldArtifacts = async (userId?: string) => {
   const db = getDb();
   const thirtyDaysAgo = new Date();
   thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
   
   try {
-    const snapshot = await db.collection('artifacts')
-      .where('createdAt', '<', admin.firestore.Timestamp.fromDate(thirtyDaysAgo))
-      .get();
+    let query: any = db.collection('artifacts');
+    
+    if (userId) {
+      query = query.where('userId', '==', userId);
+    } else {
+      query = query.where('createdAt', '<', admin.firestore.Timestamp.fromDate(thirtyDaysAgo));
+    }
+    
+    const snapshot = await query.get();
     
     if (snapshot.empty) {
-      await logEvent('INFO', 'STORAGE', 'Cleanup task: No old artifacts found to purge.');
+      await logEvent('INFO', 'STORAGE', userId ? `Cleanup task: No artifacts found for user ${userId}.` : 'Cleanup task: No old artifacts found to purge.');
       return { count: 0 };
     }
 
@@ -156,18 +209,131 @@ export const purgeOldArtifacts = async () => {
 };
 
 /**
+ * Performs a physical purge of a user's Wavvault data for GDPR compliance.
+ * This deletes the main document and all snapshots, breaking the chain.
+ */
+export const purgeUserWavvault = async (userId: string): Promise<{ success: boolean }> => {
+  const db = getDb();
+  try {
+    const wavvaultRef = db.collection('wavvault').doc(userId);
+    const snapshotsRef = wavvaultRef.collection('snapshots');
+
+    // Delete all snapshots
+    const snapshots = await snapshotsRef.get();
+    const batch = db.batch();
+    snapshots.forEach(doc => {
+      batch.delete(doc.ref);
+    });
+    
+    // Delete main document
+    batch.delete(wavvaultRef);
+    
+    await batch.commit();
+
+    // Also purge artifacts
+    await purgeOldArtifacts(userId);
+
+    await logEvent('INFO', 'SYSTEM', `Physical purge completed for user: ${userId}`, { userId });
+
+    return { success: true };
+  } catch (error: any) {
+    console.error("Error purging user Wavvault:", error.message || error);
+    await logEvent('ERROR', 'SYSTEM', `Purge failed for user: ${userId}: ${error.message}`);
+    throw error;
+  }
+};
+
+/**
+ * Gets the latest snapshot for a user
+ */
+export const getLatestSnapshot = async (userId: string) => {
+  const db = getDb();
+  const snapshots = await db.collection('wavvault').doc(userId).collection('snapshots')
+    .orderBy('committedAt', 'desc')
+    .limit(1)
+    .get();
+  
+  if (snapshots.empty) return null;
+  return snapshots.docs[0].data();
+};
+
+/**
+ * Analyzes the delta between current data and the latest snapshot
+ * to suggest if a new commit is needed.
+ */
+export const analyzeWavvaultDelta = async (userId: string, currentData: UserWavvaultData) => {
+  const latestSnapshot = await getLatestSnapshot(userId);
+  if (!latestSnapshot) return { suggestCommit: true, reason: "First version of your Career DNA." };
+
+  const currentText = `
+    Identity: ${currentData.identity}
+    Strengths: ${currentData.strengths.join(', ')}
+    Career Stories: ${currentData.careerStories.join('\n')}
+  `.trim();
+
+  const snapshotText = `
+    Identity: ${latestSnapshot.identity}
+    Strengths: ${latestSnapshot.strengths.join(', ')}
+    Career Stories: ${latestSnapshot.careerStories.join('\n')}
+  `.trim();
+
+  // If hashes match, no change
+  if (generateHash(currentText) === latestSnapshot.contentHash) {
+    return { suggestCommit: false };
+  }
+
+  try {
+    const ai = getAI();
+    const prompt = `
+      Compare these two versions of a professional's Career DNA.
+      Version A (Latest Snapshot):
+      ${snapshotText}
+
+      Version B (Current Updates):
+      ${currentText}
+
+      Has there been a significant evolution or addition that warrants a new version commit?
+      Significant changes include:
+      - New major achievements or career stories.
+      - Shift in professional identity or brand persona.
+      - Addition of new core strengths.
+
+      Respond in JSON format:
+      {
+        "suggestCommit": boolean,
+        "reason": "Short explanation of why a commit is suggested or not",
+        "deltaSummary": "Brief summary of what changed"
+      }
+    `;
+
+    const response = await ai.models.generateContent({
+      model: "gemini-3-flash-preview",
+      contents: [{ parts: [{ text: prompt }] }],
+      config: { responseMimeType: "application/json" }
+    });
+
+    return JSON.parse(response.text || "{}");
+  } catch (error) {
+    console.error("Error analyzing delta:", error);
+    return { suggestCommit: true, reason: "Significant updates detected." };
+  }
+};
+
+/**
  * Writes user identity and career data to Firestore with vector embeddings
- * to support similarity search.
+ * and cryptographic snapshots for immutable storage.
  */
 export const writeUserWavvault = async (data: UserWavvaultData) => {
   const db = getDb();
   
-  // Combine text for embedding generation
+  // Combine text for embedding and hashing
   const combinedText = `
     Identity: ${data.identity}
     Strengths: ${data.strengths.join(', ')}
     Career Stories: ${data.careerStories.join('\n')}
   `.trim();
+  
+  const contentHash = generateHash(combinedText);
   
   try {
     const ai = getAI();
@@ -179,39 +345,67 @@ export const writeUserWavvault = async (data: UserWavvaultData) => {
     });
     const embeddingValues = result.embeddings[0].values;
     
-    // Store in Firestore using the vector type
     const docRef = db.collection('wavvault').doc(data.userId);
-    await docRef.set({
+    const existingDoc = await docRef.get();
+    const previousHash = existingDoc.exists ? existingDoc.data()?.contentHash : null;
+
+    const updatePayload = {
       userId: data.userId,
       identity: data.identity,
       strengths: data.strengths,
       careerStories: data.careerStories,
-      // Explicitly store as a vector for similarity search
-      // Using FieldValue.vector if VectorValue is not directly accessible
+      contentHash: contentHash,
+      previousHash: previousHash,
       embedding: admin.firestore.FieldValue.vector(embeddingValues),
       updatedAt: admin.firestore.FieldValue.serverTimestamp()
-    });
+    };
+
+    // 1. Update the "Current" state
+    await docRef.set(updatePayload);
+
+    // 2. If this is an explicit commit, create a snapshot
+    if (data.isCommit) {
+      const snapshotRef = docRef.collection('snapshots').doc(contentHash);
+      await snapshotRef.set({
+        ...updatePayload,
+        committedAt: admin.firestore.FieldValue.serverTimestamp()
+      });
+
+      // 3. Manage retention (keep only latest 5 snapshots)
+      const snapshots = await docRef.collection('snapshots')
+        .orderBy('committedAt', 'desc')
+        .get();
+      
+      if (snapshots.size > MAX_SNAPSHOTS) {
+        const batch = db.batch();
+        snapshots.docs.slice(MAX_SNAPSHOTS).forEach(doc => {
+          batch.delete(doc.ref);
+        });
+        await batch.commit();
+        await logEvent('INFO', 'FIRESTORE', `Pruned ${snapshots.size - MAX_SNAPSHOTS} old snapshots for user ${data.userId}`);
+      }
+
+      await logEvent('INFO', 'FIRESTORE', `New snapshot committed: ${contentHash.substring(0, 8)}`, { userId: data.userId });
+    }
     
-    return { success: true, userId: data.userId };
+    return { success: true, userId: data.userId, contentHash };
   } catch (error: any) {
     console.error("Error writing to Wavvault:", error.message || error);
-    if (error.code === 5) {
-      console.error("Firestore Error 5 (NOT_FOUND): Database not initialized.");
-    }
     throw error;
   }
 };
 
 /**
- * Writes artifact metadata to Firestore with hardcoded Cloud Storage mapping.
+ * Writes artifact metadata to Firestore with hardcoded Cloud Storage mapping
+ * and content integrity hashing.
  */
 export const writeArtifact = async (data: ArtifactData) => {
   const db = getDb();
   
   // Check quota first
   const metrics = await getStorageMetrics();
-  // Assume 1MB per new artifact for this simulation
-  const estimatedNewSize = 1024 * 1024; 
+  // Assume 1MB per new artifact for this simulation if content not provided
+  const estimatedNewSize = data.content ? (typeof data.content === 'string' ? Buffer.byteLength(data.content) : data.content.length) : 1024 * 1024; 
   
   if ((metrics.totalSize as number) + estimatedNewSize > MAX_STORAGE_QUOTA) {
     await logEvent('ERROR', 'STORAGE', 'Failed to upload artifact: bucket_quota_exceeded', { 
@@ -221,6 +415,9 @@ export const writeArtifact = async (data: ArtifactData) => {
     throw new Error('bucket_quota_exceeded');
   }
 
+  // Generate content hash for integrity
+  const contentHash = data.content ? generateHash(data.content) : generateHash(data.filename + Date.now());
+
   // Generate a unique ID for the artifact
   const artifactId = db.collection('artifacts').doc().id;
   
@@ -229,6 +426,20 @@ export const writeArtifact = async (data: ArtifactData) => {
   
   try {
     const docRef = db.collection('artifacts').doc(artifactId);
+    
+    // Check if an artifact with this filename already exists for this user (Latest version only)
+    const existing = await db.collection('artifacts')
+      .where('userId', '==', data.userId)
+      .where('filename', '==', data.filename)
+      .get();
+    
+    if (!existing.empty) {
+      // Delete old version metadata (Latest version only policy)
+      const batch = db.batch();
+      existing.docs.forEach(doc => batch.delete(doc.ref));
+      await batch.commit();
+    }
+
     await docRef.set({
       id: artifactId,
       userId: data.userId,
@@ -236,14 +447,15 @@ export const writeArtifact = async (data: ArtifactData) => {
       type: data.type,
       description: data.description || '',
       storagePath: storagePath, // GS URI for artifact mapping
+      contentHash: contentHash,
       createdAt: admin.firestore.FieldValue.serverTimestamp()
     });
     
     // Update metrics
     await updateStorageMetrics(estimatedNewSize, 1);
-    await logEvent('INFO', 'STORAGE', `Artifact uploaded: ${data.filename}`, { userId: data.userId });
+    await logEvent('INFO', 'STORAGE', `Artifact uploaded: ${data.filename} (Hash: ${contentHash.substring(0, 8)})`, { userId: data.userId });
     
-    return { success: true, id: artifactId, storagePath };
+    return { success: true, id: artifactId, storagePath, contentHash };
   } catch (error: any) {
     console.error("Error writing artifact mapping:", error.message || error);
     if (error.code === 5) {

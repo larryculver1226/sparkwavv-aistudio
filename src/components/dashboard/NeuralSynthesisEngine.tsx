@@ -11,13 +11,19 @@ import {
   Terminal,
   X,
   ChevronRight,
-  Sparkles
+  Sparkles,
+  ShieldCheck,
+  History,
+  AlertTriangle
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { KnowledgeGraph } from './KnowledgeGraph';
 import { KnowledgeGraph as GraphData, ProcessingLogEntry, WavvaultData } from '../../types/wavvault';
 import { skylar } from '../../services/skylarService';
 import { useIdentity } from '../../contexts/IdentityContext';
+import { analyzeDelta } from '../../services/assetEngineService';
+import SkylarCommitSuggestion from './SkylarCommitSuggestion';
+import AssetSynthesizer from '../synthesis/AssetSynthesizer';
 
 interface NeuralSynthesisEngineProps {
   userId: string;
@@ -33,19 +39,41 @@ export const NeuralSynthesisEngine: React.FC<NeuralSynthesisEngineProps> = ({
   const [isIngesting, setIsIngesting] = useState(false);
   const [processingLogs, setProcessingLogs] = useState<ProcessingLogEntry[]>([]);
   const [graphData, setGraphData] = useState<GraphData>({ nodes: [], links: [] });
-  const [activeTab, setActiveTab] = useState<'graph' | 'logs'>('graph');
+  const [activeTab, setActiveTab] = useState<'graph' | 'logs' | 'assets'>('graph');
   const [isSimulating, setIsSimulating] = useState(false);
+  const [integrityStatus, setIntegrityStatus] = useState<{ valid: boolean; actualHash: string; expectedHash: string } | null>(null);
+  const [existingWavvault, setExistingWavvault] = useState<WavvaultData | null>(null);
+  const [isCommitting, setIsCommitting] = useState(false);
+  const [showHistory, setShowHistory] = useState(false);
+  const [commitSuggestion, setCommitSuggestion] = useState<{ show: boolean; reason: string }>({ show: false, reason: '' });
   const { user } = useIdentity();
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Check for unlock status
   useEffect(() => {
-    const checkUnlock = () => {
+    const checkUnlock = async () => {
       const isDiscovery = currentStage.toLowerCase() === 'discovery' || 
                           currentStage.toLowerCase() === 'branding' || 
                           currentStage.toLowerCase() === 'outreach';
       const isSimulated = localStorage.getItem('sparkwavv_discovery_unlocked') === 'true';
       setIsUnlocked(isDiscovery || isSimulated);
+
+      if (isDiscovery || isSimulated) {
+        try {
+          const data = await skylar.getWavvaultData(userId);
+          if (data) {
+            setExistingWavvault(data);
+            if (data.graph && data.graph.nodes.length > 0) {
+              setGraphData(data.graph);
+            }
+            if (data.logs && data.logs.length > 0) {
+              setProcessingLogs(data.logs);
+            }
+          }
+        } catch (err) {
+          console.error("Failed to fetch Wavvault data:", err);
+        }
+      }
     };
 
     checkUnlock();
@@ -55,14 +83,14 @@ export const NeuralSynthesisEngine: React.FC<NeuralSynthesisEngineProps> = ({
       window.removeEventListener('discovery-status-changed', checkUnlock);
       window.removeEventListener('storage', checkUnlock);
     };
-  }, [currentStage]);
+  }, [currentStage, userId]);
 
   // Simulate Initial Synthesis on Unlock
   useEffect(() => {
     if (isUnlocked && graphData.nodes.length === 0) {
       performInitialSynthesis();
     }
-  }, [isUnlocked]);
+  }, [isUnlocked, graphData.nodes.length]);
 
   const performInitialSynthesis = async () => {
     if (!user) return;
@@ -89,6 +117,45 @@ export const NeuralSynthesisEngine: React.FC<NeuralSynthesisEngineProps> = ({
     
     setGraphData(initialGraph);
     addLog('Initial Synthesis Complete. Knowledge Graph Updated.', 'success', 'complete');
+
+    // Verify integrity after initial load
+    try {
+      const integrity = await skylar.verifyWavvaultIntegrity(userId);
+      setIntegrityStatus(integrity);
+    } catch (err) {
+      console.error("Integrity check failed:", err);
+    }
+  };
+
+  const handleCommit = async () => {
+    if (!user) return;
+    setIsCommitting(true);
+    try {
+      const data: WavvaultData = {
+        userId: userId,
+        identity: existingWavvault?.identity || '',
+        strengths: existingWavvault?.strengths || [],
+        careerStories: existingWavvault?.careerStories || [],
+        graph: graphData,
+        logs: processingLogs,
+        journeyEvents: existingWavvault?.journeyEvents || [],
+        artifacts: existingWavvault?.artifacts || [],
+        lastSynthesis: new Date().toISOString(),
+        isDiscoveryUnlocked: true
+      };
+      await skylar.saveWavvaultData(data, true);
+      
+      // Re-verify integrity after commit
+      const integrity = await skylar.verifyWavvaultIntegrity(userId);
+      setIntegrityStatus(integrity);
+      
+      addLog("IMMUTABLE_SNAPSHOT_CREATED // INTEGRITY_VERIFIED", 'success', 'commit');
+    } catch (error) {
+      console.error("Commit failed:", error);
+      addLog("COMMIT_FAILED // INTEGRITY_ERROR", 'error', 'commit');
+    } finally {
+      setIsCommitting(false);
+    }
   };
 
   const addLog = (message: string, status: ProcessingLogEntry['status'], step: string) => {
@@ -148,11 +215,31 @@ export const NeuralSynthesisEngine: React.FC<NeuralSynthesisEngineProps> = ({
       setGraphData(updatedGraph);
       addLog(`Neural Synthesis Complete: ${updatedGraph.nodes.length - graphData.nodes.length} New Nodes Identified.`, 'success', 'complete');
       
+      // Analyze delta for versioning suggestion
+      const deltaResult = await analyzeDelta({
+        userId: user.uid,
+        graph: updatedGraph,
+        identity: existingWavvault?.identity || '',
+        strengths: existingWavvault?.strengths || [],
+        careerStories: existingWavvault?.careerStories || [],
+        logs: processingLogs,
+        journeyEvents: existingWavvault?.journeyEvents || [],
+        artifacts: existingWavvault?.artifacts || [],
+        lastSynthesis: new Date().toISOString(),
+        isDiscoveryUnlocked: true
+      });
+
+      if (deltaResult.suggestCommit) {
+        setCommitSuggestion({ show: true, reason: deltaResult.reason || 'Significant changes detected in your career DNA.' });
+      }
+
       // Save to Firestore
       await skylar.saveWavvaultData({
         userId: user.uid,
         graph: updatedGraph,
         logs: [...processingLogs, { timestamp: new Date().toISOString(), message: 'Synthesis Complete', status: 'success', step: 'complete' }],
+        journeyEvents: existingWavvault?.journeyEvents || [],
+        artifacts: existingWavvault?.artifacts || [],
         lastSynthesis: new Date().toISOString(),
         isDiscoveryUnlocked: true
       });
@@ -271,6 +358,12 @@ export const NeuralSynthesisEngine: React.FC<NeuralSynthesisEngineProps> = ({
             >
               Logs
             </button>
+            <button 
+              onClick={() => setActiveTab('assets')}
+              className={`px-3 py-1.5 rounded-md text-[10px] font-bold uppercase transition-all ${activeTab === 'assets' ? 'bg-neon-cyan text-black' : 'text-white/40 hover:text-white'}`}
+            >
+              Assets
+            </button>
           </div>
           
           <button 
@@ -312,7 +405,7 @@ export const NeuralSynthesisEngine: React.FC<NeuralSynthesisEngineProps> = ({
                 </p>
               </div>
             </div>
-          ) : (
+          ) : activeTab === 'logs' ? (
             <div className="w-full h-full bg-black/60 rounded-2xl border border-white/5 p-6 font-mono overflow-hidden flex flex-col">
               <div className="flex items-center gap-2 text-neon-cyan mb-4">
                 <Terminal className="w-4 h-4" />
@@ -339,6 +432,10 @@ export const NeuralSynthesisEngine: React.FC<NeuralSynthesisEngineProps> = ({
                   </div>
                 )}
               </div>
+            </div>
+          ) : (
+            <div className="w-full h-full overflow-y-auto custom-scrollbar">
+              <AssetSynthesizer userId={userId} />
             </div>
           )}
         </div>
@@ -373,6 +470,67 @@ export const NeuralSynthesisEngine: React.FC<NeuralSynthesisEngineProps> = ({
                 <p className="text-xs font-bold text-white">Upload Career Assets</p>
                 <p className="text-[10px] text-white/40 uppercase tracking-wider">PDF or DOCX supported</p>
               </div>
+            </div>
+          </section>
+
+          <section className="space-y-4">
+            <h4 className="text-[10px] font-bold text-white/40 uppercase tracking-widest flex items-center gap-2">
+              <ShieldCheck className="w-3 h-3" />
+              Immutable Storage
+            </h4>
+            
+            <div className="space-y-3">
+              {integrityStatus && (
+                <div className={`p-4 rounded-xl border flex items-center gap-3 ${
+                  integrityStatus.valid ? 'bg-emerald-500/5 border-emerald-500/20' : 'bg-red-500/5 border-red-500/20'
+                }`}>
+                  {integrityStatus.valid ? (
+                    <ShieldCheck className="w-5 h-5 text-emerald-400" />
+                  ) : (
+                    <AlertTriangle className="w-5 h-5 text-red-400" />
+                  )}
+                  <div>
+                    <p className={`text-[10px] font-bold uppercase tracking-widest ${
+                      integrityStatus.valid ? 'text-emerald-400' : 'text-red-400'
+                    }`}>
+                      {integrityStatus.valid ? 'Integrity Verified' : 'Integrity Compromised'}
+                    </p>
+                    <p className="text-[8px] font-mono text-white/40 truncate w-40">
+                      HASH: {integrityStatus.actualHash.substring(0, 16)}...
+                    </p>
+                  </div>
+                </div>
+              )}
+
+              {!integrityStatus?.valid && integrityStatus && (
+                <div className="p-3 rounded-lg bg-red-500/10 border border-red-500/20 flex items-start gap-2">
+                  <AlertTriangle className="w-3 h-3 text-red-400 shrink-0 mt-0.5" />
+                  <p className="text-[9px] text-red-400 leading-tight">
+                    Warning: Data integrity check failed. The current state does not match the last committed snapshot.
+                  </p>
+                </div>
+              )}
+
+              <button
+                onClick={handleCommit}
+                disabled={isCommitting}
+                className="w-full py-3 rounded-xl bg-neon-cyan/10 border border-neon-cyan/20 text-neon-cyan text-[10px] font-bold uppercase tracking-widest hover:bg-neon-cyan/20 transition-all flex items-center justify-center gap-2 disabled:opacity-50"
+              >
+                {isCommitting ? (
+                  <Loader2 className="w-3 h-3 animate-spin" />
+                ) : (
+                  <ShieldCheck className="w-3 h-3" />
+                )}
+                Commit to Vault
+              </button>
+
+              <button
+                onClick={() => setShowHistory(!showHistory)}
+                className="w-full py-3 rounded-xl bg-white/5 border border-white/10 text-white/60 text-[10px] font-bold uppercase tracking-widest hover:bg-white/10 transition-all flex items-center justify-center gap-2"
+              >
+                <History className="w-3 h-3" />
+                Version History
+              </button>
             </div>
           </section>
 
@@ -470,6 +628,16 @@ export const NeuralSynthesisEngine: React.FC<NeuralSynthesisEngineProps> = ({
           </motion.div>
         )}
       </AnimatePresence>
+
+      <SkylarCommitSuggestion 
+        show={commitSuggestion.show}
+        reason={commitSuggestion.reason}
+        onCommit={() => {
+          handleCommit();
+          setCommitSuggestion({ show: false, reason: '' });
+        }}
+        onDismiss={() => setCommitSuggestion({ show: false, reason: '' })}
+      />
     </div>
   );
 };

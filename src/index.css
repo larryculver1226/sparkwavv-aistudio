@@ -18,16 +18,39 @@
   --color-neon-lime: #ccff00;
   --color-dark-bg: #0a0a0c;
   --color-dark-surface: #16161e;
+  
+  /* Yin Theme Colors */
+  --color-yin-bg: #f8f9fa;
+  --color-yin-surface: #ffffff;
+  --color-yin-text: #1a1a1a;
+  --color-yin-accent: #4a5568;
 }
 
 @layer base {
   body {
-    @apply bg-dark-bg text-white font-sans antialiased;
+    @apply bg-dark-bg text-white font-sans antialiased transition-colors duration-500;
+  }
+
+  body[data-theme='yin'] {
+    @apply bg-yin-bg text-yin-text;
   }
 
   h1, h2, h3, h4 {
     @apply font-display tracking-tight;
   }
+}
+
+/* Yin Theme Overrides */
+[data-theme='yin'] .glass-panel {
+  @apply bg-white/80 border-black/5 shadow-sm;
+}
+
+[data-theme='yin'] .neon-border-cyan {
+  @apply border-yin-accent/20 shadow-none;
+}
+
+[data-theme='yin'] .neon-text-cyan {
+  @apply text-yin-accent shadow-none;
 }
 
 .neon-border-cyan {
@@ -48,9 +71,14 @@
   @apply bg-dark-surface/80 backdrop-blur-xl border border-white/10 rounded-2xl;
 }
 
-@keyframes pulse-neon {
-  0%, 100% { opacity: 1; }
-  50% { opacity: 0.7; }
+@keyframes shimmer {
+  0% { transform: translateX(-150%); }
+  50% { transform: translateX(150%); }
+  100% { transform: translateX(150%); }
+}
+
+.animate-shimmer {
+  animation: shimmer 3s infinite linear;
 }
 
 .animate-pulse-neon {

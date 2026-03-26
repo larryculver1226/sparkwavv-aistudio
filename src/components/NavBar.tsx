@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Menu, X, Sparkles, ChevronDown, LayoutDashboard, LogOut, Settings } from 'lucide-react';
+import { Menu, X, Sparkles, ChevronDown, LayoutDashboard, LogOut, Settings, Database } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { onAuthStateChanged, User as FirebaseUser, signOut } from 'firebase/auth';
 import { auth } from '../lib/firebase';
@@ -58,7 +58,7 @@ export const NavBar: React.FC<NavBarProps> = ({ onNavigate }) => {
   const [scrolled, setScrolled] = useState(false);
   const [activeDropdown, setActiveDropdown] = useState<string | null>(null);
   const { user, profile, loading, status } = useIdentity();
-  const isConfirmed = status === 'authenticated';
+  const isConfirmed = status === 'authenticated' || status === 'ready';
 
   useEffect(() => {
     const handleScroll = () => {
@@ -173,6 +173,13 @@ export const NavBar: React.FC<NavBarProps> = ({ onNavigate }) => {
                     >
                       <LayoutDashboard className="w-3.5 h-3.5 text-neon-cyan" />
                       <span>SPARKWavv Dashboard</span>
+                    </button>
+                    <button 
+                      onClick={() => navigate('/vault')}
+                      className="flex items-center gap-2 px-4 py-2 rounded-full bg-white/5 border border-white/10 text-white text-sm font-bold hover:bg-white/10 hover:border-white/20 transition-all duration-300 group"
+                    >
+                      <Database className="w-3.5 h-3.5 text-neon-magenta" />
+                      <span>Vault</span>
                     </button>
                     <button 
                       onClick={() => onNavigate('settings')}

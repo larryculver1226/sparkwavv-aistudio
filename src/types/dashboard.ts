@@ -77,6 +77,7 @@ export interface UserProfile {
   bio?: string;
   journeyStage?: string;
   brandDNAAttributes?: string[];
+  alignmentScore?: number;
 }
 
 export interface UserInsight {
@@ -89,4 +90,53 @@ export interface UserInsight {
   evidence?: string;
   conflictWith?: string; // ID of the insight it replaces
   tags?: string[]; // For thematic mapping
+}
+
+export interface MarketSignal {
+  id: string;
+  title: string;
+  company: string;
+  location: string;
+  salary?: string;
+  resonanceScore: number; // 0-100
+  dnaAlignment: {
+    values: number;
+    capabilities: number;
+    trajectory: number;
+  };
+  tags: string[];
+  timestamp: string;
+  source: string;
+  url?: string;
+}
+
+export interface DNAGap {
+  skill: string;
+  currentLevel: number; // 0-100
+  targetLevel: number; // 0-100
+  importance: 'critical' | 'high' | 'medium';
+  learningPath?: {
+    title: string;
+    provider: string;
+    url: string;
+  }[];
+}
+
+export interface ResonanceHistory {
+  industry: string;
+  dataPoints: {
+    timestamp: string;
+    score: number;
+  }[];
+}
+
+export interface StrategicDirective {
+  id: string;
+  title: string;
+  content: string;
+  priority: 'immediate' | 'high' | 'medium';
+  type: 'pivot' | 'capability' | 'positioning';
+  action: string;
+  timestamp: string;
+  status: 'active' | 'archived';
 }

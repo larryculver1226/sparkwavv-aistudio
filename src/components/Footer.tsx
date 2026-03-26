@@ -26,8 +26,8 @@ export const Footer: React.FC<FooterProps> = ({ onNavigate }) => {
       { label: 'Give a Little', href: 'company-give' },
     ],
     resources: [
-      { label: 'Documentation', href: '#' },
-      { label: 'Help Center', href: '#' },
+      { label: 'Documentation', href: 'documentation' },
+      { label: 'Help Center', href: 'help-center' },
       { label: 'Community', href: '#' },
       { label: 'Join the Partner Program', href: 'partner-join' },
     ],

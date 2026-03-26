@@ -11,6 +11,12 @@ interface EveningSparkProps {
 
 export const EveningSpark: React.FC<EveningSparkProps> = ({ energyTrough, onClose }) => {
   const [isActive, setIsActive] = useState(false);
+  const [isDismissed, setIsDismissed] = useState(() => {
+    if (typeof window !== 'undefined') {
+      return sessionStorage.getItem('evening_spark_dismissed') === 'true';
+    }
+    return false;
+  });
   const [isSpeaking, setIsSpeaking] = useState(false);
   const [autoplayFailed, setAutoplayFailed] = useState(false);
   const [currentPhase, setCurrentPhase] = useState<'relax' | 'refresh' | 'review' | 'reflect'>('relax');
@@ -18,7 +24,7 @@ export const EveningSpark: React.FC<EveningSparkProps> = ({ energyTrough, onClos
   const { user } = useIdentity();
 
   useEffect(() => {
-    if (!energyTrough) return;
+    if (!energyTrough || isDismissed) return;
 
     const checkTime = () => {
       const now = new Date();
@@ -34,7 +40,7 @@ export const EveningSpark: React.FC<EveningSparkProps> = ({ energyTrough, onClos
     checkTime(); // Initial check
 
     return () => clearInterval(interval);
-  }, [energyTrough, isActive]);
+  }, [energyTrough, isActive, isDismissed]);
 
   const startSession = async () => {
     const text = "Hello! It's your scheduled Energy Trough. I'm Skylar, your Soft Coach. Instead of pushing through, let's take a moment to reboot. We'll start with a quick relaxation exercise.";
@@ -79,7 +85,7 @@ export const EveningSpark: React.FC<EveningSparkProps> = ({ energyTrough, onClos
     }
   };
 
-  if (!isActive) return null;
+  if (!isActive || isDismissed) return null;
 
   return (
     <AnimatePresence>
@@ -104,7 +110,12 @@ export const EveningSpark: React.FC<EveningSparkProps> = ({ energyTrough, onClos
         </div>
 
         <button 
-          onClick={() => { setIsActive(false); onClose(); }}
+          onClick={() => { 
+            setIsActive(false); 
+            setIsDismissed(true);
+            sessionStorage.setItem('evening_spark_dismissed', 'true');
+            onClose(); 
+          }}
           className="absolute top-8 right-8 z-10 p-4 rounded-full bg-white/5 text-white/40 hover:text-white hover:bg-white/10 transition-all"
         >
           <X className="w-6 h-6" />

@@ -29,7 +29,7 @@ export const AccessDenied: React.FC<{ requiredRole?: string }> = ({ requiredRole
           </p>
           {role && (
             <p className="text-xs text-gray-500 uppercase tracking-widest mt-4">
-              Current Role: <span className="text-red-400 font-mono">{role}</span>
+              Current Role: <span className="text-red-400 font-mono">{typeof role === 'string' ? role : (role as any)?.role || 'Unknown'}</span>
             </p>
           )}
         </div>

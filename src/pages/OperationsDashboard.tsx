@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
+import { useNavigate } from 'react-router-dom';
 import { 
   Users, 
   Search, 
@@ -21,16 +22,46 @@ import {
   GraduationCap,
   RefreshCw,
   Edit2,
-  X
+  X,
+  Globe,
+  TrendingUp,
+  Activity,
+  Heart,
+  MessageSquare,
+  Shield,
+  ArrowDownRight,
+  ShieldCheck
 } from 'lucide-react';
+import { 
+  BarChart, 
+  Bar, 
+  XAxis, 
+  YAxis, 
+  CartesianGrid, 
+  Tooltip as RechartsTooltip, 
+  ResponsiveContainer,
+  AreaChart,
+  Area,
+  LineChart,
+  Line
+} from 'recharts';
 import * as Tooltip from '@radix-ui/react-tooltip';
 import { useIdentity } from '../contexts/IdentityContext';
+import { ROLES } from '../constants';
 
-type TabType = 'users' | 'cohorts' | 'programs';
+type TabType = 'users' | 'cohorts' | 'programs' | 'content' | 'analytics';
+
+const TENANTS = [
+  { id: 'all', name: 'Global (All Tenants)' },
+  { id: 'sparkwavv', name: 'Sparkwavv' },
+  { id: 'kwieri', name: 'Kwieri' }
+];
 
 export const OperationsDashboard: React.FC<{ onLogout?: () => void }> = ({ onLogout }) => {
+  const navigate = useNavigate();
   const { role: adminRole, logout } = useIdentity();
   const [activeTab, setActiveTab] = useState<TabType>('users');
+  const [selectedTenant, setSelectedTenant] = useState('all');
   const [users, setUsers] = useState<any[]>([]);
   const [cohorts, setCohorts] = useState<any[]>([]);
   const [programs, setPrograms] = useState<any[]>([]);
@@ -271,8 +302,30 @@ export const OperationsDashboard: React.FC<{ onLogout?: () => void }> = ({ onLog
             </p>
           </div>
 
-            <div className="flex flex-wrap items-center gap-4">
-              {!isReadOnly && (
+          <div className="flex flex-wrap items-center gap-4">
+            {(adminRole === ROLES.SUPER_ADMIN || adminRole === ROLES.ADMIN) && (
+              <button
+                onClick={() => navigate('/admin')}
+                className="flex items-center gap-2 px-4 py-3 rounded-2xl bg-white/5 border border-white/10 text-white/60 hover:text-white hover:bg-white/10 transition-all text-xs font-bold uppercase tracking-widest"
+              >
+                <ShieldCheck className="w-4 h-4 text-neon-cyan" />
+                System Admin
+              </button>
+            )}
+            <div className="relative">
+              <Globe className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-neon-cyan" />
+              <select 
+                value={selectedTenant}
+                onChange={(e) => setSelectedTenant(e.target.value)}
+                className="pl-12 pr-8 py-3 bg-white/5 border border-white/10 rounded-2xl focus:ring-2 focus:ring-neon-cyan/50 outline-none appearance-none cursor-pointer hover:bg-white/10 transition-all font-bold text-xs uppercase tracking-widest"
+              >
+                {TENANTS.map(t => (
+                  <option key={t.id} value={t.id} className="bg-gray-900">{t.name}</option>
+                ))}
+              </select>
+            </div>
+
+            {!isReadOnly && (
                 <button 
                   onClick={() => {
                     setEditingItem(null);
@@ -307,11 +360,13 @@ export const OperationsDashboard: React.FC<{ onLogout?: () => void }> = ({ onLog
         </header>
 
         {/* Tabs */}
-        <div className="flex items-center gap-2 mb-8 p-1.5 bg-white/5 border border-white/10 rounded-2xl w-fit">
+        <div className="flex items-center gap-2 mb-8 p-1.5 bg-white/5 border border-white/10 rounded-2xl w-fit overflow-x-auto max-w-full">
           {[
             { id: 'users', label: 'Users', icon: Users },
             { id: 'cohorts', label: 'Cohorts', icon: GraduationCap },
-            { id: 'programs', label: 'Programs', icon: Layers }
+            { id: 'programs', label: 'Programs', icon: Layers },
+            { id: 'content', label: 'Moderation', icon: MessageSquare },
+            { id: 'analytics', label: 'Business Insights', icon: TrendingUp }
           ].map((tab) => (
             <button
               key={tab.id}
@@ -359,7 +414,185 @@ export const OperationsDashboard: React.FC<{ onLogout?: () => void }> = ({ onLog
             </div>
           </div>
 
-          <div className="overflow-x-auto">
+          {activeTab === 'content' ? (
+            <div className="p-8 space-y-8">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                <div className="glass-panel p-6 rounded-3xl border border-white/5 bg-white/[0.02]">
+                  <div className="flex items-center gap-3 mb-4">
+                    <div className="p-2 rounded-xl bg-neon-magenta/10 text-neon-magenta">
+                      <ShieldAlert className="w-5 h-5" />
+                    </div>
+                    <h4 className="text-sm font-bold uppercase tracking-widest text-white/60">Pending Review</h4>
+                  </div>
+                  <p className="text-3xl font-display font-bold">12</p>
+                  <p className="text-xs text-white/20 mt-2">Flagged by AI sentiment analysis</p>
+                </div>
+                <div className="glass-panel p-6 rounded-3xl border border-white/5 bg-white/[0.02]">
+                  <div className="flex items-center gap-3 mb-4">
+                    <div className="p-2 rounded-xl bg-neon-lime/10 text-neon-lime">
+                      <CheckCircle2 className="w-5 h-5" />
+                    </div>
+                    <h4 className="text-sm font-bold uppercase tracking-widest text-white/60">Resolved Today</h4>
+                  </div>
+                  <p className="text-3xl font-display font-bold">48</p>
+                  <p className="text-xs text-white/20 mt-2">Manual actions taken</p>
+                </div>
+                <div className="glass-panel p-6 rounded-3xl border border-white/5 bg-white/[0.02]">
+                  <div className="flex items-center gap-3 mb-4">
+                    <div className="p-2 rounded-xl bg-neon-cyan/10 text-neon-cyan">
+                      <Heart className="w-5 h-5" />
+                    </div>
+                    <h4 className="text-sm font-bold uppercase tracking-widest text-white/60">Avg Sentiment</h4>
+                  </div>
+                  <p className="text-3xl font-display font-bold">84%</p>
+                  <p className="text-xs text-white/20 mt-2">Positive community health</p>
+                </div>
+              </div>
+
+              <div className="glass-panel rounded-3xl border border-white/5 bg-white/[0.02] overflow-hidden">
+                <div className="p-6 border-b border-white/5 flex items-center justify-between">
+                  <h3 className="text-lg font-display font-bold">Recent Flagged Content</h3>
+                  <button className="text-xs font-bold text-neon-cyan uppercase tracking-widest hover:underline">View All Reports</button>
+                </div>
+                <div className="divide-y divide-white/5">
+                  {[
+                    { id: 1, user: 'User_882', content: 'This program is not what I expected, very disappointed with the support.', reason: 'Negative Sentiment (High)', time: '2m ago' },
+                    { id: 2, user: 'User_129', content: 'Check out this external link for better resources: [redacted]', reason: 'External Link Policy', time: '15m ago' },
+                    { id: 3, user: 'User_441', content: 'I hate how this cohort is structured, it makes no sense.', reason: 'Hostility Detected', time: '1h ago' }
+                  ].map(item => (
+                    <div key={item.id} className="p-6 flex items-start justify-between hover:bg-white/[0.01] transition-colors">
+                      <div className="space-y-2">
+                        <div className="flex items-center gap-3">
+                          <span className="text-xs font-bold text-neon-cyan">{item.user}</span>
+                          <span className="text-[10px] text-white/20 uppercase tracking-widest">{item.time}</span>
+                          <span className="px-2 py-0.5 rounded bg-neon-magenta/10 text-neon-magenta text-[9px] font-bold uppercase tracking-widest border border-neon-magenta/20">{item.reason}</span>
+                        </div>
+                        <p className="text-sm text-white/70 italic">"{item.content}"</p>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <button className="p-2 rounded-lg bg-white/5 border border-white/10 hover:bg-neon-lime/10 hover:text-neon-lime transition-all" title="Dismiss">
+                          <CheckCircle2 className="w-4 h-4" />
+                        </button>
+                        <button className="p-2 rounded-lg bg-white/5 border border-white/10 hover:bg-neon-magenta/10 hover:text-neon-magenta transition-all" title="Remove Content">
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+          ) : activeTab === 'analytics' ? (
+            <div className="p-8 space-y-8">
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                <div className="glass-panel p-8 rounded-[32px] border border-white/5 bg-white/[0.02]">
+                  <div className="flex items-center justify-between mb-8">
+                    <div>
+                      <h3 className="text-lg font-display font-bold">User Growth</h3>
+                      <p className="text-xs text-white/40">New registrations over time</p>
+                    </div>
+                    <div className="flex items-center gap-2 text-neon-lime">
+                      <TrendingUp className="w-4 h-4" />
+                      <span className="text-xs font-bold">+12.5%</span>
+                    </div>
+                  </div>
+                  <div className="h-64">
+                    <ResponsiveContainer width="100%" height="100%">
+                      <AreaChart data={[
+                        { name: 'Mon', users: 400 },
+                        { name: 'Tue', users: 300 },
+                        { name: 'Wed', users: 600 },
+                        { name: 'Thu', users: 800 },
+                        { name: 'Fri', users: 500 },
+                        { name: 'Sat', users: 900 },
+                        { name: 'Sun', users: 1100 },
+                      ]}>
+                        <defs>
+                          <linearGradient id="colorUsers" x1="0" y1="0" x2="0" y2="1">
+                            <stop offset="5%" stopColor="#00f3ff" stopOpacity={0.3}/>
+                            <stop offset="95%" stopColor="#00f3ff" stopOpacity={0}/>
+                          </linearGradient>
+                        </defs>
+                        <CartesianGrid strokeDasharray="3 3" stroke="#ffffff05" vertical={false} />
+                        <XAxis dataKey="name" stroke="#ffffff20" fontSize={10} tickLine={false} axisLine={false} />
+                        <YAxis stroke="#ffffff20" fontSize={10} tickLine={false} axisLine={false} />
+                        <RechartsTooltip 
+                          contentStyle={{ backgroundColor: '#0a0a0a', border: '1px solid #ffffff10', borderRadius: '12px' }}
+                          itemStyle={{ color: '#00f3ff' }}
+                        />
+                        <Area type="monotone" dataKey="users" stroke="#00f3ff" fillOpacity={1} fill="url(#colorUsers)" strokeWidth={3} />
+                      </AreaChart>
+                    </ResponsiveContainer>
+                  </div>
+                </div>
+
+                <div className="glass-panel p-8 rounded-[32px] border border-white/5 bg-white/[0.02]">
+                  <div className="flex items-center justify-between mb-8">
+                    <div>
+                      <h3 className="text-lg font-display font-bold">Engagement Metrics</h3>
+                      <p className="text-xs text-white/40">Daily active users vs Retention</p>
+                    </div>
+                    <div className="flex items-center gap-4">
+                      <div className="flex items-center gap-2">
+                        <div className="w-2 h-2 rounded-full bg-neon-cyan" />
+                        <span className="text-[10px] text-white/40 uppercase font-bold">DAU</span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <div className="w-2 h-2 rounded-full bg-neon-magenta" />
+                        <span className="text-[10px] text-white/40 uppercase font-bold">Retention</span>
+                      </div>
+                    </div>
+                  </div>
+                  <div className="h-64">
+                    <ResponsiveContainer width="100%" height="100%">
+                      <BarChart data={[
+                        { name: 'W1', dau: 4000, ret: 2400 },
+                        { name: 'W2', dau: 3000, ret: 1398 },
+                        { name: 'W3', dau: 2000, ret: 9800 },
+                        { name: 'W4', dau: 2780, ret: 3908 },
+                        { name: 'W5', dau: 1890, ret: 4800 },
+                        { name: 'W6', dau: 2390, ret: 3800 },
+                      ]}>
+                        <CartesianGrid strokeDasharray="3 3" stroke="#ffffff05" vertical={false} />
+                        <XAxis dataKey="name" stroke="#ffffff20" fontSize={10} tickLine={false} axisLine={false} />
+                        <YAxis stroke="#ffffff20" fontSize={10} tickLine={false} axisLine={false} />
+                        <RechartsTooltip 
+                          contentStyle={{ backgroundColor: '#0a0a0a', border: '1px solid #ffffff10', borderRadius: '12px' }}
+                        />
+                        <Bar dataKey="dau" fill="#00f3ff" radius={[4, 4, 0, 0]} />
+                        <Bar dataKey="ret" fill="#ff00ff" radius={[4, 4, 0, 0]} />
+                      </BarChart>
+                    </ResponsiveContainer>
+                  </div>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+                {[
+                  { label: 'Avg Session', value: '18.4m', trend: '+2.1m', icon: Activity, color: 'text-neon-cyan' },
+                  { label: 'Retention Rate', value: '64.2%', trend: '+4.8%', icon: Users, color: 'text-neon-magenta' },
+                  { label: 'Conversion', value: '12.8%', trend: '+1.2%', icon: TrendingUp, color: 'text-neon-lime' },
+                  { label: 'Churn Rate', value: '2.4%', trend: '-0.8%', icon: ArrowDownRight, color: 'text-neon-magenta' }
+                ].map((stat, i) => (
+                  <div key={i} className="glass-panel p-6 rounded-3xl border border-white/5 bg-white/[0.02] relative overflow-hidden group">
+                    <div className="relative z-10 space-y-4">
+                      <div className="flex items-center justify-between">
+                        <p className="text-[10px] font-bold text-white/40 uppercase tracking-widest">{stat.label}</p>
+                        <stat.icon className={`w-4 h-4 ${stat.color}`} />
+                      </div>
+                      <div className="flex items-end justify-between">
+                        <h3 className="text-2xl font-display font-bold">{stat.value}</h3>
+                        <span className={`text-[10px] font-bold px-2 py-1 rounded-lg bg-white/5 ${stat.trend.startsWith('+') ? 'text-neon-lime' : 'text-neon-magenta'}`}>
+                          {stat.trend}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          ) : (
+            <div className="overflow-x-auto">
             <table className="w-full text-left border-collapse">
               <thead>
                 <tr className="bg-white/[0.02]">
@@ -429,7 +662,7 @@ export const OperationsDashboard: React.FC<{ onLogout?: () => void }> = ({ onLog
                           </span>
                         </td>
                         <td className="px-8 py-6">
-                          <span className="text-xs font-bold text-white/60 uppercase tracking-widest">{item.role || 'User'}</span>
+                          <span className="text-xs font-bold text-white/60 uppercase tracking-widest">{typeof item.role === 'string' ? item.role : (item.role as any)?.role || 'User'}</span>
                         </td>
                         <td className="px-8 py-6">
                           <span className="text-xs font-medium text-white/40">
@@ -481,38 +714,44 @@ export const OperationsDashboard: React.FC<{ onLogout?: () => void }> = ({ onLog
                               />
                             )}
                             {activeTab === 'users' && (
-                          <>
-                            <ActionButton 
-                              icon={Key} 
-                              label="Reset Password" 
-                              loading={isActionLoading === item.uid}
-                              onClick={() => handleResetPassword(item.uid)} 
-                            />
-                            <ActionButton 
-                              icon={item.disabled ? CheckCircle2 : UserX} 
-                              label={item.disabled ? "Enable Account" : "Disable Account"} 
-                              variant={item.disabled ? "success" : "danger"}
-                              loading={isActionLoading === item.uid}
-                              onClick={() => handleDisableUser(item.uid, item.disabled)} 
-                            />
-                          </>
-                        )}
-                        <ActionButton 
-                          icon={Trash2} 
-                          label={`Delete ${activeTab.slice(0, -1)}`} 
-                          variant="danger"
-                          loading={isActionLoading === (item.uid || item.id)}
-                          onClick={() => handleDelete(item.uid || item.id)} 
-                        />
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+                              <>
+                                {(adminRole === ROLES.SUPER_ADMIN || adminRole === ROLES.ADMIN || (adminRole === ROLES.OPERATOR && item.role !== ROLES.ADMIN && item.role !== ROLES.SUPER_ADMIN)) && (
+                                  <>
+                                    <ActionButton 
+                                      icon={Key} 
+                                      label="Reset Password" 
+                                      loading={isActionLoading === item.uid}
+                                      onClick={() => handleResetPassword(item.uid)} 
+                                    />
+                                    <ActionButton 
+                                      icon={item.disabled ? CheckCircle2 : UserX} 
+                                      label={item.disabled ? "Enable Account" : "Disable Account"} 
+                                      variant={item.disabled ? "success" : "danger"}
+                                      loading={isActionLoading === item.uid}
+                                      onClick={() => handleDisableUser(item.uid, item.disabled)} 
+                                    />
+                                  </>
+                                )}
+                              </>
+                            )}
+                            {(adminRole === ROLES.SUPER_ADMIN || adminRole === ROLES.ADMIN || (adminRole === ROLES.OPERATOR && (activeTab !== 'users' || (item.role !== ROLES.ADMIN && item.role !== ROLES.SUPER_ADMIN)))) && (
+                              <ActionButton 
+                                icon={Trash2} 
+                                label={`Delete ${activeTab.slice(0, -1)}`} 
+                                variant="danger"
+                                loading={isActionLoading === (item.uid || item.id)}
+                                onClick={() => handleDelete(item.uid || item.id)} 
+                              />
+                            )}
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
           </div>
-        </div>
-      </div>
       {/* Resource Modal */}
       {isModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
@@ -657,6 +896,7 @@ export const OperationsDashboard: React.FC<{ onLogout?: () => void }> = ({ onLog
           </motion.div>
         </div>
       )}
+      </div>
     </div>
   );
 };

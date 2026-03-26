@@ -109,7 +109,7 @@ export const Hero: React.FC = () => {
                 <div className="absolute top-0 left-0 w-full h-full bg-neon-cyan/5 blur-[100px] rounded-full -z-10" />
                 <div className="relative z-10 space-y-8">
                   <h3 className="text-3xl md:text-4xl font-display font-black text-neon-cyan tracking-tighter uppercase italic">
-                    Dive In Phase
+                    Dive-In Phase
                   </h3>
                   <div className="glass-panel p-8 md:p-12 relative border-neon-cyan/20 bg-black/40 backdrop-blur-xl rounded-3xl w-full">
                     <div className="absolute -top-4 -left-4 w-12 h-12 rounded-full bg-neon-cyan flex items-center justify-center text-black font-bold text-xl shadow-[0_0_20px_rgba(0,255,255,0.5)]">
@@ -137,7 +137,7 @@ export const Hero: React.FC = () => {
                 <div className="absolute top-0 left-0 w-full h-full bg-neon-cyan/5 blur-[100px] rounded-full -z-10" />
                 <div className="relative z-10 space-y-8">
                   <h3 className="text-3xl md:text-4xl font-display font-black text-neon-cyan tracking-tighter uppercase italic">
-                    Ignite Phase
+                    Ignition Phase
                   </h3>
                   <div className="glass-panel p-8 md:p-12 relative border-neon-cyan/20 bg-black/40 backdrop-blur-xl rounded-3xl w-full">
                     <div className="absolute -top-4 -left-4 w-12 h-12 rounded-full bg-neon-cyan flex items-center justify-center text-black font-bold text-xl shadow-[0_0_20px_rgba(0,255,255,0.5)]">
@@ -164,7 +164,7 @@ export const Hero: React.FC = () => {
                 <div className="absolute top-0 left-0 w-full h-full bg-neon-cyan/5 blur-[100px] rounded-full -z-10" />
                 <div className="relative z-10 space-y-8">
                   <h3 className="text-3xl md:text-4xl font-display font-black text-neon-cyan tracking-tighter uppercase italic">
-                    Discover Phase
+                    Discovery Phase
                   </h3>
                   <div className="glass-panel p-8 md:p-12 relative border-neon-cyan/20 bg-black/40 backdrop-blur-xl rounded-3xl w-full">
                     <div className="absolute -top-4 -left-4 w-12 h-12 rounded-full bg-neon-cyan flex items-center justify-center text-black font-bold text-xl shadow-[0_0_20px_rgba(0,255,255,0.5)]">
@@ -192,7 +192,7 @@ export const Hero: React.FC = () => {
                 <div className="absolute top-0 left-0 w-full h-full bg-neon-cyan/5 blur-[100px] rounded-full -z-10" />
                 <div className="relative z-10 space-y-8">
                   <h3 className="text-3xl md:text-4xl font-display font-black text-neon-cyan tracking-tighter uppercase italic">
-                    Brand Phase
+                    Branding Phase
                   </h3>
                   <div className="glass-panel p-8 md:p-12 relative border-neon-cyan/20 bg-black/40 backdrop-blur-xl rounded-3xl w-full">
                     <div className="absolute -top-4 -left-4 w-12 h-12 rounded-full bg-neon-cyan flex items-center justify-center text-black font-bold text-xl shadow-[0_0_20px_rgba(0,255,255,0.5)]">

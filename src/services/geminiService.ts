@@ -57,7 +57,7 @@ export async function generateBrandImage(
   prompt: string, 
   base64Image?: string, 
   mimeType?: string,
-  size: "1K" | "2K" | "4K" = "1K"
+  size: "512px" | "1K" | "2K" | "4K" = "1K"
 ) {
   const ai = getAI();
   
@@ -73,7 +73,7 @@ export async function generateBrandImage(
 
   try {
     const response = await ai.models.generateContent({
-      model: 'gemini-3-pro-image-preview',
+      model: 'gemini-3.1-flash-image-preview',
       contents: { parts },
       config: {
         imageConfig: {
@@ -123,6 +123,7 @@ export async function generateDiscoverySummary(userData: UserData) {
     3. careerClusters: 2-3 aligned career direction clusters (e.g., "Creative Strategy in Fintech").
     4. nextExperiments: 3-5 concrete projects or courses to test their brand.
     5. nextSteps: 3-4 actionable next steps with a title, description, and action label (e.g., "Update LinkedIn", "Network in Fintech").
+    6. skillsCloud: A list of 10-15 key skills derived from their profile.
   `;
 
   try {
@@ -150,9 +151,10 @@ export async function generateDiscoverySummary(userData: UserData) {
                 },
                 required: ["title", "description", "actionLabel"]
               }
-            }
+            },
+            skillsCloud: { type: Type.ARRAY, items: { type: Type.STRING } }
           },
-          required: ["brandPortrait", "strengths", "careerClusters", "nextExperiments", "nextSteps"]
+          required: ["brandPortrait", "strengths", "careerClusters", "nextExperiments", "nextSteps", "skillsCloud"]
         }
       }
     });
@@ -160,6 +162,62 @@ export async function generateDiscoverySummary(userData: UserData) {
     return JSON.parse(response.text || "{}");
   } catch (error) {
     console.error("Error generating summary:", error);
+    return null;
+  }
+}
+
+export async function generateCinematicManifesto(userData: UserData) {
+  const prompt = `
+    Act as a cinematic brand storyteller for SPARKWavv. 
+    Based on the following user data, synthesize their "Cinematic Brand Manifesto".
+    
+    User Data:
+    - Name: ${userData.onboarding.name}
+    - Industry: ${userData.onboarding.industry}
+    - Bio: ${userData.onboarding.bio}
+    - Accomplishments: ${userData.accomplishments.map(a => `${a.title}: ${a.description}`).join("; ")}
+    - Brand Attributes: ${userData.attributes.join(", ")}
+    - Career Tagline: ${userData.tagline}
+
+    Generate 3 "Brand Pillars". Each pillar must have:
+    1. quote: A powerful, personalized quote that encapsulates a core aspect of their professional identity.
+    2. tagline: A short, strategic tagline (3-5 words).
+    3. visualPrompt: A detailed prompt for generating a unique, abstract, high-end cinematic visual that represents this pillar. Focus on textures, lighting, and abstract concepts (e.g., "Liquid gold flowing through obsidian cracks, representing resilience and value").
+
+    Output a JSON object with an array of 3 pillars.
+  `;
+
+  try {
+    const ai = getAI();
+    const response = await ai.models.generateContent({
+      model: "gemini-3-flash-preview",
+      contents: prompt,
+      config: {
+        responseMimeType: "application/json",
+        responseSchema: {
+          type: Type.OBJECT,
+          properties: {
+            pillars: {
+              type: Type.ARRAY,
+              items: {
+                type: Type.OBJECT,
+                properties: {
+                  quote: { type: Type.STRING },
+                  tagline: { type: Type.STRING },
+                  visualPrompt: { type: Type.STRING }
+                },
+                required: ["quote", "tagline", "visualPrompt"]
+              }
+            }
+          },
+          required: ["pillars"]
+        }
+      }
+    });
+
+    return JSON.parse(response.text || "{}");
+  } catch (error) {
+    console.error("Error generating cinematic manifesto:", error);
     return null;
   }
 }

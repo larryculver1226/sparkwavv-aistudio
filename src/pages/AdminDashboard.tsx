@@ -31,7 +31,8 @@ import {
   Mail,
   GraduationCap,
   Calendar,
-  Fingerprint
+  Fingerprint,
+  Brain
 } from 'lucide-react';
 import { 
   sendPasswordResetEmail
@@ -63,6 +64,7 @@ import { AuthDiagnostics } from './AuthDiagnostics';
 import { auth, db, adminDb } from '../lib/firebase';
 import { FirebaseSetup } from './FirebaseSetup';
 import { IdentityReconciliation } from './IdentityReconciliation';
+import { VertexDashboard } from '../components/admin/VertexDashboard';
 import { 
   JOURNEY_STAGES, 
   TENANTS, 
@@ -127,9 +129,9 @@ interface StorageMetrics {
 
 export const AdminDashboard: React.FC<{ onLogout: () => void }> = ({ onLogout }) => {
   const navigate = useNavigate();
-  const { role: adminRole, logout } = useIdentity();
+  const { role: adminRole, logout, isAdmin } = useIdentity();
   const isReadOnly = adminRole === 'viewer';
-  const isSuperAdmin = adminRole === 'super_admin' || adminRole === 'admin';
+  const isSuperAdmin = isAdmin; // Use the isAdmin from context which includes super_admin
   const [stats, setStats] = useState<AdminStats | null>(null);
   const [users, setUsers] = useState<any[]>([]);
   const [programs, setPrograms] = useState<any[]>([]);
@@ -179,25 +181,35 @@ export const AdminDashboard: React.FC<{ onLogout: () => void }> = ({ onLogout })
   }, []);
 
   const fetchStorageMetrics = async () => {
+    if (!auth.currentUser) return;
+    
     try {
-      const idToken = await auth.currentUser?.getIdToken();
+      const idToken = await auth.currentUser.getIdToken();
       const res = await fetch('/api/admin/storage/metrics', {
         headers: { 'Authorization': `Bearer ${idToken}` }
       });
       if (res.ok) {
         const data = await res.json();
         setStorageMetrics(data);
+      } else {
+        const errorData = await res.json().catch(() => ({}));
+        console.warn("Storage metrics API returned error:", res.status, errorData);
       }
     } catch (error) {
-      console.error("Failed to fetch storage metrics:", error);
+      // Only log if it's not a common network error during logout/refresh
+      if (auth.currentUser) {
+        console.error("Failed to fetch storage metrics:", error);
+      }
     }
   };
 
   useEffect(() => {
-    fetchStorageMetrics();
-    const interval = setInterval(fetchStorageMetrics, 30000);
-    return () => clearInterval(interval);
-  }, []);
+    if (auth.currentUser) {
+      fetchStorageMetrics();
+      const interval = setInterval(fetchStorageMetrics, 30000);
+      return () => clearInterval(interval);
+    }
+  }, [auth.currentUser]);
 
   const handlePurgeStorage = async () => {
     if (!confirm("Are you sure you want to purge artifacts older than 30 days?")) return;
@@ -235,7 +247,6 @@ export const AdminDashboard: React.FC<{ onLogout: () => void }> = ({ onLogout })
     message: '',
     onConfirm: () => {},
   });
-  const [currentUserRole, setCurrentUserRole] = useState<string>('user');
   const [userSearchTerm, setUserSearchTerm] = useState('');
   const [userRoleFilter, setUserRoleFilter] = useState('all');
   const [userTenantFilter, setUserTenantFilter] = useState('all');
@@ -293,22 +304,6 @@ export const AdminDashboard: React.FC<{ onLogout: () => void }> = ({ onLogout })
       console.error("Error fetching admin stats:", error);
     } finally {
       setLoading(false);
-    }
-  };
-
-  const fetchCurrentUserRole = async () => {
-    try {
-      const idToken = auth?.currentUser ? await auth.currentUser.getIdToken() : null;
-      if (!idToken) return;
-      const response = await fetch('/api/user/profile', {
-        headers: { 'Authorization': `Bearer ${idToken}` }
-      });
-      if (response.ok) {
-        const data = await response.json();
-        setCurrentUserRole(data.role || 'user');
-      }
-    } catch (error) {
-      console.error("Error fetching current user role:", error);
     }
   };
 
@@ -431,7 +426,6 @@ export const AdminDashboard: React.FC<{ onLogout: () => void }> = ({ onLogout })
     fetchStats();
     fetchUsers(); // Fetch users on mount to show in Recent Activity
     fetchProgramsAndCohorts();
-    fetchCurrentUserRole();
   }, []);
 
   useEffect(() => {
@@ -852,18 +846,28 @@ export const AdminDashboard: React.FC<{ onLogout: () => void }> = ({ onLogout })
                       <p className="text-[10px] text-neon-cyan font-display uppercase tracking-widest">Admin Console</p>
                     </div>
                   </div>
-                  <button onClick={() => setMobileMenuOpen(false)} className="p-2 text-white/40 hover:text-white">
-                    <X className="w-6 h-6" />
-                  </button>
+                  <div className="flex items-center gap-2">
+                    {(adminRole === ROLES.SUPER_ADMIN || adminRole === ROLES.ADMIN) && (
+                      <button
+                        onClick={() => navigate('/operations')}
+                        className="p-2 rounded-xl bg-neon-lime/10 border border-neon-lime/20 text-neon-lime lg:hidden"
+                        title="Operations Center"
+                      >
+                        <ArrowUpRight className="w-5 h-5" />
+                      </button>
+                    )}
+                    <button onClick={() => setMobileMenuOpen(false)} className="p-2 text-white/40 hover:text-white">
+                      <X className="w-6 h-6" />
+                    </button>
+                  </div>
                 </div>
 
                 <nav className="space-y-2">
                   {[
                     { id: 'overview', label: 'Overview', icon: LayoutDashboard, roles: [ROLES.SUPER_ADMIN, ROLES.ADMIN, ROLES.EDITOR, ROLES.VIEWER] },
-                    { id: 'users', label: 'Users & Roles', icon: Users, roles: [ROLES.SUPER_ADMIN, ROLES.ADMIN, ROLES.EDITOR, ROLES.VIEWER] },
                     { id: 'cloud', label: 'Cloud Resources', icon: Cloud, roles: [ROLES.SUPER_ADMIN, ROLES.ADMIN] },
-                    { id: 'content', label: 'Content Monitor', icon: AlertTriangle, roles: [ROLES.SUPER_ADMIN, ROLES.ADMIN, ROLES.EDITOR, ROLES.VIEWER] },
                     { id: 'security', label: 'Security', icon: ShieldCheck, roles: [ROLES.SUPER_ADMIN, ROLES.ADMIN] },
+                    { id: 'vertex', label: 'Vertex AI', icon: Brain, roles: [ROLES.SUPER_ADMIN, ROLES.ADMIN] },
                     { id: 'identity', label: 'Identity Reconciliation', icon: Fingerprint, roles: [ROLES.SUPER_ADMIN, ROLES.ADMIN] },
                     { id: 'logs', label: 'System Logs', icon: Activity, roles: [ROLES.SUPER_ADMIN, ROLES.ADMIN] },
                     { id: 'diagnostics', label: 'Diagnostics', icon: ShieldCheck, roles: [ROLES.SUPER_ADMIN, ROLES.ADMIN] },
@@ -885,6 +889,13 @@ export const AdminDashboard: React.FC<{ onLogout: () => void }> = ({ onLogout })
                       <span className="font-medium">{item.label}</span>
                     </button>
                   ))}
+                  <button
+                    onClick={() => navigate('/operations')}
+                    className="w-full flex items-center gap-3 px-4 py-3 rounded-xl text-neon-lime hover:bg-neon-lime/10 transition-all border border-transparent hover:border-neon-lime/20"
+                  >
+                    <ArrowUpRight className="w-5 h-5" />
+                    <span className="font-medium">Operations Center</span>
+                  </button>
                 </nav>
               </div>
 
@@ -918,10 +929,9 @@ export const AdminDashboard: React.FC<{ onLogout: () => void }> = ({ onLogout })
           <nav className="space-y-2">
             {[
               { id: 'overview', label: 'Overview', icon: LayoutDashboard, roles: [ROLES.SUPER_ADMIN, ROLES.ADMIN, ROLES.EDITOR, ROLES.VIEWER] },
-              { id: 'users', label: 'Users & Roles', icon: Users, roles: [ROLES.SUPER_ADMIN, ROLES.ADMIN, ROLES.EDITOR, ROLES.VIEWER] },
               { id: 'cloud', label: 'Cloud Resources', icon: Cloud, roles: [ROLES.SUPER_ADMIN, ROLES.ADMIN] },
-              { id: 'content', label: 'Content Monitor', icon: AlertTriangle, roles: [ROLES.SUPER_ADMIN, ROLES.ADMIN, ROLES.EDITOR, ROLES.VIEWER] },
               { id: 'security', label: 'Security', icon: ShieldCheck, roles: [ROLES.SUPER_ADMIN, ROLES.ADMIN] },
+              { id: 'vertex', label: 'Vertex AI', icon: Brain, roles: [ROLES.SUPER_ADMIN, ROLES.ADMIN] },
               { id: 'identity', label: 'Identity Reconciliation', icon: Fingerprint, roles: [ROLES.SUPER_ADMIN, ROLES.ADMIN] },
               { id: 'logs', label: 'System Logs', icon: Activity, roles: [ROLES.SUPER_ADMIN, ROLES.ADMIN] },
               { id: 'diagnostics', label: 'Diagnostics', icon: ShieldCheck, roles: [ROLES.SUPER_ADMIN, ROLES.ADMIN] },
@@ -940,6 +950,13 @@ export const AdminDashboard: React.FC<{ onLogout: () => void }> = ({ onLogout })
                 <span className="font-medium">{item.label}</span>
               </button>
             ))}
+            <button
+              onClick={() => navigate('/operations')}
+              className="w-full flex items-center gap-3 px-4 py-3 rounded-xl text-neon-lime hover:bg-neon-lime/10 transition-all border border-transparent hover:border-neon-lime/20"
+            >
+              <ArrowUpRight className="w-5 h-5" />
+              <span className="font-medium">Operations Center</span>
+            </button>
           </nav>
         </div>
 
@@ -961,21 +978,20 @@ export const AdminDashboard: React.FC<{ onLogout: () => void }> = ({ onLogout })
           <div>
             <h2 className="text-3xl font-display font-bold">
               {activeTab === 'overview' && 'System Overview'}
-              {activeTab === 'users' && 'User Analytics'}
               {activeTab === 'cloud' && 'Cloud Infrastructure'}
-              {activeTab === 'content' && 'Content & Sentiment'}
               {activeTab === 'security' && 'Security Audit'}
               {activeTab === 'identity' && 'Identity Reconciliation'}
               {activeTab === 'logs' && 'System Logs'}
+              {activeTab === 'vertex' && 'Vertex AI Enterprise Intelligence'}
               {activeTab === 'diagnostics' && 'Connectivity Diagnostics'}
               {activeTab === 'firebase-setup' && 'Firebase Configuration'}
             </h2>
             <p className="text-white/40">
               {activeTab === 'overview' && 'Real-time metrics and environment status'}
-              {activeTab === 'content' && 'User engagement and sentiment analysis'}
+              {activeTab === 'vertex' && 'Managed RAG, Fine-Tuning, and Model Garden (Track B)'}
               {activeTab === 'diagnostics' && 'Evaluate SPARKWavv & Firebase integration status'}
               {activeTab === 'firebase-setup' && 'Step-by-step guide to connect your Firebase project'}
-              {activeTab !== 'overview' && activeTab !== 'content' && activeTab !== 'diagnostics' && activeTab !== 'firebase-setup' && 'Detailed system metrics'}
+              {activeTab !== 'overview' && activeTab !== 'diagnostics' && activeTab !== 'firebase-setup' && 'Detailed system metrics'}
             </p>
           </div>
           <div className="flex items-center gap-4">
@@ -1002,67 +1018,66 @@ export const AdminDashboard: React.FC<{ onLogout: () => void }> = ({ onLogout })
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-12">
           {activeTab === 'overview' ? (
             <>
-              <button 
-                onClick={() => setActiveTab('users')}
-                className="glass-panel p-6 rounded-3xl border border-neon-cyan/20 bg-neon-cyan/5 relative overflow-hidden group text-left transition-all hover:bg-neon-cyan/10"
-              >
-                <div className="absolute top-0 right-0 p-4 opacity-10 group-hover:opacity-20 transition-opacity">
-                  <Users className="w-12 h-12 text-neon-cyan" />
-                </div>
-                <div className="relative z-10 space-y-4">
-                  <p className="text-sm font-medium text-neon-cyan uppercase tracking-widest">Total Users</p>
-                  <div className="flex items-end justify-between">
-                    <h3 className="text-3xl font-display font-bold text-white">{stats?.users?.total || 0}</h3>
-                    <span className="text-xs font-medium px-2 py-1 rounded-lg bg-neon-cyan/20 text-neon-cyan">
-                      View List
-                    </span>
-                  </div>
-                </div>
-              </button>
-              {[
-                { label: 'Verified Users', value: stats?.users?.active || 0, trend: 'Verified', icon: ShieldCheck, color: 'text-neon-lime' },
-                { label: 'Pending Email', value: stats?.users?.pendingVerification || 0, trend: 'Unverified', icon: Mail, color: 'text-neon-magenta' },
-                { label: 'New Today', value: stats?.users?.newToday || 0, trend: 'Today', icon: Heart, color: 'text-neon-lime' },
-              ].map((stat, i) => (
-                <div key={i} className="glass-panel p-6 rounded-3xl border border-white/5 bg-black/40 relative overflow-hidden group">
-                  <div className="absolute top-0 right-0 p-4 opacity-10 group-hover:opacity-20 transition-opacity">
-                    <stat.icon className={`w-12 h-12 ${stat.color}`} />
-                  </div>
-                  <div className="relative z-10 space-y-4">
-                    <p className="text-sm font-medium text-white/40 uppercase tracking-widest">{stat.label}</p>
-                    <div className="flex items-end justify-between">
-                      <h3 className="text-3xl font-display font-bold">{stat.value}</h3>
-                      <span className="text-xs font-medium px-2 py-1 rounded-lg bg-white/5 text-white/40">
-                        {stat.trend}
-                      </span>
+              <div className="glass-panel p-6 rounded-3xl border border-neon-cyan/20 bg-neon-cyan/5 relative overflow-hidden group text-left transition-all">
+                <div className="relative z-10">
+                  <div className="flex items-center justify-between mb-4">
+                    <div className="p-2 rounded-xl bg-neon-cyan/10 text-neon-cyan">
+                      <Activity className="w-5 h-5" />
                     </div>
+                    <span className="text-[10px] font-bold text-neon-cyan uppercase tracking-widest">CPU Load</span>
+                  </div>
+                  <div className="flex items-end gap-2">
+                    <span className="text-4xl font-display font-bold">{stats?.resources?.cpuUsage ? `${stats.resources.cpuUsage}%` : '0%'}</span>
+                    <span className="text-xs text-white/40 mb-1.5">Avg/min</span>
                   </div>
                 </div>
-              ))}
-            </>
-          ) : activeTab === 'content' ? (
-            <>
-              {[
-                { label: 'Avg Session', value: stats?.engagement?.avgSessionDuration, trend: '+2m', icon: Activity, color: 'text-neon-cyan' },
-                { label: 'Retention', value: stats?.engagement?.retentionRate, trend: '+4%', icon: Users, color: 'text-neon-magenta' },
-                { label: 'Positive Sentiment', value: `${stats?.sentiment?.positive || 0}%`, trend: '+8%', icon: Heart, color: 'text-neon-lime' },
-                { label: 'Bounce Rate', value: stats?.engagement?.bounceRate, trend: '-3%', icon: ArrowDownRight, color: 'text-neon-magenta' },
-              ].map((stat, i) => (
-                <div key={i} className="glass-panel p-6 rounded-3xl border border-white/5 bg-black/40 relative overflow-hidden group">
-                  <div className="absolute top-0 right-0 p-4 opacity-10 group-hover:opacity-20 transition-opacity">
-                    <stat.icon className={`w-12 h-12 ${stat.color}`} />
-                  </div>
-                  <div className="relative z-10 space-y-4">
-                    <p className="text-sm font-medium text-white/40 uppercase tracking-widest">{stat.label}</p>
-                    <div className="flex items-end justify-between">
-                      <h3 className="text-3xl font-display font-bold">{stat.value}</h3>
-                      <span className={`text-xs font-medium px-2 py-1 rounded-lg bg-white/5 ${stat.trend.startsWith('+') ? 'text-neon-lime' : 'text-white/40'}`}>
-                        {stat.trend}
-                      </span>
+                <div className="absolute -right-4 -bottom-4 w-24 h-24 bg-neon-cyan/5 rounded-full blur-2xl group-hover:bg-neon-cyan/10 transition-all" />
+              </div>
+
+              <div className="glass-panel p-6 rounded-3xl border border-white/5 bg-white/[0.02] relative overflow-hidden group text-left transition-all">
+                <div className="relative z-10">
+                  <div className="flex items-center justify-between mb-4">
+                    <div className="p-2 rounded-xl bg-neon-magenta/10 text-neon-magenta">
+                      <Database className="w-5 h-5" />
                     </div>
+                    <span className="text-[10px] font-bold text-neon-magenta uppercase tracking-widest">Memory</span>
+                  </div>
+                  <div className="flex items-end gap-2">
+                    <span className="text-4xl font-display font-bold">{stats?.resources?.memoryUsage ? `${stats.resources.memoryUsage}%` : '0%'}</span>
+                    <span className="text-xs text-white/40 mb-1.5">Utilization</span>
                   </div>
                 </div>
-              ))}
+              </div>
+
+              <div className="glass-panel p-6 rounded-3xl border border-white/5 bg-white/[0.02] relative overflow-hidden group text-left transition-all">
+                <div className="relative z-10">
+                  <div className="flex items-center justify-between mb-4">
+                    <div className="p-2 rounded-xl bg-neon-lime/10 text-neon-lime">
+                      <Cloud className="w-5 h-5" />
+                    </div>
+                    <span className="text-[10px] font-bold text-neon-lime uppercase tracking-widest">Storage</span>
+                  </div>
+                  <div className="flex items-end gap-2">
+                    <span className="text-4xl font-display font-bold">{storageMetrics ? `${(storageMetrics.totalSize / (1024 * 1024)).toFixed(1)}MB` : '0MB'}</span>
+                    <span className="text-xs text-white/40 mb-1.5">Artifacts</span>
+                  </div>
+                </div>
+              </div>
+
+              <div className="glass-panel p-6 rounded-3xl border border-white/5 bg-white/[0.02] relative overflow-hidden group text-left transition-all">
+                <div className="relative z-10">
+                  <div className="flex items-center justify-between mb-4">
+                    <div className="p-2 rounded-xl bg-white/10 text-white">
+                      <ShieldCheck className="w-5 h-5" />
+                    </div>
+                    <span className="text-[10px] font-bold text-white/40 uppercase tracking-widest">Uptime</span>
+                  </div>
+                  <div className="flex items-end gap-2">
+                    <span className="text-4xl font-display font-bold">99.9%</span>
+                    <span className="text-xs text-white/40 mb-1.5">SLA Target</span>
+                  </div>
+                </div>
+              </div>
             </>
           ) : activeTab === 'diagnostics' ? (
             <div className="col-span-4">
@@ -1080,349 +1095,6 @@ export const AdminDashboard: React.FC<{ onLogout: () => void }> = ({ onLogout })
         </div>
 
         {/* Dynamic Content based on Tab */}
-        {activeTab === 'programs' && (
-          <div className="glass-panel p-8 rounded-3xl border border-white/5 bg-white/[0.02] mb-12">
-            <div className="flex items-center justify-between mb-8">
-              <div>
-                <h3 className="text-xl font-display font-bold">Programs & Cohorts</h3>
-                <p className="text-sm text-white/40">Manage educational tracks and student groups</p>
-              </div>
-              <button 
-                onClick={fetchProgramsAndCohorts}
-                className="p-2 rounded-xl bg-white/5 border border-white/10 hover:bg-white/10 transition-all"
-                disabled={fetchingPrograms}
-              >
-                <RefreshCw className={`w-4 h-4 ${fetchingPrograms ? 'animate-spin' : ''}`} />
-              </button>
-            </div>
-
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-              {/* Programs List */}
-              <div className="space-y-4">
-                <h4 className="text-xs font-bold uppercase tracking-widest text-neon-cyan flex items-center gap-2">
-                  <GraduationCap className="w-4 h-4" />
-                  Available Programs
-                </h4>
-                <div className="space-y-3">
-                  {programs.map(p => (
-                    <div key={p.id} className="p-4 rounded-2xl bg-white/5 border border-white/10 hover:border-white/20 transition-all">
-                      <div className="flex justify-between items-start mb-2">
-                        <h5 className="font-bold text-white">{p.name}</h5>
-                        <span className="text-[10px] font-bold uppercase tracking-widest px-2 py-1 rounded-lg bg-neon-cyan/10 text-neon-cyan">
-                          {p.type}
-                        </span>
-                      </div>
-                      <p className="text-xs text-white/60 mb-3">{p.description}</p>
-                      {p.curriculum && (
-                        <div className="flex flex-wrap gap-2">
-                          {p.curriculum.map((c: string, i: number) => (
-                            <span key={i} className="text-[9px] uppercase tracking-tighter px-2 py-0.5 rounded bg-white/5 text-white/40 border border-white/5">
-                              {c}
-                            </span>
-                          ))}
-                        </div>
-                      )}
-                    </div>
-                  ))}
-                </div>
-              </div>
-
-              {/* Cohorts List */}
-              <div className="space-y-4">
-                <h4 className="text-xs font-bold uppercase tracking-widest text-neon-magenta flex items-center gap-2">
-                  <Calendar className="w-4 h-4" />
-                  Active Cohorts
-                </h4>
-                <div className="space-y-3">
-                  {cohorts.map(c => (
-                    <div key={c.id} className="p-4 rounded-2xl bg-white/5 border border-white/10 hover:border-white/20 transition-all">
-                      <div className="flex justify-between items-start mb-2">
-                        <h5 className="font-bold text-white">{c.name}</h5>
-                        <span className="text-[10px] font-bold uppercase tracking-widest px-2 py-1 rounded-lg bg-neon-magenta/10 text-neon-magenta">
-                          {c.type}
-                        </span>
-                      </div>
-                      <div className="flex items-center gap-4 mb-3">
-                        <div className="flex items-center gap-1 text-[10px] text-white/40">
-                          <Calendar className="w-3 h-3" />
-                          {new Date(c.startDate).toLocaleDateString()} - {new Date(c.endDate).toLocaleDateString()}
-                        </div>
-                        {c.institution && (
-                          <div className="text-[10px] text-neon-cyan font-bold uppercase tracking-widest">
-                            {c.institution}
-                          </div>
-                        )}
-                      </div>
-                      <p className="text-xs text-white/60">{c.description}</p>
-                      <div className="mt-3 pt-3 border-t border-white/5 flex justify-between items-center">
-                        <span className="text-[9px] text-white/20 uppercase tracking-widest">Target: {c.targetAudience}</span>
-                        <span className="text-[9px] text-white/20 uppercase tracking-widest">Tenant: {c.tenantId}</span>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            </div>
-
-            {/* User Journeys Section */}
-            <div className="mt-12 pt-12 border-t border-white/5">
-              <h4 className="text-xs font-bold uppercase tracking-widest text-neon-lime flex items-center gap-2 mb-6">
-                <Activity className="w-4 h-4" />
-                Core User Journeys
-              </h4>
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                {journeys.map(j => (
-                  <div key={j.id} className="p-5 rounded-2xl bg-white/5 border border-white/10 hover:border-white/20 transition-all">
-                    <div className="flex justify-between items-start mb-4">
-                      <div>
-                        <h5 className="font-bold text-white text-sm">{j.userId}</h5>
-                        <p className="text-[10px] text-white/40 uppercase tracking-widest">{j.programId}</p>
-                      </div>
-                      <span className={`text-[9px] font-bold uppercase tracking-widest px-2 py-1 rounded-lg ${
-                        j.status === 'completed' ? 'bg-neon-lime/10 text-neon-lime' : 
-                        j.status === 'active' ? 'bg-neon-cyan/10 text-neon-cyan' : 'bg-white/10 text-white/40'
-                      }`}>
-                        {j.status}
-                      </span>
-                    </div>
-                    
-                    <div className="space-y-3">
-                      {j.steps?.map((step: any, idx: number) => (
-                        <div key={idx} className="flex items-center justify-between">
-                          <div className="flex items-center gap-2">
-                            <div className={`w-1.5 h-1.5 rounded-full ${
-                              step.status === 'completed' ? 'bg-neon-lime' : 
-                              step.status === 'in-progress' ? 'bg-neon-cyan' : 'bg-white/20'
-                            }`} />
-                            <span className={`text-[11px] ${step.status === 'completed' ? 'text-white/80' : 'text-white/40'}`}>
-                              {step.name}
-                            </span>
-                          </div>
-                          {step.status === 'completed' && (
-                            <ShieldCheck className="w-3 h-3 text-neon-lime" />
-                          )}
-                        </div>
-                      ))}
-                    </div>
-
-                    <div className="mt-4 pt-4 border-t border-white/5 flex justify-between items-center text-[9px] text-white/20 uppercase tracking-widest">
-                      <span>Started: {new Date(j.startedAt).toLocaleDateString()}</span>
-                      {j.completedAt && <span>Done: {new Date(j.completedAt).toLocaleDateString()}</span>}
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          </div>
-        )}
-
-        {activeTab === 'users' && (
-          <div className="glass-panel rounded-3xl border border-white/5 bg-white/[0.02] overflow-hidden">
-            <div className="p-6 border-b border-white/5 flex flex-col md:flex-row md:items-center justify-between gap-4">
-              <h3 className="text-xl font-display font-bold">User Management & RBAC</h3>
-              <div className="flex flex-wrap items-center gap-4">
-                <div className="relative">
-                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-white/20" />
-                  <input 
-                    type="text"
-                    placeholder="Search users..."
-                    value={userSearchTerm}
-                    onChange={(e) => setUserSearchTerm(e.target.value)}
-                    className="pl-10 pr-4 py-2 rounded-xl bg-white/5 border border-white/10 focus:border-neon-cyan transition-all text-sm w-64"
-                  />
-                </div>
-                <select 
-                  value={userRoleFilter}
-                  onChange={(e) => setUserRoleFilter(e.target.value)}
-                  className="px-4 py-2 rounded-xl bg-white/5 border border-white/10 text-sm focus:border-neon-cyan transition-all"
-                >
-                  <option value="all">All Roles</option>
-                  {Object.values(APP_ROLES).map(role => (
-                    <option key={role} value={role}>{role.toUpperCase()}</option>
-                  ))}
-                </select>
-                <select 
-                  value={userTenantFilter}
-                  onChange={(e) => setUserTenantFilter(e.target.value)}
-                  className="px-4 py-2 rounded-xl bg-white/5 border border-white/10 text-sm focus:border-neon-cyan transition-all"
-                >
-                  <option value="all">All Tenants</option>
-                  {TENANTS.map(t => (
-                    <option key={t.id} value={t.id}>{t.name}</option>
-                  ))}
-                </select>
-                {currentUserRole === 'admin' && (
-                  <button 
-                    onClick={() => setIsAddModalOpen(true)}
-                    className="flex items-center gap-2 px-4 py-2 rounded-xl bg-neon-cyan text-black font-bold uppercase tracking-widest text-[10px] shadow-[0_0_15px_rgba(0,243,255,0.2)] hover:scale-105 transition-all"
-                  >
-                    <Plus className="w-4 h-4" />
-                    Add User
-                  </button>
-                )}
-                <button 
-                  onClick={fetchDiagnostics}
-                  className="p-2 rounded-xl bg-white/5 border border-white/10 hover:bg-white/10 transition-all text-white/50 hover:text-white"
-                  title="Firebase Diagnostics"
-                  disabled={loadingDiagnostics}
-                >
-                  <Activity className={`w-4 h-4 ${loadingDiagnostics ? 'animate-pulse' : ''}`} />
-                </button>
-                <button 
-                  onClick={fetchUsers}
-                  className="p-2 rounded-xl bg-white/5 border border-white/10 hover:bg-white/10 transition-all"
-                  disabled={fetchingUsers}
-                >
-                  <RefreshCw className={`w-4 h-4 ${fetchingUsers ? 'animate-spin' : ''}`} />
-                </button>
-              </div>
-            </div>
-            <div className="overflow-x-auto">
-              <table className="w-full text-left">
-                <thead>
-                  <tr className="text-xs text-white/20 uppercase tracking-widest border-b border-white/5">
-                    <th className="px-6 py-4 font-medium">User</th>
-                    <th className="px-6 py-4 font-medium">Email</th>
-                    <th className="px-6 py-4 font-medium">Tenant</th>
-                    <th className="px-6 py-4 font-medium">Role</th>
-                    <th className="px-6 py-4 font-medium">Journey Stage</th>
-                    <th className="px-6 py-4 font-medium">Verification</th>
-                    <th className="px-6 py-4 font-medium">Joined</th>
-                    <th className="px-6 py-4 font-medium">Actions</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-white/5">
-                  {(() => {
-                    const filteredUsers = users.filter(u => {
-                      const matchesSearch = 
-                        u.displayName?.toLowerCase().includes(userSearchTerm.toLowerCase()) ||
-                        u.email?.toLowerCase().includes(userSearchTerm.toLowerCase());
-                      const matchesRole = userRoleFilter === 'all' || u.role === userRoleFilter;
-                      const matchesTenant = userTenantFilter === 'all' || u.tenantId === userTenantFilter;
-                      return matchesSearch && matchesRole && matchesTenant;
-                    });
-
-                    return filteredUsers.length > 0 ? (
-                      filteredUsers.map((user, i) => (
-                        <tr key={i} className="hover:bg-white/[0.02] transition-colors">
-                          <td className="px-6 py-4 font-medium">{user.displayName}</td>
-                          <td className="px-6 py-4 text-white/60">{user.email}</td>
-                          <td className="px-6 py-4">
-                            <span className="text-[10px] font-bold uppercase tracking-widest px-2 py-1 rounded-lg bg-white/5 text-white/40">
-                              {TENANTS.find(t => t.id === user.tenantId)?.name || 'SPARKWavv'}
-                            </span>
-                          </td>
-                          <td className="px-6 py-4">
-                            <div className="flex items-center gap-2">
-                              <Shield className={`w-3 h-3 ${
-                                user.role === 'admin' ? 'text-neon-cyan' : 
-                                user.role === 'operator' ? 'text-neon-magenta' :
-                                user.role === 'mentor' ? 'text-neon-lime' :
-                                user.role === 'agent' ? 'text-neon-cyan' : 'text-white/40'
-                              }`} />
-                              <span className={`text-[10px] font-bold uppercase tracking-widest ${
-                                user.role === 'admin' ? 'text-neon-cyan' : 
-                                user.role === 'operator' ? 'text-neon-magenta' :
-                                user.role === 'mentor' ? 'text-neon-lime' :
-                                user.role === 'agent' ? 'text-neon-cyan' : 'text-white/40'
-                              }`}>
-                                {user.role}
-                              </span>
-                            </div>
-                          </td>
-                          <td className="px-6 py-4">
-                            <span className="text-[10px] font-bold uppercase tracking-widest px-2 py-1 rounded-lg bg-white/5 text-white/60">
-                              {user.journeyStage || 'Dive-In'}
-                            </span>
-                          </td>
-                          <td className="px-6 py-4">
-                            <div className="flex flex-col gap-1">
-                              <span className={`text-[10px] font-bold uppercase tracking-widest px-2 py-1 rounded-lg w-fit ${
-                                user.emailVerified ? 'bg-neon-lime/10 text-neon-lime' : 'bg-neon-magenta/10 text-neon-magenta'
-                              }`}>
-                                {user.emailVerified ? 'Email Verified' : 'Email Pending'}
-                              </span>
-                              <span className={`text-[10px] font-bold uppercase tracking-widest px-2 py-1 rounded-lg w-fit ${
-                                (user.emailVerified && user.journeyStage !== 'Dive-In') ? 'bg-neon-cyan/10 text-neon-cyan' : 'bg-white/5 text-white/40'
-                              }`}>
-                                {(user.emailVerified && user.journeyStage !== 'Dive-In') ? 'FULL ACCESS' : 'DIVE-IN ONLY'}
-                              </span>
-                            </div>
-                          </td>
-                          <td className="px-6 py-4 text-white/40 text-sm">
-                            {user.creationTime ? new Date(user.creationTime).toLocaleDateString() : 'N/A'}
-                          </td>
-                          <td className="px-6 py-4">
-                            {currentUserRole === 'admin' ? (
-                              <div className="flex items-center gap-2">
-                                {user.role !== 'admin' && (
-                                  <button 
-                                    onClick={() => navigate(`/dashboard/${user.uid}`)}
-                                    className="p-2 rounded-lg bg-white/5 border border-white/10 hover:bg-white/10 text-white/60 hover:text-neon-cyan transition-all"
-                                    title="View User Dashboard"
-                                  >
-                                    <ArrowUpRight className="w-4 h-4" />
-                                  </button>
-                                )}
-                                <button 
-                                  onClick={() => {
-                                    const url = `${window.location.origin}/dashboard/${user.uid}`;
-                                    navigator.clipboard.writeText(url);
-                                    setToast({ message: 'Dashboard link copied to clipboard!', type: 'success' });
-                                  }}
-                                  className="p-2 rounded-lg bg-white/5 border border-white/10 hover:bg-white/10 text-white/60 hover:text-neon-cyan transition-all"
-                                  title="Copy Dashboard Link"
-                                >
-                                  <Copy className="w-4 h-4" />
-                                </button>
-                                <button 
-                                  onClick={() => handleResetPassword(user.email)}
-                                  disabled={resettingPassword === user.email}
-                                  className="p-2 rounded-lg bg-white/5 border border-white/10 hover:bg-white/10 text-white/60 hover:text-neon-cyan transition-all disabled:opacity-50"
-                                  title="Send Password Reset Email"
-                                >
-                                  {resettingPassword === user.email ? (
-                                    <RefreshCw className="w-4 h-4 animate-spin" />
-                                  ) : (
-                                    <Mail className="w-4 h-4" />
-                                  )}
-                                </button>
-                                <button 
-                                  onClick={() => {
-                                    setEditingUser(user);
-                                    setIsEditModalOpen(true);
-                                  }}
-                                  className="p-2 rounded-lg bg-white/5 border border-white/10 hover:bg-white/10 text-white/60 hover:text-white transition-all"
-                                >
-                                  <Edit2 className="w-4 h-4" />
-                                </button>
-                                <button 
-                                  onClick={() => handleDeleteUser(user.uid)}
-                                  className="p-2 rounded-lg bg-neon-magenta/10 border border-neon-magenta/20 hover:bg-neon-magenta/20 text-neon-magenta transition-all"
-                                >
-                                  <Trash2 className="w-4 h-4" />
-                                </button>
-                              </div>
-                            ) : (
-                              <span className="text-[10px] text-white/20 uppercase tracking-widest italic">View Only</span>
-                            )}
-                          </td>
-                        </tr>
-                      ))
-                    ) : (
-                      <tr>
-                        <td colSpan={8} className="px-6 py-12 text-center text-white/40 italic">
-                          {fetchingUsers ? 'Fetching users from Firebase...' : 'No users match your filters.'}
-                        </td>
-                      </tr>
-                    );
-                  })()}
-                </tbody>
-              </table>
-            </div>
-          </div>
-        )}
-
         {activeTab === 'security' && (
           <div className="glass-panel rounded-3xl border border-white/5 bg-white/[0.02] overflow-hidden">
             <div className="p-6 border-b border-white/5 flex items-center justify-between">
@@ -1459,7 +1131,7 @@ export const AdminDashboard: React.FC<{ onLogout: () => void }> = ({ onLogout })
                         <td className="px-6 py-4 border-r border-white/5">
                           <div className="flex flex-col">
                             <span className="text-sm font-bold group-hover:text-neon-cyan transition-colors">{log.actorEmail}</span>
-                            <span className="text-[9px] uppercase tracking-widest text-white/20">{log.actorRole}</span>
+                            <span className="text-[9px] uppercase tracking-widest text-white/20">{typeof log.actorRole === 'string' ? log.actorRole : (log.actorRole as any)?.role || 'Unknown'}</span>
                           </div>
                         </td>
                         <td className="px-6 py-4 border-r border-white/5">
@@ -1535,7 +1207,11 @@ export const AdminDashboard: React.FC<{ onLogout: () => void }> = ({ onLogout })
         )}
 
         {activeTab === 'identity' && (
-          <IdentityReconciliation />
+          <IdentityReconciliation onNotify={(msg, type) => setNotification({ message: msg, type: type as any })} />
+        )}
+
+        {activeTab === 'vertex' && (
+          <VertexDashboard onNotify={(msg, type) => setNotification({ message: msg, type: type as any })} />
         )}
 
         {activeTab === 'overview' && (

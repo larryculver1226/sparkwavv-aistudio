@@ -155,16 +155,16 @@ service cloud.firestore {
 
     function isAdmin() {
       return isAuthenticated() && 
-        (get(/databases/$(database)/documents/admins/$(request.auth.uid)).data.role == 'admin' ||
-         get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin' ||
-         (request.auth.token.email.lower() == "larry.culver1226@gmail.com" && (request.auth.token.email_verified == true || request.auth.token.firebase.sign_in_provider == "google.com")));
+        ((exists(/databases/$(database)/documents/admins/$(request.auth.uid)) && get(/databases/$(database)/documents/admins/$(request.auth.uid)).data.role == 'admin') ||
+         (exists(/databases/$(database)/documents/users/$(request.auth.uid)) && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin') ||
+         ('email' in request.auth.token && request.auth.token.email.lower() == "larry.culver1226@gmail.com" && (request.auth.token.email_verified == true || request.auth.token.firebase.sign_in_provider == "google.com")));
     }
 
     function isOperator() {
       return isAuthenticated() && 
         (isAdmin() || 
-         get(/databases/$(database)/documents/admins/$(request.auth.uid)).data.role == 'operator' ||
-         get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'operator');
+         (exists(/databases/$(database)/documents/admins/$(request.auth.uid)) && get(/databases/$(database)/documents/admins/$(request.auth.uid)).data.role == 'operator') ||
+         (exists(/databases/$(database)/documents/users/$(request.auth.uid)) && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'operator'));
     }
 
     function isRecent(time) {
@@ -217,7 +217,7 @@ service cloud.firestore {
         'brandDNAAttributes', 'journeyStage', 'onboardingComplete', 'linkedinId', 'linkedinProfile',
         'firstName', 'lastName', 'jobTitle', 'companyOrg', 'phone', 'programTrack', 
         'lifecycleStage', 'outcomesAttributes', 'feedbackQuote', 'userId', 'createdAt',
-        'userData', 'currentStep', 'summary', 'updatedAt'
+        'userData', 'currentStep', 'summary', 'updatedAt', 'emailVerified'
       ];
       return hasRequiredFields(['uid', 'email', 'role', 'tenantId']) &&
              hasOnlyAllowedFields(allowedFields) &&
@@ -235,6 +235,7 @@ service cloud.firestore {
              (!('outcomesAttributes' in data) || (data.outcomesAttributes is string && data.outcomesAttributes.size() < 500)) &&
              (!('feedbackQuote' in data) || (data.feedbackQuote is string && data.feedbackQuote.size() < 1000)) &&
              (!('userId' in data) || (data.userId is string && data.userId.size() < 128)) &&
+             (!('emailVerified' in data) || data.emailVerified is bool) &&
              (!('updatedAt' in data) || isRecent(data.updatedAt));
     }
 
@@ -406,22 +407,34 @@ service cloud.firestore {
              isRecent(data.createdAt);
     }
 
+    function isValidBrandNarrative(data) {
+      let allowedFields = ['userId', 'pillars', 'strengths', 'skillsCloud', 'secretId', 'createdAt', 'updatedAt'];
+      return hasRequiredFields(['userId', 'pillars', 'secretId', 'createdAt']) &&
+             hasOnlyAllowedFields(allowedFields) &&
+             data.userId is string && data.userId.size() < 128 &&
+             data.pillars is list && data.pillars.size() == 3 &&
+             data.secretId is string && data.secretId.size() < 128 &&
+             isRecent(data.createdAt);
+    }
+
     function isCoachOf(tenantId) {
       return isAuthenticated() && 
+             exists(/databases/$(database)/documents/users/$(request.auth.uid)) &&
              get(/databases/$(database)/documents/users/$(request.auth.uid)).data.tenantId == tenantId &&
              get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role in ['mentor', 'admin'];
     }
 
     function isPartnerOf(userId) {
-      let userTenantId = get(/databases/$(database)/documents/users/$(request.auth.uid)).data.tenantId;
       return isAuthenticated() && 
-             exists(/databases/$(database)/documents/partner_access/$(userTenantId + '_' + userId));
+             exists(/databases/$(database)/documents/users/$(request.auth.uid)) &&
+             exists(/databases/$(database)/documents/partner_access/$(get(/databases/$(database)/documents/users/$(request.auth.uid)).data.tenantId + '_' + userId));
     }
 
     function hasPartnerPermission(userId, permission) {
-      let userTenantId = get(/databases/$(database)/documents/users/$(request.auth.uid)).data.tenantId;
-      let accessPath = /databases/$(database)/documents/partner_access/$(userTenantId + '_' + userId);
-      return exists(accessPath) && permission in get(accessPath).data.permissions;
+      return isAuthenticated() && 
+             exists(/databases/$(database)/documents/users/$(request.auth.uid)) &&
+             exists(/databases/$(database)/documents/partner_access/$(get(/databases/$(database)/documents/users/$(request.auth.uid)).data.tenantId + '_' + userId)) &&
+             permission in get(/databases/$(database)/documents/partner_access/$(get(/databases/$(database)/documents/users/$(request.auth.uid)).data.tenantId + '_' + userId)).data.permissions;
     }
 
     function isValidJourney(data) {
@@ -591,6 +604,11 @@ service cloud.firestore {
       allow create: if isAuthenticated() && isOwner(request.resource.data.userId) && isValidUserAsset(request.resource.data);
       allow update: if (isOwner(resource.data.userId) || isAdmin()) && isValidUserAsset(request.resource.data) && unchanged('id') && unchanged('userId');
       allow delete: if isOwner(resource.data.userId) || isAdmin();
+    }
+
+    match /brand_narratives/{userId} {
+      allow read: if isOwner(userId) || isAdmin();
+      allow write: if (isOwner(userId) || isAdmin()) && isValidBrandNarrative(request.resource.data) && unchanged('userId');
     }
   }
 }

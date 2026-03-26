@@ -65,6 +65,7 @@ import {
   serverTimestamp
 } from 'firebase/firestore';
 import { auth, isFirebaseConfigured, googleProvider, linkedinProvider, db } from './lib/firebase';
+import { handleFirestoreError, OperationType } from './lib/firestore-errors';
 import { IdentityProvider, useIdentity } from './contexts/IdentityContext';
 import { AccessDenied } from './components/AccessDenied';
 import { OperationsDashboard } from './pages/OperationsDashboard';
@@ -80,6 +81,10 @@ import { generateDiscoverySummary, parseResume, generateBrandImage, UserData } f
 import { NavBar } from './components/NavBar';
 import { Footer } from './components/Footer';
 import { Hero } from './components/Hero';
+import { Documentation } from './components/Documentation';
+import { HelpCenter } from './components/HelpCenter';
+import { IgnitionPage } from './pages/IgnitionPage';
+import { WavvaultPage } from './pages/WavvaultPage';
 
 class ErrorBoundary extends React.Component<{ children: React.ReactNode }, { hasError: boolean; error: any }> {
   constructor(props: any) {
@@ -132,7 +137,10 @@ import { BrainModel } from './components/landing/BrainModel';
 import { Roadmap } from './components/landing/Roadmap';
 
 // --- Types ---
-type Step = 'landing' | 'login' | 'onboarding' | 'forgot-password' | 'settings' | 'module1' | 'module2' | 'module3' | 'module4' | 'module5' | 'processing' | 'results' | 'product-skylar' | 'product-features' | 'product-technology' | 'product-wavvault' | 'company-vision' | 'company-about' | 'company-investors' | 'company-give' | 'pricing';
+import { CinematicSynthesis } from './components/synthesis/CinematicSynthesis';
+import { PublicBrandPage } from './components/sharing/PublicBrandPage';
+
+type Step = 'landing' | 'login' | 'onboarding' | 'ignition' | 'forgot-password' | 'settings' | 'module1' | 'module2' | 'module3' | 'module4' | 'module5' | 'processing' | 'synthesis' | 'results' | 'product-skylar' | 'product-features' | 'product-technology' | 'product-wavvault' | 'company-vision' | 'company-about' | 'company-investors' | 'company-give' | 'pricing' | 'documentation' | 'help-center';
 
 // --- Constants ---
 const INDUSTRIES = [
@@ -281,6 +289,8 @@ const Toast = ({ message, type = 'success', onClose }: { message: string, type?:
   );
 };
 
+import { PrecisionMatchingCard } from './components/landing/PrecisionMatchingCard';
+
 export function SPARKWavvApp({ isAdmin = false }: { isAdmin?: boolean }) {
   const navigate = useNavigate();
   const [step, setStep] = useState<Step>('landing');
@@ -323,14 +333,14 @@ export function SPARKWavvApp({ isAdmin = false }: { isAdmin?: boolean }) {
   const [isRegistering, setIsRegistering] = useState(false);
   const [userId, setUserId] = useState<string | null>(null);
   const [dashboardData, setDashboardData] = useState<DashboardData | null>(null);
-  const { user, profile, status: authStatus, loading: authLoading, emailVerified, onboardingComplete, refreshProfile, logout } = useIdentity();
+  const { user, profile, status: authStatus, loading: authLoading, emailVerified, onboardingComplete, refreshProfile, logout, updateProfile: updateIdentityProfile } = useIdentity();
 
   // Scroll to top on step change
   useEffect(() => {
     window.scrollTo(0, 0);
   }, [step]);
 
-  // Auto-redirect to dashboard when ready
+  // Auto-redirect to dashboard or ignition when ready
   useEffect(() => {
     if (authStatus === 'ready' && profile) {
       if (profile.role === 'admin' || profile.role === 'super_admin') {
@@ -338,10 +348,20 @@ export function SPARKWavvApp({ isAdmin = false }: { isAdmin?: boolean }) {
         navigate('/sparkwavv-admin');
         return;
       }
-      console.log('🚀 Auth ready, redirecting to dashboard:', profile.uid);
-      navigate(`/dashboard/${profile.uid}`);
+      
+      // If email is verified but onboarding/ignition is not complete, go to ignition
+      if (emailVerified && !profile.onboardingComplete && step !== 'ignition') {
+        console.log('🔥 Email verified, redirecting to Ignition flow');
+        setStep('ignition');
+        return;
+      }
+
+      if (profile.onboardingComplete) {
+        console.log('🚀 Auth ready, redirecting to dashboard:', profile.uid);
+        navigate(`/dashboard/${profile.uid}`);
+      }
     }
-  }, [authStatus, profile, navigate]);
+  }, [authStatus, profile, emailVerified, navigate]);
 
   // OAuth Message Listener
   useEffect(() => {
@@ -647,10 +667,14 @@ export function SPARKWavvApp({ isAdmin = false }: { isAdmin?: boolean }) {
       
       // Update Firestore to reflect verification status
       if (db) {
-        await setDoc(doc(db, 'users', userCredential.user.uid), {
-          emailVerified: userCredential.user.emailVerified,
-          updatedAt: serverTimestamp()
-        }, { merge: true });
+        try {
+          await setDoc(doc(db, 'users', userCredential.user.uid), {
+            emailVerified: userCredential.user.emailVerified,
+            updatedAt: serverTimestamp()
+          }, { merge: true });
+        } catch (error) {
+          handleFirestoreError(error, OperationType.WRITE, `users/${userCredential.user.uid}`);
+        }
       }
       
       setStep('landing');
@@ -958,7 +982,7 @@ export function SPARKWavvApp({ isAdmin = false }: { isAdmin?: boolean }) {
           setSummary(result);
         }
         setLoading(false);
-        setStep('results');
+        setStep('synthesis');
       };
       process();
     }
@@ -1318,7 +1342,8 @@ export function SPARKWavvApp({ isAdmin = false }: { isAdmin?: boolean }) {
                     title: "Precision Matching",
                     desc: "Advanced algorithms that align your unique profile with high-value market opportunities.",
                     icon: Target,
-                    color: "text-neon-lime"
+                    color: "text-neon-lime",
+                    isPrecision: true
                   },
                   {
                     title: "Real-time Analytics",
@@ -1327,13 +1352,17 @@ export function SPARKWavvApp({ isAdmin = false }: { isAdmin?: boolean }) {
                     color: "text-neon-cyan"
                   }
                 ].map((feature, i) => (
-                  <div key={i} className="glass-panel p-8 space-y-6 group hover:border-white/20 transition-all duration-500">
-                    <div className={`w-12 h-12 rounded-xl bg-white/5 border border-white/10 flex items-center justify-center ${feature.color}`}>
-                      <feature.icon className="w-6 h-6" />
+                  feature.isPrecision ? (
+                    <PrecisionMatchingCard key={i} userId={userId} dashboardData={dashboardData} />
+                  ) : (
+                    <div key={i} className="glass-panel p-8 space-y-6 group hover:border-white/20 transition-all duration-500">
+                      <div className={`w-12 h-12 rounded-xl bg-white/5 border border-white/10 flex items-center justify-center ${feature.color}`}>
+                        <feature.icon className="w-6 h-6" />
+                      </div>
+                      <h3 className="text-xl font-bold">{feature.title}</h3>
+                      <p className="text-white/40 leading-relaxed text-sm">{feature.desc}</p>
                     </div>
-                    <h3 className="text-xl font-bold">{feature.title}</h3>
-                    <p className="text-white/40 leading-relaxed text-sm">{feature.desc}</p>
-                  </div>
+                  )
                 ))}
               </div>
 
@@ -2102,6 +2131,28 @@ export function SPARKWavvApp({ isAdmin = false }: { isAdmin?: boolean }) {
             </motion.div>
           )}
 
+          {step === 'documentation' && (
+            <motion.div 
+              key="documentation"
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -20 }}
+            >
+              <Documentation />
+            </motion.div>
+          )}
+
+          {step === 'help-center' && (
+            <motion.div 
+              key="help-center"
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -20 }}
+            >
+              <HelpCenter />
+            </motion.div>
+          )}
+
           {step === 'login' && (
             <motion.div 
               key="login"
@@ -2346,6 +2397,35 @@ export function SPARKWavvApp({ isAdmin = false }: { isAdmin?: boolean }) {
                     >
                       Save Changes
                     </Button>
+                  </section>
+
+                  <section className="glass-panel p-8 space-y-6">
+                    <h3 className="text-xl font-bold flex items-center gap-2">
+                      <Zap className="w-5 h-5 text-neon-cyan" /> Voice Mode
+                    </h3>
+                    <div className="flex items-center justify-between p-4 rounded-2xl bg-white/5 border border-white/10">
+                      <div className="space-y-1">
+                        <p className="font-medium">Proactive Voice Interaction</p>
+                        <p className="text-sm text-white/40">Skylar will automatically start listening when the sidebar is opened.</p>
+                      </div>
+                      <button 
+                        onClick={async () => {
+                          const newVoiceMode = !profile?.voiceMode;
+                          try {
+                            await updateIdentityProfile({ voiceMode: newVoiceMode });
+                          } catch (err) {
+                            console.error('Failed to update voice mode:', err);
+                          }
+                        }}
+                        className={`w-14 h-7 rounded-full transition-all duration-500 relative ${profile?.voiceMode ? 'bg-neon-cyan' : 'bg-white/10'}`}
+                        id="voice-mode-toggle"
+                      >
+                        <motion.div 
+                          animate={{ x: profile?.voiceMode ? 28 : 4 }}
+                          className="absolute top-1 w-5 h-5 rounded-full bg-white shadow-lg"
+                        />
+                      </button>
+                    </div>
                   </section>
 
                   <section className="glass-panel p-8 space-y-6">
@@ -2621,8 +2701,16 @@ export function SPARKWavvApp({ isAdmin = false }: { isAdmin?: boolean }) {
                       </Button>
                     )}
                     {registrationMessage && (
-                      <div className="p-6 rounded-2xl bg-neon-cyan/10 border border-neon-cyan/30 text-neon-cyan text-center font-bold">
-                        {registrationMessage}
+                      <div className="p-6 rounded-2xl bg-neon-cyan/10 border border-neon-cyan/30 text-neon-cyan text-center space-y-4">
+                        <p className="font-bold">{registrationMessage}</p>
+                        <Button 
+                          onClick={() => refreshProfile()} 
+                          variant="outline" 
+                          className="mx-auto border-neon-cyan/30 text-neon-cyan hover:bg-neon-cyan/10"
+                        >
+                          <RefreshCw className="w-4 h-4 mr-2" />
+                          Refresh Status
+                        </Button>
                       </div>
                     )}
 
@@ -2655,6 +2743,18 @@ export function SPARKWavvApp({ isAdmin = false }: { isAdmin?: boolean }) {
                   </div>
                 </div>
               </div>
+            </motion.div>
+          )}
+
+          {step === 'ignition' && (
+            <motion.div
+              key="ignition"
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.95 }}
+              className="w-full"
+            >
+              <IgnitionPage onComplete={() => setStep('module1')} />
             </motion.div>
           )}
 
@@ -3070,6 +3170,16 @@ export function SPARKWavvApp({ isAdmin = false }: { isAdmin?: boolean }) {
             </motion.div>
           )}
 
+          {step === 'synthesis' && (
+            <CinematicSynthesis 
+              dashboardData={dashboardData}
+              onComplete={(secretId) => {
+                setStep('results');
+                // Optionally store secretId in local state if needed for immediate display
+              }} 
+            />
+          )}
+
           {step === 'results' && summary && (
             <motion.div 
               key="results"
@@ -3273,6 +3383,8 @@ function ScrollToTop() {
   return null;
 }
 
+import ShareView from './pages/ShareView';
+
 function App() {
   const { user, role, status, loading, error, refreshIdentity } = useIdentity();
   const [showRetry, setShowRetry] = useState(false);
@@ -3334,12 +3446,14 @@ function App() {
     );
   }
 
-  const isAdmin = role === 'admin' || role === 'super_admin' || role === 'editor';
+  const isAdmin = role === 'admin' || role === 'super_admin' || role === 'editor' || role === 'mentor';
 
   return (
     <Router>
       <ScrollToTop />
       <Routes>
+        <Route path="/brand/:secretId" element={<PublicBrandPage />} />
+        <Route path="/share/:shareId" element={<ShareView />} />
         <Route path="/admin/login" element={<AdminLogin vibe="technical" onLogin={() => window.location.href = '/admin'} />} />
         <Route path="/operations/login" element={<AdminLogin vibe="vibrant" onLogin={() => window.location.href = '/operations'} />} />
         
@@ -3373,6 +3487,7 @@ function App() {
         <Route path="/partner-dashboard" element={<PartnerDashboard />} />
         <Route path="/accept-invitation/:token" element={<AcceptInvitation />} />
         <Route path="/profile" element={<ProfilePage />} />
+        <Route path="/vault" element={<ProtectedRoute user={user} onRedirect={() => window.location.href = '/'}><OnboardingGate><WavvaultPage /></OnboardingGate></ProtectedRoute>} />
         <Route path="/privacy" element={<PrivacyPolicy />} />
         <Route path="/terms" element={<TermsOfService />} />
         <Route path="/cookies" element={<CookieSettings />} />

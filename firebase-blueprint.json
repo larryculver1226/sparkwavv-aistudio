@@ -72,6 +72,7 @@
         "userData": { "type": "object", "description": "Full onboarding and progress data" },
         "currentStep": { "type": "string", "description": "Current step in the onboarding flow" },
         "summary": { "type": "object", "description": "Generated career discovery summary" },
+        "emailVerified": { "type": "boolean", "description": "Whether the user's email has been verified" },
         "updatedAt": { "type": "string", "format": "date-time" }
       },
       "required": ["uid", "email", "tenantId"]

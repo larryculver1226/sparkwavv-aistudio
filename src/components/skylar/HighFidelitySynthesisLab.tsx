@@ -4,14 +4,17 @@ import {
   Camera, Send, Sliders, Shield, Image as ImageIcon, 
   Download, RefreshCw, Check, AlertCircle, Key, 
   User, Building2, Briefcase, ChevronRight, 
-  X, Upload, Sparkles, Info
+  X, Upload, Sparkles, Info, FileText, Globe, Zap
 } from 'lucide-react';
 import { skylar } from '../../services/skylarService';
 import { useIdentity } from '../../contexts/IdentityContext';
+import { LiveResume } from './LiveResume';
+import { InteractivePortfolio } from './InteractivePortfolio';
+import { OutreachForge } from './OutreachForge';
 
 interface UserAsset {
   id: string;
-  type: 'portrait' | 'outreach_sequence';
+  type: 'portrait' | 'outreach_sequence' | 'live_resume' | 'interactive_portfolio';
   content: string;
   metadata: any;
   createdAt: string;
@@ -19,7 +22,7 @@ interface UserAsset {
 
 export const HighFidelitySynthesisLab: React.FC = () => {
   const { user } = useIdentity();
-  const [activeTab, setActiveTab] = useState<'portrait' | 'outreach' | 'kit'>('portrait');
+  const [activeTab, setActiveTab] = useState<'portrait' | 'outreach' | 'branding' | 'kit'>('portrait');
   const [loading, setLoading] = useState(false);
   const [assets, setAssets] = useState<UserAsset[]>([]);
   
@@ -35,6 +38,13 @@ export const HighFidelitySynthesisLab: React.FC = () => {
   const [targetRole, setTargetRole] = useState('');
   const [tone, setTone] = useState({ formal: 70, detail: 60 });
   const [generatedSequence, setGeneratedSequence] = useState<any>(null);
+
+  // Branding Studio State
+  const [generatedResume, setGeneratedResume] = useState<any>(null);
+  const [generatedPortfolio, setGeneratedPortfolio] = useState<any>(null);
+  const [showLiveResume, setShowLiveResume] = useState(false);
+  const [showPortfolio, setShowPortfolio] = useState(false);
+  const [resonanceFeedback, setResonanceFeedback] = useState<any>(null);
 
   const styles = [
     'Cinematic Professional',
@@ -73,7 +83,6 @@ export const HighFidelitySynthesisLab: React.FC = () => {
     try {
       const modelId = useHighFidelity ? 'gemini-3.1-flash-image-preview' : 'gemini-2.5-flash-image';
       
-      // Check for API key if using 3.1
       if (useHighFidelity && window.aistudio) {
         const hasKey = await window.aistudio.hasSelectedApiKey();
         if (!hasKey) {
@@ -89,7 +98,6 @@ export const HighFidelitySynthesisLab: React.FC = () => {
       );
       setGeneratedPortrait(portrait);
       
-      // Save to kit
       await skylar.saveUserAsset(user.uid, {
         type: 'portrait',
         content: portrait,
@@ -115,7 +123,6 @@ export const HighFidelitySynthesisLab: React.FC = () => {
       );
       setGeneratedSequence(sequence);
       
-      // Save to kit
       await skylar.saveUserAsset(user.uid, {
         type: 'outreach_sequence',
         content: JSON.stringify(sequence),
@@ -129,80 +136,115 @@ export const HighFidelitySynthesisLab: React.FC = () => {
     }
   };
 
+  const generateBrandingAsset = async (type: 'live_resume' | 'interactive_portfolio') => {
+    if (!user?.uid) return;
+    setLoading(true);
+    try {
+      if (type === 'live_resume') {
+        const resume = await skylar.generateLiveResume(user.uid);
+        setGeneratedResume(resume);
+        await skylar.saveUserAsset(user.uid, {
+          type: 'live_resume',
+          content: JSON.stringify(resume),
+          metadata: { style: 'Editorial / Magazine' }
+        });
+      } else {
+        const portfolio = await skylar.generateInteractivePortfolio(user.uid);
+        setGeneratedPortfolio(portfolio);
+        await skylar.saveUserAsset(user.uid, {
+          type: 'interactive_portfolio',
+          content: JSON.stringify(portfolio),
+          metadata: { style: 'Editorial / Magazine' }
+        });
+      }
+      fetchAssets();
+    } catch (error) {
+      console.error(`${type} generation failed:`, error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const getFeedback = async (content: string) => {
+    if (!user?.uid) return;
+    const feedback = await skylar.getResonanceFeedback(user.uid, content, targetRole || "Strategic Leader");
+    setResonanceFeedback(feedback);
+  };
+
   return (
-    <div className="flex flex-col h-full bg-[#E4E3E0] text-[#141414] font-sans">
+    <div className="flex flex-col h-full bg-[#E4E3E0] text-[#141414] font-sans selection:bg-[#141414] selection:text-[#E4E3E0]">
       {/* Header */}
-      <div className="p-8 border-b border-[#141414]">
+      <div className="p-8 border-b-2 border-[#141414]">
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-4xl font-serif italic tracking-tight">Synthesis Lab</h1>
-            <p className="text-sm opacity-60 mt-1 uppercase tracking-widest font-mono">High-Fidelity Asset Generation</p>
+            <h1 className="text-5xl font-serif italic tracking-tighter">Synthesis Lab</h1>
+            <p className="text-xs opacity-40 mt-1 uppercase tracking-[0.3em] font-mono font-bold">High-Fidelity Asset Generation</p>
           </div>
-          <div className="flex gap-4">
-            <button 
-              onClick={() => setActiveTab('portrait')}
-              className={`px-4 py-2 text-xs uppercase tracking-widest font-mono border border-[#141414] transition-colors ${activeTab === 'portrait' ? 'bg-[#141414] text-[#E4E3E0]' : 'hover:bg-[#141414] hover:text-[#E4E3E0]'}`}
-            >
-              Portrait Studio
-            </button>
-            <button 
-              onClick={() => setActiveTab('outreach')}
-              className={`px-4 py-2 text-xs uppercase tracking-widest font-mono border border-[#141414] transition-colors ${activeTab === 'outreach' ? 'bg-[#141414] text-[#E4E3E0]' : 'hover:bg-[#141414] hover:text-[#E4E3E0]'}`}
-            >
-              Outreach Forge
-            </button>
-            <button 
-              onClick={() => setActiveTab('kit')}
-              className={`px-4 py-2 text-xs uppercase tracking-widest font-mono border border-[#141414] transition-colors ${activeTab === 'kit' ? 'bg-[#141414] text-[#E4E3E0]' : 'hover:bg-[#141414] hover:text-[#E4E3E0]'}`}
-            >
-              Brand Kit ({assets.length})
-            </button>
+          <div className="flex gap-2">
+            {[
+              { id: 'portrait', label: 'Portrait Studio', icon: Camera },
+              { id: 'branding', label: 'Branding Studio', icon: Sparkles },
+              { id: 'outreach', label: 'Outreach Forge', icon: Send },
+              { id: 'kit', label: `Brand Kit (${assets.length})`, icon: Briefcase }
+            ].map(tab => (
+              <button 
+                key={tab.id}
+                onClick={() => setActiveTab(tab.id as any)}
+                className={`px-6 py-3 text-[10px] uppercase tracking-widest font-bold border-2 border-[#141414] transition-all flex items-center gap-3 ${activeTab === tab.id ? 'bg-[#141414] text-[#E4E3E0]' : 'hover:bg-[#141414] hover:text-[#E4E3E0]'}`}
+              >
+                <tab.icon className="w-4 h-4" />
+                {tab.label}
+              </button>
+            ))}
           </div>
         </div>
       </div>
 
-      <div className="flex-1 overflow-y-auto p-8">
+      <div className="flex-1 overflow-y-auto p-12">
         <AnimatePresence mode="wait">
           {activeTab === 'portrait' && (
             <motion.div 
               key="portrait"
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -20 }}
-              className="grid grid-cols-1 lg:grid-cols-2 gap-12"
+              initial={{ opacity: 0, scale: 0.98 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 1.02 }}
+              className="grid grid-cols-1 lg:grid-cols-2 gap-16"
             >
               {/* Controls */}
-              <div className="space-y-8">
+              <div className="space-y-12">
                 <section>
-                  <h2 className="text-xl font-serif italic mb-4">1. Likeness Preservation</h2>
-                  <div className="border border-[#141414] p-6 bg-white/50 space-y-4">
-                    <div className="flex items-start gap-4 p-4 bg-blue-50 border border-blue-200 rounded-lg">
-                      <Shield className="w-5 h-5 text-blue-600 mt-0.5" />
+                  <div className="flex items-center gap-4 mb-6">
+                    <span className="text-4xl font-serif italic opacity-20">01</span>
+                    <h2 className="text-3xl font-serif italic tracking-tight">Likeness Preservation</h2>
+                  </div>
+                  <div className="border-2 border-[#141414] p-8 bg-white space-y-6">
+                    <div className="flex items-start gap-4 p-4 bg-[#141414] text-[#E4E3E0]">
+                      <Shield className="w-5 h-5 mt-0.5" />
                       <div>
-                        <p className="text-xs font-bold text-blue-800 uppercase tracking-wider">Privacy Shield Active</p>
-                        <p className="text-xs text-blue-700 mt-1">
-                          Your reference photos are used solely to maintain likeness in your Sparkwavv profile assets. 
-                          They are stored securely and never shared with third parties.
+                        <p className="text-[10px] font-bold uppercase tracking-widest">Privacy Shield Active</p>
+                        <p className="text-xs opacity-60 mt-1">
+                          Reference photos are used solely for profile synthesis. 
+                          Encrypted at rest.
                         </p>
                       </div>
                     </div>
                     
-                    <div className="flex items-center gap-6">
+                    <div className="flex items-center gap-8">
                       <div 
-                        className="w-32 h-32 border-2 border-dashed border-[#141414] flex items-center justify-center cursor-pointer overflow-hidden bg-white"
+                        className="w-40 h-40 border-2 border-dashed border-[#141414] flex items-center justify-center cursor-pointer overflow-hidden bg-[#F5F5F0] group"
                         onClick={() => fileInputRef.current?.click()}
                       >
                         {referencePhoto ? (
                           <img src={referencePhoto} alt="Reference" className="w-full h-full object-cover" />
                         ) : (
-                          <div className="text-center p-4">
-                            <Upload className="w-6 h-6 mx-auto mb-2 opacity-40" />
-                            <span className="text-[10px] uppercase tracking-tighter opacity-40">Upload Photo</span>
+                          <div className="text-center p-4 group-hover:scale-110 transition-transform">
+                            <Upload className="w-8 h-8 mx-auto mb-2 opacity-20" />
+                            <span className="text-[10px] uppercase tracking-widest font-bold opacity-40">Upload Photo</span>
                           </div>
                         )}
                       </div>
                       <div className="flex-1">
-                        <p className="text-xs opacity-60 mb-2">Upload a clear headshot to help Skylar maintain your likeness in generated portraits.</p>
+                        <p className="text-sm font-serif italic opacity-60 mb-4">Upload a clear headshot to help Skylar maintain your likeness in generated portraits.</p>
                         <input 
                           type="file" 
                           ref={fileInputRef} 
@@ -213,7 +255,7 @@ export const HighFidelitySynthesisLab: React.FC = () => {
                         {referencePhoto && (
                           <button 
                             onClick={() => setReferencePhoto(null)}
-                            className="text-[10px] uppercase tracking-widest font-mono text-red-600 hover:underline"
+                            className="text-[10px] uppercase tracking-widest font-bold text-red-600 hover:underline"
                           >
                             Remove Photo
                           </button>
@@ -224,58 +266,34 @@ export const HighFidelitySynthesisLab: React.FC = () => {
                 </section>
 
                 <section>
-                  <h2 className="text-xl font-serif italic mb-4">2. Style Selection</h2>
+                  <div className="flex items-center gap-4 mb-6">
+                    <span className="text-4xl font-serif italic opacity-20">02</span>
+                    <h2 className="text-3xl font-serif italic tracking-tight">Style Selection</h2>
+                  </div>
                   <div className="grid grid-cols-2 gap-4">
                     {styles.map(style => (
                       <button
                         key={style}
                         onClick={() => setSelectedStyle(style)}
-                        className={`p-4 text-left border border-[#141414] transition-all ${selectedStyle === style ? 'bg-[#141414] text-[#E4E3E0]' : 'bg-white hover:bg-white/80'}`}
+                        className={`p-6 text-left border-2 border-[#141414] transition-all ${selectedStyle === style ? 'bg-[#141414] text-[#E4E3E0]' : 'bg-white hover:bg-white/80'}`}
                       >
-                        <span className="text-xs uppercase tracking-widest font-mono">{style}</span>
+                        <span className="text-[10px] uppercase tracking-widest font-bold">{style}</span>
                       </button>
                     ))}
-                  </div>
-                </section>
-
-                <section>
-                  <div className="flex items-center justify-between mb-4">
-                    <h2 className="text-xl font-serif italic">3. Model Fidelity</h2>
-                    <div className="flex items-center gap-2">
-                      <Key className="w-4 h-4 opacity-40" />
-                      <span className="text-[10px] uppercase tracking-widest font-mono opacity-40">Gemini 3.1 Ready</span>
-                    </div>
-                  </div>
-                  <div className="border border-[#141414] p-6 bg-white/50">
-                    <label className="flex items-center gap-4 cursor-pointer">
-                      <div className={`w-12 h-6 rounded-full border border-[#141414] relative transition-colors ${useHighFidelity ? 'bg-emerald-500' : 'bg-white'}`}>
-                        <input 
-                          type="checkbox" 
-                          className="hidden" 
-                          checked={useHighFidelity}
-                          onChange={(e) => setUseHighFidelity(e.target.checked)}
-                        />
-                        <div className={`absolute top-1 w-4 h-4 rounded-full bg-[#141414] transition-all ${useHighFidelity ? 'left-7' : 'left-1'}`} />
-                      </div>
-                      <div>
-                        <p className="text-xs font-bold uppercase tracking-wider">High-Fidelity Mode (4K)</p>
-                        <p className="text-[10px] opacity-60">Uses Gemini 3.1 Flash for superior detail and lighting.</p>
-                      </div>
-                    </label>
                   </div>
                 </section>
 
                 <button
                   onClick={generatePortrait}
                   disabled={loading}
-                  className="w-full py-6 bg-[#141414] text-[#E4E3E0] flex items-center justify-center gap-4 hover:bg-black transition-colors disabled:opacity-50"
+                  className="w-full py-8 bg-[#141414] text-[#E4E3E0] flex items-center justify-center gap-6 hover:bg-black transition-all disabled:opacity-50 group"
                 >
                   {loading ? (
-                    <RefreshCw className="w-6 h-6 animate-spin" />
+                    <RefreshCw className="w-8 h-8 animate-spin" />
                   ) : (
                     <>
-                      <Sparkles className="w-6 h-6" />
-                      <span className="text-sm uppercase tracking-[0.2em] font-mono font-bold">Synthesize Portrait</span>
+                      <Sparkles className="w-8 h-8 group-hover:rotate-12 transition-transform" />
+                      <span className="text-lg uppercase tracking-[0.3em] font-bold">Synthesize Portrait</span>
                     </>
                   )}
                 </button>
@@ -283,25 +301,154 @@ export const HighFidelitySynthesisLab: React.FC = () => {
 
               {/* Preview */}
               <div className="flex flex-col">
-                <h2 className="text-xl font-serif italic mb-4">Synthesis Preview</h2>
-                <div className="flex-1 border border-[#141414] bg-white relative flex items-center justify-center overflow-hidden min-h-[400px]">
+                <div className="flex items-center gap-4 mb-6">
+                  <h2 className="text-3xl font-serif italic tracking-tight">Synthesis Preview</h2>
+                  <div className="h-[1px] flex-1 bg-[#141414] opacity-10" />
+                </div>
+                <div className="flex-1 border-2 border-[#141414] bg-white relative flex items-center justify-center overflow-hidden min-h-[500px] shadow-2xl">
                   {generatedPortrait ? (
                     <>
                       <img src={generatedPortrait} alt="Generated" className="w-full h-full object-cover" />
-                      <div className="absolute bottom-6 right-6 flex gap-4">
+                      <div className="absolute bottom-8 right-8 flex gap-4">
                         <a 
                           href={generatedPortrait} 
                           download="sparkwavv-portrait.png"
-                          className="p-3 bg-white border border-[#141414] hover:bg-[#141414] hover:text-white transition-all"
+                          className="p-4 bg-white border-2 border-[#141414] hover:bg-[#141414] hover:text-[#E4E3E0] transition-all"
                         >
-                          <Download className="w-5 h-5" />
+                          <Download className="w-6 h-6" />
                         </a>
                       </div>
                     </>
                   ) : (
-                    <div className="text-center opacity-20">
-                      <ImageIcon className="w-24 h-24 mx-auto mb-4" />
-                      <p className="text-xs uppercase tracking-widest font-mono">Awaiting Synthesis</p>
+                    <div className="text-center opacity-10">
+                      <ImageIcon className="w-32 h-32 mx-auto mb-6" />
+                      <p className="text-xs uppercase tracking-[0.4em] font-bold">Awaiting Synthesis</p>
+                    </div>
+                  )}
+                </div>
+              </div>
+            </motion.div>
+          )}
+
+          {activeTab === 'branding' && (
+            <motion.div 
+              key="branding"
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -20 }}
+              className="grid grid-cols-1 lg:grid-cols-2 gap-16"
+            >
+              <div className="space-y-12">
+                <section>
+                  <div className="flex items-center gap-4 mb-6">
+                    <span className="text-4xl font-serif italic opacity-20">01</span>
+                    <h2 className="text-3xl font-serif italic tracking-tight">Cinematic Branding</h2>
+                  </div>
+                  <div className="grid grid-cols-1 gap-6">
+                    <button
+                      onClick={() => generateBrandingAsset('live_resume')}
+                      disabled={loading}
+                      className="p-8 border-2 border-[#141414] bg-white hover:bg-[#141414] hover:text-[#E4E3E0] transition-all group text-left"
+                    >
+                      <div className="flex justify-between items-start mb-8">
+                        <FileText className="w-8 h-8" />
+                        <ChevronRight className="w-6 h-6 opacity-0 group-hover:opacity-100 transition-all" />
+                      </div>
+                      <h3 className="text-2xl font-serif italic mb-2">Live Resume</h3>
+                      <p className="text-xs opacity-60 uppercase tracking-widest font-bold">Editorial / Interactive / PDF Optimized</p>
+                    </button>
+
+                    <button
+                      onClick={() => generateBrandingAsset('interactive_portfolio')}
+                      disabled={loading}
+                      className="p-8 border-2 border-[#141414] bg-white hover:bg-[#141414] hover:text-[#E4E3E0] transition-all group text-left"
+                    >
+                      <div className="flex justify-between items-start mb-8">
+                        <Globe className="w-8 h-8" />
+                        <ChevronRight className="w-6 h-6 opacity-0 group-hover:opacity-100 transition-all" />
+                      </div>
+                      <h3 className="text-2xl font-serif italic mb-2">Interactive Portfolio</h3>
+                      <p className="text-xs opacity-60 uppercase tracking-widest font-bold">Multi-page / Narrative Driven / Cinematic</p>
+                    </button>
+                  </div>
+                </section>
+
+                {resonanceFeedback && (
+                  <motion.div 
+                    initial={{ opacity: 0, scale: 0.95 }}
+                    animate={{ opacity: 1, scale: 1 }}
+                    className="p-8 border-2 border-[#141414] bg-[#141414] text-[#E4E3E0]"
+                  >
+                    <div className="flex items-center justify-between mb-6">
+                      <div className="flex items-center gap-3">
+                        <Zap className="w-5 h-5 text-neon-cyan" />
+                        <span className="text-[10px] uppercase tracking-widest font-bold">Skylar's Resonance Feedback</span>
+                      </div>
+                      <span className="text-2xl font-mono font-bold text-neon-cyan">{resonanceFeedback.resonanceScore}%</span>
+                    </div>
+                    <p className="text-lg font-serif italic mb-6 opacity-80">"{resonanceFeedback.feedback}"</p>
+                    <div className="space-y-2">
+                      {resonanceFeedback.suggestions.map((s: string, i: number) => (
+                        <div key={i} className="flex items-center gap-3 text-[10px] uppercase tracking-widest font-bold opacity-40">
+                          <div className="w-1 h-1 bg-neon-cyan rounded-full" />
+                          {s}
+                        </div>
+                      ))}
+                    </div>
+                  </motion.div>
+                )}
+              </div>
+
+              <div className="space-y-8">
+                <div className="flex items-center gap-4 mb-6">
+                  <h2 className="text-3xl font-serif italic tracking-tight">Branding Preview</h2>
+                  <div className="h-[1px] flex-1 bg-[#141414] opacity-10" />
+                </div>
+                
+                <div className="grid grid-cols-1 gap-8">
+                  {generatedResume && (
+                    <div className="border-2 border-[#141414] bg-white p-8 group">
+                      <div className="flex justify-between items-center mb-8">
+                        <span className="text-[10px] uppercase tracking-widest font-bold opacity-40">Live Resume Ready</span>
+                        <div className="flex gap-2">
+                          <button 
+                            onClick={() => setShowLiveResume(true)}
+                            className="p-3 border border-[#141414] hover:bg-[#141414] hover:text-[#E4E3E0] transition-all"
+                          >
+                            <Globe className="w-4 h-4" />
+                          </button>
+                          <button className="p-3 border border-[#141414] hover:bg-[#141414] hover:text-[#E4E3E0] transition-all">
+                            <Download className="w-4 h-4" />
+                          </button>
+                        </div>
+                      </div>
+                      <h3 className="text-4xl font-serif italic mb-4">{generatedResume.spark.title}</h3>
+                      <p className="text-sm font-serif italic opacity-60 line-clamp-3">{generatedResume.spark.narrative}</p>
+                    </div>
+                  )}
+
+                  {generatedPortfolio && (
+                    <div className="border-2 border-[#141414] bg-white p-8 group">
+                      <div className="flex justify-between items-center mb-8">
+                        <span className="text-[10px] uppercase tracking-widest font-bold opacity-40">Portfolio Ready</span>
+                        <button 
+                          onClick={() => setShowPortfolio(true)}
+                          className="p-3 border border-[#141414] hover:bg-[#141414] hover:text-[#E4E3E0] transition-all"
+                        >
+                          <Globe className="w-4 h-4" />
+                        </button>
+                      </div>
+                      <h3 className="text-4xl font-serif italic mb-4">The Cinematic Narrative</h3>
+                      <p className="text-sm font-serif italic opacity-60 line-clamp-3">{generatedPortfolio.pages[0].content}</p>
+                    </div>
+                  )}
+
+                  {!generatedResume && !generatedPortfolio && (
+                    <div className="h-[400px] border-2 border-dashed border-[#141414] flex items-center justify-center opacity-10">
+                      <div className="text-center">
+                        <Sparkles className="w-24 h-24 mx-auto mb-6" />
+                        <p className="text-xs uppercase tracking-[0.4em] font-bold">Awaiting Branding Synthesis</p>
+                      </div>
                     </div>
                   )}
                 </div>
@@ -310,195 +457,113 @@ export const HighFidelitySynthesisLab: React.FC = () => {
           )}
 
           {activeTab === 'outreach' && (
-            <motion.div 
-              key="outreach"
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -20 }}
-              className="grid grid-cols-1 lg:grid-cols-2 gap-12"
-            >
-              {/* Controls */}
-              <div className="space-y-8">
-                <section>
-                  <h2 className="text-xl font-serif italic mb-4">1. Target Intelligence</h2>
-                  <div className="space-y-4">
-                    <div>
-                      <label className="text-[10px] uppercase tracking-widest font-mono opacity-60 mb-2 block">Target Company / Department</label>
-                      <input 
-                        type="text"
-                        value={targetCompany}
-                        onChange={(e) => setTargetCompany(e.target.value)}
-                        placeholder="e.g. Google Cloud, Marketing Dept"
-                        className="w-full p-4 border border-[#141414] bg-white focus:outline-none focus:ring-1 focus:ring-black"
-                      />
-                    </div>
-                    <div>
-                      <label className="text-[10px] uppercase tracking-widest font-mono opacity-60 mb-2 block">Target Role / Contact Title</label>
-                      <input 
-                        type="text"
-                        value={targetRole}
-                        onChange={(e) => setTargetRole(e.target.value)}
-                        placeholder="e.g. VP of Engineering"
-                        className="w-full p-4 border border-[#141414] bg-white focus:outline-none focus:ring-1 focus:ring-black"
-                      />
-                    </div>
-                  </div>
-                </section>
-
-                <section>
-                  <h2 className="text-xl font-serif italic mb-4">2. Tone Refinement</h2>
-                  <div className="border border-[#141414] p-8 bg-white/50 space-y-8">
-                    <div>
-                      <div className="flex justify-between text-[10px] uppercase tracking-widest font-mono mb-4">
-                        <span>Casual</span>
-                        <span>Formal</span>
-                      </div>
-                      <input 
-                        type="range" 
-                        min="0" max="100" 
-                        value={tone.formal}
-                        onChange={(e) => setTone({...tone, formal: parseInt(e.target.value)})}
-                        className="w-full accent-[#141414]"
-                      />
-                    </div>
-                    <div>
-                      <div className="flex justify-between text-[10px] uppercase tracking-widest font-mono mb-4">
-                        <span>Brief</span>
-                        <span>Detailed</span>
-                      </div>
-                      <input 
-                        type="range" 
-                        min="0" max="100" 
-                        value={tone.detail}
-                        onChange={(e) => setTone({...tone, detail: parseInt(e.target.value)})}
-                        className="w-full accent-[#141414]"
-                      />
-                    </div>
-                  </div>
-                </section>
-
-                <button
-                  onClick={generateSequence}
-                  disabled={loading || !targetCompany || !targetRole}
-                  className="w-full py-6 bg-[#141414] text-[#E4E3E0] flex items-center justify-center gap-4 hover:bg-black transition-colors disabled:opacity-50"
-                >
-                  {loading ? (
-                    <RefreshCw className="w-6 h-6 animate-spin" />
-                  ) : (
-                    <>
-                      <Send className="w-6 h-6" />
-                      <span className="text-sm uppercase tracking-[0.2em] font-mono font-bold">Forge Sequence</span>
-                    </>
-                  )}
-                </button>
-              </div>
-
-              {/* Preview */}
-              <div className="flex flex-col">
-                <h2 className="text-xl font-serif italic mb-4">Sequence Preview</h2>
-                <div className="flex-1 border border-[#141414] bg-white p-8 overflow-y-auto max-h-[600px]">
-                  {generatedSequence ? (
-                    <div className="space-y-12">
-                      {generatedSequence.steps.map((step: any, idx: number) => (
-                        <div key={idx} className="space-y-4">
-                          <div className="flex items-center gap-3">
-                            <div className="w-8 h-8 rounded-full bg-[#141414] text-[#E4E3E0] flex items-center justify-center text-xs font-mono">
-                              {idx + 1}
-                            </div>
-                            <span className="text-xs uppercase tracking-widest font-mono font-bold">
-                              {step.type.replace('_', ' ')}
-                            </span>
-                          </div>
-                          <div className="p-6 bg-[#F5F5F0] border border-[#141414]/10 font-mono text-sm whitespace-pre-wrap">
-                            {step.subject && (
-                              <div className="mb-4 pb-4 border-b border-[#141414]/10">
-                                <span className="opacity-40">Subject:</span> {step.subject}
-                              </div>
-                            )}
-                            {step.content}
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  ) : (
-                    <div className="h-full flex items-center justify-center text-center opacity-20">
-                      <div>
-                        <Sliders className="w-24 h-24 mx-auto mb-4" />
-                        <p className="text-xs uppercase tracking-widest font-mono">Awaiting Forge</p>
-                      </div>
-                    </div>
-                  )}
-                </div>
-              </div>
-            </motion.div>
+            <OutreachForge userId={user?.uid || ''} />
           )}
 
           {activeTab === 'kit' && (
             <motion.div 
               key="kit"
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -20 }}
-              className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8"
+              initial={{ opacity: 0, scale: 0.98 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 1.02 }}
+              className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-12"
             >
               {assets.length > 0 ? (
                 assets.map(asset => (
-                  <div key={asset.id} className="border border-[#141414] bg-white group overflow-hidden">
+                  <div key={asset.id} className="border-2 border-[#141414] bg-white group overflow-hidden shadow-lg hover:shadow-2xl transition-all">
                     <div className="aspect-square bg-[#F5F5F0] relative overflow-hidden">
                       {asset.type === 'portrait' ? (
                         <img src={asset.content} alt="Portrait" className="w-full h-full object-cover" />
                       ) : (
-                        <div className="p-6 h-full flex items-center justify-center text-center">
+                        <div className="p-12 h-full flex items-center justify-center text-center">
                           <div>
-                            <Send className="w-12 h-12 mx-auto mb-4 opacity-20" />
-                            <p className="text-[10px] uppercase tracking-widest font-mono font-bold">
-                              {asset.metadata?.targetCompany || 'Outreach Sequence'}
+                            {asset.type === 'live_resume' ? <FileText className="w-16 h-16 mx-auto mb-6 opacity-10" /> :
+                             asset.type === 'interactive_portfolio' ? <Globe className="w-16 h-16 mx-auto mb-6 opacity-10" /> :
+                             <Send className="w-16 h-16 mx-auto mb-6 opacity-10" />}
+                            <p className="text-xs uppercase tracking-widest font-bold">
+                              {asset.metadata?.targetCompany || asset.type.replace('_', ' ')}
                             </p>
                           </div>
                         </div>
                       )}
-                      <div className="absolute inset-0 bg-[#141414]/80 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-4">
+                      <div className="absolute inset-0 bg-[#141414]/90 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-6">
                         <button 
                           onClick={() => {
                             if (asset.type === 'portrait') {
                               setGeneratedPortrait(asset.content);
                               setActiveTab('portrait');
-                            } else {
+                            } else if (asset.type === 'outreach_sequence') {
                               setGeneratedSequence(JSON.parse(asset.content));
                               setActiveTab('outreach');
+                            } else if (asset.type === 'live_resume') {
+                              setGeneratedResume(JSON.parse(asset.content));
+                              setShowLiveResume(true);
+                            } else if (asset.type === 'interactive_portfolio') {
+                              setGeneratedPortfolio(JSON.parse(asset.content));
+                              setShowPortfolio(true);
                             }
                           }}
-                          className="p-3 bg-white text-[#141414] hover:bg-white/90 transition-colors"
+                          className="p-4 bg-white text-[#141414] hover:bg-neon-cyan transition-all"
                         >
-                          <RefreshCw className="w-5 h-5" />
+                          <RefreshCw className="w-6 h-6" />
                         </button>
                         <a 
                           href={asset.type === 'portrait' ? asset.content : `data:text/plain;base64,${btoa(asset.content)}`}
                           download={`sparkwavv-${asset.type}-${asset.id}.${asset.type === 'portrait' ? 'png' : 'txt'}`}
-                          className="p-3 bg-white text-[#141414] hover:bg-white/90 transition-colors"
+                          className="p-4 bg-white text-[#141414] hover:bg-neon-cyan transition-all"
                         >
-                          <Download className="w-5 h-5" />
+                          <Download className="w-6 h-6" />
                         </a>
                       </div>
                     </div>
-                    <div className="p-4 border-t border-[#141414]">
+                    <div className="p-6 border-t-2 border-[#141414]">
                       <div className="flex items-center justify-between">
-                        <span className="text-[10px] uppercase tracking-widest font-mono font-bold">{asset.type}</span>
+                        <span className="text-[10px] uppercase tracking-widest font-bold">{asset.type.replace('_', ' ')}</span>
                         <span className="text-[10px] opacity-40 font-mono">{new Date(asset.createdAt).toLocaleDateString()}</span>
                       </div>
                     </div>
                   </div>
                 ))
               ) : (
-                <div className="col-span-full py-24 text-center opacity-20">
-                  <Briefcase className="w-24 h-24 mx-auto mb-4" />
-                  <p className="text-xs uppercase tracking-widest font-mono">Brand Kit is Empty</p>
+                <div className="col-span-full py-32 text-center opacity-10">
+                  <Briefcase className="w-32 h-32 mx-auto mb-8" />
+                  <p className="text-xs uppercase tracking-[0.4em] font-bold">Brand Kit is Empty</p>
                 </div>
               )}
             </motion.div>
           )}
         </AnimatePresence>
       </div>
+
+      {/* Overlays */}
+      <AnimatePresence>
+        {showLiveResume && generatedResume && (
+          <motion.div 
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-50 overflow-y-auto"
+          >
+            <LiveResume 
+              data={generatedResume} 
+              onDownload={() => window.print()} 
+            />
+            <button 
+              onClick={() => setShowLiveResume(false)}
+              className="fixed top-12 right-12 p-4 bg-[#141414] text-[#E4E3E0] rounded-full z-[60] hover:scale-110 transition-transform"
+            >
+              <X className="w-6 h-6" />
+            </button>
+          </motion.div>
+        )}
+
+        {showPortfolio && generatedPortfolio && (
+          <InteractivePortfolio 
+            data={generatedPortfolio} 
+            onClose={() => setShowPortfolio(false)} 
+          />
+        )}
+      </AnimatePresence>
     </div>
   );
 };

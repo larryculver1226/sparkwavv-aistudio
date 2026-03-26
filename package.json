@@ -15,6 +15,7 @@
     "test:e2e": "playwright test"
   },
   "dependencies": {
+    "@google-cloud/discoveryengine": "^2.6.0",
     "@google-cloud/vertexai": "^1.10.0",
     "@google/genai": "^1.29.0",
     "@radix-ui/react-tooltip": "^1.2.8",

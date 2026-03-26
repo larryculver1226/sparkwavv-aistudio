@@ -17,8 +17,11 @@ export interface UserProfile {
   brandDNAAttributes?: string[];
   journeyStage: JourneyStage;
   onboardingComplete?: boolean;
+  alignmentScore?: number;
   location?: string;
   website?: string;
   bio?: string;
+  voiceMode?: boolean;
+  specializedSector?: 'Healthcare' | 'Legal' | 'Cybersecurity' | 'Finance' | 'General';
   updatedAt?: any;
 }

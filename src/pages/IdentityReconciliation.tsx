@@ -25,7 +25,11 @@ interface ReconData {
   };
 }
 
-export const IdentityReconciliation: React.FC = () => {
+interface IdentityReconciliationProps {
+  onNotify?: (message: string, type: 'success' | 'error' | 'info') => void;
+}
+
+export const IdentityReconciliation: React.FC<IdentityReconciliationProps> = ({ onNotify }) => {
   const [data, setData] = useState<ReconData | null>(null);
   const [loading, setLoading] = useState(true);
   const [relinking, setRelinking] = useState<string | null>(null);

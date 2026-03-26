@@ -121,11 +121,16 @@ export const PartnerDashboard: React.FC = () => {
     }
   };
 
+  const [showDnaModal, setShowDnaModal] = useState(false);
+  const [showMilestoneModal, setShowMilestoneModal] = useState(false);
+  const [dnaSuggestion, setDnaSuggestion] = useState({ field: 'brandPersona', value: '' });
+  const [milestoneSuggestion, setMilestoneSuggestion] = useState({ title: '', description: '' });
+
   const proposeSuggestion = async (type: 'dna_shift' | 'milestone', content: any) => {
     if (!selectedClient) return;
     try {
       const idToken = await auth.currentUser?.getIdToken();
-      await fetch('/api/partner/suggestions', {
+      const res = await fetch('/api/partner/suggestions', {
         method: 'POST',
         headers: { 
           'Authorization': `Bearer ${idToken}`,
@@ -137,7 +142,14 @@ export const PartnerDashboard: React.FC = () => {
           content
         })
       });
-      alert('Suggestion submitted! The user will be notified.');
+      if (res.ok) {
+        alert('Suggestion submitted! The user will be notified.');
+        setShowDnaModal(false);
+        setShowMilestoneModal(false);
+      } else {
+        const err = await res.json();
+        alert(`Error: ${err.error}`);
+      }
     } catch (error) {
       console.error("Error submitting suggestion:", error);
     }
@@ -257,13 +269,21 @@ export const PartnerDashboard: React.FC = () => {
                           <h3 className="text-2xl font-bold text-white">{selectedClient.displayName}</h3>
                           <p className="text-slate-400">{selectedClient.email}</p>
                         </div>
-                        <div className="flex gap-2">
-                          <span className="px-3 py-1 bg-slate-800 border border-slate-700 rounded-full text-xs font-medium text-slate-300">
-                            Stage: {selectedClient.journeyStage}
-                          </span>
-                          <span className={`px-3 py-1 rounded-full text-xs font-medium ${selectedClient.permissions.includes('propose') ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20' : 'bg-slate-800 text-slate-400 border border-slate-700'}`}>
-                            {selectedClient.permissions.includes('propose') ? 'Propose Access' : 'Read Only'}
-                          </span>
+                        <div className="flex items-center gap-4">
+                          <button 
+                            onClick={() => navigate(`/dashboard/${selectedClient.uid}`)}
+                            className="flex items-center gap-2 px-4 py-2 bg-slate-800 hover:bg-slate-700 border border-slate-700 rounded-xl text-sm font-medium transition-all"
+                          >
+                            <ExternalLink className="w-4 h-4" /> View Dashboard
+                          </button>
+                          <div className="flex gap-2">
+                            <span className="px-3 py-1 bg-slate-800 border border-slate-700 rounded-full text-xs font-medium text-slate-300">
+                              Stage: {selectedClient.journeyStage}
+                            </span>
+                            <span className={`px-3 py-1 rounded-full text-xs font-medium ${selectedClient.permissions.includes('propose') ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20' : 'bg-slate-800 text-slate-400 border border-slate-700'}`}>
+                              {selectedClient.permissions.includes('propose') ? 'Propose Access' : 'Read Only'}
+                            </span>
+                          </div>
                         </div>
                       </div>
 
@@ -283,7 +303,7 @@ export const PartnerDashboard: React.FC = () => {
                           ) : (
                             <div className="space-y-4">
                               <button 
-                                onClick={() => proposeSuggestion('dna_shift', { field: 'brandPersona', value: 'Right Brain (Spark/Yang)' })}
+                                onClick={() => setShowDnaModal(true)}
                                 className="w-full bg-slate-700 hover:bg-slate-600 text-white py-2 rounded-lg text-sm transition-all flex items-center justify-center gap-2"
                               >
                                 <Plus className="w-4 h-4" /> Suggest Persona Shift
@@ -307,7 +327,7 @@ export const PartnerDashboard: React.FC = () => {
                           ) : (
                             <div className="space-y-4">
                               <button 
-                                onClick={() => proposeSuggestion('milestone', { title: 'Complete Brand Identity Workshop', description: 'Finalize core values and visual direction.' })}
+                                onClick={() => setShowMilestoneModal(true)}
                                 className="w-full bg-slate-700 hover:bg-slate-600 text-white py-2 rounded-lg text-sm transition-all flex items-center justify-center gap-2"
                               >
                                 <Plus className="w-4 h-4" /> Add Milestone
@@ -535,6 +555,113 @@ export const PartnerDashboard: React.FC = () => {
           </AnimatePresence>
         </main>
       </div>
+      {/* DNA Shift Modal */}
+      <AnimatePresence>
+        {showDnaModal && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
+            <motion.div 
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.95 }}
+              className="bg-slate-900 border border-slate-800 rounded-2xl p-8 max-w-md w-full shadow-2xl"
+            >
+              <h3 className="text-xl font-bold text-white mb-4">Propose DNA Shift</h3>
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-xs font-medium text-slate-500 uppercase tracking-wider mb-1">Attribute Field</label>
+                  <select 
+                    value={dnaSuggestion.field}
+                    onChange={(e) => setDnaSuggestion(prev => ({ ...prev, field: e.target.value }))}
+                    className="w-full bg-slate-800 border border-slate-700 rounded-xl py-2 px-4 text-white focus:outline-none"
+                  >
+                    <option value="brandPersona">Brand Persona</option>
+                    <option value="generationalPersona">Generational Persona</option>
+                    <option value="careerStageRole">Career Stage Role</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-slate-500 uppercase tracking-wider mb-1">Suggested Value</label>
+                  <input 
+                    type="text"
+                    value={dnaSuggestion.value}
+                    onChange={(e) => setDnaSuggestion(prev => ({ ...prev, value: e.target.value }))}
+                    className="w-full bg-slate-800 border border-slate-700 rounded-xl py-2 px-4 text-white focus:outline-none"
+                    placeholder="e.g., Right Brain (Spark/Yang)"
+                  />
+                </div>
+                <div className="flex gap-3 pt-4">
+                  <button 
+                    onClick={() => setShowDnaModal(false)}
+                    className="flex-1 px-4 py-2 bg-slate-800 hover:bg-slate-700 text-white rounded-xl transition-all"
+                  >
+                    Cancel
+                  </button>
+                  <button 
+                    onClick={() => proposeSuggestion('dna_shift', dnaSuggestion)}
+                    disabled={!dnaSuggestion.value}
+                    className="flex-1 px-4 py-2 bg-white text-slate-950 font-bold rounded-xl hover:bg-slate-200 transition-all disabled:opacity-50"
+                  >
+                    Propose
+                  </button>
+                </div>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* Milestone Modal */}
+      <AnimatePresence>
+        {showMilestoneModal && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
+            <motion.div 
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.95 }}
+              className="bg-slate-900 border border-slate-800 rounded-2xl p-8 max-w-md w-full shadow-2xl"
+            >
+              <h3 className="text-xl font-bold text-white mb-4">Propose Milestone</h3>
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-xs font-medium text-slate-500 uppercase tracking-wider mb-1">Milestone Title</label>
+                  <input 
+                    type="text"
+                    value={milestoneSuggestion.title}
+                    onChange={(e) => setMilestoneSuggestion(prev => ({ ...prev, title: e.target.value }))}
+                    className="w-full bg-slate-800 border border-slate-700 rounded-xl py-2 px-4 text-white focus:outline-none"
+                    placeholder="e.g., Complete Brand Workshop"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-slate-500 uppercase tracking-wider mb-1">Description</label>
+                  <textarea 
+                    value={milestoneSuggestion.description}
+                    onChange={(e) => setMilestoneSuggestion(prev => ({ ...prev, description: e.target.value }))}
+                    rows={3}
+                    className="w-full bg-slate-800 border border-slate-700 rounded-xl py-2 px-4 text-white focus:outline-none resize-none"
+                    placeholder="What should the user achieve?"
+                  />
+                </div>
+                <div className="flex gap-3 pt-4">
+                  <button 
+                    onClick={() => setShowMilestoneModal(false)}
+                    className="flex-1 px-4 py-2 bg-slate-800 hover:bg-slate-700 text-white rounded-xl transition-all"
+                  >
+                    Cancel
+                  </button>
+                  <button 
+                    onClick={() => proposeSuggestion('milestone', milestoneSuggestion)}
+                    disabled={!milestoneSuggestion.title}
+                    className="flex-1 px-4 py-2 bg-white text-slate-950 font-bold rounded-xl hover:bg-slate-200 transition-all disabled:opacity-50"
+                  >
+                    Propose
+                  </button>
+                </div>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
     </div>
   );
 };

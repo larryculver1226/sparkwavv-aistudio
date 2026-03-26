@@ -52,7 +52,7 @@ export const SkylarSidebar: React.FC<SkylarSidebarProps> = ({ onLogin }) => {
   const [error, setError] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<'chat' | 'alerts'>('chat');
   const [alerts, setAlerts] = useState<any[]>([]);
-  const { user } = useIdentity();
+  const { user, profile } = useIdentity();
   const location = useLocation();
   const scrollRef = useRef<HTMLDivElement>(null);
   const audioRef = useRef<HTMLAudioElement>(null);
@@ -84,19 +84,73 @@ export const SkylarSidebar: React.FC<SkylarSidebarProps> = ({ onLogin }) => {
     }
   }, []);
 
-  const toggleListening = () => {
+  const playChime = () => {
+    try {
+      const AudioContextClass = (window as any).AudioContext || (window as any).webkitAudioContext;
+      if (!AudioContextClass) return;
+      
+      const audioCtx = new AudioContextClass();
+      const oscillator = audioCtx.createOscillator();
+      const gainNode = audioCtx.createGain();
+
+      oscillator.type = 'sine';
+      oscillator.frequency.setValueAtTime(880, audioCtx.currentTime); // A5
+      oscillator.frequency.exponentialRampToValueAtTime(1320, audioCtx.currentTime + 0.1); // E6
+      oscillator.frequency.exponentialRampToValueAtTime(880, audioCtx.currentTime + 0.3); // A5
+
+      gainNode.gain.setValueAtTime(0, audioCtx.currentTime);
+      gainNode.gain.linearRampToValueAtTime(0.1, audioCtx.currentTime + 0.05);
+      gainNode.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.4);
+
+      oscillator.connect(gainNode);
+      gainNode.connect(audioCtx.destination);
+
+      oscillator.start();
+      oscillator.stop(audioCtx.currentTime + 0.4);
+    } catch (err) {
+      console.warn("Failed to play chime:", err);
+    }
+  };
+
+  const toggleListening = async (isAuto = false) => {
     if (isListening) {
       recognitionRef.current?.stop();
       setIsListening(false);
     } else {
       if (!recognitionRef.current) {
-        alert("Speech recognition is not supported in your browser.");
+        if (!isAuto) alert("Speech recognition is not supported in your browser.");
         return;
       }
-      recognitionRef.current.start();
-      setIsListening(true);
+
+      try {
+        // Request microphone access explicitly if not already granted
+        await navigator.mediaDevices.getUserMedia({ audio: true });
+        
+        if (isAuto) {
+          playChime();
+        }
+        
+        recognitionRef.current.start();
+        setIsListening(true);
+      } catch (err) {
+        console.error("Microphone access denied:", err);
+        if (!isAuto) {
+          setError("Microphone access is required for voice-to-text. Please enable it in your browser settings.");
+        }
+      }
     }
   };
+
+  // Auto-listen when sidebar opens if voiceMode is enabled
+  useEffect(() => {
+    if (isOpen && profile?.voiceMode && !isListening) {
+      // Small delay to ensure UI is ready and not jarring
+      const timer = setTimeout(() => {
+        toggleListening(true);
+      }, 500);
+      return () => clearTimeout(timer);
+    }
+  }, [isOpen, profile?.voiceMode]);
 
   // Listen for external toggle events
   useEffect(() => {
@@ -124,7 +178,8 @@ export const SkylarSidebar: React.FC<SkylarSidebarProps> = ({ onLogin }) => {
     const loadHistory = async () => {
       const uid = user?.uid;
       if (uid) {
-        const history = await skylar.getChatHistory(uid);
+        const token = await user.getIdToken();
+        const history = await skylar.getChatHistory(uid, token);
         setMessages(history);
       }
     };
@@ -143,11 +198,6 @@ export const SkylarSidebar: React.FC<SkylarSidebarProps> = ({ onLogin }) => {
   const handleSend = async () => {
     if (!input.trim()) return;
 
-    if (!user) {
-      setError("Authentication required. Please login to chat with Skylar.");
-      return;
-    }
-
     const userMessage: ChatMessage = {
       role: 'user',
       parts: [{ text: input }]
@@ -160,8 +210,8 @@ export const SkylarSidebar: React.FC<SkylarSidebarProps> = ({ onLogin }) => {
     setError(null);
 
     try {
-      const uid = user.uid;
-      const token = await user.getIdToken();
+      const uid = user?.uid || 'anonymous';
+      const token = user ? await user.getIdToken() : undefined;
       
       // Convert history to Vertex format
       const vertexHistory = messages.map(msg => ({
@@ -169,27 +219,26 @@ export const SkylarSidebar: React.FC<SkylarSidebarProps> = ({ onLogin }) => {
         parts: msg.parts
       }));
 
-      const response = await skylar.chatWithVertex(uid, currentInput, vertexHistory, methodology, token);
+      const response = await skylar.chatWithVertex(uid === 'anonymous' ? '' : uid, currentInput, vertexHistory, methodology, token);
       
-      const modelParts = response.candidates[0].content.parts;
-      const textPart = modelParts.find((p: any) => p.text);
-      const functionCallPart = modelParts.find((p: any) => p.functionCall);
-
-      let responseText = textPart?.text || "";
+      const responseText = response.text || "";
+      const calls = response.functionCalls;
       
-      if (functionCallPart) {
-        const { name, args } = functionCallPart.functionCall;
-        
-        if (name.startsWith('propose_') || name === 'flag_dna_conflict') {
-          const proposal: SkylarProposal = {
-            type: name === 'flag_dna_conflict' ? 'CONFLICT' : 'PROPOSAL',
-            action: name as any,
-            data: args,
-            reasoning: (args as any).reasoning || (args as any).conflictReason || "Skylar suggests this based on your conversation."
-          };
+      if (calls && calls.length > 0) {
+        for (const call of calls) {
+          const { name, args } = call;
           
-          const messageIndex = messages.length + 1;
-          setProposals(prev => ({ ...prev, [messageIndex]: proposal }));
+          if (name.startsWith('propose_') || name === 'flag_dna_conflict') {
+            const proposal: SkylarProposal = {
+              type: name === 'flag_dna_conflict' ? 'CONFLICT' : 'PROPOSAL',
+              action: name as any,
+              data: args,
+              reasoning: (args as any).reasoning || (args as any).conflictReason || "Skylar suggests this based on your conversation."
+            };
+            
+            const messageIndex = messages.length + 1;
+            setProposals(prev => ({ ...prev, [messageIndex]: proposal }));
+          }
         }
       }
 
@@ -200,7 +249,11 @@ export const SkylarSidebar: React.FC<SkylarSidebarProps> = ({ onLogin }) => {
       
       setMessages(prev => {
         const updatedMessages = [...prev, modelMessage];
-        skylar.saveChatToWavvault(uid, updatedMessages);
+        if (user) {
+          user.getIdToken().then(token => {
+            skylar.saveChatToWavvault(user.uid, updatedMessages, token);
+          });
+        }
         return updatedMessages;
       });
       
@@ -356,6 +409,7 @@ export const SkylarSidebar: React.FC<SkylarSidebarProps> = ({ onLogin }) => {
   };
 
   const handleSpeak = async (text: string) => {
+    if (!text) return;
     if (isSpeaking) {
       audioRef.current?.pause();
       setIsSpeaking(false);
@@ -393,10 +447,16 @@ export const SkylarSidebar: React.FC<SkylarSidebarProps> = ({ onLogin }) => {
       {!isOpen && (
         <button 
           onClick={() => setIsOpen(true)}
-          className="fixed bottom-8 right-8 z-50 w-14 h-14 rounded-full bg-neon-cyan text-black flex items-center justify-center shadow-2xl hover:scale-110 transition-transform group"
+          className="fixed bottom-8 right-8 z-50 w-16 h-16 rounded-full bg-[#0a0a0a] border-2 border-neon-cyan/50 text-black flex items-center justify-center shadow-[0_0_20px_rgba(0,255,255,0.3)] hover:scale-110 transition-transform group overflow-hidden"
         >
-          <MessageSquare className="w-6 h-6" />
-          <span className="absolute -top-2 -right-2 w-5 h-5 bg-neon-magenta rounded-full border-2 border-[#050505] animate-pulse" />
+          <img 
+            src={PERSONA_CONFIG[persona].avatar} 
+            alt="Skylar"
+            className="w-full h-full object-cover object-[center_20%]"
+            referrerPolicy="no-referrer"
+          />
+          <div className="absolute inset-0 bg-gradient-to-tr from-transparent via-white/10 to-transparent -translate-x-full animate-shimmer pointer-events-none" />
+          <span className="absolute -top-1 -right-1 w-5 h-5 bg-neon-magenta rounded-full border-2 border-[#050505] animate-pulse z-10" />
         </button>
       )}
 
@@ -413,8 +473,26 @@ export const SkylarSidebar: React.FC<SkylarSidebarProps> = ({ onLogin }) => {
             <div className="p-6 border-b border-white/10 bg-white/[0.02] flex flex-col gap-4">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-3">
-                  <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${isSpeaking ? 'bg-neon-cyan text-black animate-pulse' : 'bg-white/5 text-neon-cyan'}`}>
-                    {getPersonaIcon()}
+                  <div className="relative group">
+                    <div className={`w-12 h-12 rounded-xl overflow-hidden border-2 ${isSpeaking ? 'border-neon-cyan shadow-[0_0_15px_rgba(0,255,255,0.3)]' : 'border-white/10'}`}>
+                      <img 
+                        src={PERSONA_CONFIG[persona].avatar} 
+                        alt={PERSONA_CONFIG[persona].name}
+                        className="w-full h-full object-cover object-[center_20%]"
+                        referrerPolicy="no-referrer"
+                      />
+                      {/* AI Shimmer Overlay */}
+                      <div className="absolute inset-0 bg-gradient-to-tr from-transparent via-white/10 to-transparent -translate-x-full animate-shimmer pointer-events-none" />
+                      {/* Active Pulse */}
+                      {isSpeaking && (
+                        <div className="absolute inset-0 border-2 border-neon-cyan rounded-xl animate-ping opacity-20" />
+                      )}
+                    </div>
+                    <div className="absolute -bottom-1 -right-1 w-4 h-4 rounded-full bg-[#0a0a0a] border border-white/10 flex items-center justify-center">
+                      <div className="text-neon-cyan">
+                        {getPersonaIcon()}
+                      </div>
+                    </div>
                   </div>
                   <div>
                     <h3 className="text-sm font-bold text-white">{PERSONA_CONFIG[persona].name}</h3>
@@ -484,7 +562,28 @@ export const SkylarSidebar: React.FC<SkylarSidebarProps> = ({ onLogin }) => {
 
               {messages.map((msg, i) => (
                 <div key={i} className="space-y-4">
-                  <div className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
+                  <div className={`flex items-start gap-3 ${msg.role === 'user' ? 'flex-row-reverse' : 'flex-row'}`}>
+                    {msg.role === 'model' && (
+                      <div className="w-8 h-8 rounded-lg overflow-hidden border border-white/10 shrink-0 mt-1">
+                        <img 
+                          src={PERSONA_CONFIG[persona].avatar} 
+                          alt="Skylar"
+                          className="w-full h-full object-cover object-[center_20%]"
+                          referrerPolicy="no-referrer"
+                        />
+                      </div>
+                    )}
+                    {msg.role === 'user' && (
+                      <div className="w-8 h-8 rounded-lg bg-white/5 flex items-center justify-center border border-white/10 shrink-0 mt-1">
+                        {user?.photoURL ? (
+                          <img src={user.photoURL} alt="User" className="w-full h-full object-cover rounded-lg" referrerPolicy="no-referrer" />
+                        ) : (
+                          <div className="text-[10px] font-bold text-white/40 uppercase">
+                            {user?.displayName?.charAt(0) || 'U'}
+                          </div>
+                        )}
+                      </div>
+                    )}
                     <div className={`max-w-[85%] p-4 rounded-2xl text-sm leading-relaxed ${
                       msg.role === 'user' 
                         ? 'bg-neon-cyan text-black font-medium' 
@@ -663,20 +762,13 @@ export const SkylarSidebar: React.FC<SkylarSidebarProps> = ({ onLogin }) => {
         {/* Input */}
         <div className="p-6 border-t border-white/10 bg-white/[0.02]">
               {activeTab === 'chat' ? (
-                !user ? (
-                  <div className="flex flex-col items-center gap-4 py-2">
-                    <div className="flex items-center gap-2 text-white/40 text-[10px] uppercase font-bold tracking-wider">
-                      <Lock className="w-3 h-3" />
-                      <span>Authentication Required</span>
+                <div className="flex flex-col gap-3">
+                  {!user && (
+                    <div className="flex items-center justify-center gap-2 text-[9px] text-white/20 uppercase font-bold tracking-widest mb-1">
+                      <Lock className="w-2.5 h-2.5" />
+                      <span>Login to save chat history</span>
                     </div>
-                    <button 
-                      onClick={onLogin}
-                      className="w-full py-3 bg-neon-cyan text-black rounded-xl font-bold text-sm hover:shadow-[0_0_20px_rgba(0,255,255,0.3)] transition-all"
-                    >
-                      Login to Chat
-                    </button>
-                  </div>
-                ) : (
+                  )}
                   <div className="relative">
                     <input 
                       type="text" 
@@ -688,7 +780,7 @@ export const SkylarSidebar: React.FC<SkylarSidebarProps> = ({ onLogin }) => {
                     />
                     <div className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-2">
                       <button 
-                        onClick={toggleListening}
+                        onClick={() => toggleListening(false)}
                         className={`p-2 transition-colors ${isListening ? 'text-neon-cyan animate-pulse' : 'text-white/20 hover:text-neon-cyan'}`}
                         title={isListening ? 'Listening...' : 'Start Voice-to-Text'}
                       >
@@ -703,7 +795,7 @@ export const SkylarSidebar: React.FC<SkylarSidebarProps> = ({ onLogin }) => {
                       </button>
                     </div>
                   </div>
-                )
+                </div>
               ) : (
                 /* Alerts Tab Footer */
                 <div className="text-center py-2">

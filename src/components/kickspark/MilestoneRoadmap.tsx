@@ -33,7 +33,7 @@ export const MilestoneRoadmap: React.FC<MilestoneRoadmapProps> = ({
       <div className="flex items-center justify-between">
         <div>
           <h3 className="text-sm font-bold text-white/40 uppercase tracking-widest">Kickspark 12-Week Roadmap</h3>
-          <p className="text-xs text-white/20 mt-1">Systemic transition through four critical phases</p>
+          <p className="text-xs text-white/20 mt-1">Systemic transition through five critical phases</p>
         </div>
         <div className="text-right">
           <span className="text-2xl font-display font-bold text-neon-cyan">{Math.round(progress)}%</span>
