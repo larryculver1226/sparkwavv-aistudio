@@ -32,7 +32,8 @@ import {
   CheckCircle2,
   LogOut,
   History,
-  Camera
+  Camera,
+  Menu
 } from 'lucide-react';
 import { audioService } from '../services/audioService';
 import { SynthesisNarrative } from '../components/dashboard/SynthesisNarrative';
@@ -51,6 +52,7 @@ import { NeuralSynthesisEngine } from '../components/dashboard/NeuralSynthesisEn
 import { HighFidelitySynthesisLab } from '../components/skylar/HighFidelitySynthesisLab';
 import { OutreachForge } from '../components/skylar/OutreachForge';
 import { JobMatchesView } from '../components/dashboard/JobMatchesView';
+import { StrengthsView } from '../components/dashboard/StrengthsView';
 import { PhaseDetails } from '../components/kickspark/PhaseDetails';
 import { MilestoneRoadmap } from '../components/kickspark/MilestoneRoadmap';
 import { EvolutionVisualizer } from '../components/EvolutionVisualizer';
@@ -59,6 +61,7 @@ import { X, Eye, EyeOff, Brain as BrainIcon } from 'lucide-react';
 import { SentimentMotivationModal } from '../components/dashboard/SentimentMotivationModal';
 import { GateReviewModal } from '../components/dashboard/GateReviewModal';
 import { SectorIntelligence } from '../components/dashboard/SectorIntelligence';
+import { InactivityTimeout } from '../components/dashboard/InactivityTimeout';
 import { skylar } from '../services/skylarService';
 
 const MiniGauge: React.FC<{ value: number; label: string; color: string }> = ({ value, label, color }) => {
@@ -488,11 +491,13 @@ export const UserDashboard: React.FC<{ userId: string; isAdmin?: boolean }> = ({
   const [showRoadmap, setShowRoadmap] = useState(false);
 
   const [searchParams, setSearchParams] = useSearchParams();
-  const [activeView, setActiveView] = useState<'dashboard' | 'synthesis' | 'matches' | 'outreach'>(() => {
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const [activeView, setActiveView] = useState<'dashboard' | 'synthesis' | 'matches' | 'outreach' | 'strengths'>(() => {
     const view = searchParams.get('view');
     if (view === 'matches') return 'matches';
     if (view === 'synthesis') return 'synthesis';
     if (view === 'outreach') return 'outreach';
+    if (view === 'strengths') return 'strengths';
     return 'dashboard';
   });
 
@@ -501,12 +506,14 @@ export const UserDashboard: React.FC<{ userId: string; isAdmin?: boolean }> = ({
     if (view === 'matches') setActiveView('matches');
     else if (view === 'synthesis') setActiveView('synthesis');
     else if (view === 'outreach') setActiveView('outreach');
+    else if (view === 'strengths') setActiveView('strengths');
     else setActiveView('dashboard');
   }, [searchParams]);
 
-  const handleViewChange = (view: 'dashboard' | 'synthesis' | 'matches' | 'outreach') => {
+  const handleViewChange = (view: 'dashboard' | 'synthesis' | 'matches' | 'outreach' | 'strengths') => {
     setActiveView(view);
     setSearchParams({ view });
+    setIsMobileMenuOpen(false);
   };
 
   const [isEQModalOpen, setIsEQModalOpen] = useState(false);
@@ -805,6 +812,7 @@ export const UserDashboard: React.FC<{ userId: string; isAdmin?: boolean }> = ({
 
   return (
     <div className="min-h-screen bg-dark-bg text-white font-sans selection:bg-neon-cyan selection:text-black flex overflow-hidden h-screen">
+      <InactivityTimeout />
       {/* Synthesis Narrative Overlay */}
       <AnimatePresence>
         {showSynthesisNarrative && (
@@ -812,6 +820,81 @@ export const UserDashboard: React.FC<{ userId: string; isAdmin?: boolean }> = ({
             insights={newInsights}
             onComplete={() => setShowSynthesisNarrative(false)}
           />
+        )}
+      </AnimatePresence>
+
+      {/* Mobile Sidebar Overlay */}
+      <AnimatePresence>
+        {isMobileMenuOpen && (
+          <>
+            <motion.div 
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => setIsMobileMenuOpen(false)}
+              className="fixed inset-0 bg-black/80 backdrop-blur-sm z-[150] lg:hidden"
+            />
+            <motion.aside 
+              initial={{ x: -300 }}
+              animate={{ x: 0 }}
+              exit={{ x: -300 }}
+              transition={{ type: 'spring', damping: 25, stiffness: 200 }}
+              className="fixed inset-y-0 left-0 w-72 bg-black border-r border-white/5 p-8 flex flex-col gap-10 z-[160] lg:hidden"
+            >
+              <div className="flex items-center justify-between px-2">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-xl bg-neon-cyan/10 border border-neon-cyan/20 flex items-center justify-center">
+                    <Zap className="w-6 h-6 text-neon-cyan" />
+                  </div>
+                  <span className="text-2xl font-display font-bold tracking-tight text-white">Skylar</span>
+                </div>
+                <button 
+                  onClick={() => setIsMobileMenuOpen(false)}
+                  className="p-2 rounded-xl bg-white/5 border border-white/10 text-white/40 hover:text-white"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+
+              <nav className="flex flex-col gap-3">
+                {[
+                  { icon: LayoutDashboard, label: 'Dashboard', active: activeView === 'dashboard', onClick: () => handleViewChange('dashboard') },
+                  { icon: BrainIcon, label: 'Emotional DNA', onClick: handleOpenEQ },
+                  { icon: Award, label: 'My Strengths', active: activeView === 'strengths', onClick: () => handleViewChange('strengths') },
+                  { icon: Briefcase, label: 'Job Matches', active: activeView === 'matches', onClick: () => handleViewChange('matches') },
+                  { icon: Camera, label: 'Synthesis Lab', active: activeView === 'synthesis', onClick: () => handleViewChange('synthesis') },
+                  { icon: Send, label: 'Outreach Forge', active: activeView === 'outreach', onClick: () => handleViewChange('outreach') },
+                  { icon: Database, label: 'Vault', path: '/vault' },
+                  { icon: UserIcon, label: 'Profile', path: '/profile' },
+                  { icon: Users, label: 'Community', path: '/community' },
+                  { icon: Settings, label: 'Settings', path: '/settings' },
+                ].map((item, i) => (
+                  <button 
+                    key={i}
+                    onClick={() => item.onClick ? item.onClick() : navigate(item.path!)}
+                    className={`flex items-center gap-4 px-5 py-4 rounded-2xl transition-all ${
+                      item.active 
+                        ? 'bg-neon-cyan/10 text-neon-cyan border border-neon-cyan/20 neon-border-cyan' 
+                        : 'text-white/40 hover:text-white hover:bg-white/5'
+                    }`}
+                  >
+                    <item.icon className="w-5 h-5" />
+                    <span className="text-sm font-bold tracking-wide">{item.label}</span>
+                  </button>
+                ))}
+              </nav>
+
+              <div className="mt-auto">
+                <button 
+                  onClick={handleLogout}
+                  className="w-full flex items-center gap-4 px-5 py-4 rounded-2xl text-neon-magenta hover:bg-neon-magenta/10 transition-all group"
+                >
+                  <LogOut className="w-5 h-5 group-hover:scale-110 transition-transform" />
+                  <span className="text-sm font-bold tracking-wide">Logout</span>
+                </button>
+              </div>
+            </motion.aside>
+          </>
         )}
       </AnimatePresence>
 
@@ -832,7 +915,7 @@ export const UserDashboard: React.FC<{ userId: string; isAdmin?: boolean }> = ({
             { icon: Send, label: 'Outreach Forge', active: activeView === 'outreach', onClick: () => handleViewChange('outreach') },
             { icon: Database, label: 'Vault', path: '/vault' },
             { icon: UserIcon, label: 'Profile', path: '/profile' },
-            { icon: Award, label: 'My Strengths', path: '/strengths' },
+            { icon: Award, label: 'My Strengths', active: activeView === 'strengths', onClick: () => handleViewChange('strengths') },
             { icon: Briefcase, label: 'Job Matches', active: activeView === 'matches', onClick: () => handleViewChange('matches') },
             { icon: Users, label: 'Community', path: '/community' },
             { icon: Settings, label: 'Settings', path: '/settings' },
@@ -895,8 +978,14 @@ export const UserDashboard: React.FC<{ userId: string; isAdmin?: boolean }> = ({
       {/* Main Content */}
       <div className="flex-1 flex flex-col h-full overflow-hidden">
         {/* Header */}
-        <header className="h-24 border-b border-white/5 px-12 flex items-center justify-between bg-black/20 backdrop-blur-xl shrink-0">
-          <div className="flex items-center gap-8">
+        <header className="h-24 border-b border-white/5 px-6 md:px-12 flex items-center justify-between bg-black/20 backdrop-blur-xl shrink-0">
+          <div className="flex items-center gap-4 md:gap-8">
+            <button 
+              onClick={() => setIsMobileMenuOpen(true)}
+              className="lg:hidden p-2 rounded-xl bg-white/5 border border-white/10 text-white/40 hover:text-white transition-colors"
+            >
+              <Menu className="w-6 h-6" />
+            </button>
             <div className="flex flex-col">
               <h1 className="text-2xl font-display font-bold tracking-tight">
                 {activePhaseView === 'discovery' ? 'Discovery Bento' : 'Ignition Dashboard'}
@@ -926,6 +1015,12 @@ export const UserDashboard: React.FC<{ userId: string; isAdmin?: boolean }> = ({
                 className={`px-4 py-2 rounded-xl text-[10px] font-bold uppercase tracking-widest transition-all ${activeView === 'matches' ? 'bg-neon-cyan text-black' : 'text-white/40 hover:text-white'}`}
               >
                 Market Fit
+              </button>
+              <button 
+                onClick={() => handleViewChange('strengths')}
+                className={`px-4 py-2 rounded-xl text-[10px] font-bold uppercase tracking-widest transition-all ${activeView === 'strengths' ? 'bg-neon-cyan text-black' : 'text-white/40 hover:text-white'}`}
+              >
+                Strengths
               </button>
             </div>
           </div>
@@ -967,7 +1062,9 @@ export const UserDashboard: React.FC<{ userId: string; isAdmin?: boolean }> = ({
               ) : activeView === 'outreach' ? (
                 <OutreachForge userId={userId} />
               ) : activeView === 'matches' ? (
-                <JobMatchesView />
+                <JobMatchesView onBack={() => handleViewChange('dashboard')} />
+              ) : activeView === 'strengths' ? (
+                <StrengthsView onBack={() => handleViewChange('dashboard')} />
               ) : (
                 <>
                   <div className="mb-12">
@@ -1296,7 +1393,7 @@ export const UserDashboard: React.FC<{ userId: string; isAdmin?: boolean }> = ({
               })}
             </div>
             <button 
-              onClick={() => navigate('/strengths')}
+              onClick={() => handleViewChange('strengths')}
               className="w-full mt-12 py-4 rounded-2xl border border-white/10 text-[10px] font-bold uppercase tracking-[0.2em] hover:bg-neon-cyan/10 hover:border-neon-cyan/30 transition-all"
             >
               Details Profile
@@ -1311,9 +1408,9 @@ export const UserDashboard: React.FC<{ userId: string; isAdmin?: boolean }> = ({
             </h3>
             <div className="space-y-6">
               {[
-                { label: 'Resume Process', status: 'Reviewing items and themes', path: '/wavvault/resume' },
+                { label: 'Resume Process', status: 'Reviewing items and themes', path: '/vault' },
                 { label: 'Custom Profile', status: 'Modified achievements, skills, and stories', path: '/profile' },
-                { label: 'Certifications', status: '3 verified credentials', path: '/wavvault/credentials' },
+                { label: 'Certifications', status: '3 verified credentials', path: '/vault' },
               ].map((item, i) => (
                 <button 
                   key={i} 
@@ -1329,7 +1426,7 @@ export const UserDashboard: React.FC<{ userId: string; isAdmin?: boolean }> = ({
               ))}
             </div>
             <button 
-              onClick={() => navigate('/wavvault')}
+              onClick={() => navigate('/vault')}
               className="w-full mt-12 py-4 rounded-2xl border border-white/10 text-[10px] font-bold uppercase tracking-[0.2em] hover:bg-neon-cyan/10 hover:border-neon-cyan/30 transition-all"
             >
               Revvault
@@ -1350,7 +1447,7 @@ export const UserDashboard: React.FC<{ userId: string; isAdmin?: boolean }> = ({
               ]).map((job, i) => (
                 <button 
                   key={i} 
-                  onClick={() => navigate(`/matches/${i}`)}
+                  onClick={() => handleViewChange('matches')}
                   className="w-full flex items-start gap-5 p-5 rounded-2xl bg-white/5 border border-white/5 hover:bg-neon-cyan/5 hover:border-neon-cyan/20 transition-all group"
                 >
                   <div className="w-12 h-12 rounded-2xl bg-white/5 flex items-center justify-center group-hover:bg-neon-cyan/10 transition-all">
@@ -1365,7 +1462,7 @@ export const UserDashboard: React.FC<{ userId: string; isAdmin?: boolean }> = ({
               ))}
             </div>
             <button 
-              onClick={() => navigate('/matches')}
+              onClick={() => handleViewChange('matches')}
               className="w-full mt-12 py-4 rounded-2xl border border-white/10 text-[10px] font-bold uppercase tracking-[0.2em] hover:bg-neon-cyan/10 hover:border-neon-cyan/30 transition-all"
             >
               Job Matches

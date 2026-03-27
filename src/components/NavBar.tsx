@@ -74,8 +74,8 @@ export const NavBar: React.FC<NavBarProps> = ({ onNavigate }) => {
       return;
     }
     
+    e.preventDefault();
     if (href.startsWith('/')) {
-      e.preventDefault();
       navigate(href);
     } else {
       onNavigate(href);
@@ -172,7 +172,7 @@ export const NavBar: React.FC<NavBarProps> = ({ onNavigate }) => {
                       className="flex items-center gap-2 px-4 py-2 rounded-full bg-white/5 border border-white/10 text-white text-sm font-bold hover:bg-white/10 hover:border-white/20 transition-all duration-300 group"
                     >
                       <LayoutDashboard className="w-3.5 h-3.5 text-neon-cyan" />
-                      <span>SPARKWavv Dashboard</span>
+                      <span>Dashboard Login</span>
                     </button>
                     <button 
                       onClick={() => navigate('/vault')}
@@ -214,7 +214,7 @@ export const NavBar: React.FC<NavBarProps> = ({ onNavigate }) => {
                     onClick={() => onNavigate('login')}
                     className="px-4 py-2 rounded-full bg-white/5 border border-white/10 text-white text-sm font-bold hover:bg-white/10 transition-all duration-300"
                   >
-                    SPARKWavv Dashboard
+                    Dashboard Login
                   </button>
                 </div>
               )
@@ -287,7 +287,7 @@ export const NavBar: React.FC<NavBarProps> = ({ onNavigate }) => {
                         className="w-full py-5 rounded-2xl bg-white/5 border border-white/10 text-white font-bold text-2xl flex items-center justify-center gap-3"
                       >
                         <LayoutDashboard className="w-7 h-7 text-neon-cyan" />
-                        SPARKWavv Dashboard
+                        Dashboard Login
                       </button>
                     ) : (
                       <div className="flex flex-col gap-4">
@@ -316,7 +316,7 @@ export const NavBar: React.FC<NavBarProps> = ({ onNavigate }) => {
                         }}
                         className="w-full py-5 rounded-2xl bg-white/5 border border-white/10 text-white font-bold text-2xl"
                       >
-                        SPARKWavv Dashboard
+                        Dashboard Login
                       </button>
                     </div>
                   )

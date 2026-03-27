@@ -14,6 +14,7 @@ import {
   XCircle,
   Sparkles,
   Database,
+  ArrowLeft,
   ArrowRight,
   Filter,
   MoreVertical,
@@ -371,6 +372,13 @@ export const WavvaultExplorer: React.FC<WavvaultExplorerProps> = ({ userId, even
       <header className="sticky top-0 z-50 border-b border-white/5 bg-[#050505]/60 backdrop-blur-2xl">
         <div className="max-w-7xl mx-auto px-6 h-24 flex items-center justify-between">
           <div className="flex items-center gap-6">
+            <button 
+              onClick={() => window.history.back()}
+              className="w-12 h-12 rounded-2xl bg-white/5 border border-white/10 flex items-center justify-center hover:bg-white/10 transition-all group"
+              title="Back to Dashboard"
+            >
+              <ArrowLeft className="w-6 h-6 text-white/40 group-hover:text-white transition-colors" />
+            </button>
             <div className="w-12 h-12 rounded-2xl bg-white/5 border border-white/10 flex items-center justify-center shadow-[0_0_30px_rgba(255,255,255,0.05)] group hover:border-neon-cyan/50 transition-all">
               <Database className="w-6 h-6 text-neon-cyan group-hover:scale-110 transition-transform" />
             </div>

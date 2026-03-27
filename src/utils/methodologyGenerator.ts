@@ -1,6 +1,5 @@
 import { GoogleGenAI } from "@google/genai";
-
-const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
+import { getGeminiApiKey } from "../services/aiConfig.js";
 
 /**
  * Synthetic Methodology Generator
@@ -8,7 +7,15 @@ const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
  * on the Philip Lobkowicz coaching methodology.
  */
 export class MethodologyGenerator {
-  private model = "gemini-1.5-pro";
+  private model = "gemini-3.1-pro-preview";
+
+  private getAI() {
+    const apiKey = getGeminiApiKey();
+    if (!apiKey) {
+      throw new Error("No valid Gemini API key found.");
+    }
+    return new GoogleGenAI({ apiKey });
+  }
 
   /**
    * Generates a set of coaching dialogues based on a specific career scenario.
@@ -28,6 +35,7 @@ export class MethodologyGenerator {
     `;
 
     try {
+      const ai = this.getAI();
       const response = await ai.models.generateContent({
         model: this.model,
         contents: [{ role: 'user', parts: [{ text: prompt }] }],
@@ -35,7 +43,7 @@ export class MethodologyGenerator {
       });
 
       const data = JSON.parse(response.text);
-      return data;
+      return Array.isArray(data) ? data : [];
     } catch (error) {
       console.error("[GENERATOR ERROR]", error);
       return [];

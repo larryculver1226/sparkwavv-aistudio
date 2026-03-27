@@ -5,8 +5,8 @@
   "type": "module",
   "scripts": {
     "dev": "tsx server.ts",
-    "start": "node server.ts",
-    "build": "vite build",
+    "start": "node dist/server.js",
+    "build": "vite build && tsc server.ts --outDir dist --module esnext --target esnext --moduleResolution node --allowSyntheticDefaultImports --esModuleInterop --skipLibCheck --resolveJsonModule && cp firebase-applet-config.json dist/",
     "preview": "vite preview",
     "clean": "rm -rf dist",
     "lint": "tsc --noEmit",
@@ -16,6 +16,7 @@
   },
   "dependencies": {
     "@google-cloud/discoveryengine": "^2.6.0",
+    "@google-cloud/storage": "^7.19.0",
     "@google-cloud/vertexai": "^1.10.0",
     "@google/genai": "^1.29.0",
     "@radix-ui/react-tooltip": "^1.2.8",

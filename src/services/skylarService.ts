@@ -1,7 +1,7 @@
 import { GoogleGenAI, Modality, Type, FunctionDeclaration } from "@google/genai";
-import { getGeminiApiKey } from './aiConfig.ts';
+import { getGeminiApiKey } from './aiConfig.js';
 import * as mammoth from 'mammoth';
-import { KnowledgeGraph, WavvaultData, TargetOpportunity } from '../types/wavvault.ts';
+import { KnowledgeGraph, WavvaultData, TargetOpportunity } from '../types/wavvault.js';
 
 // Lazy initialization of Gemini
 let aiInstance: GoogleGenAI | null = null;

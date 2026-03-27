@@ -46,15 +46,27 @@ const MOCK_MATCHES: JobMatch[] = [
   }
 ];
 
-export const JobMatchesView: React.FC = () => {
+interface JobMatchesViewProps {
+  onBack: () => void;
+}
+
+export const JobMatchesView: React.FC<JobMatchesViewProps> = ({ onBack }) => {
   return (
     <div className="space-y-8">
-      <header className="space-y-2">
-        <div className="flex items-center gap-2 text-neon-lime">
-          <Target className="w-5 h-5" />
-          <h2 className="text-2xl font-display font-bold uppercase tracking-tight">Precision Job Matches</h2>
+      <header className="space-y-4">
+        <div className="flex items-center gap-4">
+          <button 
+            onClick={onBack}
+            className="p-2 rounded-xl bg-white/5 border border-white/10 text-white/40 hover:text-white transition-colors"
+          >
+            <ChevronRight className="w-5 h-5 rotate-180" />
+          </button>
+          <div className="flex items-center gap-2 text-neon-lime">
+            <Target className="w-5 h-5" />
+            <h2 className="text-2xl font-display font-bold uppercase tracking-tight">Precision Job Matches</h2>
+          </div>
         </div>
-        <p className="text-white/40 text-sm max-w-2xl">
+        <p className="text-white/40 text-sm max-w-2xl pl-14">
           Our neural engine has identified these high-value opportunities that align with your unique professional DNA and career trajectory.
         </p>
       </header>

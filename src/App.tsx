@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, lazy, Suspense } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate, useParams, useNavigate, useLocation } from 'react-router-dom';
 import { motion, AnimatePresence } from 'motion/react';
 import { 
@@ -68,65 +68,32 @@ import { auth, isFirebaseConfigured, googleProvider, linkedinProvider, db } from
 import { handleFirestoreError, OperationType } from './lib/firestore-errors';
 import { IdentityProvider, useIdentity } from './contexts/IdentityContext';
 import { AccessDenied } from './components/AccessDenied';
-import { OperationsDashboard } from './pages/OperationsDashboard';
-import { AdminLogin } from './pages/AdminLogin';
-import { AdminDashboard } from './pages/AdminDashboard';
-import { UserDashboard } from './pages/UserDashboard';
-import { PartnerDashboard } from './pages/PartnerDashboard';
-import { PartnerLogin } from './components/PartnerLogin';
-import PrivacyPolicy from './pages/PrivacyPolicy';
-import TermsOfService from './pages/TermsOfService';
-import CookieSettings from './pages/CookieSettings';
+
+// Lazy load page components to improve initial load time
+const OperationsDashboard = lazy(() => import('./pages/OperationsDashboard').then(m => ({ default: m.OperationsDashboard })));
+const AdminLogin = lazy(() => import('./pages/AdminLogin').then(m => ({ default: m.AdminLogin })));
+const AdminDashboard = lazy(() => import('./pages/AdminDashboard').then(m => ({ default: m.AdminDashboard })));
+const UserDashboard = lazy(() => import('./pages/UserDashboard').then(m => ({ default: m.UserDashboard })));
+const PartnerDashboard = lazy(() => import('./pages/PartnerDashboard').then(m => ({ default: m.PartnerDashboard })));
+const PartnerLogin = lazy(() => import('./components/PartnerLogin').then(m => ({ default: m.PartnerLogin })));
+const PrivacyPolicy = lazy(() => import('./pages/PrivacyPolicy'));
+const TermsOfService = lazy(() => import('./pages/TermsOfService'));
+const CookieSettings = lazy(() => import('./pages/CookieSettings'));
+const IgnitionPage = lazy(() => import('./pages/IgnitionPage').then(m => ({ default: m.IgnitionPage })));
+const WavvaultPage = lazy(() => import('./pages/WavvaultPage').then(m => ({ default: m.WavvaultPage })));
+const AcceptInvitation = lazy(() => import('./pages/AcceptInvitation').then(m => ({ default: m.AcceptInvitation })));
+const ProfilePage = lazy(() => import('./pages/ProfilePage').then(m => ({ default: m.ProfilePage })));
+const CommunityPage = lazy(() => import('./pages/CommunityPage').then(m => ({ default: m.CommunityPage })));
+const CinematicSynthesis = lazy(() => import('./components/synthesis/CinematicSynthesis').then(m => ({ default: m.CinematicSynthesis })));
+const PublicBrandPage = lazy(() => import('./components/sharing/PublicBrandPage').then(m => ({ default: m.PublicBrandPage })));
+
 import { generateDiscoverySummary, parseResume, generateBrandImage, UserData } from './services/geminiService';
 import { NavBar } from './components/NavBar';
 import { Footer } from './components/Footer';
 import { Hero } from './components/Hero';
 import { Documentation } from './components/Documentation';
 import { HelpCenter } from './components/HelpCenter';
-import { IgnitionPage } from './pages/IgnitionPage';
-import { WavvaultPage } from './pages/WavvaultPage';
 
-class ErrorBoundary extends React.Component<{ children: React.ReactNode }, { hasError: boolean; error: any }> {
-  constructor(props: any) {
-    super(props);
-    this.state = { hasError: false, error: null };
-  }
-
-  static getDerivedStateFromError(error: any) {
-    return { hasError: true, error };
-  }
-
-  componentDidCatch(error: any, errorInfo: any) {
-    console.error("ErrorBoundary caught an error:", error, errorInfo);
-  }
-
-  render() {
-    if (this.state.hasError) {
-      return (
-        <div className="min-h-screen bg-black text-white flex items-center justify-center p-8">
-          <div className="max-w-md w-full space-y-4 text-center">
-            <ShieldAlert className="w-16 h-16 text-red-500 mx-auto" />
-            <h1 className="text-2xl font-bold">Something went wrong</h1>
-            <p className="text-gray-400">The application encountered an unexpected error.</p>
-            <div className="bg-gray-900 p-4 rounded-lg text-left overflow-auto max-h-40">
-              <code className="text-xs text-red-400">{this.state.error?.toString()}</code>
-            </div>
-            <button 
-              onClick={() => window.location.reload()}
-              className="px-6 py-2 bg-blue-600 rounded-lg hover:bg-blue-700 transition-colors"
-            >
-              Reload Application
-            </button>
-          </div>
-        </div>
-      );
-    }
-
-    return this.props.children;
-  }
-}
-import { AcceptInvitation } from './pages/AcceptInvitation';
-import { ProfilePage } from './pages/ProfilePage';
 import { Button } from './components/Button';
 import OnboardingGate from './components/OnboardingGate';
 import { SkylarSidebar } from './components/skylar/SkylarSidebar';
@@ -135,10 +102,7 @@ import { DashboardData } from './types/dashboard';
 import { CinematicIntro } from './components/landing/CinematicIntro';
 import { BrainModel } from './components/landing/BrainModel';
 import { Roadmap } from './components/landing/Roadmap';
-
-// --- Types ---
-import { CinematicSynthesis } from './components/synthesis/CinematicSynthesis';
-import { PublicBrandPage } from './components/sharing/PublicBrandPage';
+import { PricingPlaceholder } from './components/PricingPlaceholder';
 
 type Step = 'landing' | 'login' | 'onboarding' | 'ignition' | 'forgot-password' | 'settings' | 'module1' | 'module2' | 'module3' | 'module4' | 'module5' | 'processing' | 'synthesis' | 'results' | 'product-skylar' | 'product-features' | 'product-technology' | 'product-wavvault' | 'company-vision' | 'company-about' | 'company-investors' | 'company-give' | 'pricing' | 'documentation' | 'help-center';
 
@@ -291,9 +255,14 @@ const Toast = ({ message, type = 'success', onClose }: { message: string, type?:
 
 import { PrecisionMatchingCard } from './components/landing/PrecisionMatchingCard';
 
-export function SPARKWavvApp({ isAdmin = false }: { isAdmin?: boolean }) {
+export function SPARKWavvApp({ isAdmin = false, initialStep }: { isAdmin?: boolean, initialStep?: Step }) {
   const navigate = useNavigate();
-  const [step, setStep] = useState<Step>('landing');
+  const location = useLocation();
+  const [step, setStep] = useState<Step>(() => {
+    if (initialStep) return initialStep;
+    const saved = localStorage.getItem('sparkwavv_step');
+    return (saved as Step) || 'landing';
+  });
   const [posterVibe, setPosterVibe] = useState<'Minimalist' | 'Brutalist' | 'Corporate' | 'Creative'>('Creative');
   const [showToast, setShowToast] = useState<{ message: string, type: 'success' | 'error' } | null>(null);
   const [forgotPasswordEmail, setForgotPasswordEmail] = useState('');
@@ -343,9 +312,20 @@ export function SPARKWavvApp({ isAdmin = false }: { isAdmin?: boolean }) {
   // Auto-redirect to dashboard or ignition when ready
   useEffect(() => {
     if (authStatus === 'ready' && profile) {
+      // Don't redirect if we are on an informational page that should be public/accessible
+      const informationalSteps = [
+        'product-skylar', 'product-features', 'product-technology', 'product-wavvault',
+        'company-vision', 'company-about', 'company-investors', 'company-give',
+        'pricing', 'documentation', 'help-center', 'settings', 'forgot-password'
+      ];
+      
+      if (informationalSteps.includes(step)) return;
+
       if (profile.role === 'admin' || profile.role === 'super_admin') {
-        console.log('🛡️ Admin detected in SPARKWavvApp, redirecting to admin portal');
-        navigate('/sparkwavv-admin');
+        if (location.pathname !== '/sparkwavv-admin') {
+          console.log('🛡️ Admin detected in SPARKWavvApp, redirecting to admin portal');
+          navigate('/sparkwavv-admin');
+        }
         return;
       }
       
@@ -357,11 +337,14 @@ export function SPARKWavvApp({ isAdmin = false }: { isAdmin?: boolean }) {
       }
 
       if (profile.onboardingComplete) {
-        console.log('🚀 Auth ready, redirecting to dashboard:', profile.uid);
-        navigate(`/dashboard/${profile.uid}`);
+        const dashboardPath = `/dashboard/${profile.uid}`;
+        if (location.pathname !== dashboardPath && !location.pathname.startsWith('/dashboard/')) {
+          console.log('🚀 Auth ready, redirecting to dashboard:', profile.uid);
+          navigate(dashboardPath);
+        }
       }
     }
-  }, [authStatus, profile, emailVerified, navigate]);
+  }, [authStatus, profile, emailVerified, navigate, location.pathname, step]);
 
   // OAuth Message Listener
   useEffect(() => {
@@ -1984,151 +1967,7 @@ export function SPARKWavvApp({ isAdmin = false }: { isAdmin?: boolean }) {
           )}
 
           {step === 'pricing' && (
-            <motion.div 
-              key="pricing"
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -20 }}
-              className="max-w-6xl mx-auto px-6 space-y-16 pb-24"
-            >
-              <header className="space-y-6 text-center">
-                <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-neon-cyan/10 border border-neon-cyan/20 text-neon-cyan text-xs font-bold uppercase tracking-widest">
-                  <Trophy className="w-4 h-4" />
-                  Investment in Your Future
-                </div>
-                <h2 className="text-6xl md:text-7xl font-display font-bold tracking-tighter">Choose Your <span className="text-neon-cyan italic">Trajectory</span></h2>
-                <p className="text-xl text-white/60 max-w-2xl mx-auto leading-relaxed">
-                  Transparent pricing for professionals ready to dominate their market. No hidden fees, just pure cinematic intelligence.
-                </p>
-              </header>
-
-              <div className="grid md:grid-cols-3 gap-8">
-                {[
-                  {
-                    name: "Spark",
-                    price: "0",
-                    period: "Free Forever",
-                    desc: "Perfect for exploring your Career DNA and starting your narrative journey.",
-                    features: [
-                      "Basic Career DNA Mapping",
-                      "1 Cinematic Profile Snapshot",
-                      "3 Skylar AI Interactions/mo",
-                      "Standard Wavvault (5 assets)",
-                      "Community Support"
-                    ],
-                    cta: "Start for Free",
-                    variant: "outline",
-                    color: "text-white/60"
-                  },
-                  {
-                    name: "Wavv Pro",
-                    price: "19",
-                    period: "per month",
-                    desc: "The complete engine for active job seekers and career architects.",
-                    features: [
-                      "Full DNA Synthesis",
-                      "Unlimited Cinematic Updates",
-                      "Priority Skylar Access",
-                      "Unlimited Wavvault Storage",
-                      "Precision Market Matching",
-                      "Advanced Analytics"
-                    ],
-                    cta: "Go Pro Now",
-                    variant: "neon",
-                    color: "text-neon-cyan",
-                    popular: true
-                  },
-                  {
-                    name: "Supernova",
-                    price: "49",
-                    period: "per month",
-                    desc: "Executive-level intelligence for high-stakes professional dominance.",
-                    features: [
-                      "All Pro Features",
-                      "Quarterly Strategy Reviews",
-                      "Market Dominance Analytics",
-                      "Early Access to New Modules",
-                      "White-glove Profile Optimization",
-                      "Dedicated Success Manager"
-                    ],
-                    cta: "Contact Sales",
-                    variant: "outline",
-                    color: "text-neon-magenta"
-                  }
-                ].map((plan, i) => (
-                  <div key={i} className={`glass-panel p-8 space-y-8 flex flex-col justify-between relative group hover:border-white/20 transition-all duration-500 ${plan.popular ? 'border-neon-cyan/50 shadow-[0_0_30px_rgba(0,243,255,0.1)]' : ''}`}>
-                    {plan.popular && (
-                      <div className="absolute -top-4 left-1/2 -translate-x-1/2 px-4 py-1 rounded-full bg-neon-cyan text-black text-[10px] font-bold uppercase tracking-widest">
-                        Most Popular
-                      </div>
-                    )}
-                    <div className="space-y-6">
-                      <div className="space-y-2">
-                        <h3 className={`text-2xl font-bold ${plan.color}`}>{plan.name}</h3>
-                        <div className="flex items-baseline gap-1">
-                          <span className="text-4xl font-bold text-white">${plan.price}</span>
-                          <span className="text-sm text-white/40">{plan.period}</span>
-                        </div>
-                        <p className="text-sm text-white/60 leading-relaxed">{plan.desc}</p>
-                      </div>
-                      <div className="space-y-4">
-                        {plan.features.map((feature, j) => (
-                          <div key={j} className="flex items-center gap-3">
-                            <CheckCircle2 className={`w-4 h-4 ${plan.popular ? 'text-neon-cyan' : 'text-white/20'}`} />
-                            <span className="text-sm text-white/80">{feature}</span>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                    <Button 
-                      onClick={() => setStep('login')} 
-                      variant={plan.variant as any}
-                      className="w-full py-4"
-                    >
-                      {plan.cta}
-                    </Button>
-                  </div>
-                ))}
-              </div>
-
-              <div className="glass-panel p-12 border-neon-cyan/20 relative overflow-hidden group text-center space-y-8">
-                <div className="absolute inset-0 bg-gradient-to-br from-neon-cyan/5 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-1000" />
-                <div className="relative z-10 space-y-6">
-                  <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-neon-lime/10 border border-neon-lime/20 text-neon-lime text-[10px] font-bold uppercase tracking-widest">
-                    <Zap className="w-3 h-3" />
-                    Limited Time Launch Offer
-                  </div>
-                  <h3 className="text-4xl font-bold">The Founder's <span className="text-neon-lime italic">Lifetime Pass</span></h3>
-                  <p className="text-lg text-white/60 max-w-2xl mx-auto leading-relaxed">
-                    Be one of the first 500 professionals to join the movement. Get lifetime access to all Pro features for a single one-time investment.
-                  </p>
-                  <div className="flex flex-col items-center gap-4">
-                    <div className="flex items-baseline gap-2">
-                      <span className="text-5xl font-bold text-neon-lime">$199</span>
-                      <span className="text-white/40 line-through text-xl">$999 Value</span>
-                    </div>
-                    <Button 
-                      onClick={() => setStep('login')} 
-                      variant="neon"
-                      className="px-12 py-6 text-lg bg-neon-lime border-neon-lime text-black shadow-[0_0_30px_rgba(0,255,0,0.2)]"
-                    >
-                      Secure Your Legacy
-                    </Button>
-                    <p className="text-xs text-white/40 uppercase tracking-widest">Only 142 slots remaining</p>
-                  </div>
-                </div>
-              </div>
-
-              <div className="flex flex-col items-center gap-8">
-                <button 
-                  onClick={() => setStep('landing')}
-                  className="text-white/40 hover:text-white transition-colors flex items-center gap-2 text-sm font-bold uppercase tracking-widest"
-                >
-                  <ArrowRight className="w-4 h-4 rotate-180" />
-                  Back to Home
-                </button>
-              </div>
-            </motion.div>
+            <PricingPlaceholder onBack={() => setStep('landing')} />
           )}
 
           {step === 'documentation' && (
@@ -3365,16 +3204,6 @@ const AdminRoute = ({
   return <>{children}</>;
 };
 
-export default function Root() {
-  return (
-    <ErrorBoundary>
-      <IdentityProvider>
-        <App />
-      </IdentityProvider>
-    </ErrorBoundary>
-  );
-}
-
 function ScrollToTop() {
   const { pathname } = useLocation();
   useEffect(() => {
@@ -3385,14 +3214,15 @@ function ScrollToTop() {
 
 import ShareView from './pages/ShareView';
 
-function App() {
+export default function App() {
   const { user, role, status, loading, error, refreshIdentity } = useIdentity();
   const [showRetry, setShowRetry] = useState(false);
 
   useEffect(() => {
     let timer: NodeJS.Timeout;
     if (status === 'authenticated' || status === 'initializing') {
-      timer = setTimeout(() => setShowRetry(true), 5000);
+      // Increase timeout to 30 seconds to allow for slower initial loads in AI Studio
+      timer = setTimeout(() => setShowRetry(true), 30000);
     } else {
       setShowRetry(false);
     }
@@ -3451,50 +3281,59 @@ function App() {
   return (
     <Router>
       <ScrollToTop />
-      <Routes>
-        <Route path="/brand/:secretId" element={<PublicBrandPage />} />
-        <Route path="/share/:shareId" element={<ShareView />} />
-        <Route path="/admin/login" element={<AdminLogin vibe="technical" onLogin={() => window.location.href = '/admin'} />} />
-        <Route path="/operations/login" element={<AdminLogin vibe="vibrant" onLogin={() => window.location.href = '/operations'} />} />
-        
-        <Route path="/admin" element={
-          <AdminRoute requiredRoles={['super_admin', 'admin', 'editor', 'viewer']} requiredEntryPoint="admin">
-            <AdminDashboard onLogout={() => window.location.href = '/admin/login'} />
-          </AdminRoute>
-        } />
-        
-        <Route path="/operations" element={
-          <AdminRoute requiredRoles={['super_admin', 'admin', 'editor', 'viewer', 'operator']} requiredEntryPoint="operations">
-            <OperationsDashboard onLogout={() => window.location.href = '/operations/login'} />
-          </AdminRoute>
-        } />
+      <Suspense fallback={
+        <div className="min-h-screen flex flex-col items-center justify-center bg-[#050505] text-white">
+          <Loader2 className="w-12 h-12 text-neon-cyan animate-spin" />
+          <p className="mt-4 text-white/40 uppercase tracking-widest text-xs">Loading Module...</p>
+        </div>
+      }>
+        <Routes>
+          <Route path="/brand/:secretId" element={<PublicBrandPage />} />
+          <Route path="/share/:shareId" element={<ShareView />} />
+          <Route path="/admin/login" element={<AdminLogin vibe="technical" onLogin={() => window.location.href = '/admin'} />} />
+          <Route path="/operations/login" element={<AdminLogin vibe="vibrant" onLogin={() => window.location.href = '/operations'} />} />
+          
+          <Route path="/admin" element={
+            <AdminRoute requiredRoles={['super_admin', 'admin', 'editor', 'viewer']} requiredEntryPoint="admin">
+              <AdminDashboard onLogout={() => window.location.href = '/admin/login'} />
+            </AdminRoute>
+          } />
+          
+          <Route path="/operations" element={
+            <AdminRoute requiredRoles={['super_admin', 'admin', 'editor', 'viewer', 'operator']} requiredEntryPoint="operations">
+              <OperationsDashboard onLogout={() => window.location.href = '/operations/login'} />
+            </AdminRoute>
+          } />
 
-        <Route 
-          path="/" 
-          element={
-            isAdmin ? (
-              <Navigate to="/admin" replace />
-            ) : (
-              <SPARKWavvApp isAdmin={false} />
-            )
-          } 
-        />
-        <Route 
-          path="/sparkwavv-admin" 
-          element={<Navigate to="/admin" replace />}
-        />
-        <Route path="/dashboard/:userId" element={<UserDashboardWrapper isAdmin={!!isAdmin} />} />
-        <Route path="/partner-dashboard" element={<PartnerDashboard />} />
-        <Route path="/accept-invitation/:token" element={<AcceptInvitation />} />
-        <Route path="/profile" element={<ProfilePage />} />
-        <Route path="/vault" element={<ProtectedRoute user={user} onRedirect={() => window.location.href = '/'}><OnboardingGate><WavvaultPage /></OnboardingGate></ProtectedRoute>} />
-        <Route path="/privacy" element={<PrivacyPolicy />} />
-        <Route path="/terms" element={<TermsOfService />} />
-        <Route path="/cookies" element={<CookieSettings />} />
-        <Route path="/partner/login" element={<PartnerLogin />} />
-        <Route path="/partner/dashboard" element={<PartnerDashboard />} />
-        <Route path="*" element={<Navigate to="/" replace />} />
-      </Routes>
+          <Route 
+            path="/" 
+            element={
+              isAdmin ? (
+                <Navigate to="/admin" replace />
+              ) : (
+                <SPARKWavvApp isAdmin={false} />
+              )
+            } 
+          />
+          <Route path="/settings" element={<ProtectedRoute user={user} onRedirect={() => window.location.href = '/'}><SPARKWavvApp initialStep="settings" /></ProtectedRoute>} />
+          <Route path="/community" element={<ProtectedRoute user={user} onRedirect={() => window.location.href = '/'}><CommunityPage /></ProtectedRoute>} />
+          <Route 
+            path="/sparkwavv-admin" 
+            element={<Navigate to="/admin" replace />}
+          />
+          <Route path="/dashboard/:userId" element={<UserDashboardWrapper isAdmin={!!isAdmin} />} />
+          <Route path="/partner-dashboard" element={<PartnerDashboard />} />
+          <Route path="/accept-invitation/:token" element={<AcceptInvitation />} />
+          <Route path="/profile" element={<ProfilePage />} />
+          <Route path="/vault" element={<ProtectedRoute user={user} onRedirect={() => window.location.href = '/'}><OnboardingGate><WavvaultPage /></OnboardingGate></ProtectedRoute>} />
+          <Route path="/privacy" element={<PrivacyPolicy />} />
+          <Route path="/terms" element={<TermsOfService />} />
+          <Route path="/cookies" element={<CookieSettings />} />
+          <Route path="/partner/login" element={<PartnerLogin />} />
+          <Route path="/partner/dashboard" element={<PartnerDashboard />} />
+          <Route path="*" element={<Navigate to="/" replace />} />
+        </Routes>
+      </Suspense>
     </Router>
   );
 }

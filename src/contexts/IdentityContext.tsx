@@ -37,7 +37,7 @@ export function IdentityProvider({ children }: { children: React.ReactNode }) {
   const [status, setStatus] = useState<IdentityStatus>('initializing');
   const [error, setError] = useState<string | null>(null);
 
-  const logout = async () => {
+  const logout = useCallback(async () => {
     try {
       await signOut(auth);
       setUser(null);
@@ -48,22 +48,7 @@ export function IdentityProvider({ children }: { children: React.ReactNode }) {
     } catch (err: any) {
       console.error('Logout error:', err);
     }
-  };
-
-  const loginWithGoogle = async () => {
-    try {
-      const provider = new GoogleAuthProvider();
-      const result = await signInWithPopup(auth, provider);
-      if (result.user) {
-        await fetchIdentity(result.user);
-        return { success: true };
-      }
-      return { success: false, error: 'No user returned' };
-    } catch (err: any) {
-      console.error('Login error:', err);
-      return { success: false, error: err.message };
-    }
-  };
+  }, []);
 
   const fetchIdentity = useCallback(async (firebaseUser: User, forceRefresh = false) => {
     console.group('🆔 Identity Initialization');
@@ -178,6 +163,21 @@ export function IdentityProvider({ children }: { children: React.ReactNode }) {
     }
   }, []);
 
+  const loginWithGoogle = useCallback(async () => {
+    try {
+      const provider = new GoogleAuthProvider();
+      const result = await signInWithPopup(auth, provider);
+      if (result.user) {
+        await fetchIdentity(result.user);
+        return { success: true };
+      }
+      return { success: false, error: 'No user returned' };
+    } catch (err: any) {
+      console.error('Login error:', err);
+      return { success: false, error: err.message };
+    }
+  }, [fetchIdentity]);
+
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
       setUser(firebaseUser);
@@ -193,7 +193,7 @@ export function IdentityProvider({ children }: { children: React.ReactNode }) {
     return () => unsubscribe();
   }, [fetchIdentity]);
 
-  const updateProfile = async (updates: Partial<UserProfile>) => {
+  const updateProfile = useCallback(async (updates: Partial<UserProfile>) => {
     if (!user) return;
     const idToken = await user.getIdToken();
     const response = await fetch('/api/user/profile', {
@@ -211,16 +211,30 @@ export function IdentityProvider({ children }: { children: React.ReactNode }) {
     } else {
       throw new Error('Failed to update profile');
     }
-  };
+  }, [user]);
 
-  const reloadUser = async () => {
+  const reloadUser = useCallback(async () => {
     if (user) {
       await user.reload();
       setUser({ ...user }); // Trigger re-render
     }
-  };
+  }, [user]);
 
-  const value = {
+  const refreshIdentity = useCallback(async () => {
+    if (user) {
+      await user.reload();
+      await fetchIdentity(user);
+    }
+  }, [user, fetchIdentity]);
+
+  const refreshProfile = useCallback(async () => {
+    if (user) {
+      await user.reload();
+      await fetchIdentity(user);
+    }
+  }, [user, fetchIdentity]);
+
+  const value = React.useMemo(() => ({
     user,
     profile,
     role,
@@ -235,21 +249,24 @@ export function IdentityProvider({ children }: { children: React.ReactNode }) {
     error,
     logout,
     loginWithGoogle,
-    refreshIdentity: async () => {
-      if (user) {
-        await user.reload();
-        await fetchIdentity(user);
-      }
-    },
-    refreshProfile: async () => {
-      if (user) {
-        await user.reload();
-        await fetchIdentity(user);
-      }
-    },
+    refreshIdentity,
+    refreshProfile,
     reloadUser,
     updateProfile
-  };
+  }), [
+    user, 
+    profile, 
+    role, 
+    status, 
+    hasWavvault, 
+    error, 
+    logout, 
+    loginWithGoogle, 
+    refreshIdentity, 
+    refreshProfile, 
+    reloadUser, 
+    updateProfile
+  ]);
 
   return (
     <IdentityContext.Provider value={value}>

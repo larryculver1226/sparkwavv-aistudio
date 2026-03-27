@@ -1,13 +1,13 @@
 import React from 'react';
 import { motion, useScroll, useTransform } from 'motion/react';
-import { Anchor, Compass, Sun } from 'lucide-react';
+import { Sailboat, Compass, Sun } from 'lucide-react';
 
 const panels = [
   {
     quote: "TWENTY YEARS FROM NOW YOU WILL BE MORE DISAPPOINTED BY THE THINGS THAT YOU DIDN'T DO THAN BY THE ONES YOU DID DO.\n\nSO THROW OFF THE BOWLINES. SAIL AWAY FROM THE SAFE HARBOR. CATCH THE TRADE WINDS IN YOUR SAILS.\n\nEXPLORE. DREAM. DISCOVER.",
     author: "Mark Twain",
     image: "https://images.unsplash.com/photo-1507525428034-b723cf961d3e?auto=format&fit=crop&q=80&w=1920&sat=100&con=30&bri=5&exp=10",
-    icon: <Anchor className="w-10 h-10 text-neon-cyan" />,
+    icon: <Sailboat className="w-10 h-10 text-neon-cyan" />,
     visual: "A vibrant red beach sunset with gentle waves crashing on the shore and sun rays on the horizon."
   },
   {

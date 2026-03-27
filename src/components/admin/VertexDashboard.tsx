@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { motion } from 'motion/react';
+import React, { useState, useEffect } from 'react';
+import { motion, AnimatePresence } from 'motion/react';
 import { 
   Database, 
   RefreshCw, 
@@ -9,8 +9,15 @@ import {
   Activity,
   Zap,
   FileJson,
-  AlertCircle
+  AlertCircle,
+  ChevronDown,
+  ChevronUp,
+  Download,
+  CloudUpload,
+  ExternalLink,
+  Settings
 } from 'lucide-react';
+import { auth } from '../../lib/firebase';
 
 interface VertexDashboardProps {
   onNotify: (message: string, type: 'success' | 'error' | 'info') => void;
@@ -22,6 +29,35 @@ export const VertexDashboard: React.FC<VertexDashboardProps> = ({ onNotify }) =>
   const [searchQuery, setSearchQuery] = useState('');
   const [searchResults, setSearchResults] = useState<any[]>([]);
   const [isSearching, setIsSearching] = useState(false);
+  const [syntheticData, setSyntheticData] = useState<any[]>([]);
+  const [isLoadingData, setIsLoadingData] = useState(false);
+  const [expandedEntry, setExpandedEntry] = useState<number | null>(null);
+  const [isUploading, setIsUploading] = useState(false);
+  const [gcsUri, setGcsUri] = useState<string | null>(null);
+  const [tuningJob, setTuningJob] = useState<any | null>(null);
+  const [isTuning, setIsTuning] = useState(false);
+
+  const fetchSyntheticData = async () => {
+    setIsLoadingData(true);
+    try {
+      const idToken = await auth.currentUser?.getIdToken();
+      const response = await fetch('/api/admin/vertex/synthetic-data', {
+        headers: { 'Authorization': `Bearer ${idToken}` }
+      });
+      const data = await response.json();
+      if (data.success) {
+        setSyntheticData(data.data);
+      }
+    } catch (error) {
+      console.error('Failed to fetch synthetic data:', error);
+    } finally {
+      setIsLoadingData(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchSyntheticData();
+  }, []);
 
   const handleSync = async () => {
     setIsSyncing(true);
@@ -42,11 +78,36 @@ export const VertexDashboard: React.FC<VertexDashboardProps> = ({ onNotify }) =>
 
   const handleGenerateSyntheticData = async () => {
     setIsGenerating(true);
-    // In a real implementation, this would call an endpoint that uses MethodologyGenerator
-    setTimeout(() => {
+    try {
+      const idToken = await auth.currentUser?.getIdToken();
+      const response = await fetch('/api/admin/vertex/generate-synthetic', {
+        method: 'POST',
+        headers: { 
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${idToken}`
+        },
+        body: JSON.stringify({
+          scenarios: [
+            "Mid-career professional feeling stuck in a plateau",
+            "Senior leader transitioning from corporate to entrepreneurship",
+            "Early-career talent looking to identify their 'Spark'",
+            "Executive facing a major organizational change",
+            "Individual contributor wanting to move into management"
+          ]
+        })
+      });
+      const data = await response.json();
+      if (data.success) {
+        onNotify(`Successfully generated ${data.count} synthetic dialogues.`, 'success');
+        fetchSyntheticData();
+      } else {
+        onNotify(data.error || 'Generation failed', 'error');
+      }
+    } catch (error) {
+      onNotify('Network error during generation', 'error');
+    } finally {
       setIsGenerating(false);
-      onNotify('Synthetic methodology data generated and ready for fine-tuning.', 'success');
-    }, 2000);
+    }
   };
 
   const handleSearch = async () => {
@@ -68,6 +129,56 @@ export const VertexDashboard: React.FC<VertexDashboardProps> = ({ onNotify }) =>
       onNotify('Search error', 'error');
     } finally {
       setIsSearching(false);
+    }
+  };
+
+  const handleUploadToGCS = async () => {
+    setIsUploading(true);
+    try {
+      const idToken = await auth.currentUser?.getIdToken();
+      const response = await fetch('/api/admin/vertex/upload-to-gcs', {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${idToken}` }
+      });
+      const data = await response.json();
+      if (data.success) {
+        setGcsUri(data.gcsUri);
+        onNotify(`Successfully uploaded to GCS: ${data.gcsUri}`, 'success');
+      } else {
+        onNotify(data.error || 'Upload failed', 'error');
+      }
+    } catch (error) {
+      onNotify('Network error during upload', 'error');
+    } finally {
+      setIsUploading(false);
+    }
+  };
+
+  const handleStartTuning = async () => {
+    if (!gcsUri) return;
+    
+    setIsTuning(true);
+    try {
+      const idToken = await auth.currentUser?.getIdToken();
+      const response = await fetch('/api/admin/vertex/start-tuning', {
+        method: 'POST',
+        headers: { 
+          'Authorization': `Bearer ${idToken}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ gcsUri, modelName: 'gemini-1.5-flash-002' })
+      });
+      const data = await response.json();
+      if (data.success) {
+        setTuningJob(data.job);
+        onNotify(`Tuning job started: ${data.job.id}`, 'success');
+      } else {
+        onNotify(data.error || 'Failed to start tuning job', 'error');
+      }
+    } catch (error) {
+      onNotify('Network error during tuning job start', 'error');
+    } finally {
+      setIsTuning(false);
     }
   };
 
@@ -218,6 +329,133 @@ export const VertexDashboard: React.FC<VertexDashboardProps> = ({ onNotify }) =>
             </div>
             <div className="px-2 py-1 bg-gray-500/20 text-gray-500 text-[10px] font-bold rounded uppercase">Queued</div>
           </div>
+        </div>
+      </div>
+
+      {/* Synthetic Data Review Section */}
+      <div className="bg-dark-surface/50 border border-white/10 rounded-xl overflow-hidden">
+        <div className="p-6 border-bottom border-white/10 bg-white/5 flex items-center justify-between">
+          <div>
+            <h3 className="text-lg font-display font-bold text-white flex items-center gap-2">
+              <FileJson className="w-5 h-5 text-purple-500" />
+              Synthetic Training Data Review (Phase 2)
+            </h3>
+            <p className="text-sm text-gray-400 mt-1">Review generated dialogues for Philip Lobkowicz fine-tuning.</p>
+          </div>
+          <div className="flex items-center gap-2">
+            {syntheticData.length > 0 && (
+              <>
+                <button 
+                  onClick={handleUploadToGCS}
+                  disabled={isUploading}
+                  className="flex items-center gap-2 px-3 py-1.5 bg-purple-500/20 border border-purple-500/30 text-purple-500 text-xs rounded-lg hover:bg-purple-500/30 transition-all disabled:opacity-50"
+                >
+                  <CloudUpload className={`w-3.5 h-3.5 ${isUploading ? 'animate-pulse' : ''}`} />
+                  {isUploading ? 'Uploading...' : 'Upload to GCS'}
+                </button>
+                {gcsUri && (
+                  <button 
+                    onClick={handleStartTuning}
+                    disabled={isTuning || !!tuningJob}
+                    className="flex items-center gap-2 px-3 py-1.5 bg-blue-500/20 border border-blue-500/30 text-blue-500 text-xs rounded-lg hover:bg-blue-500/30 transition-all disabled:opacity-50"
+                  >
+                    <Settings className={`w-3.5 h-3.5 ${isTuning ? 'animate-spin' : ''}`} />
+                    {isTuning ? 'Starting...' : tuningJob ? 'Job Started' : 'Start Fine-Tuning'}
+                  </button>
+                )}
+                <button 
+                  onClick={() => {
+                    const blob = new Blob([syntheticData.map(d => JSON.stringify(d)).join('\n')], { type: 'application/x-jsonlines' });
+                    const url = URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+                    a.href = url;
+                    a.download = 'synthetic-training-data.jsonl';
+                    a.click();
+                  }}
+                  className="flex items-center gap-2 px-3 py-1.5 bg-white/5 border border-white/10 text-white text-xs rounded-lg hover:bg-white/10 transition-all"
+                >
+                  <Download className="w-3.5 h-3.5" />
+                  Download JSONL
+                </button>
+              </>
+            )}
+          </div>
+        </div>
+        <div className="p-6">
+          {gcsUri && (
+            <div className="mb-6 p-4 bg-green-500/10 border border-green-500/20 rounded-lg flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <ShieldCheck className="w-5 h-5 text-green-500" />
+                <div>
+                  <div className="text-green-500 text-sm font-bold">Staged for Fine-Tuning</div>
+                  <div className="text-xs text-gray-400 font-mono">{gcsUri}</div>
+                </div>
+              </div>
+              <a 
+                href={`https://console.cloud.google.com/storage/browser/${gcsUri.replace('gs://', '')}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-xs text-neon-cyan hover:underline flex items-center gap-1"
+              >
+                View in Console
+                <ExternalLink className="w-3 h-3" />
+              </a>
+            </div>
+          )}
+          {isLoadingData ? (
+            <div className="flex items-center justify-center py-12">
+              <RefreshCw className="w-8 h-8 text-purple-500 animate-spin" />
+            </div>
+          ) : syntheticData.length > 0 ? (
+            <div className="space-y-3">
+              {syntheticData.map((entry, idx) => (
+                <div key={idx} className="border border-white/5 rounded-lg overflow-hidden">
+                  <button 
+                    onClick={() => setExpandedEntry(expandedEntry === idx ? null : idx)}
+                    className="w-full flex items-center justify-between p-4 bg-white/5 hover:bg-white/10 transition-all text-left"
+                  >
+                    <div className="flex items-center gap-3">
+                      <span className="text-xs font-mono text-purple-500">#{idx + 1}</span>
+                      <span className="text-sm text-gray-300 truncate max-w-md">
+                        {entry.contents[0].parts[0].text}
+                      </span>
+                    </div>
+                    {expandedEntry === idx ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+                  </button>
+                  <AnimatePresence>
+                    {expandedEntry === idx && (
+                      <motion.div 
+                        initial={{ height: 0, opacity: 0 }}
+                        animate={{ height: 'auto', opacity: 1 }}
+                        exit={{ height: 0, opacity: 0 }}
+                        className="overflow-hidden bg-black/40"
+                      >
+                        <div className="p-4 space-y-4">
+                          <div className="space-y-1">
+                            <p className="text-[10px] font-mono text-gray-500 uppercase">Client Input</p>
+                            <p className="text-sm text-gray-300 bg-white/5 p-3 rounded-lg border border-white/5">
+                              {entry.contents[0].parts[0].text}
+                            </p>
+                          </div>
+                          <div className="space-y-1">
+                            <p className="text-[10px] font-mono text-purple-500 uppercase">Philip Lobkowicz Response</p>
+                            <p className="text-sm text-white bg-purple-500/10 p-3 rounded-lg border border-purple-500/20 italic">
+                              {entry.contents[1].parts[0].text}
+                            </p>
+                          </div>
+                        </div>
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div className="text-center py-12 border border-dashed border-white/10 rounded-lg">
+              <AlertCircle className="w-12 h-12 text-gray-600 mx-auto mb-4" />
+              <p className="text-gray-500">No synthetic data generated yet. Click "Generate Synthetic Data" above.</p>
+            </div>
+          )}
         </div>
       </div>
     </div>

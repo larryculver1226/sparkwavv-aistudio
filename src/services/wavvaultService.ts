@@ -5,8 +5,8 @@ import fs from 'fs';
 import path from 'path';
 import crypto from 'crypto';
 import { fileURLToPath } from 'url';
-import { logEvent } from './loggingService.ts';
-import { getGeminiApiKey } from './aiConfig.ts';
+import { logEvent } from './loggingService.js';
+import { getGeminiApiKey } from './aiConfig.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -72,6 +72,7 @@ const getAI = () => {
 
 export interface UserWavvaultData {
   userId: string;
+  tenantId: string; // Added for tenant isolation
   identity: string;
   strengths: string[];
   careerStories: string[];
@@ -351,6 +352,7 @@ export const writeUserWavvault = async (data: UserWavvaultData) => {
 
     const updatePayload = {
       userId: data.userId,
+      tenantId: data.tenantId, // Added for tenant isolation
       identity: data.identity,
       strengths: data.strengths,
       careerStories: data.careerStories,
@@ -467,9 +469,9 @@ export const writeArtifact = async (data: ArtifactData) => {
 };
 
 /**
- * Performs a vector similarity search in Firestore
+ * Performs a vector similarity search in Firestore with tenant isolation
  */
-export const searchSimilarWavvaults = async (queryText: string, limit: number = 5) => {
+export const searchSimilarWavvaults = async (queryText: string, tenantId: string, limit: number = 5) => {
   const db = getDb();
   
   try {
@@ -482,9 +484,9 @@ export const searchSimilarWavvaults = async (queryText: string, limit: number = 
     });
     const queryVector = result.embeddings[0].values;
     
-    // Perform vector search
-    // Note: findNearest might require a specific version of the SDK
+    // Perform vector search with tenant filter
     const snapshot = await db.collection('wavvault')
+      .where('tenantId', '==', tenantId) // Tenant Isolation
       .findNearest('embedding', admin.firestore.FieldValue.vector(queryVector), {
         limit: limit,
         distanceMeasure: 'COSINE'

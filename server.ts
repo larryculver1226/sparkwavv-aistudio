@@ -34,11 +34,17 @@ import {
   verifyWavvaultIntegrity,
   analyzeWavvaultDelta,
   getLatestSnapshot
-} from './src/services/wavvaultService.ts';
-import { logEvent } from './src/services/loggingService.ts';
-import { ROLES, JOURNEY_STAGES, TENANTS } from './src/constants.ts';
-import { getGeminiApiKey } from './src/services/aiConfig.ts';
-import { vertexService } from './src/services/vertexService.ts';
+} from './src/services/wavvaultService.js';
+import { logEvent } from './src/services/loggingService.js';
+import { ROLES, JOURNEY_STAGES, TENANTS } from './src/constants.js';
+import { getGeminiApiKey } from './src/services/aiConfig.js';
+import { vertexService } from './src/services/vertexService.js';
+import { methodologyGenerator } from './src/utils/methodologyGenerator.js';
+import { DocumentServiceClient } from '@google-cloud/discoveryengine';
+
+const PROJECT_ID = process.env.VERTEX_AI_PROJECT_ID || process.env.FIREBASE_PROJECT_ID;
+const LOCATION = process.env.VERTEX_AI_LOCATION || 'global';
+const DATA_STORE_ID = process.env.VERTEX_AI_SEARCH_DATA_STORE_ID;
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -343,10 +349,16 @@ async function migrateDashboardsToFirestore(db: admin.firestore.Firestore) {
  * Scheduled Batch Sync Logic (Simulated for now)
  */
 async function syncWavvaultToVertex() {
+  const discoveryEngineClient = new DocumentServiceClient();
   const db = getFirestoreDb();
   if (!db) return { success: false, message: "Database unavailable" };
 
-  console.log("[VERTEX SYNC] Starting scheduled batch sync of Wavvault to Vertex AI Search...");
+  if (!PROJECT_ID || !DATA_STORE_ID) {
+    console.warn("[VERTEX SYNC] Missing Project ID or Data Store ID. Sync will be simulated.");
+    return { success: true, count: 0, simulated: true };
+  }
+
+  console.log("[VERTEX SYNC] Starting batch sync of Wavvault to Vertex AI Search...");
   
   try {
     // 1. Fetch all Wavvault entries
@@ -358,26 +370,38 @@ async function syncWavvaultToVertex() {
 
     console.log(`[VERTEX SYNC] Found ${entries.length} entries to sync.`);
 
-    // 2. In a real production environment, we would use the Discovery Engine API 
-    // to bulk upload these documents to the Data Store.
-    // For this implementation, we simulate the success of the sync.
-    
-    // Example of what the Discovery Engine API call would look like:
-    /*
+    if (entries.length === 0) {
+      return { success: true, count: 0 };
+    }
+
+    // 2. Use the Discovery Engine API to bulk upload these documents to the Data Store.
     const parent = `projects/${PROJECT_ID}/locations/${LOCATION}/collections/default_collection/dataStores/${DATA_STORE_ID}/branches/0`;
-    await discoveryEngineClient.importDocuments({
+    
+    // We use importDocuments for batch sync
+    const [operation] = await discoveryEngineClient.importDocuments({
       parent,
       inlineSource: {
         documents: entries.map(e => ({
           id: e.id,
           jsonData: JSON.stringify(e)
         }))
-      }
-    });
-    */
+      },
+      // Reconciliation mode ensures we update existing docs and add new ones
+      reconciliationMode: 'INCREMENTAL'
+    } as any);
 
-    console.log("[VERTEX SYNC] Batch sync completed successfully.");
-    return { success: true, count: entries.length };
+    console.log(`[VERTEX SYNC] Import operation started: ${operation.name}`);
+    
+    // We don't necessarily want to wait for the long-running operation in a request-response cycle,
+    // but for the admin dashboard feedback, we might wait a bit or just return the op name.
+    // For now, we'll return success as the operation has started.
+
+    return { 
+      success: true, 
+      count: entries.length, 
+      operationName: operation.name,
+      message: "Sync operation started on Vertex AI Search."
+    };
   } catch (error: any) {
     console.error("[VERTEX SYNC ERROR]", error.message || error);
     return { success: false, error: error.message };
@@ -549,74 +573,6 @@ async function startServer() {
   console.log('Starting server initialization...');
   const app = express();
   const PORT = 3000;
-
-    if (isFirebaseAdminConfigured && sparkwavvAdmin) {
-      console.log('Firebase Admin configured. Verifying connectivity...');
-      try {
-        const listUsersResult = await withTimeout(sparkwavvAdmin.auth().listUsers(), 5000);
-        envStatus.USER_COUNT = listUsersResult.users.length;
-        console.log(`[AUTH] Firebase Auth connected. Found ${envStatus.USER_COUNT} users.`);
-        
-        const db = getFirestoreDb();
-        let fsUsers: any[] = [];
-        if (db) {
-          const snapshot = await withTimeout(db.collection('users').get(), 5000) as any;
-          fsUsers = snapshot.docs.map((d: any) => ({ uid: d.id, ...d.data() }));
-          console.log(`[FIRESTORE] Connectivity check successful. Found ${snapshot.size} users in 'users' collection.`);
-          
-          const targetUser = fsUsers.find(u => u.email === 'lculver123@comcast.net');
-          if (targetUser) {
-            console.log("[DEBUG] Found target user in Firestore:", JSON.stringify(targetUser, null, 2));
-            
-            // Check for dashboard
-            const dashboardSnapshot = await db.collection('dashboards').where('userId', '==', targetUser.uid).get();
-            if (!dashboardSnapshot.empty) {
-              console.log(`[DEBUG] Found ${dashboardSnapshot.size} dashboards for user ${targetUser.uid}`);
-              dashboardSnapshot.docs.forEach(d => console.log(` - Dashboard ID: ${d.id}`));
-            } else {
-              console.log(`[DEBUG] No dashboards found for user ${targetUser.uid}`);
-            }
-          } else {
-            console.log("[DEBUG] Target user NOT found in Firestore 'users' collection");
-          }
-        }
-        
-        const debugData = {
-          projectId: firebaseAppletConfig.projectId,
-          authUsers: listUsersResult.users.map(u => ({ 
-            uid: u.uid, 
-            email: u.email,
-            displayName: u.displayName,
-            emailVerified: u.emailVerified,
-            disabled: u.disabled,
-            metadata: u.metadata
-          })),
-          firestoreUsers: fsUsers,
-          dashboards: [] as any[]
-        };
-        
-        if (db) {
-          const dashSnapshot = await db.collection('dashboards').get();
-          debugData.dashboards = dashSnapshot.docs.map(d => ({ id: d.id, ...d.data() }));
-        }
-        
-        fs.writeFileSync(path.join(process.cwd(), 'users-debug.json'), JSON.stringify(debugData, null, 2));
-      } catch (error: any) {
-      console.error("[FIRESTORE] Connectivity check failed:", error.message);
-      envStatus.FIRESTORE_ERROR = error.message;
-      if (error.code === 16 || error.message?.includes('UNAUTHENTICATED')) {
-        console.error("CRITICAL: Firestore Unauthenticated (Error 16). Check your Service Account credentials.");
-      }
-    }
-    console.log('Firebase connectivity check complete.');
-  }
-
-  console.log("[ENV STATUS]", envStatus);
-  try {
-    fs.writeFileSync(path.join(__dirname, 'env-status.json'), JSON.stringify(envStatus, null, 2));
-  } catch (e) {
-    console.error("Failed to write env-status.json:", e);
-  }
 
   console.log('Configuring session middleware...');
   app.set("trust proxy", 1); // Trust first proxy (Nginx)
@@ -2068,7 +2024,10 @@ async function startServer() {
       }
 
       try {
-        const result = await writeUserWavvault(req.body);
+        const result = await writeUserWavvault({
+          ...req.body,
+          tenantId: authenticatedUser.tenantId
+        });
         res.json(result);
       } catch (error: any) {
         res.status(500).json({ error: error.message });
@@ -2093,9 +2052,14 @@ async function startServer() {
 
     app.get("/api/wavvault/search", requireRole([ROLES.USER, ROLES.ADMIN, ROLES.OPERATOR, ROLES.MENTOR, ROLES.AGENT]), async (req, res) => {
       const { q, limit } = req.query;
+      const authenticatedUser = (req as any).user;
       if (!q) return res.status(400).json({ error: "Query string 'q' is required" });
       try {
-        const result = await searchSimilarWavvaults(q as string, limit ? parseInt(limit as string) : 5);
+        const result = await searchSimilarWavvaults(
+          q as string, 
+          authenticatedUser.tenantId,
+          limit ? parseInt(limit as string) : 5
+        );
         res.json(result);
       } catch (error: any) {
         res.status(500).json({ error: error.message });
@@ -2334,8 +2298,9 @@ async function startServer() {
     // Skylar AI Agentic Routes
     app.post("/api/skylar/search-wavvault", requireRole([ROLES.USER, ROLES.ADMIN, ROLES.OPERATOR, ROLES.MENTOR, ROLES.AGENT]), async (req, res) => {
       const { query } = req.body;
+      const authenticatedUser = (req as any).user;
       try {
-        const results = await searchSimilarWavvaults(query, 3);
+        const results = await searchSimilarWavvaults(query, authenticatedUser.tenantId, 3);
         const anonymizedResults = results.map((res: any) => ({
           role: res.role,
           journeyStage: res.journeyStage,
@@ -2538,7 +2503,12 @@ async function startServer() {
       const authenticatedUser = (req as any).user;
 
       try {
-        const results = await vertexService.searchWavvault(query, authenticatedUser.role === ROLES.ADMIN ? undefined : authenticatedUser.uid);
+        // Tenant Isolation: Only search within the user's tenant
+        // Admins can search across all tenants if they want, but by default we isolate
+        const results = await vertexService.searchWavvault(
+          query, 
+          authenticatedUser.role === ROLES.SUPER_ADMIN ? undefined : authenticatedUser.tenantId
+        );
         
         if (!results) {
           return res.status(503).json({ 
@@ -2577,14 +2547,18 @@ async function startServer() {
       try {
         // Check if user is in Healthcare sector
         const db = getFirestoreDb();
+        if (!db) throw new Error("Database unavailable");
+        
         const userDoc = await db.collection('users').doc(authenticatedUser.uid).get();
         const userData = userDoc.data();
 
-        if (userData?.specializedSector !== 'Healthcare' && authenticatedUser.role !== ROLES.ADMIN) {
+        if (userData?.specializedSector !== 'Healthcare' && authenticatedUser.role !== ROLES.SUPER_ADMIN) {
           return res.status(403).json({ error: "MedLM access is restricted to the Healthcare sector." });
         }
 
-        const insight = await vertexService.getHealthcareInsight(prompt);
+        // Tenant Isolation: We could pass tenant-specific context here if needed
+        const context = `User is part of tenant: ${authenticatedUser.tenantId}. Sector: Healthcare.`;
+        const insight = await vertexService.getHealthcareInsight(prompt, context);
         res.json({ success: true, insight });
       } catch (error: any) {
         console.error("[VERTEX HEALTHCARE ERROR]", error);
@@ -2597,12 +2571,103 @@ async function startServer() {
      */
     app.post("/api/skylar/coaching", requireRole([ROLES.USER, ROLES.ADMIN]), async (req, res) => {
       const { prompt } = req.body;
+      const authenticatedUser = (req as any).user;
       try {
-        const advice = await vertexService.getLobkowiczCoaching(prompt);
+        const context = `User is part of tenant: ${authenticatedUser.tenantId}.`;
+        const advice = await vertexService.getLobkowiczCoaching(prompt, context);
         res.json({ success: true, advice });
       } catch (error: any) {
         console.error("[VERTEX COACHING ERROR]", error);
         res.status(500).json({ error: error.message || "Failed to get strategic coaching advice." });
+      }
+    });
+
+    /**
+     * Phase 2: Synthetic Methodology Generation (Fine-Tuning Prep)
+     */
+    app.post("/api/admin/vertex/generate-synthetic", requireRole([ROLES.ADMIN, ROLES.SUPER_ADMIN]), async (req, res) => {
+      const { scenarios } = req.body;
+      const defaultScenarios = [
+        "Mid-career professional feeling stuck in a plateau",
+        "Senior leader transitioning from corporate to entrepreneurship",
+        "Early-career talent looking to identify their 'Spark'",
+        "Executive facing a major organizational change",
+        "Individual contributor wanting to move into management"
+      ];
+
+      try {
+        const trainingSet = await methodologyGenerator.generateTrainingSet(scenarios || defaultScenarios);
+        const filePath = path.join(__dirname, 'synthetic-training-data.jsonl');
+        fs.writeFileSync(filePath, trainingSet);
+        
+        res.json({ 
+          success: true, 
+          message: "Synthetic training data generated successfully.",
+          path: filePath,
+          count: trainingSet.split('\n').filter(line => line.trim()).length
+        });
+      } catch (error: any) {
+        console.error("[VERTEX GENERATION ERROR]", error);
+        res.status(500).json({ error: error.message || "Failed to generate synthetic data." });
+      }
+    });
+
+    app.get("/api/admin/vertex/synthetic-data", requireRole([ROLES.ADMIN, ROLES.SUPER_ADMIN]), async (req, res) => {
+      try {
+        const filePath = path.join(__dirname, 'synthetic-training-data.jsonl');
+        if (!fs.existsSync(filePath)) {
+          return res.json({ success: true, data: [] });
+        }
+        
+        const content = fs.readFileSync(filePath, 'utf8');
+        const data = content.split('\n')
+          .filter(line => line.trim())
+          .map(line => {
+            try {
+              return JSON.parse(line);
+            } catch (e) {
+              return null;
+            }
+          })
+          .filter(Boolean);
+          
+        res.json({ success: true, data });
+      } catch (error: any) {
+        console.error("[VERTEX DATA RETRIEVAL ERROR]", error);
+        res.status(500).json({ error: error.message || "Failed to retrieve synthetic data." });
+      }
+    });
+
+    app.post("/api/admin/vertex/upload-to-gcs", requireRole([ROLES.ADMIN, ROLES.SUPER_ADMIN]), async (req, res) => {
+      try {
+        const filePath = path.join(__dirname, 'synthetic-training-data.jsonl');
+        if (!fs.existsSync(filePath)) {
+          return res.status(404).json({ error: "Synthetic data file not found. Please generate it first." });
+        }
+
+        const content = fs.readFileSync(filePath, 'utf8');
+        const filename = `lobkowicz-fine-tuning-${Date.now()}.jsonl`;
+        const gcsUri = await vertexService.uploadToGCS(filename, content);
+
+        res.json({ success: true, gcsUri });
+      } catch (error: any) {
+        console.error("[VERTEX GCS UPLOAD ERROR]", error);
+        res.status(500).json({ error: error.message || "Failed to upload to GCS." });
+      }
+    });
+
+    app.post("/api/admin/vertex/start-tuning", requireRole([ROLES.ADMIN, ROLES.SUPER_ADMIN]), async (req, res) => {
+      try {
+        const { gcsUri, modelName } = req.body;
+        if (!gcsUri) {
+          return res.status(400).json({ error: "GCS URI is required" });
+        }
+        
+        const job = await vertexService.createTuningJob(gcsUri, modelName);
+        res.json({ success: true, job });
+      } catch (error: any) {
+        console.error("[VERTEX TUNING ERROR]", error);
+        res.status(500).json({ error: error.message || "Failed to start tuning job." });
       }
     });
   }
@@ -3670,21 +3735,28 @@ async function startServer() {
 
   // Vite middleware for development
   if (process.env.NODE_ENV !== "production") {
-    console.log('Starting Vite server...');
-    const vite = await createViteServer({
+    console.log('Initializing Vite server promise...');
+    const vitePromise = createViteServer({
       server: { 
         middlewareMode: true,
         hmr: false
       },
       appType: "spa",
     });
-    console.log('Vite server created.');
-    app.use(vite.middlewares);
-    console.log('Vite middlewares attached.');
+    
+    app.use(async (req, res, next) => {
+      try {
+        const vite = await vitePromise;
+        vite.middlewares(req, res, next);
+      } catch (err) {
+        console.error('Vite middleware error:', err);
+        next(err);
+      }
+    });
   } else {
-    app.use(express.static(path.join(__dirname, "dist")));
+    app.use(express.static(__dirname));
     app.get("*", (req, res) => {
-      res.sendFile(path.join(__dirname, "dist", "index.html"));
+      res.sendFile(path.join(__dirname, "index.html"));
     });
   }
 
@@ -3697,7 +3769,80 @@ async function startServer() {
       console.log('Running scheduled 24-hour Wavvault sync to Vertex AI Search...');
       syncWavvaultToVertex().catch(err => console.error('Scheduled sync failed:', err));
     }, 24 * 60 * 60 * 1000);
+
+    // Run connectivity checks in background
+    runConnectivityChecks().catch(err => console.error('Connectivity checks failed:', err));
   });
+}
+
+async function runConnectivityChecks() {
+  if (isFirebaseAdminConfigured && sparkwavvAdmin) {
+    console.log('Firebase Admin configured. Verifying connectivity...');
+    try {
+      const listUsersResult = await withTimeout(sparkwavvAdmin.auth().listUsers(), 5000);
+      envStatus.USER_COUNT = listUsersResult.users.length;
+      console.log(`[AUTH] Firebase Auth connected. Found ${envStatus.USER_COUNT} users.`);
+      
+      const db = getFirestoreDb();
+      let fsUsers: any[] = [];
+      if (db) {
+        const snapshot = await withTimeout(db.collection('users').get(), 5000) as any;
+        fsUsers = snapshot.docs.map((d: any) => ({ uid: d.id, ...d.data() }));
+        console.log(`[FIRESTORE] Connectivity check successful. Found ${snapshot.size} users in 'users' collection.`);
+        
+        const targetUser = fsUsers.find(u => u.email === 'lculver123@comcast.net');
+        if (targetUser) {
+          console.log("[DEBUG] Found target user in Firestore:", JSON.stringify(targetUser, null, 2));
+          
+          // Check for dashboard
+          const dashboardSnapshot = await withTimeout(db.collection('dashboards').where('userId', '==', targetUser.uid).get(), 5000) as any;
+          if (!dashboardSnapshot.empty) {
+            console.log(`[DEBUG] Found ${dashboardSnapshot.size} dashboards for user ${targetUser.uid}`);
+            dashboardSnapshot.docs.forEach((d: any) => console.log(` - Dashboard ID: ${d.id}`));
+          } else {
+            console.log(`[DEBUG] No dashboards found for user ${targetUser.uid}`);
+          }
+        } else {
+          console.log("[DEBUG] Target user NOT found in Firestore 'users' collection");
+        }
+      }
+      
+      const debugData = {
+        projectId: firebaseAppletConfig.projectId,
+        authUsers: listUsersResult.users.map(u => ({ 
+          uid: u.uid, 
+          email: u.email,
+          displayName: u.displayName,
+          emailVerified: u.emailVerified,
+          disabled: u.disabled,
+          metadata: u.metadata
+        })),
+        firestoreUsers: fsUsers,
+        dashboards: [] as any[]
+      };
+      
+      if (db) {
+        const dashSnapshot = await withTimeout(db.collection('dashboards').get(), 5000) as any;
+        debugData.dashboards = dashSnapshot.docs.map((d: any) => ({ id: d.id, ...d.data() }));
+      }
+      
+      fs.writeFileSync(path.join(process.cwd(), 'users-debug.json'), JSON.stringify(debugData, null, 2));
+    } catch (error: any) {
+      console.error("[FIRESTORE] Connectivity check failed:", error.message);
+      envStatus.FIRESTORE_ERROR = error.message;
+      if (error.code === 16 || error.message?.includes('UNAUTHENTICATED')) {
+        console.error("CRITICAL: Firestore Unauthenticated (Error 16). Check your Service Account credentials.");
+      }
+    }
+    console.log('Firebase connectivity check complete.');
+  }
+
+  console.log("[ENV STATUS]", envStatus);
+  try {
+    fs.writeFileSync(path.join(__dirname, 'env-status.json'), JSON.stringify(envStatus, null, 2));
+  } catch (e) {
+    console.error("Failed to write env-status.json:", e);
+  }
 }
 
 startServer();
