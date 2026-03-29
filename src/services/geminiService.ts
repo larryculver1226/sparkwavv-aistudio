@@ -1,4 +1,4 @@
-import { GoogleGenAI, Type } from "@google/genai";
+import { GoogleGenAI, Type, ThinkingLevel } from "@google/genai";
 import { getGeminiApiKey } from './aiConfig.js';
 
 // Lazy initialization of Gemini
@@ -133,6 +133,10 @@ export async function generateDiscoverySummary(userData: UserData) {
       contents: prompt,
       config: {
         responseMimeType: "application/json",
+        maxOutputTokens: 16384,
+        thinkingConfig: {
+          thinkingLevel: ThinkingLevel.LOW
+        },
         responseSchema: {
           type: Type.OBJECT,
           properties: {
@@ -194,6 +198,10 @@ export async function generateCinematicManifesto(userData: UserData) {
       contents: prompt,
       config: {
         responseMimeType: "application/json",
+        maxOutputTokens: 16384,
+        thinkingConfig: {
+          thinkingLevel: ThinkingLevel.LOW
+        },
         responseSchema: {
           type: Type.OBJECT,
           properties: {
@@ -254,6 +262,10 @@ export async function parseResume(fileData: string, mimeType: string) {
       ],
       config: {
         responseMimeType: "application/json",
+        maxOutputTokens: 16384,
+        thinkingConfig: {
+          thinkingLevel: ThinkingLevel.LOW
+        },
         responseSchema: {
           type: Type.OBJECT,
           properties: {

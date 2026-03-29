@@ -221,7 +221,10 @@ export const SkylarSidebar: React.FC<SkylarSidebarProps> = ({ onLogin }) => {
 
       const response = await skylar.chatWithVertex(uid === 'anonymous' ? '' : uid, currentInput, vertexHistory, methodology, token);
       
-      const responseText = response.text || "";
+      const responseText = response.candidates?.[0]?.content?.parts
+        ?.filter(part => part.text)
+        ?.map(part => part.text)
+        ?.join('') || "";
       const calls = response.functionCalls;
       
       if (calls && calls.length > 0) {
@@ -301,10 +304,10 @@ export const SkylarSidebar: React.FC<SkylarSidebarProps> = ({ onLogin }) => {
       
       if (proposal.action === 'propose_major_shift') {
         const insight = {
-          type: proposal.data.type,
-          content: proposal.data.content,
-          evidence: proposal.data.evidence,
-          tags: proposal.data.tags || [],
+          type: proposal.data?.type || 'strength',
+          content: proposal.data?.content || 'New insight identified',
+          evidence: proposal.data?.evidence || 'Conversation context',
+          tags: proposal.data?.tags || [],
           status: 'confirmed',
           timestamp: new Date().toISOString()
         };
@@ -318,29 +321,31 @@ export const SkylarSidebar: React.FC<SkylarSidebarProps> = ({ onLogin }) => {
         });
       } else if (proposal.action === 'flag_dna_conflict') {
         // 1. Mark existing as superseded
-        const existingInsightId = proposal.data.existingInsightId;
-        const existingResponse = await fetch(`/api/user-insights`, {
-          headers: { 'Authorization': `Bearer ${token}` }
-        });
-        const allInsights = await existingResponse.json();
-        const existing = allInsights.find((i: any) => i.id === existingInsightId);
-        
-        if (existing) {
-          await fetch('/api/user-insights', {
-            method: 'POST',
-            headers: { 
-              'Content-Type': 'application/json',
-              'Authorization': `Bearer ${token}`
-            },
-            body: JSON.stringify({ 
-              insight: { ...existing, status: 'superseded' } 
-            })
+        const existingInsightId = proposal.data?.existingInsightId;
+        if (existingInsightId) {
+          const existingResponse = await fetch(`/api/user-insights`, {
+            headers: { 'Authorization': `Bearer ${token}` }
           });
+          const allInsights = await existingResponse.json();
+          const existing = allInsights.find((i: any) => i.id === existingInsightId);
+          
+          if (existing) {
+            await fetch('/api/user-insights', {
+              method: 'POST',
+              headers: { 
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${token}`
+              },
+              body: JSON.stringify({ 
+                insight: { ...existing, status: 'superseded' } 
+              })
+            });
+          }
         }
 
         // 2. Add new insight as confirmed
         const newInsight = {
-          ...proposal.data.newInsight,
+          ...(proposal.data?.newInsight || {}),
           status: 'confirmed',
           timestamp: new Date().toISOString(),
           conflictWith: existingInsightId
@@ -354,7 +359,7 @@ export const SkylarSidebar: React.FC<SkylarSidebarProps> = ({ onLogin }) => {
           body: JSON.stringify({ insight: newInsight })
         });
       } else {
-        await skylar.executeAction(uid, proposal.action, proposal.data, token);
+        await skylar.executeAction(uid, proposal.action, proposal.data || {}, token);
       }
       
       setExecutedActions(prev => ({ ...prev, [index]: true }));
@@ -589,10 +594,10 @@ export const SkylarSidebar: React.FC<SkylarSidebarProps> = ({ onLogin }) => {
                         ? 'bg-neon-cyan text-black font-medium' 
                         : 'bg-white/5 text-white/80 border border-white/10'
                     }`}>
-                      {msg.parts[0].text}
-                      {msg.role === 'model' && msg.parts[0].text && (
+                      {msg.parts?.[0]?.text}
+                      {msg.role === 'model' && msg.parts?.[0]?.text && (
                         <button 
-                          onClick={() => handleSpeak(msg.parts[0].text)}
+                          onClick={() => handleSpeak(msg.parts?.[0]?.text || '')}
                           className="mt-2 flex items-center gap-1 text-[10px] uppercase font-bold text-white/40 hover:text-neon-cyan transition-colors"
                         >
                           {isSpeaking ? <VolumeX className="w-3 h-3" /> : <Volume2 className="w-3 h-3" />}
@@ -617,18 +622,18 @@ export const SkylarSidebar: React.FC<SkylarSidebarProps> = ({ onLogin }) => {
                       <div className="space-y-1">
                         <p className="text-xs font-bold text-white">
                           {proposals[i].action === 'update_dashboard' 
-                            ? `Update ${proposals[i].data.field} to "${proposals[i].data.value}"`
+                            ? `Update ${proposals[i].data?.field || 'field'} to "${proposals[i].data?.value || 'new value'}"`
                             : proposals[i].action === 'add_milestone'
-                            ? `Add Milestone: ${proposals[i].data.title}`
+                            ? `Add Milestone: ${proposals[i].data?.title || 'New Milestone'}`
                             : proposals[i].action === 'propose_major_shift'
-                            ? `New Insight: ${proposals[i].data.content}`
-                            : `Resolve Conflict: ${proposals[i].data.newInsight.content}`
+                            ? `New Insight: ${proposals[i].data?.content || 'Strategic Shift'}`
+                            : `Resolve Conflict: ${proposals[i].data?.newInsight?.content || 'Updated Truth'}`
                           }
                         </p>
                         {proposals[i].action === 'flag_dna_conflict' && (
                           <div className="p-2 bg-red-500/10 border border-red-500/20 rounded-lg mb-2">
                             <p className="text-[10px] text-red-400 font-bold uppercase mb-1">Conflict Detected</p>
-                            <p className="text-[10px] text-white/40 line-through">Old: {proposals[i].data.existingInsightContent}</p>
+                            <p className="text-[10px] text-white/40 line-through">Old: {proposals[i].data?.existingInsightContent || 'Existing Truth'}</p>
                           </div>
                         )}
                         <p className="text-[10px] text-white/60 leading-relaxed italic">

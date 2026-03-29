@@ -1,29 +1,47 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { motion } from 'motion/react';
-import { ShieldCheck, Loader2, AlertCircle } from 'lucide-react';
+import { ShieldCheck, Loader2, AlertCircle, User, ShieldAlert, LogOut } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 import { useIdentity } from '../contexts/IdentityContext';
 
 export const AdminLogin: React.FC<{ 
   onLogin: () => void;
   vibe?: 'technical' | 'vibrant';
 }> = ({ onLogin, vibe = 'technical' }) => {
-  const { loginWithGoogle, loading: identityLoading, error: identityError } = useIdentity();
+  const { login, logout, user, role, status, loading: identityLoading, error: identityError } = useIdentity();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [showDiagnostics, setShowDiagnostics] = useState(false);
+
+  useEffect(() => {
+    if (user) {
+      console.log('👤 [AdminLogin] Current User:', user.email, 'Role:', role, 'Status:', status);
+    }
+  }, [user, role, status]);
+
+  const navigate = useNavigate();
+
+  useEffect(() => {
+    if (status === 'ready' && user && (role === 'admin' || role === 'super_admin' || role === 'editor' || role === 'mentor')) {
+      console.log('👤 [AdminLogin] Admin already logged in, redirecting to /admin');
+      onLogin(); // Call the callback
+      navigate('/admin', { replace: true });
+    }
+  }, [user, role, status, navigate, onLogin]);
 
   const handleGoogleLogin = async () => {
     setLoading(true);
     setError('');
     try {
-      console.log('🚀 [AdminLogin] Starting Google Login...');
-      const result = await loginWithGoogle();
+      const returnTo = vibe === 'technical' ? '/admin' : '/operations';
+      console.log('🚀 [AdminLogin] Starting Auth0 Login...', { vibe, returnTo });
       
-      if (result.success) {
-        console.log('✅ [AdminLogin] Login successful, redirecting...');
-        onLogin();
-      } else {
-        setError(result.error || 'Authentication failed');
-      }
+      // Save current path to session storage to help recovery if appState is lost
+      sessionStorage.setItem('auth0_last_path', window.location.pathname);
+      
+      await login({ 
+        appState: { returnTo } 
+      });
     } catch (err: any) {
       console.error('❌ [AdminLogin] Login error:', err);
       setError(err.message || 'An unexpected error occurred');
@@ -103,6 +121,45 @@ export const AdminLogin: React.FC<{
               )}
             </button>
 
+            {user && (
+              <div className="mt-8 p-6 rounded-2xl bg-white/5 border border-white/10 space-y-4">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-full bg-neon-cyan/20 flex items-center justify-center">
+                      <User className="w-5 h-5 text-neon-cyan" />
+                    </div>
+                    <div className="text-left">
+                      <p className="text-sm font-bold text-white truncate max-w-[150px]">{user.email}</p>
+                      <p className="text-[10px] uppercase tracking-widest text-white/40">Current Identity</p>
+                    </div>
+                  </div>
+                  <div className="text-right">
+                    <p className={`text-sm font-bold ${role === 'super_admin' || role === 'admin' ? 'text-neon-cyan' : 'text-neon-magenta'}`}>
+                      {role || 'user'}
+                    </p>
+                    <p className="text-[10px] uppercase tracking-widest text-white/40">Role</p>
+                  </div>
+                </div>
+
+                {role !== 'super_admin' && role !== 'admin' && (
+                  <div className="p-3 rounded-xl bg-neon-magenta/10 border border-neon-magenta/20 flex items-start gap-3">
+                    <ShieldAlert className="w-4 h-4 text-neon-magenta mt-0.5 flex-shrink-0" />
+                    <p className="text-[10px] text-neon-magenta leading-relaxed">
+                      Your account does not have administrative privileges. Please use an authorized account or contact the system owner.
+                    </p>
+                  </div>
+                )}
+
+                <button 
+                  onClick={() => logout()}
+                  className="w-full py-3 rounded-xl bg-white/5 hover:bg-white/10 text-white/60 text-xs font-bold transition-all flex items-center justify-center gap-2"
+                >
+                  <LogOut className="w-4 h-4" />
+                  Sign Out & Try Another Account
+                </button>
+              </div>
+            )}
+
             {error && (
               <motion.div 
                 initial={{ opacity: 0, y: -10 }}
@@ -114,10 +171,86 @@ export const AdminLogin: React.FC<{
               </motion.div>
             )}
 
-            <div className="pt-4 border-t border-white/5">
+            <div className="pt-4 border-t border-white/5 space-y-4">
               <p className="text-[10px] text-center text-white/20 uppercase tracking-[0.2em]">
                 Secure Stateless Identity Engine v2.0
               </p>
+                           <button 
+                onClick={() => setShowDiagnostics(!showDiagnostics)}
+                className="w-full py-2 px-4 bg-white/5 border border-white/10 rounded-lg text-[10px] text-white/40 hover:text-white/80 hover:bg-white/10 uppercase tracking-widest transition-all flex items-center justify-center gap-2"
+              >
+                {showDiagnostics ? 'Hide System Diagnostics' : 'Show System Diagnostics'}
+                <div className={`w-1.5 h-1.5 rounded-full ${status === 'ready' ? 'bg-green-500' : 'bg-yellow-500 animate-pulse'}`} />
+              </button>
+
+              {showDiagnostics && (
+                <div className="mt-4 p-4 bg-black/80 border border-white/10 rounded-xl text-[10px] font-mono text-white/60 space-y-3 overflow-y-auto max-h-[400px] backdrop-blur-xl">
+                  <div className="flex justify-between items-center border-b border-white/5 pb-2">
+                    <span className="text-neon-cyan uppercase tracking-tighter">Auth0 Config</span>
+                    <span className="text-[8px] opacity-40">v2.16.0</span>
+                  </div>
+                  
+                  <div className="grid grid-cols-2 gap-2">
+                    <div className="space-y-1">
+                      <p className="opacity-40 uppercase text-[8px]">Domain</p>
+                      <p className="truncate">{import.meta.env.VITE_AUTH0_DOMAIN || 'Not Set'}</p>
+                    </div>
+                    <div className="space-y-1">
+                      <p className="opacity-40 uppercase text-[8px]">Client ID</p>
+                      <p className="truncate">{import.meta.env.VITE_AUTH0_CLIENT_ID || 'Not Set'}</p>
+                    </div>
+                  </div>
+
+                  <div className="space-y-1">
+                    <p className="opacity-40 uppercase text-[8px]">Audience</p>
+                    <p className="truncate">{import.meta.env.VITE_AUTH0_AUDIENCE || 'Not Set'}</p>
+                  </div>
+
+                  <div className="flex justify-between items-center border-b border-white/5 pb-2 pt-2">
+                    <span className="text-neon-cyan uppercase tracking-tighter">Identity Status</span>
+                    <span className={`px-1.5 py-0.5 rounded text-[8px] ${status === 'ready' ? 'bg-green-500/20 text-green-400' : 'bg-yellow-500/20 text-yellow-400'}`}>
+                      {status.toUpperCase()}
+                    </span>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-2">
+                    <div className="space-y-1">
+                      <p className="opacity-40 uppercase text-[8px]">User</p>
+                      <p className="truncate">{user?.email || 'Guest'}</p>
+                    </div>
+                    <div className="space-y-1">
+                      <p className="opacity-40 uppercase text-[8px]">Role</p>
+                      <p className={`font-bold ${role === 'super_admin' ? 'text-purple-400' : 'text-white'}`}>
+                        {role || 'None'}
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-2">
+                    <div className="space-y-1">
+                      <p className="opacity-40 uppercase text-[8px]">Is Admin</p>
+                      <p className={role === 'admin' || role === 'super_admin' ? 'text-green-400' : 'text-red-400'}>
+                        {role === 'admin' || role === 'super_admin' ? 'YES' : 'NO'}
+                      </p>
+                    </div>
+                    <div className="space-y-1">
+                      <p className="opacity-40 uppercase text-[8px]">Auth0 Auth</p>
+                      <p className={isAuthenticated ? 'text-green-400' : 'text-red-400'}>
+                        {isAuthenticated ? 'YES' : 'NO'}
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="pt-2 flex flex-col gap-2">
+                    <button 
+                      onClick={() => logout({ logoutParams: { returnTo: window.location.origin + '/admin/login' } })}
+                      className="w-full py-2 bg-red-500/10 border border-red-500/20 rounded text-red-400 hover:bg-red-500/20 transition-colors uppercase text-[9px] tracking-widest"
+                    >
+                      Sign Out & Reset
+                    </button>
+                  </div>
+                </div>
+              )}
             </div>
           </div>
         </div>

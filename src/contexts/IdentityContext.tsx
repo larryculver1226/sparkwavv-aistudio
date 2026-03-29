@@ -1,13 +1,15 @@
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
-import { onAuthStateChanged, User, getIdTokenResult, signOut, signInWithPopup, GoogleAuthProvider } from 'firebase/auth';
+import { onAuthStateChanged, User, getIdTokenResult, signOut as firebaseSignOut, signInWithCustomToken } from 'firebase/auth';
+import { useAuth0 } from '@auth0/auth0-react';
 import { auth } from '../lib/firebase';
-import { UserProfile, UserRole } from '../types/user';
+import { UserProfile } from '../types/user';
 import { ROLES } from '../constants';
 
 export type IdentityStatus = 'initializing' | 'unauthenticated' | 'authenticated' | 'ready' | 'error';
 
 interface IdentityContextType {
   user: User | null;
+  auth0User: any;
   profile: UserProfile | null;
   role: string | null;
   status: IdentityStatus;
@@ -20,7 +22,7 @@ interface IdentityContextType {
   hasWavvault: boolean;
   error: string | null;
   logout: () => Promise<void>;
-  loginWithGoogle: () => Promise<{ success: boolean; error?: string }>;
+  login: (options?: any) => Promise<void>;
   refreshIdentity: () => Promise<void>;
   refreshProfile: () => Promise<void>;
   reloadUser: () => Promise<void>;
@@ -30,6 +32,23 @@ interface IdentityContextType {
 const IdentityContext = createContext<IdentityContextType | undefined>(undefined);
 
 export function IdentityProvider({ children }: { children: React.ReactNode }) {
+  const { 
+    isAuthenticated, 
+    user: auth0User, 
+    getAccessTokenSilently, 
+    loginWithRedirect, 
+    logout: auth0Logout,
+    isLoading: auth0Loading,
+    error: auth0Error
+  } = useAuth0();
+
+  useEffect(() => {
+    if (auth0Error) {
+      console.error('🛡️ [Auth0] SDK Error:', auth0Error);
+      setError(auth0Error.message);
+    }
+  }, [auth0Error]);
+
   const [user, setUser] = useState<User | null>(null);
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [role, setRole] = useState<string | null>(null);
@@ -39,7 +58,8 @@ export function IdentityProvider({ children }: { children: React.ReactNode }) {
 
   const logout = useCallback(async () => {
     try {
-      await signOut(auth);
+      await firebaseSignOut(auth);
+      auth0Logout({ logoutParams: { returnTo: window.location.origin } });
       setUser(null);
       setProfile(null);
       setRole(null);
@@ -48,7 +68,11 @@ export function IdentityProvider({ children }: { children: React.ReactNode }) {
     } catch (err: any) {
       console.error('Logout error:', err);
     }
-  }, []);
+  }, [auth0Logout]);
+
+  const login = useCallback(async (options?: any) => {
+    await loginWithRedirect(options);
+  }, [loginWithRedirect]);
 
   const fetchIdentity = useCallback(async (firebaseUser: User, forceRefresh = false) => {
     console.group('🆔 Identity Initialization');
@@ -62,6 +86,7 @@ export function IdentityProvider({ children }: { children: React.ReactNode }) {
       );
       
       let tokenResult = await Promise.race([tokenPromise, timeoutPromise]);
+      console.log('🎫 Token Result Claims:', tokenResult.claims);
       
       // If we don't have a role claim and we haven't forced a refresh yet, try once with force refresh
       if (!tokenResult.claims.role && !forceRefresh) {
@@ -72,10 +97,19 @@ export function IdentityProvider({ children }: { children: React.ReactNode }) {
 
       const rawRole = tokenResult.claims.role;
       const claimRole = typeof rawRole === 'string' ? rawRole : (rawRole as any)?.role;
-      console.log('🎫 Claims Role:', claimRole);
+      console.log('🎫 Claims Role:', claimRole, 'for Email:', firebaseUser.email);
       
+      // Safety net for Larry Culver
+      let finalRole = claimRole || ROLES.USER;
+      const userEmail = firebaseUser.email?.toLowerCase()?.trim();
+      if (userEmail === 'larry.culver1226@gmail.com') {
+        console.log('🛡️ Safety Net: Identified Larry Culver as Super Admin', userEmail);
+        finalRole = ROLES.SUPER_ADMIN;
+      }
+      
+      console.log('🎫 Final Role determined:', finalRole);
       // Set initial role from claims or default to user
-      setRole(claimRole || ROLES.USER);
+      setRole(String(finalRole));
 
       // 2. Fetch Profile and Wavvault Status (using Bearer token)
       const idToken = tokenResult.token;
@@ -113,7 +147,6 @@ export function IdentityProvider({ children }: { children: React.ReactNode }) {
         }
       };
 
-      console.log('👤 Fetching profile and wavvault status...');
       const [profileRes, wavvaultRes] = await Promise.all([
         fetchWithRetry('/api/user/profile', { headers: { 'Authorization': `Bearer ${idToken}` } }),
         fetchWithRetry('/api/user/wavvault-status', { headers: { 'Authorization': `Bearer ${idToken}` } })
@@ -126,14 +159,23 @@ export function IdentityProvider({ children }: { children: React.ReactNode }) {
         // Prioritize profile role if it exists and differs from claim role
         if (pData.role) {
           const actualRole = typeof pData.role === 'string' ? pData.role : (pData.role as any)?.role;
-          if (actualRole !== claimRole) {
-            console.log('🔄 Role updated from profile:', actualRole, '(was:', claimRole, ')');
-            setRole(actualRole);
+          
+          // Only update role from profile if claimRole is missing or if the profile role is an admin role
+          // while the claimRole is not. This prevents downgrading bootstrapped admins.
+          const isAdminRole = (r: string) => [ROLES.ADMIN, ROLES.SUPER_ADMIN, ROLES.EDITOR, ROLES.MENTOR].includes(r as any);
+          
+          if (actualRole !== finalRole) {
+            const isAdminRoleCheck = (r: any) => {
+              const roleStr = typeof r === 'string' ? r : (r?.role || '');
+              return [ROLES.ADMIN, ROLES.SUPER_ADMIN, ROLES.EDITOR, ROLES.MENTOR].includes(roleStr as any);
+            };
+            
+            if (!isAdminRoleCheck(finalRole) || isAdminRoleCheck(actualRole)) {
+              setRole(String(actualRole));
+            }
           }
         }
-        console.log('✅ Profile loaded:', pData.role);
       } else if (profileRes.status === 404) {
-        console.log('ℹ️ Profile not found (new user)');
         setProfile(null);
       } else {
         throw new Error(`Profile fetch failed: ${profileRes.status}`);
@@ -142,7 +184,6 @@ export function IdentityProvider({ children }: { children: React.ReactNode }) {
       if (wavvaultRes.ok) {
         const { exists } = await wavvaultRes.json();
         setHasWavvault(exists);
-        console.log('✅ Wavvault status:', exists);
       } else {
         console.warn('⚠️ Wavvault status fetch failed:', wavvaultRes.status);
       }
@@ -163,27 +204,55 @@ export function IdentityProvider({ children }: { children: React.ReactNode }) {
     }
   }, []);
 
-  const loginWithGoogle = useCallback(async () => {
-    try {
-      const provider = new GoogleAuthProvider();
-      const result = await signInWithPopup(auth, provider);
-      if (result.user) {
-        await fetchIdentity(result.user);
-        return { success: true };
+  useEffect(() => {
+    const bridgeAuth = async () => {
+      if (isAuthenticated && auth0User && !user) {
+        setStatus('authenticated');
+        try {
+          const token = await getAccessTokenSilently();
+          const response = await fetch('/api/auth/bridge', {
+            method: 'POST',
+            headers: {
+              'Authorization': `Bearer ${token}`,
+              'Content-Type': 'application/json'
+            }
+          });
+
+          if (response.ok) {
+            const { firebaseToken, user: bridgeUser } = await response.json();
+            
+            // Set initial identity from bridge response to avoid flicker
+            if (bridgeUser) {
+              setRole(bridgeUser.role);
+              setProfile(bridgeUser);
+            }
+            
+            await signInWithCustomToken(auth, firebaseToken);
+          } else {
+            const errData = await response.json().catch(() => ({ error: 'Unknown error' }));
+            console.error('❌ Bridge failed with status:', response.status, 'Error:', errData.error);
+            setError(errData.error);
+            setStatus('error');
+          }
+        } catch (err: any) {
+          console.error('❌ Bridge error:', err);
+          setError(err.message);
+          setStatus('error');
+        }
+      } else if (!auth0Loading && !isAuthenticated) {
+        setStatus('unauthenticated');
       }
-      return { success: false, error: 'No user returned' };
-    } catch (err: any) {
-      console.error('Login error:', err);
-      return { success: false, error: err.message };
-    }
-  }, [fetchIdentity]);
+    };
+
+    bridgeAuth();
+  }, [isAuthenticated, auth0User, getAccessTokenSilently, auth0Loading, user]);
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
       setUser(firebaseUser);
       if (firebaseUser) {
         await fetchIdentity(firebaseUser);
-      } else {
+      } else if (!auth0Loading && !isAuthenticated) {
         setProfile(null);
         setRole(null);
         setStatus('unauthenticated');
@@ -191,7 +260,7 @@ export function IdentityProvider({ children }: { children: React.ReactNode }) {
     });
 
     return () => unsubscribe();
-  }, [fetchIdentity]);
+  }, [fetchIdentity, auth0Loading, isAuthenticated]);
 
   const updateProfile = useCallback(async (updates: Partial<UserProfile>) => {
     if (!user) return;
@@ -236,32 +305,35 @@ export function IdentityProvider({ children }: { children: React.ReactNode }) {
 
   const value = React.useMemo(() => ({
     user,
+    auth0User,
     profile,
     role,
     status,
-    loading: status === 'initializing',
+    loading: status === 'initializing' || status === 'authenticated' || auth0Loading,
     isAdmin: role === ROLES.ADMIN || role === ROLES.SUPER_ADMIN,
     isOperator: role === ROLES.OPERATOR,
     isSuperAdmin: role === ROLES.SUPER_ADMIN,
-    emailVerified: user?.emailVerified || false,
+    emailVerified: auth0User?.email_verified || false,
     onboardingComplete: profile?.onboardingComplete === true,
     hasWavvault,
     error,
     logout,
-    loginWithGoogle,
+    login,
     refreshIdentity,
     refreshProfile,
     reloadUser,
     updateProfile
   }), [
     user, 
+    auth0User,
     profile, 
     role, 
     status, 
+    auth0Loading,
     hasWavvault, 
     error, 
     logout, 
-    loginWithGoogle, 
+    login, 
     refreshIdentity, 
     refreshProfile, 
     reloadUser, 

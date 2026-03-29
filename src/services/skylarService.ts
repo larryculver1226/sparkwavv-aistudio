@@ -1,4 +1,4 @@
-import { GoogleGenAI, Modality, Type, FunctionDeclaration } from "@google/genai";
+import { GoogleGenAI, Modality, Type, FunctionDeclaration, ThinkingLevel } from "@google/genai";
 import { getGeminiApiKey } from './aiConfig.js';
 import * as mammoth from 'mammoth';
 import { KnowledgeGraph, WavvaultData, TargetOpportunity } from '../types/wavvault.js';
@@ -353,6 +353,10 @@ class SkylarService {
         config: {
           systemInstruction,
           tools: tools as any,
+          maxOutputTokens: 16384,
+          thinkingConfig: {
+            thinkingLevel: ThinkingLevel.LOW
+          }
         },
         history: history.map(h => ({
           role: h.role,
@@ -676,7 +680,7 @@ class SkylarService {
       contents: { parts },
     });
 
-    if (response.candidates && response.candidates[0].content.parts) {
+    if (response.candidates?.[0]?.content?.parts) {
       for (const part of response.candidates[0].content.parts) {
         if (part.inlineData) {
           return `data:image/png;base64,${part.inlineData.data}`;
@@ -1032,6 +1036,7 @@ class SkylarService {
       contents: [{ parts: [{ text: prompt }] }],
       config: {
         responseMimeType: "application/json",
+        maxOutputTokens: 16384,
       }
     });
 
@@ -1077,6 +1082,7 @@ class SkylarService {
       contents: [{ parts: [{ text: prompt }] }],
       config: {
         responseMimeType: "application/json",
+        maxOutputTokens: 16384,
       }
     });
 
@@ -1110,6 +1116,10 @@ class SkylarService {
       contents: [{ parts: [{ text: prompt }] }],
       config: {
         responseMimeType: "application/json",
+        maxOutputTokens: 16384,
+        thinkingConfig: {
+          thinkingLevel: ThinkingLevel.LOW
+        }
       }
     });
 
@@ -1171,6 +1181,10 @@ class SkylarService {
       config: {
         tools: [{ urlContext: {} }],
         responseMimeType: "application/json",
+        maxOutputTokens: 16384,
+        thinkingConfig: {
+          thinkingLevel: ThinkingLevel.LOW
+        }
       }
     });
 

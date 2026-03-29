@@ -6,7 +6,7 @@
   "scripts": {
     "dev": "tsx server.ts",
     "start": "node dist/server.js",
-    "build": "vite build && tsc server.ts --outDir dist --module esnext --target esnext --moduleResolution node --allowSyntheticDefaultImports --esModuleInterop --skipLibCheck --resolveJsonModule && cp firebase-applet-config.json dist/",
+    "build": "vite build && npx esbuild server.ts --bundle --platform=node --target=node20 --outfile=dist/server.js --format=esm --packages=external --minify && cp firebase-applet-config.json dist/",
     "preview": "vite preview",
     "clean": "rm -rf dist",
     "lint": "tsc --noEmit",
@@ -15,6 +15,7 @@
     "test:e2e": "playwright test"
   },
   "dependencies": {
+    "@auth0/auth0-react": "^2.16.0",
     "@google-cloud/discoveryengine": "^2.6.0",
     "@google-cloud/storage": "^7.19.0",
     "@google-cloud/vertexai": "^1.10.0",
@@ -30,6 +31,7 @@
     "d3": "^7.9.0",
     "dotenv": "^17.2.3",
     "express": "^4.21.2",
+    "express-oauth2-jwt-bearer": "^1.7.4",
     "express-session": "^1.19.0",
     "fast-xml-parser": "^5.5.8",
     "firebase": "^12.9.0",

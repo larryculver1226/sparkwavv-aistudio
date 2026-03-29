@@ -1,5 +1,5 @@
 import React, { useState, useEffect, lazy, Suspense } from 'react';
-import { BrowserRouter as Router, Routes, Route, Navigate, useParams, useNavigate, useLocation } from 'react-router-dom';
+import { Routes, Route, Navigate, useParams, useNavigate, useLocation } from 'react-router-dom';
 import { motion, AnimatePresence } from 'motion/react';
 import { 
   Sparkles, 
@@ -41,16 +41,7 @@ import {
   Star
 } from 'lucide-react';
 import { 
-  createUserWithEmailAndPassword, 
-  sendEmailVerification, 
-  signInWithEmailAndPassword, 
-  signOut,
-  signInWithPopup,
-  signInWithCustomToken,
-  sendPasswordResetEmail,
-  deleteUser,
-  updateProfile,
-  updatePassword
+  updateProfile as firebaseUpdateProfile,
 } from 'firebase/auth';
 import { 
   doc, 
@@ -64,8 +55,9 @@ import {
   onSnapshot,
   serverTimestamp
 } from 'firebase/firestore';
-import { auth, isFirebaseConfigured, googleProvider, linkedinProvider, db } from './lib/firebase';
+import { auth, isFirebaseConfigured, db } from './lib/firebase';
 import { handleFirestoreError, OperationType } from './lib/firestore-errors';
+import { ROLES } from './constants';
 import { IdentityProvider, useIdentity } from './contexts/IdentityContext';
 import { AccessDenied } from './components/AccessDenied';
 
@@ -103,8 +95,9 @@ import { CinematicIntro } from './components/landing/CinematicIntro';
 import { BrainModel } from './components/landing/BrainModel';
 import { Roadmap } from './components/landing/Roadmap';
 import { PricingPlaceholder } from './components/PricingPlaceholder';
+import { TimeoutManager } from './components/TimeoutManager';
 
-type Step = 'landing' | 'login' | 'onboarding' | 'ignition' | 'forgot-password' | 'settings' | 'module1' | 'module2' | 'module3' | 'module4' | 'module5' | 'processing' | 'synthesis' | 'results' | 'product-skylar' | 'product-features' | 'product-technology' | 'product-wavvault' | 'company-vision' | 'company-about' | 'company-investors' | 'company-give' | 'pricing' | 'documentation' | 'help-center';
+type Step = 'landing' | 'login' | 'onboarding' | 'ignition' | 'settings' | 'module1' | 'module2' | 'module3' | 'module4' | 'module5' | 'processing' | 'synthesis' | 'results' | 'product-skylar' | 'product-features' | 'product-technology' | 'product-wavvault' | 'company-vision' | 'company-about' | 'company-investors' | 'company-give' | 'pricing' | 'documentation' | 'help-center';
 
 // --- Constants ---
 const INDUSTRIES = [
@@ -255,9 +248,21 @@ const Toast = ({ message, type = 'success', onClose }: { message: string, type?:
 
 import { PrecisionMatchingCard } from './components/landing/PrecisionMatchingCard';
 
+const LoginRedirect: React.FC<{ login: () => void }> = ({ login }) => {
+  useEffect(() => {
+    login();
+  }, [login]);
+  return null;
+};
+
 export function SPARKWavvApp({ isAdmin = false, initialStep }: { isAdmin?: boolean, initialStep?: Step }) {
   const navigate = useNavigate();
   const location = useLocation();
+  const { role, status, isAdmin: isIdentityAdmin } = useIdentity();
+
+  useEffect(() => {
+    console.log('🚀 [SPARKWavvApp] Render:', { isAdmin, isIdentityAdmin, initialStep, role, status, path: location.pathname });
+  }, [isAdmin, isIdentityAdmin, initialStep, role, status, location.pathname]);
   const [step, setStep] = useState<Step>(() => {
     if (initialStep) return initialStep;
     const saved = localStorage.getItem('sparkwavv_step');
@@ -265,7 +270,6 @@ export function SPARKWavvApp({ isAdmin = false, initialStep }: { isAdmin?: boole
   });
   const [posterVibe, setPosterVibe] = useState<'Minimalist' | 'Brutalist' | 'Corporate' | 'Creative'>('Creative');
   const [showToast, setShowToast] = useState<{ message: string, type: 'success' | 'error' } | null>(null);
-  const [forgotPasswordEmail, setForgotPasswordEmail] = useState('');
   const [userData, setUserData] = useState<UserData>({
     onboarding: { 
       firstName: '', lastName: '', jobTitle: '', companyOrg: '', email: '', phone: '', programTrack: '', lifecycleStage: '', outcomesAttributes: '', feedbackQuote: '', userId: '', password: '',
@@ -302,7 +306,7 @@ export function SPARKWavvApp({ isAdmin = false, initialStep }: { isAdmin?: boole
   const [isRegistering, setIsRegistering] = useState(false);
   const [userId, setUserId] = useState<string | null>(null);
   const [dashboardData, setDashboardData] = useState<DashboardData | null>(null);
-  const { user, profile, status: authStatus, loading: authLoading, emailVerified, onboardingComplete, refreshProfile, logout, updateProfile: updateIdentityProfile } = useIdentity();
+  const { user, profile, status: authStatus, loading: authLoading, emailVerified, onboardingComplete, refreshProfile, logout, login, updateProfile: updateIdentityProfile } = useIdentity();
 
   // Scroll to top on step change
   useEffect(() => {
@@ -316,14 +320,14 @@ export function SPARKWavvApp({ isAdmin = false, initialStep }: { isAdmin?: boole
       const informationalSteps = [
         'product-skylar', 'product-features', 'product-technology', 'product-wavvault',
         'company-vision', 'company-about', 'company-investors', 'company-give',
-        'pricing', 'documentation', 'help-center', 'settings', 'forgot-password'
+        'pricing', 'documentation', 'help-center', 'settings'
       ];
       
       if (informationalSteps.includes(step)) return;
 
-      if (profile.role === 'admin' || profile.role === 'super_admin') {
-        if (location.pathname !== '/sparkwavv-admin') {
-          console.log('🛡️ Admin detected in SPARKWavvApp, redirecting to admin portal');
+      if (isIdentityAdmin || role === 'admin' || role === 'super_admin' || role === 'editor' || role === 'mentor') {
+        if (location.pathname !== '/sparkwavv-admin' && location.pathname !== '/admin' && location.pathname !== '/operations') {
+          console.log('🛡️ Admin detected in SPARKWavvApp, redirecting to admin portal. Role:', role);
           navigate('/sparkwavv-admin');
         }
         return;
@@ -346,38 +350,10 @@ export function SPARKWavvApp({ isAdmin = false, initialStep }: { isAdmin?: boole
     }
   }, [authStatus, profile, emailVerified, navigate, location.pathname, step]);
 
-  // OAuth Message Listener
+  // OAuth Message Listener (Removed LinkedIn direct OAuth as Auth0 handles it)
   useEffect(() => {
-    const handleMessage = (event: MessageEvent) => {
-      const origin = event.origin;
-      if (!origin.endsWith('.run.app') && !origin.includes('localhost')) {
-        return;
-      }
-      
-      if (event.data?.type === 'OAUTH_AUTH_SUCCESS' && event.data?.provider === 'linkedin') {
-        console.log('LinkedIn Auth Success!');
-        const token = event.data.token;
-        if (token && auth) {
-          signInWithCustomToken(auth, token)
-            .then(() => {
-              refreshProfile();
-              setStep('landing');
-            })
-            .catch(err => {
-              console.error('Error signing in with custom token:', err);
-              setErrors({ general: 'Failed to complete LinkedIn login.' });
-            });
-        } else {
-          refreshProfile();
-          setStep('landing');
-        }
-      } else if (event.data?.type === 'OAUTH_AUTH_ERROR') {
-        setErrors({ general: `LinkedIn login failed: ${event.data.error}` });
-      }
-    };
-    window.addEventListener('message', handleMessage);
-    return () => window.removeEventListener('message', handleMessage);
-  }, [refreshProfile]);
+    // Auth0 handles social logins automatically
+  }, []);
 
   useEffect(() => {
     if (user && profile) {
@@ -536,242 +512,12 @@ export function SPARKWavvApp({ isAdmin = false, initialStep }: { isAdmin?: boole
     return Object.keys(newErrors).length === 0;
   };
 
-  const handleRegister = async () => {
-    if (!validateOnboarding()) return;
 
-    setIsRegistering(true);
-    setRegistrationMessage(null);
 
-    if (!isFirebaseConfigured || !auth) {
-      setErrors({ ...errors, general: "Firebase is not configured. Please add your credentials to the environment variables." });
-      setIsRegistering(false);
-      return;
-    }
 
-    // Default User ID to email if blank
-    let finalUserId = userData.onboarding.userId.trim() || userData.onboarding.email;
-    if (finalUserId === 'undefined') finalUserId = userData.onboarding.email;
-    
-    const updatedUserData = {
-      ...userData,
-      onboarding: {
-        ...userData.onboarding,
-        userId: finalUserId
-      }
-    };
-    setUserData(updatedUserData);
-
-    try {
-      // Create user in Firebase Auth
-      const userCredential = await createUserWithEmailAndPassword(
-        auth, 
-        updatedUserData.onboarding.email, 
-        updatedUserData.onboarding.password || ''
-      );
-      
-      // Send verification email
-      await sendEmailVerification(userCredential.user);
-
-      // Initialize role in backend
-      const idToken = await userCredential.user.getIdToken();
-      const initRoleResponse = await fetch('/api/user/init-role', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ 
-          idToken, 
-          userId: finalUserId,
-          email: updatedUserData.onboarding.email,
-          firstName: updatedUserData.onboarding.firstName,
-          lastName: updatedUserData.onboarding.lastName,
-          jobTitle: updatedUserData.onboarding.jobTitle,
-          companyOrg: updatedUserData.onboarding.companyOrg,
-          phone: updatedUserData.onboarding.phone,
-          programTrack: updatedUserData.onboarding.programTrack,
-          lifecycleStage: updatedUserData.onboarding.lifecycleStage,
-          outcomesAttributes: updatedUserData.onboarding.outcomesAttributes,
-          feedbackQuote: updatedUserData.onboarding.feedbackQuote
-        }),
-      });
-
-      if (!initRoleResponse.ok) {
-        const errorData = await initRoleResponse.json();
-        throw new Error(errorData.error || "Failed to initialize user role. Please contact support.");
-      }
-
-      await refreshProfile();
-
-      setRegistrationMessage("Registration successful! A verification email has been sent to your address. Please verify your email to activate your account.");
-      
-      // Redirect to login after 5 seconds
-      setTimeout(() => {
-        setStep('login');
-        setRegistrationMessage(null);
-      }, 5000);
-    } catch (err: any) {
-      console.error("Firebase registration error:", err);
-      let message = "Registration failed. Please try again.";
-      if (err.code === 'auth/email-already-in-use') {
-        message = "This email is already registered. Please try logging in.";
-      } else if (err.code === 'auth/invalid-email') {
-        message = "Invalid email address.";
-      } else if (err.code === 'auth/weak-password') {
-        message = "Password is too weak.";
-      } else if (err.code === 'auth/operation-not-allowed') {
-        message = "Email/Password registration is not enabled in the Firebase Console. Please enable it under Authentication > Sign-in method.";
-      }
-      setErrors({ ...errors, general: message });
-    } finally {
-      setIsRegistering(false);
-    }
-  };
-
-  const handleLogin = async () => {
-    if (!userData.onboarding.email || !userData.onboarding.password) {
-      setErrors({ general: "Email and password are required to login." });
-      return;
-    }
-
-    if (!isFirebaseConfigured || !auth) {
-      setErrors({ general: "Firebase is not configured. Please check your environment variables." });
-      return;
-    }
-
-    setIsRegistering(true);
-    try {
-      const userCredential = await signInWithEmailAndPassword(auth, userData.onboarding.email, userData.onboarding.password);
-      
-      /* 
-      if (!userCredential.user.emailVerified) {
-        setErrors({ general: "Please verify your email address before logging in. Check your inbox for the activation link." });
-        await signOut(auth);
-        return;
-      }
-      */
-      
-      // Update Firestore to reflect verification status
-      if (db) {
-        try {
-          await setDoc(doc(db, 'users', userCredential.user.uid), {
-            emailVerified: userCredential.user.emailVerified,
-            updatedAt: serverTimestamp()
-          }, { merge: true });
-        } catch (error) {
-          handleFirestoreError(error, OperationType.WRITE, `users/${userCredential.user.uid}`);
-        }
-      }
-      
-      setStep('landing');
-      setErrors({});
-    } catch (err: any) {
-      console.error("Login error:", err);
-      let message = "Login failed. Please check your credentials.";
-      if (err.code === 'auth/user-not-found' || err.code === 'auth/wrong-password' || err.code === 'auth/invalid-credential') {
-        message = "Invalid email or password.";
-      } else if (err.code === 'auth/too-many-requests') {
-        message = "Too many failed attempts. Please try again later.";
-      } else if (err.code === 'auth/invalid-email') {
-        message = "Invalid email address.";
-      } else if (err.code === 'auth/operation-not-allowed') {
-        message = "Email/Password login is not enabled in the Firebase Console. Please enable it under Authentication > Sign-in method.";
-      }
-      setErrors({ general: message });
-    } finally {
-      setIsRegistering(false);
-    }
-  };
 
   const handleSocialLogin = async (provider: 'google' | 'linkedin') => {
-    if (!auth) return;
-    
-    if (provider === 'google') {
-      setIsRegistering(true);
-      try {
-        const result = await signInWithPopup(auth, googleProvider);
-        
-        /*
-        if (!result.user.emailVerified) {
-          setErrors({ general: "Your Google account email is not verified. Please verify it in your Google settings before logging in." });
-          await signOut(auth);
-          return;
-        }
-        */
-        
-        // Initialize role if new user
-        const idToken = await result.user.getIdToken();
-        const [firstName, ...lastNameParts] = (result.user.displayName || '').split(' ');
-        const lastName = lastNameParts.join(' ');
-        
-        await fetch('/api/user/init-role', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ 
-            idToken, 
-            userId: result.user.email,
-            email: result.user.email,
-            firstName: firstName || '',
-            lastName: lastName || ''
-          }),
-        });
-
-        await refreshProfile();
-
-        setStep('landing');
-        setErrors({});
-      } catch (err: any) {
-        console.error(`${provider} login error:`, err);
-        let message = `Failed to login with ${provider}.`;
-        if (err.code === 'auth/operation-not-allowed') {
-          message = `${provider} login is not enabled in the Firebase Console. Please enable it under Authentication > Sign-in method.`;
-        }
-        setErrors({ general: message });
-      } finally {
-        setIsRegistering(false);
-      }
-    } else if (provider === 'linkedin') {
-      try {
-        // 1. Fetch the OAuth URL from your server
-        const response = await fetch('/api/auth/linkedin/url');
-        if (!response.ok) {
-          throw new Error('Failed to get auth URL');
-        }
-        const { url } = await response.json();
-
-        // 2. Open the OAuth PROVIDER's URL directly in popup
-        const authWindow = window.open(
-          url,
-          'linkedin_oauth_popup',
-          'width=600,height=700'
-        );
-
-        if (!authWindow) {
-          alert('Please allow popups for this site to connect your LinkedIn account.');
-        }
-      } catch (error) {
-        console.error('LinkedIn OAuth error:', error);
-        setErrors({ general: 'Failed to initiate LinkedIn login.' });
-      }
-    }
-  };
-
-  const handleForgotPassword = async (email: string) => {
-    if (!auth || !email) {
-      setErrors({ forgotPassword: "Email is required." });
-      return;
-    }
-    setLoading(true);
-    try {
-      await sendPasswordResetEmail(auth, email);
-      setRegistrationMessage("Password reset email sent! Please check your inbox.");
-      setTimeout(() => {
-        setStep('login');
-        setRegistrationMessage(null);
-      }, 3000);
-    } catch (err: any) {
-      console.error("Password reset error:", err);
-      setErrors({ forgotPassword: "Failed to send reset email. Please check the address." });
-    } finally {
-      setLoading(false);
-    }
+    await login();
   };
 
   const validateModule1 = () => {
@@ -907,8 +653,8 @@ export function SPARKWavvApp({ isAdmin = false, initialStep }: { isAdmin?: boole
     
     let isValid = true;
     if (step === 'onboarding') {
-      if (!emailVerified) {
-        setErrors({ ...errors, general: "Please confirm your registration via email before continuing." });
+      if (!user) {
+        login();
         return;
       }
       isValid = validateOnboarding();
@@ -1002,12 +748,12 @@ export function SPARKWavvApp({ isAdmin = false, initialStep }: { isAdmin?: boole
         <NavBar onNavigate={(s) => {
           window.scrollTo(0, 0);
           if (s === 'login') {
-            setStep('login');
+            login();
           } else if (s === 'onboarding') {
-            if (emailVerified) {
+            if (user) {
               setStep('module1');
             } else {
-              setStep('onboarding');
+              login();
             }
           } else {
             setStep(s as Step);
@@ -1015,18 +761,14 @@ export function SPARKWavvApp({ isAdmin = false, initialStep }: { isAdmin?: boole
         }} />
         <VerificationBanner 
           user={user} 
-          onResend={async () => {
-            if (auth?.currentUser) {
-              await sendEmailVerification(auth.currentUser);
-              setRegistrationMessage("Verification email resent!");
-              setTimeout(() => setRegistrationMessage(null), 3000);
-            }
+          onResend={() => {
+            // Auth0 handles verification resending via their dashboard or universal login
+            setShowToast({ message: "Please check your inbox for the verification email from Auth0.", type: 'success' });
           }} 
           onRefresh={async () => {
             if (user) {
-              await user.reload();
               await refreshProfile();
-              if (user.emailVerified) {
+              if (emailVerified) {
                 setShowToast({ message: "Email verified! Welcome aboard.", type: 'success' });
               } else {
                 setShowToast({ message: "Email still not verified. Please check your inbox.", type: 'error' });
@@ -1993,167 +1735,11 @@ export function SPARKWavvApp({ isAdmin = false, initialStep }: { isAdmin?: boole
           )}
 
           {step === 'login' && (
-            <motion.div 
-              key="login"
-              initial={{ opacity: 0, scale: 0.95 }}
-              animate={{ opacity: 1, scale: 1 }}
-              exit={{ opacity: 0, scale: 0.95 }}
-              className="max-w-xl mx-auto px-6 space-y-12 pb-24"
-            >
-              <header className="text-center space-y-4">
-                <div className="w-16 h-16 rounded-2xl bg-neon-cyan/10 border border-neon-cyan/30 flex items-center justify-center mx-auto mb-6">
-                  <Lock className="w-8 h-8 text-neon-cyan" />
-                </div>
-                <h2 className="text-4xl font-bold">Dashboard Login</h2>
-                <p className="text-white/60">Enter your credentials to access your career dashboard.</p>
-              </header>
-
-              {authStatus === 'ready' ? (
-                <div className="glass-panel p-12 flex flex-col items-center justify-center space-y-6">
-                  <Loader2 className="w-12 h-12 text-neon-cyan animate-spin" />
-                  <div className="text-center space-y-2">
-                    <p className="text-xl font-bold">Authentication Successful</p>
-                    <p className="text-white/40 text-sm uppercase tracking-widest animate-pulse">Redirecting to your dashboard...</p>
-                  </div>
-                </div>
-              ) : (
-                <div className="glass-panel p-8 space-y-6">
-                  <div className="space-y-4">
-                    <div className="space-y-2">
-                      <label className="text-sm font-medium text-white/40 uppercase tracking-wider">Email Address</label>
-                      <input 
-                        type="email" 
-                        className={`w-full bg-white/5 border rounded-xl px-4 py-3 focus:outline-none transition-colors ${errors.email ? 'border-red-500' : 'border-white/10 focus:border-neon-cyan'}`}
-                        placeholder="michael.t@testcrm.com"
-                        value={userData.onboarding.email}
-                        onChange={(e) => setUserData({...userData, onboarding: {...userData.onboarding, email: e.target.value}})}
-                      />
-                      {errors.email && <p className="text-xs text-red-500 mt-1">{errors.email}</p>}
-                    </div>
-                    <div className="space-y-2">
-                      <label className="text-sm font-medium text-white/40 uppercase tracking-wider">Password</label>
-                      <input 
-                        type="password" 
-                        className={`w-full bg-white/5 border rounded-xl px-4 py-3 focus:outline-none transition-colors ${errors.password ? 'border-red-500' : 'border-white/10 focus:border-neon-cyan'}`}
-                        placeholder="••••••••"
-                        value={userData.onboarding.password}
-                        onChange={(e) => setUserData({...userData, onboarding: {...userData.onboarding, password: e.target.value}})}
-                      />
-                      {errors.password && <p className="text-xs text-red-500 mt-1">{errors.password}</p>}
-                    </div>
-                  </div>
-
-                  {errors.general && (
-                    <div className="p-4 rounded-xl bg-red-500/10 border border-red-500/30 text-red-500 text-sm font-bold text-center">
-                      {errors.general}
-                    </div>
-                  )}
-
-                  <div className="flex flex-col gap-4">
-                    <Button 
-                      onClick={handleLogin} 
-                      loading={isRegistering}
-                      className="w-full"
-                    >
-                      Login to Dashboard <ArrowRight className="w-5 h-5" />
-                    </Button>
-                    
-                    <div className="relative py-4">
-                      <div className="absolute inset-0 flex items-center"><div className="w-full border-t border-white/10"></div></div>
-                      <div className="relative flex justify-center text-xs uppercase"><span className="bg-black px-2 text-white/40">Or continue with</span></div>
-                    </div>
-
-                    <div className="grid grid-cols-2 gap-4">
-                      <button 
-                        onClick={() => handleSocialLogin('google')}
-                        className="flex items-center justify-center gap-2 px-4 py-3 rounded-xl bg-white/5 border border-white/10 hover:bg-white/10 transition-all"
-                      >
-                        <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" className="w-5 h-5" alt="Google" />
-                        <span className="text-sm font-medium">Google</span>
-                      </button>
-                      <button 
-                        onClick={() => handleSocialLogin('linkedin')}
-                        className="flex items-center justify-center gap-2 px-4 py-3 rounded-xl bg-white/5 border border-white/10 hover:bg-white/10 transition-all"
-                      >
-                        <svg viewBox="0 0 24 24" className="w-5 h-5 fill-[#0077b5]"><path d="M19 0h-14c-2.761 0-5 2.239-5 5v14c0 2.761 2.239 5 5 5h14c2.762 0 5-2.239 5-5v-14c0-2.761-2.238-5-5-5zm-11 19h-3v-11h3v11zm-1.5-12.268c-.966 0-1.75-.79-1.75-1.764s.784-1.764 1.75-1.764 1.75.79 1.75 1.764-.783 1.764-1.75 1.764zm13.5 12.268h-3v-5.604c0-3.368-4-3.113-4 0v5.604h-3v-11h3v1.765c1.396-2.586 7-2.777 7 2.476v6.759z"/></svg>
-                        <span className="text-sm font-medium">LinkedIn</span>
-                      </button>
-                    </div>
-
-                    <div className="flex justify-between items-center pt-4">
-                      <button 
-                        onClick={() => setStep('forgot-password')}
-                        className="text-neon-cyan text-sm font-bold hover:underline transition-all flex items-center gap-1"
-                      >
-                        <Lock className="w-3 h-3" /> Forgot Password?
-                      </button>
-                      <button 
-                        onClick={() => setStep('onboarding')}
-                        className="text-neon-cyan text-sm font-bold hover:underline transition-all"
-                      >
-                        Don't have an account? Sign Up
-                      </button>
-                    </div>
-                  </div>
-                </div>
-              )}
-            </motion.div>
-          )}
-
-          {step === 'forgot-password' && (
-            <motion.div 
-              key="forgot-password"
-              initial={{ opacity: 0, scale: 0.95 }}
-              animate={{ opacity: 1, scale: 1 }}
-              exit={{ opacity: 0, scale: 0.95 }}
-              className="max-w-xl mx-auto px-6 space-y-12 pb-24"
-            >
-              <header className="text-center space-y-4">
-                <div className="w-16 h-16 rounded-2xl bg-neon-cyan/10 border border-neon-cyan/30 flex items-center justify-center mx-auto mb-6">
-                  <Mail className="w-8 h-8 text-neon-cyan" />
-                </div>
-                <h2 className="text-4xl font-bold">Reset Password</h2>
-                <p className="text-white/60">Enter your email and we'll send you a link to reset your password.</p>
-              </header>
-
-              <div className="glass-panel p-8 space-y-6">
-                <div className="space-y-4">
-                  <div className="space-y-2">
-                    <label className="text-sm font-medium text-white/40 uppercase tracking-wider">Email Address</label>
-                    <input 
-                      type="email" 
-                      className={`w-full bg-white/5 border rounded-xl px-4 py-3 focus:outline-none transition-colors ${errors.forgotPassword ? 'border-red-500' : 'border-white/10 focus:border-neon-cyan'}`}
-                      placeholder="michael.t@testcrm.com"
-                      value={forgotPasswordEmail}
-                      onChange={(e) => setForgotPasswordEmail(e.target.value)}
-                    />
-                    {errors.forgotPassword && <p className="text-xs text-red-500 mt-1">{errors.forgotPassword}</p>}
-                  </div>
-                </div>
-
-                {registrationMessage && (
-                  <div className="p-4 rounded-xl bg-green-500/10 border border-green-500/30 text-green-500 text-sm font-bold text-center">
-                    {registrationMessage}
-                  </div>
-                )}
-
-                <div className="flex flex-col gap-4">
-                  <Button 
-                    onClick={() => handleForgotPassword(forgotPasswordEmail)} 
-                    loading={loading}
-                    className="w-full"
-                  >
-                    Send Reset Link
-                  </Button>
-                  <button 
-                    onClick={() => setStep('login')}
-                    className="text-white/40 text-sm hover:text-neon-cyan transition-colors"
-                  >
-                    Back to Login
-                  </button>
-                </div>
-              </div>
-            </motion.div>
+            <div className="flex items-center justify-center py-24">
+              <Loader2 className="w-12 h-12 text-neon-cyan animate-spin" />
+              <p className="ml-4 text-white/60">Redirecting to Auth0...</p>
+              <LoginRedirect login={login} />
+            </div>
           )}
 
           {step === 'settings' && user && (
@@ -2227,7 +1813,7 @@ export function SPARKWavvApp({ isAdmin = false, initialStep }: { isAdmin?: boole
                       onClick={async () => {
                         const name = (document.getElementById('settings-display-name') as HTMLInputElement).value;
                         if (auth?.currentUser) {
-                          await updateProfile(auth.currentUser, { displayName: name });
+                          await firebaseUpdateProfile(auth.currentUser, { displayName: name });
                           setRegistrationMessage("Profile updated successfully!");
                           setTimeout(() => setRegistrationMessage(null), 3000);
                         }
@@ -2267,54 +1853,16 @@ export function SPARKWavvApp({ isAdmin = false, initialStep }: { isAdmin?: boole
                     </div>
                   </section>
 
-                  <section className="glass-panel p-8 space-y-6">
-                    <h3 className="text-xl font-bold flex items-center gap-2">
-                      <Lock className="w-5 h-5 text-neon-cyan" /> Security
-                    </h3>
-                    <div className="space-y-4">
-                      <div className="space-y-2">
-                        <label className="text-xs font-medium text-white/40 uppercase">New Password</label>
-                        <input 
-                          type="password" 
-                          placeholder="••••••••"
-                          className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-2 focus:outline-none focus:border-neon-cyan transition-colors"
-                          id="settings-new-password"
-                        />
-                      </div>
-                      <Button 
-                        onClick={async () => {
-                          const pwd = (document.getElementById('settings-new-password') as HTMLInputElement).value;
-                          if (auth?.currentUser && pwd) {
-                            try {
-                              await updatePassword(auth.currentUser, pwd);
-                              setRegistrationMessage("Password updated successfully!");
-                              (document.getElementById('settings-new-password') as HTMLInputElement).value = '';
-                              setTimeout(() => setRegistrationMessage(null), 3000);
-                            } catch (e: any) {
-                              setErrors({ settings: e.message });
-                            }
-                          }
-                        }}
-                        variant="secondary"
-                      >
-                        Update Password
-                      </Button>
-                    </div>
-                  </section>
+
 
                   <section className="glass-panel p-8 border-red-500/20 space-y-6">
                     <h3 className="text-xl font-bold text-red-500">Danger Zone</h3>
-                    <p className="text-white/60 text-sm">Once you delete your account, there is no going back. Please be certain.</p>
+                    <p className="text-white/60 text-sm">To delete your account, please contact support or manage your profile via the Auth0 dashboard.</p>
                     <Button 
-                      onClick={async () => {
-                        if (window.confirm("Are you absolutely sure? This action cannot be undone.") && auth?.currentUser) {
-                          await deleteUser(auth.currentUser);
-                          setStep('landing');
-                        }
-                      }}
+                      onClick={() => window.open('mailto:support@sparkwavv.ai')}
                       className="bg-red-500/10 text-red-500 border border-red-500/30 hover:bg-red-500/20"
                     >
-                      Delete Account
+                      Contact Support to Delete Account
                     </Button>
                   </section>
 
@@ -2346,241 +1894,35 @@ export function SPARKWavvApp({ isAdmin = false, initialStep }: { isAdmin?: boole
           {step === 'onboarding' && (
             <motion.div 
               key="onboarding"
-              initial={{ opacity: 0, x: 20 }}
-              animate={{ opacity: 1, x: 0 }}
-              exit={{ opacity: 0, x: -20 }}
-              className="max-w-4xl mx-auto px-6 space-y-12 pb-24"
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.95 }}
+              className="max-w-xl mx-auto px-6 space-y-12 pb-24"
             >
-              <header className="space-y-4 text-center">
-                <h2 className="text-4xl font-bold">Let's Dive-In, and get started with building your SPARKWavv Profile</h2>
-              </header>
-              
-              <div className="space-y-6">
-                <div className="glass-panel p-8 space-y-6">
-                  <div className="space-y-6">
-                    <h3 className="text-2xl font-bold text-center text-neon-cyan">SPARKWavv Account Registration</h3>
-                    <div className="p-4 rounded-xl bg-white/5 border border-white/10 space-y-3">
-                      <div className="flex items-start gap-3">
-                        <ShieldCheck className="w-5 h-5 text-neon-cyan mt-0.5" />
-                        <div className="space-y-1">
-                          <p className="text-sm font-medium text-white">Confidentiality Statement</p>
-                          <p className="text-xs text-white/60">Your information is kept strictly confidential and used only for your SPARKWavv profile and career guidance.</p>
-                        </div>
-                      </div>
-                      <div className="flex items-start gap-3">
-                        <Mail className="w-5 h-5 text-neon-magenta mt-0.5" />
-                        <div className="space-y-1">
-                          <p className="text-sm font-medium text-white">Account Activation</p>
-                          <p className="text-xs text-white/60">Please reply to the confirmation email to activate your SPARKWavv account.</p>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="space-y-6">
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                      <div className="space-y-2">
-                        <label className="text-sm font-medium text-white/40 uppercase tracking-wider">First Name <span className="text-neon-magenta">*</span></label>
-                        <input 
-                          type="text" 
-                          className={`w-full bg-white/5 border rounded-xl px-4 py-3 focus:outline-none transition-colors ${errors.firstName ? 'border-red-500' : 'border-white/10 focus:border-neon-cyan'}`}
-                          placeholder="Michael"
-                          value={userData.onboarding.firstName}
-                          onChange={(e) => setUserData({...userData, onboarding: {...userData.onboarding, firstName: e.target.value}})}
-                        />
-                        {errors.firstName && <p className="text-xs text-red-500 mt-1">{errors.firstName}</p>}
-                      </div>
-                      <div className="space-y-2">
-                        <label className="text-sm font-medium text-white/40 uppercase tracking-wider">Last Name <span className="text-neon-magenta">*</span></label>
-                        <input 
-                          type="text" 
-                          className={`w-full bg-white/5 border rounded-xl px-4 py-3 focus:outline-none transition-colors ${errors.lastName ? 'border-red-500' : 'border-white/10 focus:border-neon-cyan'}`}
-                          placeholder="T."
-                          value={userData.onboarding.lastName}
-                          onChange={(e) => setUserData({...userData, onboarding: {...userData.onboarding, lastName: e.target.value}})}
-                        />
-                        {errors.lastName && <p className="text-xs text-red-500 mt-1">{errors.lastName}</p>}
-                      </div>
-                    </div>
-
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                      <div className="space-y-2">
-                        <label className="text-sm font-medium text-white/40 uppercase tracking-wider">Job Title <span className="text-neon-magenta">*</span></label>
-                        <input 
-                          type="text" 
-                          className={`w-full bg-white/5 border rounded-xl px-4 py-3 focus:outline-none transition-colors ${errors.jobTitle ? 'border-red-500' : 'border-white/10 focus:border-neon-cyan'}`}
-                          placeholder="Software Engineer"
-                          value={userData.onboarding.jobTitle}
-                          onChange={(e) => setUserData({...userData, onboarding: {...userData.onboarding, jobTitle: e.target.value}})}
-                        />
-                        {errors.jobTitle && <p className="text-xs text-red-500 mt-1">{errors.jobTitle}</p>}
-                      </div>
-                      <div className="space-y-2">
-                        <label className="text-sm font-medium text-white/40 uppercase tracking-wider">Company/Org <span className="text-neon-magenta">*</span></label>
-                        <input 
-                          type="text" 
-                          className={`w-full bg-white/5 border rounded-xl px-4 py-3 focus:outline-none transition-colors ${errors.companyOrg ? 'border-red-500' : 'border-white/10 focus:border-neon-cyan'}`}
-                          placeholder="Tech Corp"
-                          value={userData.onboarding.companyOrg}
-                          onChange={(e) => setUserData({...userData, onboarding: {...userData.onboarding, companyOrg: e.target.value}})}
-                        />
-                        {errors.companyOrg && <p className="text-xs text-red-500 mt-1">{errors.companyOrg}</p>}
-                      </div>
-                    </div>
-
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                      <div className="space-y-2">
-                        <label className="text-sm font-medium text-white/40 uppercase tracking-wider">Email Address <span className="text-neon-magenta">*</span></label>
-                        <input 
-                          type="email" 
-                          className={`w-full bg-white/5 border rounded-xl px-4 py-3 focus:outline-none transition-colors ${errors.email ? 'border-red-500' : 'border-white/10 focus:border-neon-cyan'}`}
-                          placeholder="michael.t@testcrm.com"
-                          value={userData.onboarding.email}
-                          onChange={(e) => setUserData({...userData, onboarding: {...userData.onboarding, email: e.target.value}})}
-                        />
-                        {errors.email && <p className="text-xs text-red-500 mt-1">{errors.email}</p>}
-                      </div>
-                      <div className="space-y-2">
-                        <label className="text-sm font-medium text-white/40 uppercase tracking-wider">Phone <span className="text-neon-magenta">*</span></label>
-                        <input 
-                          type="tel" 
-                          className={`w-full bg-white/5 border rounded-xl px-4 py-3 focus:outline-none transition-colors ${errors.phone ? 'border-red-500' : 'border-white/10 focus:border-neon-cyan'}`}
-                          placeholder="555-0101"
-                          value={userData.onboarding.phone}
-                          onChange={(e) => setUserData({...userData, onboarding: {...userData.onboarding, phone: e.target.value}})}
-                        />
-                        {errors.phone && <p className="text-xs text-red-500 mt-1">{errors.phone}</p>}
-                      </div>
-                    </div>
-
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                      <div className="space-y-2">
-                        <label className="text-sm font-medium text-white/40 uppercase tracking-wider">Program/Track <span className="text-neon-magenta">*</span></label>
-                        <input 
-                          type="text" 
-                          className={`w-full bg-white/5 border rounded-xl px-4 py-3 focus:outline-none transition-colors ${errors.programTrack ? 'border-red-500' : 'border-white/10 focus:border-neon-cyan'}`}
-                          placeholder="Skylar Beta User"
-                          value={userData.onboarding.programTrack}
-                          onChange={(e) => setUserData({...userData, onboarding: {...userData.onboarding, programTrack: e.target.value}})}
-                        />
-                        {errors.programTrack && <p className="text-xs text-red-500 mt-1">{errors.programTrack}</p>}
-                      </div>
-                      <div className="space-y-2">
-                        <label className="text-sm font-medium text-white/40 uppercase tracking-wider">Lifecycle Stage <span className="text-neon-magenta">*</span></label>
-                        <input 
-                          type="text" 
-                          className={`w-full bg-white/5 border rounded-xl px-4 py-3 focus:outline-none transition-colors ${errors.lifecycleStage ? 'border-red-500' : 'border-white/10 focus:border-neon-cyan'}`}
-                          placeholder="Closed Won (Placed)"
-                          value={userData.onboarding.lifecycleStage}
-                          onChange={(e) => setUserData({...userData, onboarding: {...userData.onboarding, lifecycleStage: e.target.value}})}
-                        />
-                        {errors.lifecycleStage && <p className="text-xs text-red-500 mt-1">{errors.lifecycleStage}</p>}
-                      </div>
-                    </div>
-
-                    <div className="space-y-2">
-                      <label className="text-sm font-medium text-white/40 uppercase tracking-wider">Outcomes & Attributes</label>
-                      <textarea 
-                        className={`w-full bg-white/5 border rounded-xl px-4 py-3 focus:outline-none transition-colors h-24 resize-none ${errors.outcomesAttributes ? 'border-red-500' : 'border-white/10 focus:border-neon-cyan'}`}
-                        placeholder="Used AI-powered application process..."
-                        value={userData.onboarding.outcomesAttributes}
-                        onChange={(e) => setUserData({...userData, onboarding: {...userData.onboarding, outcomesAttributes: e.target.value}})}
-                      />
-                      {errors.outcomesAttributes && <p className="text-xs text-red-500 mt-1">{errors.outcomesAttributes}</p>}
-                    </div>
-
-                    <div className="space-y-2">
-                      <label className="text-sm font-medium text-white/40 uppercase tracking-wider">Feedback / Quote</label>
-                      <textarea 
-                        className={`w-full bg-white/5 border rounded-xl px-4 py-3 focus:outline-none transition-colors h-24 resize-none ${errors.feedbackQuote ? 'border-red-500' : 'border-white/10 focus:border-neon-cyan'}`}
-                        placeholder="The strengths assessment was eye-opening..."
-                        value={userData.onboarding.feedbackQuote}
-                        onChange={(e) => setUserData({...userData, onboarding: {...userData.onboarding, feedbackQuote: e.target.value}})}
-                      />
-                      {errors.feedbackQuote && <p className="text-xs text-red-500 mt-1">{errors.feedbackQuote}</p>}
-                    </div>
-
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                      <div className="space-y-2">
-                        <label className="text-sm font-medium text-white/40 uppercase tracking-wider">User ID (Optional)</label>
-                        <input 
-                          type="text" 
-                          className={`w-full bg-white/5 border rounded-xl px-4 py-3 focus:outline-none transition-colors border-white/10 focus:border-neon-cyan`}
-                          placeholder="michael.t (defaults to email)"
-                          value={userData.onboarding.userId}
-                          onChange={(e) => setUserData({...userData, onboarding: {...userData.onboarding, userId: e.target.value}})}
-                        />
-                        <p className="text-[10px] text-white/30 italic">This will be your unique dashboard URL</p>
-                      </div>
-                      <div className="space-y-2">
-                        <label className="text-sm font-medium text-white/40 uppercase tracking-wider">Password <span className="text-neon-magenta">*</span></label>
-                        <input 
-                          type="password" 
-                          className={`w-full bg-white/5 border rounded-xl px-4 py-3 focus:outline-none transition-colors ${errors.password ? 'border-red-500' : 'border-white/10 focus:border-neon-cyan'}`}
-                          placeholder="••••••••"
-                          value={userData.onboarding.password}
-                          onChange={(e) => setUserData({...userData, onboarding: {...userData.onboarding, password: e.target.value}})}
-                        />
-                        {errors.password && <p className="text-xs text-red-500 mt-1">{errors.password}</p>}
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="flex flex-col gap-6">
-                    {process.env.NODE_ENV === 'development' && (
-                      <Button 
-                        onClick={() => {
-                          localStorage.setItem('sparkwavv_current_step', 'module1');
-                          setStep('module1');
-                        }} 
-                        variant="outline" 
-                        className="w-full border-neon-cyan/20 text-neon-cyan/60 hover:text-neon-cyan"
-                      >
-                        [DEV] Skip Registration & Go to Module 1
-                      </Button>
-                    )}
-                    {registrationMessage && (
-                      <div className="p-6 rounded-2xl bg-neon-cyan/10 border border-neon-cyan/30 text-neon-cyan text-center space-y-4">
-                        <p className="font-bold">{registrationMessage}</p>
-                        <Button 
-                          onClick={() => refreshProfile()} 
-                          variant="outline" 
-                          className="mx-auto border-neon-cyan/30 text-neon-cyan hover:bg-neon-cyan/10"
-                        >
-                          <RefreshCw className="w-4 h-4 mr-2" />
-                          Refresh Status
-                        </Button>
-                      </div>
-                    )}
-
-                    {errors.general && (
-                      <div className="p-6 rounded-2xl bg-red-500/10 border border-red-500/30 text-red-500 text-center font-bold">
-                        {errors.general}
-                      </div>
-                    )}
-                    
-                    <div className="flex flex-col sm:flex-row justify-between items-center gap-4">
-                      <button 
-                        onClick={() => setStep('login')}
-                        className="text-neon-cyan text-sm font-medium hover:underline"
-                      >
-                        Already have an account? Login here
-                      </button>
-
-                      <div className="flex justify-end gap-4 w-full sm:w-auto">
-                        {!registrationMessage && (
-                          <Button 
-                            onClick={handleRegister} 
-                            loading={isRegistering}
-                            className="w-full sm:w-auto"
-                          >
-                            Register for Dive-In <ArrowRight className="w-5 h-5" />
-                          </Button>
-                        )}
-                      </div>
-                    </div>
-                  </div>
+              <header className="text-center space-y-4">
+                <div className="w-16 h-16 rounded-2xl bg-neon-cyan/10 border border-neon-cyan/30 flex items-center justify-center mx-auto mb-6">
+                  <Rocket className="w-8 h-8 text-neon-cyan" />
                 </div>
+                <h2 className="text-4xl font-bold">Ready to Dive-In?</h2>
+                <p className="text-white/60">Join SPARKWavv and start building your cinematic career identity.</p>
+              </header>
+
+              <div className="glass-panel p-8 space-y-6 text-center">
+                <p className="text-white/60 mb-8">
+                  We use Auth0 for secure, industry-standard authentication. You'll be redirected to our secure login page to create your account or sign in.
+                </p>
+                <Button 
+                  onClick={() => login()} 
+                  className="w-full py-4 text-lg"
+                >
+                  Get Started with Auth0 <ArrowRight className="ml-2 w-5 h-5" />
+                </Button>
+                <button 
+                  onClick={() => setStep('landing')}
+                  className="mt-4 text-white/40 hover:text-white transition-colors text-sm uppercase tracking-widest font-bold"
+                >
+                  Back to Home
+                </button>
               </div>
             </motion.div>
           )}
@@ -3148,6 +2490,7 @@ const UserDashboardWrapper = ({ isAdmin }: { isAdmin: boolean }) => {
   const { userId } = useParams<{ userId: string }>();
   return (
     <OnboardingGate>
+      {!isAdmin && <TimeoutManager />}
       <UserDashboard userId={userId || 'default'} isAdmin={isAdmin} />
       {!isAdmin && <SkylarSidebar />}
     </OnboardingGate>
@@ -3156,7 +2499,7 @@ const UserDashboardWrapper = ({ isAdmin }: { isAdmin: boolean }) => {
 
 const AdminRoute = ({ 
   children, 
-  requiredRoles = ['admin', 'operator'],
+  requiredRoles = ['super_admin', 'admin', 'editor', 'viewer'],
   requiredEntryPoint
 }: { 
   children: React.ReactNode; 
@@ -3169,11 +2512,16 @@ const AdminRoute = ({
     if (!loading) {
       console.log('🛡️ [AdminRoute] Check:', { 
         hasUser: !!user, 
+        email: user?.email,
         role, 
         requiredRoles, 
         status,
-        requiredEntryPoint 
+        loading,
+        requiredEntryPoint,
+        pathname: window.location.pathname
       });
+    } else {
+      console.log('🛡️ [AdminRoute] Loading...', { status, loading });
     }
   }, [loading, user, role, status, requiredRoles, requiredEntryPoint]);
 
@@ -3217,6 +2565,10 @@ import ShareView from './pages/ShareView';
 export default function App() {
   const { user, role, status, loading, error, refreshIdentity } = useIdentity();
   const [showRetry, setShowRetry] = useState(false);
+  const location = useLocation();
+  const navigate = useNavigate();
+
+  const isAdmin = role === ROLES.ADMIN || role === ROLES.SUPER_ADMIN || role === ROLES.EDITOR || role === ROLES.MENTOR;
 
   useEffect(() => {
     let timer: NodeJS.Timeout;
@@ -3228,6 +2580,19 @@ export default function App() {
     }
     return () => clearTimeout(timer);
   }, [status]);
+
+  useEffect(() => {
+    if (status === 'ready' || status === 'authenticated') {
+      console.log('🛡️ [App] Status Check:', { role, isAdmin, path: location.pathname, status });
+    }
+  }, [status, role, isAdmin, location.pathname]);
+
+  useEffect(() => {
+    if (status === 'ready' && isAdmin && location.pathname === '/') {
+      console.log('🛡️ [App] Admin detected on home page, redirecting to /admin');
+      navigate('/admin', { replace: true });
+    }
+  }, [status, isAdmin, location.pathname, navigate]);
 
   if (loading || status === 'initializing') {
     return (
@@ -3276,11 +2641,10 @@ export default function App() {
     );
   }
 
-  const isAdmin = role === 'admin' || role === 'super_admin' || role === 'editor' || role === 'mentor';
-
   return (
-    <Router>
+    <>
       <ScrollToTop />
+      
       <Suspense fallback={
         <div className="min-h-screen flex flex-col items-center justify-center bg-[#050505] text-white">
           <Loader2 className="w-12 h-12 text-neon-cyan animate-spin" />
@@ -3334,6 +2698,6 @@ export default function App() {
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </Suspense>
-    </Router>
+    </>
   );
 }

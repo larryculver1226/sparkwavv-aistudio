@@ -155,8 +155,8 @@ service cloud.firestore {
 
     function isAdmin() {
       return isAuthenticated() && 
-        ((exists(/databases/$(database)/documents/admins/$(request.auth.uid)) && get(/databases/$(database)/documents/admins/$(request.auth.uid)).data.role == 'admin') ||
-         (exists(/databases/$(database)/documents/users/$(request.auth.uid)) && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin') ||
+        ((exists(/databases/$(database)/documents/admins/$(request.auth.uid)) && (get(/databases/$(database)/documents/admins/$(request.auth.uid)).data.role == 'admin' || get(/databases/$(database)/documents/admins/$(request.auth.uid)).data.role == 'super_admin')) ||
+         (exists(/databases/$(database)/documents/users/$(request.auth.uid)) && (get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin' || get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'super_admin')) ||
          ('email' in request.auth.token && request.auth.token.email.lower() == "larry.culver1226@gmail.com" && (request.auth.token.email_verified == true || request.auth.token.firebase.sign_in_provider == "google.com")));
     }
 

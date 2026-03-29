@@ -4,8 +4,6 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Menu, X, Sparkles, ChevronDown, LayoutDashboard, LogOut, Settings, Database } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
-import { onAuthStateChanged, User as FirebaseUser, signOut } from 'firebase/auth';
-import { auth } from '../lib/firebase';
 import { useIdentity } from '../contexts/IdentityContext';
 
 interface NavItem {
@@ -57,7 +55,7 @@ export const NavBar: React.FC<NavBarProps> = ({ onNavigate }) => {
   const [isOpen, setIsOpen] = useState(false);
   const [scrolled, setScrolled] = useState(false);
   const [activeDropdown, setActiveDropdown] = useState<string | null>(null);
-  const { user, profile, loading, status } = useIdentity();
+  const { user, profile, loading, status, login, logout } = useIdentity();
   const isConfirmed = status === 'authenticated' || status === 'ready';
 
   useEffect(() => {
@@ -189,7 +187,7 @@ export const NavBar: React.FC<NavBarProps> = ({ onNavigate }) => {
                       <Settings className="w-4 h-4" />
                     </button>
                     <button 
-                      onClick={() => auth && signOut(auth)}
+                      onClick={logout}
                       className="p-2 rounded-full bg-white/5 border border-white/10 text-white/60 hover:text-neon-magenta hover:border-neon-magenta/30 transition-all duration-300"
                       title="Sign Out"
                     >
@@ -200,7 +198,7 @@ export const NavBar: React.FC<NavBarProps> = ({ onNavigate }) => {
                   <div className="flex items-center gap-3">
                     <span className="text-xs text-white/40 italic">Awaiting Verification</span>
                     <button 
-                      onClick={() => auth && signOut(auth)}
+                      onClick={logout}
                       className="p-2 rounded-full bg-white/5 border border-white/10 text-white/60 hover:text-neon-magenta hover:border-neon-magenta/30 transition-all duration-300"
                       title="Sign Out"
                     >
@@ -211,7 +209,7 @@ export const NavBar: React.FC<NavBarProps> = ({ onNavigate }) => {
               ) : (
                 <div className="flex items-center gap-3">
                   <button 
-                    onClick={() => onNavigate('login')}
+                    onClick={login}
                     className="px-4 py-2 rounded-full bg-white/5 border border-white/10 text-white text-sm font-bold hover:bg-white/10 transition-all duration-300"
                   >
                     Dashboard Login
@@ -297,7 +295,7 @@ export const NavBar: React.FC<NavBarProps> = ({ onNavigate }) => {
                         </div>
                         <button 
                           onClick={() => {
-                            auth && signOut(auth);
+                            logout();
                             setIsOpen(false);
                           }}
                           className="w-full py-5 rounded-2xl bg-white/5 border border-white/10 text-white font-bold text-2xl flex items-center justify-center gap-3"
@@ -311,7 +309,7 @@ export const NavBar: React.FC<NavBarProps> = ({ onNavigate }) => {
                     <div className="flex flex-col gap-4">
                       <button 
                         onClick={() => {
-                          onNavigate('login');
+                          login();
                           setIsOpen(false);
                         }}
                         className="w-full py-5 rounded-2xl bg-white/5 border border-white/10 text-white font-bold text-2xl"
