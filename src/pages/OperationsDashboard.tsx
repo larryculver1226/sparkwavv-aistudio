@@ -148,7 +148,12 @@ export const OperationsDashboard: React.FC<{ onLogout?: () => void }> = ({ onLog
       const res = await fetch('/api/admin/users-v2');
       if (res.ok) {
         const data = await res.json();
-        setUsers(data.users || []);
+        // Filter to only show regular users (user, client, guest)
+        const regularUsers = (data.users || []).filter((u: any) => {
+          const role = typeof u.role === 'string' ? u.role : u.role?.role;
+          return role === ROLES.USER || role === ROLES.CLIENT || role === ROLES.GUEST;
+        });
+        setUsers(regularUsers);
       }
     } catch (e) {
       console.error("Failed to fetch users:", e);
@@ -329,7 +334,12 @@ export const OperationsDashboard: React.FC<{ onLogout?: () => void }> = ({ onLog
                 <button 
                   onClick={() => {
                     setEditingItem(null);
-                    setFormData({});
+                    setFormData({
+                      subscriptionTier: 'DIVE-IN',
+                      hasWavvault: false,
+                      onboardingProgress: 0,
+                      role: 'user'
+                    });
                     setIsModalOpen(true);
                   }}
                   className="flex items-center gap-2 px-6 py-3 bg-neon-cyan text-black font-display font-bold rounded-2xl hover:bg-white transition-all shadow-[0_0_20px_rgba(0,255,255,0.3)] hover:shadow-[0_0_30px_rgba(255,255,255,0.4)]"
@@ -600,8 +610,10 @@ export const OperationsDashboard: React.FC<{ onLogout?: () => void }> = ({ onLog
                     <>
                       <th className="px-8 py-5 text-[10px] font-bold text-white/30 uppercase tracking-[0.2em]">User Identity</th>
                       <th className="px-8 py-5 text-[10px] font-bold text-white/30 uppercase tracking-[0.2em]">Status</th>
-                      <th className="px-8 py-5 text-[10px] font-bold text-white/30 uppercase tracking-[0.2em]">Role</th>
-                      <th className="px-8 py-5 text-[10px] font-bold text-white/30 uppercase tracking-[0.2em]">Joined</th>
+                      <th className="px-8 py-5 text-[10px] font-bold text-white/30 uppercase tracking-[0.2em]">Tier</th>
+                      <th className="px-8 py-5 text-[10px] font-bold text-white/30 uppercase tracking-[0.2em]">Vault</th>
+                      <th className="px-8 py-5 text-[10px] font-bold text-white/30 uppercase tracking-[0.2em]">Onboarding</th>
+                      <th className="px-8 py-5 text-[10px] font-bold text-white/30 uppercase tracking-[0.2em]">Last Login</th>
                     </>
                   )}
                   {activeTab === 'cohorts' && (
@@ -642,12 +654,16 @@ export const OperationsDashboard: React.FC<{ onLogout?: () => void }> = ({ onLog
                       <>
                         <td className="px-8 py-6">
                           <div className="flex items-center gap-4">
-                            <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-neon-cyan/20 to-neon-cyan/5 border border-neon-cyan/20 flex items-center justify-center text-neon-cyan font-display font-bold text-lg shadow-[0_0_15px_rgba(0,255,255,0.05)]">
-                              {item.email?.[0].toUpperCase()}
+                            <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-neon-cyan/20 to-neon-cyan/5 border border-neon-cyan/20 flex items-center justify-center text-neon-cyan font-display font-bold text-lg shadow-[0_0_15px_rgba(0,255,255,0.05)] overflow-hidden">
+                              {item.photoURL ? (
+                                <img src={item.photoURL} alt="" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+                              ) : (
+                                item.displayName?.[0]?.toUpperCase() || item.email?.[0]?.toUpperCase() || '?'
+                              )}
                             </div>
                             <div>
-                              <p className="font-display font-bold text-white group-hover:text-neon-cyan transition-colors">{item.email}</p>
-                              <p className="text-[10px] font-mono text-white/20 tracking-tighter">UID: {item.uid}</p>
+                              <p className="font-display font-bold text-white group-hover:text-neon-cyan transition-colors">{item.displayName || 'Anonymous'}</p>
+                              <p className="text-[10px] font-mono text-white/40 tracking-tighter">{item.email}</p>
                             </div>
                           </div>
                         </td>
@@ -658,15 +674,29 @@ export const OperationsDashboard: React.FC<{ onLogout?: () => void }> = ({ onLog
                               : 'bg-neon-lime/10 text-neon-lime border border-neon-lime/20'
                           }`}>
                             <div className={`w-1.5 h-1.5 rounded-full ${item.disabled ? 'bg-neon-magenta' : 'bg-neon-lime'} animate-pulse`} />
-                            {item.disabled ? 'Disabled' : 'Active'}
+                            {item.disabled ? 'Suspended' : 'Active'}
                           </span>
                         </td>
                         <td className="px-8 py-6">
-                          <span className="text-xs font-bold text-white/60 uppercase tracking-widest">{typeof item.role === 'string' ? item.role : (item.role as any)?.role || 'User'}</span>
+                          <span className="text-xs font-bold text-neon-cyan uppercase tracking-widest">{item.subscriptionTier || 'DIVE-IN'}</span>
+                        </td>
+                        <td className="px-8 py-6">
+                          <span className={`text-xs font-bold uppercase tracking-widest ${item.hasWavvault ? 'text-neon-lime' : 'text-white/20'}`}>
+                            {item.hasWavvault ? 'Enabled' : 'Locked'}
+                          </span>
+                        </td>
+                        <td className="px-8 py-6">
+                          <div className="w-24 h-1.5 bg-white/5 rounded-full overflow-hidden">
+                            <div 
+                              className="h-full bg-neon-cyan transition-all duration-500" 
+                              style={{ width: `${item.onboardingProgress || 0}%` }}
+                            />
+                          </div>
+                          <span className="text-[10px] text-white/40 mt-1 block font-mono">{item.onboardingProgress || 0}% Complete</span>
                         </td>
                         <td className="px-8 py-6">
                           <span className="text-xs font-medium text-white/40">
-                            {item.metadata?.creationTime ? new Date(item.metadata.creationTime).toLocaleDateString() : 'N/A'}
+                            {item.metadata?.lastSignInTime ? new Date(item.metadata.lastSignInTime).toLocaleString() : 'Never'}
                           </span>
                         </td>
                       </>
@@ -796,6 +826,20 @@ export const OperationsDashboard: React.FC<{ onLogout?: () => void }> = ({ onLog
                     />
                   </div>
                   <div>
+                    <label className="block text-[10px] font-bold text-white/40 uppercase tracking-widest mb-2">Subscription Tier</label>
+                    <select 
+                      className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white focus:ring-2 focus:ring-neon-cyan/50 outline-none"
+                      value={formData.subscriptionTier || 'DIVE-IN'}
+                      onChange={(e) => setFormData({ ...formData, subscriptionTier: e.target.value })}
+                    >
+                      <option value="DIVE-IN">DIVE-IN</option>
+                      <option value="IGNITION">IGNITION</option>
+                      <option value="BRANDING">BRANDING</option>
+                      <option value="DISCOVERY">DISCOVERY</option>
+                      <option value="OUTREACH">OUTREACH</option>
+                    </select>
+                  </div>
+                  <div>
                     <label className="block text-[10px] font-bold text-white/40 uppercase tracking-widest mb-2">Role</label>
                     <select 
                       className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white focus:ring-2 focus:ring-neon-cyan/50 outline-none"
@@ -803,9 +847,30 @@ export const OperationsDashboard: React.FC<{ onLogout?: () => void }> = ({ onLog
                       onChange={(e) => setFormData({ ...formData, role: e.target.value })}
                     >
                       <option value="user">User</option>
-                      <option value="mentor">Mentor</option>
-                      <option value="agent">Agent</option>
+                      <option value="client">Client</option>
+                      <option value="guest">Guest</option>
                     </select>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <input 
+                      type="checkbox" 
+                      id="hasWavvault"
+                      className="w-4 h-4 bg-white/5 border border-white/10 rounded focus:ring-2 focus:ring-neon-cyan/50 outline-none"
+                      checked={formData.hasWavvault || false}
+                      onChange={(e) => setFormData({ ...formData, hasWavvault: e.target.checked })}
+                    />
+                    <label htmlFor="hasWavvault" className="text-[10px] font-bold text-white/40 uppercase tracking-widest">Vault Access (Wavvault)</label>
+                  </div>
+                  <div>
+                    <label className="block text-[10px] font-bold text-white/40 uppercase tracking-widest mb-2">Onboarding Progress (%)</label>
+                    <input 
+                      type="number" 
+                      min="0"
+                      max="100"
+                      className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white focus:ring-2 focus:ring-neon-cyan/50 outline-none"
+                      value={formData.onboardingProgress || 0}
+                      onChange={(e) => setFormData({ ...formData, onboardingProgress: parseInt(e.target.value) })}
+                    />
                   </div>
                 </>
               )}

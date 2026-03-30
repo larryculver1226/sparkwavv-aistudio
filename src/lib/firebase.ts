@@ -4,9 +4,19 @@ import { getFirestore } from 'firebase/firestore';
 import firebaseConfig from '../../firebase-applet-config.json';
 
 // Sparkwavv Project (Project 1) - End Users
-const sparkwavvApp = getApps().length === 0 ? initializeApp(firebaseConfig) : getApp();
+const config = {
+  apiKey: import.meta.env.VITE_FIREBASE_API_KEY || firebaseConfig.apiKey,
+  authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN || firebaseConfig.authDomain,
+  projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID || firebaseConfig.projectId,
+  storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET || firebaseConfig.storageBucket,
+  messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID || firebaseConfig.messagingSenderId,
+  appId: import.meta.env.VITE_FIREBASE_APP_ID || firebaseConfig.appId,
+  measurementId: import.meta.env.VITE_FIREBASE_MEASUREMENT_ID || firebaseConfig.measurementId,
+};
+
+const sparkwavvApp = getApps().length === 0 ? initializeApp(config) : getApp();
 export const auth = getAuth(sparkwavvApp);
-export const db = getFirestore(sparkwavvApp, (firebaseConfig as any).firestoreDatabaseId); 
+export const db = getFirestore(sparkwavvApp, (firebaseConfig as any).firestoreDatabaseId || config.projectId); 
 
 // Admin Database (Project 1, Database 2)
 export const adminDb = getFirestore(sparkwavvApp, 'admindb');

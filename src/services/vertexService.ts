@@ -1,6 +1,8 @@
 import { SearchServiceClient } from '@google-cloud/discoveryengine';
 import { VertexAI } from '@google-cloud/vertexai';
 import { Storage } from '@google-cloud/storage';
+import fs from 'fs';
+import path from 'path';
 
 const PROJECT_ID = process.env.VERTEX_AI_PROJECT_ID || process.env.FIREBASE_PROJECT_ID;
 const LOCATION = process.env.VERTEX_AI_LOCATION || 'global';
@@ -133,18 +135,49 @@ export class VertexService {
       throw new Error('Project ID is required for GCS upload.');
     }
 
-    const bucketName = process.env.VERTEX_AI_FINE_TUNING_BUCKET || `${PROJECT_ID}-fine-tuning`;
+    // Try to get bucket from env, then from firebase config, then fallback to project-id-fine-tuning
+    let bucketName = process.env.VERTEX_AI_FINE_TUNING_BUCKET;
+    
+    if (!bucketName) {
+      try {
+        const configPath = './firebase-applet-config.json';
+        if (fs.existsSync(configPath)) {
+          const config = JSON.parse(fs.readFileSync(configPath, 'utf8'));
+          bucketName = config.storageBucket;
+        }
+      } catch (e) {
+        console.warn('[VERTEX] Could not read firebase-applet-config.json for bucket lookup.');
+      }
+    }
+
+    if (!bucketName) {
+      bucketName = `${PROJECT_ID}-fine-tuning`;
+    }
+
+    console.log(`[VERTEX] Attempting to use bucket: ${bucketName}`);
     const bucket = getStorage().bucket(bucketName);
 
     try {
       // Check if bucket exists
       const [exists] = await bucket.exists();
       if (!exists) {
-        console.log(`[VERTEX] Creating bucket: ${bucketName}`);
-        // Note: This might fail if the service account doesn't have storage.buckets.create permission
-        await bucket.create({
-          location: 'us-central1',
-        });
+        console.log(`[VERTEX] Bucket ${bucketName} does not exist. Attempting to create...`);
+        try {
+          await bucket.create({
+            location: 'us-central1',
+          });
+        } catch (createError: any) {
+          console.error(`[VERTEX] Failed to create bucket ${bucketName}:`, createError.message);
+          
+          if (createError.message.includes('storage.buckets.create')) {
+            throw new Error(
+              `Permission denied: The service account lacks 'storage.buckets.create' access. ` +
+              `Please manually create a bucket named '${bucketName}' in the Google Cloud Console, ` +
+              `or set the VERTEX_AI_FINE_TUNING_BUCKET environment variable to an existing bucket you have access to.`
+            );
+          }
+          throw createError;
+        }
       }
 
       const file = bucket.file(filename);

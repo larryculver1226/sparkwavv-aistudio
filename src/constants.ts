@@ -44,7 +44,9 @@ export const ROLES = {
   EDITOR: 'editor',
   VIEWER: 'viewer',
   USER: 'user',
+  CLIENT: 'client',
   OPERATOR: 'operator',
+  GUEST: 'guest',
   MENTOR: 'mentor',
   AGENT: 'agent'
 } as const;

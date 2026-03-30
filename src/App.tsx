@@ -2506,7 +2506,7 @@ const AdminRoute = ({
   requiredRoles?: string[];
   requiredEntryPoint?: 'admin' | 'operations';
 }) => {
-  const { user, role, status, loading } = useIdentity();
+  const { user, role, status, loading, error } = useIdentity();
   
   useEffect(() => {
     if (!loading) {
@@ -2529,6 +2529,28 @@ const AdminRoute = ({
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-900">
         <Loader2 className="w-12 h-12 text-blue-500 animate-spin" />
+      </div>
+    );
+  }
+
+  if (status === 'error') {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gray-900 p-6">
+        <div className="max-w-md w-full bg-black/40 border border-neon-magenta/20 p-8 rounded-3xl backdrop-blur-xl text-center space-y-6">
+          <div className="w-20 h-20 bg-neon-magenta/10 rounded-full flex items-center justify-center mx-auto">
+            <ShieldAlert className="w-10 h-10 text-neon-magenta" />
+          </div>
+          <h2 className="text-2xl font-bold text-white">Authentication Error</h2>
+          <p className="text-white/60 text-sm leading-relaxed">
+            {error || 'An unexpected error occurred during authentication. This may be due to a timeout or connection issue within the preview environment.'}
+          </p>
+          <button 
+            onClick={() => window.location.reload()}
+            className="w-full py-4 bg-white text-black rounded-2xl font-bold hover:scale-[1.02] transition-transform"
+          >
+            Retry Login
+          </button>
+        </div>
       </div>
     );
   }
@@ -2561,14 +2583,17 @@ function ScrollToTop() {
 }
 
 import ShareView from './pages/ShareView';
+const DiveInPage = lazy(() => import('./pages/DiveInPage'));
 
 export default function App() {
-  const { user, role, status, loading, error, refreshIdentity } = useIdentity();
+  const { user, role, status, loading, error, refreshIdentity, isAuthenticated } = useIdentity();
   const [showRetry, setShowRetry] = useState(false);
   const location = useLocation();
   const navigate = useNavigate();
 
-  const isAdmin = role === ROLES.ADMIN || role === ROLES.SUPER_ADMIN || role === ROLES.EDITOR || role === ROLES.MENTOR;
+  const isAdmin = role === ROLES.ADMIN || role === ROLES.SUPER_ADMIN;
+  const isStaff = isAdmin || role === ROLES.EDITOR || role === ROLES.OPERATOR;
+  const isGuest = role === ROLES.GUEST;
 
   useEffect(() => {
     let timer: NodeJS.Timeout;
@@ -2592,7 +2617,50 @@ export default function App() {
       console.log('🛡️ [App] Admin detected on home page, redirecting to /admin');
       navigate('/admin', { replace: true });
     }
-  }, [status, isAdmin, location.pathname, navigate]);
+    if (status === 'ready' && role === ROLES.EDITOR && location.pathname === '/') {
+      console.log('🛡️ [App] Editor detected on home page, redirecting to /operations');
+      navigate('/operations', { replace: true });
+    }
+    if (status === 'ready' && isGuest && location.pathname !== '/dive-in') {
+      console.log('🛡️ [App] Guest detected, redirecting to /dive-in');
+      navigate('/dive-in', { replace: true });
+    }
+  }, [status, isAdmin, role, isGuest, location.pathname, navigate]);
+
+  if (status === 'error') {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-[#050505] p-6">
+        <div className="max-w-md w-full bg-black/40 border border-red-500/20 p-8 rounded-3xl backdrop-blur-xl text-center space-y-6">
+          <div className="w-20 h-20 bg-red-500/10 rounded-full flex items-center justify-center mx-auto">
+            <ShieldAlert className="w-10 h-10 text-red-500" />
+          </div>
+          <h2 className="text-2xl font-display font-bold text-white tracking-tight">Authentication Error</h2>
+          <div className="space-y-2">
+            <p className="text-white/60 text-sm leading-relaxed">
+              {error || 'An unexpected error occurred during authentication.'}
+            </p>
+            <p className="text-white/30 text-[10px] uppercase tracking-widest">
+              Preview Environment Constraint Detected
+            </p>
+          </div>
+          <div className="pt-4 space-y-3">
+            <button 
+              onClick={() => window.location.href = '/admin/login'}
+              className="w-full py-4 bg-white text-black rounded-2xl font-bold hover:scale-[1.02] transition-transform"
+            >
+              Retry Admin Login
+            </button>
+            <button 
+              onClick={() => window.location.reload()}
+              className="w-full py-4 bg-white/5 text-white rounded-2xl font-bold hover:bg-white/10 transition-colors"
+            >
+              Refresh Application
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   if (loading || status === 'initializing') {
     return (
@@ -2609,6 +2677,23 @@ export default function App() {
           <p className="text-white/40 text-sm uppercase tracking-[0.2em]">
             Securing Stateless Identity Engine
           </p>
+
+          <div className="p-4 bg-white/5 border border-white/10 rounded-2xl space-y-2 text-left">
+            <div className="flex justify-between text-[10px] uppercase tracking-widest text-white/40">
+              <span>Status</span>
+              <span className="text-blue-400 font-mono">{status}</span>
+            </div>
+            <div className="flex justify-between text-[10px] uppercase tracking-widest text-white/40">
+              <span>Auth0</span>
+              <span className={isAuthenticated ? "text-green-500" : "text-yellow-500"}>
+                {isAuthenticated ? "Authenticated" : "Pending"}
+              </span>
+            </div>
+            <div className="flex justify-between text-[10px] uppercase tracking-widest text-white/40">
+              <span>Role</span>
+              <span className="text-blue-400 font-mono">{role || 'null'}</span>
+            </div>
+          </div>
           
           {showRetry && (
             <motion.div 
@@ -2658,22 +2743,28 @@ export default function App() {
           <Route path="/operations/login" element={<AdminLogin vibe="vibrant" onLogin={() => window.location.href = '/operations'} />} />
           
           <Route path="/admin" element={
-            <AdminRoute requiredRoles={['super_admin', 'admin', 'editor', 'viewer']} requiredEntryPoint="admin">
+            <AdminRoute requiredRoles={[ROLES.SUPER_ADMIN, ROLES.ADMIN]} requiredEntryPoint="admin">
               <AdminDashboard onLogout={() => window.location.href = '/admin/login'} />
             </AdminRoute>
           } />
           
           <Route path="/operations" element={
-            <AdminRoute requiredRoles={['super_admin', 'admin', 'editor', 'viewer', 'operator']} requiredEntryPoint="operations">
+            <AdminRoute requiredRoles={[ROLES.SUPER_ADMIN, ROLES.ADMIN, ROLES.EDITOR, ROLES.OPERATOR]} requiredEntryPoint="operations">
               <OperationsDashboard onLogout={() => window.location.href = '/operations/login'} />
             </AdminRoute>
           } />
+
+          <Route path="/dive-in" element={<DiveInPage />} />
 
           <Route 
             path="/" 
             element={
               isAdmin ? (
                 <Navigate to="/admin" replace />
+              ) : role === ROLES.EDITOR ? (
+                <Navigate to="/operations" replace />
+              ) : isGuest ? (
+                <Navigate to="/dive-in" replace />
               ) : (
                 <SPARKWavvApp isAdmin={false} />
               )

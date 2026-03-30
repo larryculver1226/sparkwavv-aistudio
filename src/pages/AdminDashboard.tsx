@@ -127,6 +127,127 @@ interface StorageMetrics {
   quota: number;
 }
 
+const Auth0ManagementPanel = () => {
+  const [auth0Users, setAuth0Users] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [searchTerm, setSearchTerm] = useState('');
+
+  const fetchAuth0Users = async () => {
+    setLoading(true);
+    try {
+      const idToken = await auth.currentUser?.getIdToken();
+      const res = await fetch('/api/admin/auth0/users', {
+        headers: { 'Authorization': `Bearer ${idToken}` }
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setAuth0Users(data);
+      }
+    } catch (error) {
+      console.error("Failed to fetch Auth0 users:", error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchAuth0Users();
+  }, []);
+
+  const handleToggleBlock = async (user: any) => {
+    const isBlocked = !user.blocked;
+    try {
+      const idToken = await auth.currentUser?.getIdToken();
+      const res = await fetch(`/api/admin/auth0/users/${user.user_id}`, {
+        method: 'PATCH',
+        headers: { 
+          'Authorization': `Bearer ${idToken}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ blocked: isBlocked })
+      });
+      if (res.ok) {
+        setAuth0Users(auth0Users.map(u => u.user_id === user.user_id ? { ...u, blocked: isBlocked } : u));
+      }
+    } catch (error) {
+      console.error("Failed to toggle block status:", error);
+    }
+  };
+
+  const filteredUsers = auth0Users.filter(u => 
+    u.email?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    u.name?.toLowerCase().includes(searchTerm.toLowerCase())
+  );
+
+  return (
+    <div className="space-y-6">
+      <div className="flex justify-between items-center">
+        <div className="relative w-72">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-white/20" />
+          <input 
+            type="text"
+            placeholder="Search Auth0 users..."
+            className="w-full bg-white/5 border border-white/10 rounded-xl pl-10 pr-4 py-2 text-sm outline-none focus:ring-2 focus:ring-neon-cyan/50"
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+          />
+        </div>
+        <button 
+          onClick={fetchAuth0Users}
+          className="p-2 rounded-xl bg-white/5 border border-white/10 hover:bg-white/10 transition-all"
+        >
+          <RefreshCw className={`w-4 h-4 text-neon-cyan ${loading ? 'animate-spin' : ''}`} />
+        </button>
+      </div>
+
+      <div className="glass-panel rounded-3xl border border-white/5 overflow-hidden">
+        <table className="w-full text-left border-collapse">
+          <thead>
+            <tr className="bg-white/5">
+              <th className="px-6 py-4 text-[10px] font-bold text-white/40 uppercase tracking-widest">User</th>
+              <th className="px-6 py-4 text-[10px] font-bold text-white/40 uppercase tracking-widest">Connection</th>
+              <th className="px-6 py-4 text-[10px] font-bold text-white/40 uppercase tracking-widest">Last Login</th>
+              <th className="px-6 py-4 text-[10px] font-bold text-white/40 uppercase tracking-widest">Status</th>
+              <th className="px-6 py-4 text-[10px] font-bold text-white/40 uppercase tracking-widest text-right">Actions</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-white/5">
+            {filteredUsers.map(u => (
+              <tr key={u.user_id} className="hover:bg-white/[0.02] transition-colors group">
+                <td className="px-6 py-4">
+                  <div className="flex items-center gap-3">
+                    <img src={u.picture} alt="" className="w-8 h-8 rounded-full border border-white/10" referrerPolicy="no-referrer" />
+                    <div>
+                      <p className="text-sm font-bold">{u.name || u.nickname}</p>
+                      <p className="text-[10px] text-white/40">{u.email}</p>
+                    </div>
+                  </div>
+                </td>
+                <td className="px-6 py-4 text-xs text-white/60">{u.identities?.[0]?.connection || 'N/A'}</td>
+                <td className="px-6 py-4 text-xs text-white/40">{u.last_login ? new Date(u.last_login).toLocaleString() : 'Never'}</td>
+                <td className="px-6 py-4">
+                  <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-widest ${u.blocked ? 'bg-red-500/10 text-red-500' : 'bg-green-500/10 text-green-500'}`}>
+                    {u.blocked ? 'Blocked' : 'Active'}
+                  </span>
+                </td>
+                <td className="px-6 py-4 text-right">
+                  <button 
+                    onClick={() => handleToggleBlock(u)}
+                    className={`p-2 rounded-lg transition-all ${u.blocked ? 'bg-green-500/10 text-green-500 hover:bg-green-500/20' : 'bg-red-500/10 text-red-500 hover:bg-red-500/20'}`}
+                    title={u.blocked ? "Unblock User" : "Block User"}
+                  >
+                    {u.blocked ? <ShieldCheck className="w-4 h-4" /> : <UserCog className="w-4 h-4" />}
+                  </button>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+};
+
 export const AdminDashboard: React.FC<{ onLogout: () => void }> = ({ onLogout }) => {
   const navigate = useNavigate();
   const { role: adminRole, logout, isAdmin } = useIdentity();
@@ -342,18 +463,16 @@ export const AdminDashboard: React.FC<{ onLogout: () => void }> = ({ onLogout })
       const response = await fetch('/api/admin/users-v2', {
         headers: idToken ? { 'Authorization': `Bearer ${idToken}` } : {}
       });
-      console.log("[ADMIN] Response status:", response.status);
-      const contentType = response.headers.get("content-type");
       
-      if (response.ok && contentType?.includes("application/json")) {
+      if (response.ok) {
         const data = await response.json();
-        console.log("[ADMIN] Fetched users data:", data);
-        const fetchedUsers = data.users || [];
-        console.log("[ADMIN] Setting users state to:", fetchedUsers);
-        setUsers(fetchedUsers);
+        // Filter to only show staff (admin, super_admin)
+        const staffUsers = (data.users || []).filter((u: any) => {
+          const role = typeof u.role === 'string' ? u.role : u.role?.role;
+          return role === ROLES.ADMIN || role === ROLES.SUPER_ADMIN;
+        });
+        setUsers(staffUsers);
       } else {
-        const text = await response.text();
-        console.error("Admin API Error - Status:", response.status, "Content-Type:", contentType, "Body:", text.substring(0, 100));
         setUsers([]);
       }
     } catch (error) {
@@ -865,6 +984,7 @@ export const AdminDashboard: React.FC<{ onLogout: () => void }> = ({ onLogout })
                 <nav className="space-y-2">
                   {[
                     { id: 'overview', label: 'Overview', icon: LayoutDashboard, roles: [ROLES.SUPER_ADMIN, ROLES.ADMIN, ROLES.EDITOR, ROLES.VIEWER] },
+                    { id: 'auth0', label: 'Auth0 Management', icon: UserCog, roles: [ROLES.SUPER_ADMIN, ROLES.ADMIN] },
                     { id: 'cloud', label: 'Cloud Resources', icon: Cloud, roles: [ROLES.SUPER_ADMIN, ROLES.ADMIN] },
                     { id: 'security', label: 'Security', icon: ShieldCheck, roles: [ROLES.SUPER_ADMIN, ROLES.ADMIN] },
                     { id: 'vertex', label: 'Vertex AI', icon: Brain, roles: [ROLES.SUPER_ADMIN, ROLES.ADMIN] },
@@ -929,6 +1049,7 @@ export const AdminDashboard: React.FC<{ onLogout: () => void }> = ({ onLogout })
           <nav className="space-y-2">
             {[
               { id: 'overview', label: 'Overview', icon: LayoutDashboard, roles: [ROLES.SUPER_ADMIN, ROLES.ADMIN, ROLES.EDITOR, ROLES.VIEWER] },
+              { id: 'auth0', label: 'Auth0 Management', icon: UserCog, roles: [ROLES.SUPER_ADMIN, ROLES.ADMIN] },
               { id: 'cloud', label: 'Cloud Resources', icon: Cloud, roles: [ROLES.SUPER_ADMIN, ROLES.ADMIN] },
               { id: 'security', label: 'Security', icon: ShieldCheck, roles: [ROLES.SUPER_ADMIN, ROLES.ADMIN] },
               { id: 'vertex', label: 'Vertex AI', icon: Brain, roles: [ROLES.SUPER_ADMIN, ROLES.ADMIN] },
@@ -978,6 +1099,7 @@ export const AdminDashboard: React.FC<{ onLogout: () => void }> = ({ onLogout })
           <div>
             <h2 className="text-3xl font-display font-bold">
               {activeTab === 'overview' && 'System Overview'}
+              {activeTab === 'auth0' && 'Auth0 Identity Management'}
               {activeTab === 'cloud' && 'Cloud Infrastructure'}
               {activeTab === 'security' && 'Security Audit'}
               {activeTab === 'identity' && 'Identity Reconciliation'}
@@ -988,6 +1110,7 @@ export const AdminDashboard: React.FC<{ onLogout: () => void }> = ({ onLogout })
             </h2>
             <p className="text-white/40">
               {activeTab === 'overview' && 'Real-time metrics and environment status'}
+              {activeTab === 'auth0' && 'Manage Auth0 users, roles, and security status'}
               {activeTab === 'vertex' && 'Managed RAG, Fine-Tuning, and Model Garden (Track B)'}
               {activeTab === 'diagnostics' && 'Evaluate SPARKWavv & Firebase integration status'}
               {activeTab === 'firebase-setup' && 'Step-by-step guide to connect your Firebase project'}
@@ -1212,6 +1335,10 @@ export const AdminDashboard: React.FC<{ onLogout: () => void }> = ({ onLogout })
 
         {activeTab === 'vertex' && (
           <VertexDashboard onNotify={(msg, type) => setNotification({ message: msg, type: type as any })} />
+        )}
+
+        {activeTab === 'auth0' && (
+          <Auth0ManagementPanel />
         )}
 
         {activeTab === 'overview' && (

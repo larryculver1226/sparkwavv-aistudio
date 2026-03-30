@@ -17,18 +17,32 @@ const Auth0ProviderWithHistory = ({ children }: { children: React.ReactNode }) =
   
   const onRedirectCallback = (appState: any) => {
     const target = appState?.returnTo || window.location.pathname;
+    console.log('🔄 [Auth0] onRedirectCallback triggered', { 
+      appState, 
+      target, 
+      pathname: window.location.pathname,
+      origin: window.location.origin
+    });
     
     // If we are at root and have no appState, but we were just at /admin/login,
     // we should probably go to /admin
-    if (target === '/' && !appState?.returnTo) {
+    if (target === '/' || target === window.location.pathname) {
       const lastPath = sessionStorage.getItem('auth0_last_path');
+      console.log('🔄 [Auth0] Target is root or current, checking fallback...', { lastPath });
       if (lastPath === '/admin/login' || lastPath === '/admin') {
-        navigate('/admin');
+        console.log('🔄 [Auth0] Fallback match! Redirecting to /admin');
+        navigate('/admin', { replace: true });
+        return;
+      }
+      if (lastPath === '/operations/login' || lastPath === '/operations') {
+        console.log('🔄 [Auth0] Fallback match! Redirecting to /operations');
+        navigate('/operations', { replace: true });
         return;
       }
     }
     
-    navigate(target);
+    console.log('🔄 [Auth0] Navigating to:', target);
+    navigate(target, { replace: true });
   };
 
   return (
@@ -36,10 +50,15 @@ const Auth0ProviderWithHistory = ({ children }: { children: React.ReactNode }) =
       domain={domain!}
       clientId={clientId!}
       onRedirectCallback={onRedirectCallback}
+      cacheLocation="localstorage"
+      useRefreshTokens={true}
+      useRefreshTokensFallback={true}
+      authorizeTimeoutInSeconds={60}
+      legacySameSiteCookie={true}
       authorizationParams={{
         redirect_uri: window.location.origin,
         audience: audience,
-        scope: "openid profile email",
+        scope: "openid profile email offline_access",
       }}
     >
       {children}
@@ -59,6 +78,7 @@ if (!domain || !clientId) {
           <li>• VITE_AUTH0_DOMAIN: [{domain || 'MISSING'}]</li>
           <li>• VITE_AUTH0_CLIENT_ID: [{clientId || 'MISSING'}]</li>
           <li>• VITE_AUTH0_AUDIENCE: [{audience || 'MISSING'}]</li>
+          <li>• REDIRECT_URI: [{window.location.origin}]</li>
         </ul>
         <p className="text-xs text-neon-cyan italic">
           Once configured, the application will be able to handle secure authentication.

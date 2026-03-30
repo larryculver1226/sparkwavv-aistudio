@@ -10,6 +10,7 @@ export type IdentityStatus = 'initializing' | 'unauthenticated' | 'authenticated
 interface IdentityContextType {
   user: User | null;
   auth0User: any;
+  isAuthenticated: boolean;
   profile: UserProfile | null;
   role: string | null;
   status: IdentityStatus;
@@ -23,6 +24,7 @@ interface IdentityContextType {
   error: string | null;
   logout: () => Promise<void>;
   login: (options?: any) => Promise<void>;
+  loginWithPopup: (options?: any) => Promise<void>;
   refreshIdentity: () => Promise<void>;
   refreshProfile: () => Promise<void>;
   reloadUser: () => Promise<void>;
@@ -37,6 +39,7 @@ export function IdentityProvider({ children }: { children: React.ReactNode }) {
     user: auth0User, 
     getAccessTokenSilently, 
     loginWithRedirect, 
+    loginWithPopup: auth0LoginWithPopup,
     logout: auth0Logout,
     isLoading: auth0Loading,
     error: auth0Error
@@ -74,40 +77,54 @@ export function IdentityProvider({ children }: { children: React.ReactNode }) {
     await loginWithRedirect(options);
   }, [loginWithRedirect]);
 
+  const loginWithPopup = useCallback(async (options?: any) => {
+    try {
+      setStatus('initializing');
+      await auth0LoginWithPopup(options);
+      console.log('🌉 [Identity] Popup Login Success!');
+    } catch (err: any) {
+      console.error('❌ [Identity] Popup Login Error:', err);
+      setError(err.message);
+      setStatus('error');
+      throw err;
+    }
+  }, [auth0LoginWithPopup]);
+
   const fetchIdentity = useCallback(async (firebaseUser: User, forceRefresh = false) => {
     console.group('🆔 Identity Initialization');
+    console.log('👤 [Identity] Fetching for:', firebaseUser.email, { forceRefresh });
     try {
       // 1. Get ID Token Result for Custom Claims (Roles)
       // We try without force refresh first to avoid unnecessary network requests that might fail in restricted environments
-      console.log('🎫 Fetching ID token result...');
+      console.log('🎫 [Identity] Fetching ID token result...');
       const tokenPromise = getIdTokenResult(firebaseUser, forceRefresh);
       const timeoutPromise = new Promise<never>((_, reject) => 
         setTimeout(() => reject(new Error('ID Token fetch timed out')), 10000)
       );
       
       let tokenResult = await Promise.race([tokenPromise, timeoutPromise]);
-      console.log('🎫 Token Result Claims:', tokenResult.claims);
+      console.log('🎫 [Identity] Token Result Claims:', tokenResult.claims);
       
       // If we don't have a role claim and we haven't forced a refresh yet, try once with force refresh
       if (!tokenResult.claims.role && !forceRefresh) {
-        console.log('🎫 No role claim found, forcing token refresh...');
+        console.log('🎫 [Identity] No role claim found, forcing token refresh...');
         const forceRefreshPromise = getIdTokenResult(firebaseUser, true);
         tokenResult = await Promise.race([forceRefreshPromise, timeoutPromise]);
       }
 
       const rawRole = tokenResult.claims.role;
       const claimRole = typeof rawRole === 'string' ? rawRole : (rawRole as any)?.role;
-      console.log('🎫 Claims Role:', claimRole, 'for Email:', firebaseUser.email);
+      console.log('🎫 [Identity] Claims Role:', claimRole, 'for Email:', firebaseUser.email);
       
       // Safety net for Larry Culver
       let finalRole = claimRole || ROLES.USER;
       const userEmail = firebaseUser.email?.toLowerCase()?.trim();
       if (userEmail === 'larry.culver1226@gmail.com') {
-        console.log('🛡️ Safety Net: Identified Larry Culver as Super Admin', userEmail);
+        console.log('🛡️ [Identity] Safety Net: Identified Larry Culver as Super Admin', userEmail);
         finalRole = ROLES.SUPER_ADMIN;
       }
       
-      console.log('🎫 Final Role determined:', finalRole);
+      console.log('🎫 [Identity] Final Role determined:', finalRole);
       // Set initial role from claims or default to user
       setRole(String(finalRole));
 
@@ -207,40 +224,94 @@ export function IdentityProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     const bridgeAuth = async () => {
       if (isAuthenticated && auth0User && !user) {
+        console.log('🌉 [Identity] Auth0 Authenticated, starting bridge...', { email: auth0User.email });
         setStatus('authenticated');
         try {
+          console.log('🌉 [Identity] Calling Auth0 getAccessTokenSilently...');
           const token = await getAccessTokenSilently();
+          console.log('🌉 [Identity] Got Auth0 Access Token, calling bridge API...');
+          
+          // Add a timeout to the bridge request
+          const controller = new AbortController();
+          const timeoutId = setTimeout(() => controller.abort(), 15000); // 15s timeout
+
           const response = await fetch('/api/auth/bridge', {
             method: 'POST',
+            signal: controller.signal,
             headers: {
               'Authorization': `Bearer ${token}`,
               'Content-Type': 'application/json'
             }
           });
+          
+          clearTimeout(timeoutId);
+          console.log('🌉 [Identity] Bridge API Response Status:', response.status);
 
           if (response.ok) {
             const { firebaseToken, user: bridgeUser } = await response.json();
+            console.log('🌉 [Identity] Bridge Success! Firebase Token received.', { role: bridgeUser?.role });
             
             // Set initial identity from bridge response to avoid flicker
             if (bridgeUser) {
+              console.log('🌉 [Identity] Pre-setting role from bridge:', bridgeUser.role);
               setRole(bridgeUser.role);
               setProfile(bridgeUser);
             }
             
-            await signInWithCustomToken(auth, firebaseToken);
-          } else {
-            const errData = await response.json().catch(() => ({ error: 'Unknown error' }));
-            console.error('❌ Bridge failed with status:', response.status, 'Error:', errData.error);
-            setError(errData.error);
-            setStatus('error');
+          console.log('🌉 [Identity] Signing in with Firebase Custom Token...');
+          
+          // Add retry logic for signInWithCustomToken due to potential network-request-failed errors
+          const signInWithRetry = async (retries = 5): Promise<void> => {
+            try {
+              await signInWithCustomToken(auth, firebaseToken);
+            } catch (err: any) {
+              const isNetworkError = err.code === 'auth/network-request-failed' || err.message?.includes('network-request-failed');
+              if (isNetworkError && retries > 0) {
+                const delay = (6 - retries) * 2000; // Exponential-ish backoff
+                console.warn(`⚠️ [Identity] Firebase sign-in failed (network error), retrying in ${delay/1000}s... (${retries} left)`);
+                await new Promise(resolve => setTimeout(resolve, delay));
+                return signInWithRetry(retries - 1);
+              }
+              throw err;
+            }
+          };
+
+          await signInWithRetry();
+          console.log('🌉 [Identity] Firebase Sign-in complete.');
+          
+          // Force a quick identity fetch to ensure role is in sync with claims
+          if (auth.currentUser) {
+            await fetchIdentity(auth.currentUser, true);
           }
-        } catch (err: any) {
-          console.error('❌ Bridge error:', err);
-          setError(err.message);
+          
+          setStatus('ready');
+        } else {
+          const errData = await response.json().catch(() => ({ error: 'Unknown error' }));
+          console.error('❌ [Identity] Bridge failed with status:', response.status, 'Error:', errData.error);
+          setError(errData.error);
           setStatus('error');
         }
+      } catch (err: any) {
+        console.error('❌ [Identity] Bridge error:', err);
+        setError(err.message);
+        
+        // If it's a network error, don't set status to 'error' immediately
+        // This allows the user to see the app (maybe with a retry button) instead of a full error screen
+        if (err.code === 'auth/network-request-failed' || err.message?.includes('network-request-failed')) {
+          console.warn('⚠️ [Identity] Bridge failed due to network error. Setting status to authenticated for retry.');
+          setStatus('authenticated');
+        } else {
+          setStatus('error');
+        }
+      }
       } else if (!auth0Loading && !isAuthenticated) {
-        setStatus('unauthenticated');
+        if (auth0Error) {
+          console.log('🌉 [Identity] Auth0 has error, setting status to error.');
+          setStatus('error');
+        } else {
+          console.log('🌉 [Identity] Auth0 not authenticated.');
+          setStatus('unauthenticated');
+        }
       }
     };
 
@@ -255,7 +326,11 @@ export function IdentityProvider({ children }: { children: React.ReactNode }) {
       } else if (!auth0Loading && !isAuthenticated) {
         setProfile(null);
         setRole(null);
-        setStatus('unauthenticated');
+        if (auth0Error) {
+          setStatus('error');
+        } else {
+          setStatus('unauthenticated');
+        }
       }
     });
 
@@ -306,6 +381,7 @@ export function IdentityProvider({ children }: { children: React.ReactNode }) {
   const value = React.useMemo(() => ({
     user,
     auth0User,
+    isAuthenticated,
     profile,
     role,
     status,
@@ -319,6 +395,7 @@ export function IdentityProvider({ children }: { children: React.ReactNode }) {
     error,
     logout,
     login,
+    loginWithPopup,
     refreshIdentity,
     refreshProfile,
     reloadUser,
@@ -326,6 +403,7 @@ export function IdentityProvider({ children }: { children: React.ReactNode }) {
   }), [
     user, 
     auth0User,
+    isAuthenticated,
     profile, 
     role, 
     status, 
@@ -334,6 +412,7 @@ export function IdentityProvider({ children }: { children: React.ReactNode }) {
     error, 
     logout, 
     login, 
+    loginWithPopup,
     refreshIdentity, 
     refreshProfile, 
     reloadUser, 

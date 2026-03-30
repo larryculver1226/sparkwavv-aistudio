@@ -37,6 +37,7 @@ import {
   getLatestSnapshot
 } from './src/services/wavvaultService.js';
 import { logEvent } from './src/services/loggingService.js';
+import axios from "axios";
 import { ROLES, JOURNEY_STAGES, TENANTS } from './src/constants.js';
 import { getGeminiApiKey } from './src/services/aiConfig.js';
 import { vertexService } from './src/services/vertexService.js';
@@ -768,6 +769,12 @@ async function startServer() {
         return res.status(403).json({ error: "Operators are restricted to the Operations Center" });
       }
 
+      // Editor check (Editors strictly locked to operations)
+      if (role === ROLES.EDITOR && requiredEntryPoint === 'admin') {
+        console.warn(`[AUTH] Editor ${decodedToken.email} attempted to access admin portal`);
+        return res.status(403).json({ error: "Editors are restricted to the Operations Center" });
+      }
+
       // Attach user info to request for later use
       (req as any).user = {
         uid: decodedToken.uid,
@@ -779,6 +786,31 @@ async function startServer() {
       return next();
     };
   };
+
+  // Auth0 Management API Helper
+  async function getAuth0ManagementToken() {
+    const domain = process.env.AUTH0_DOMAIN;
+    const clientId = process.env.AUTH0_MGMT_CLIENT_ID;
+    const clientSecret = process.env.AUTH0_MGMT_CLIENT_SECRET;
+
+    if (!domain || !clientId || !clientSecret) {
+      console.error("[AUTH0 MGMT] Missing credentials");
+      return null;
+    }
+
+    try {
+      const response = await axios.post(`https://${domain}/oauth/token`, {
+        client_id: clientId,
+        client_secret: clientSecret,
+        audience: `https://${domain}/api/v2/`,
+        grant_type: "client_credentials"
+      });
+      return response.data.access_token;
+    } catch (error: any) {
+      console.error("[AUTH0 MGMT] Failed to get token:", error.response?.data || error.message);
+      return null;
+    }
+  }
 
   // RBAC Helpers & Routes
   if (isFirebaseAdminConfigured) {
@@ -1133,6 +1165,48 @@ async function startServer() {
       } catch (e: any) {
         console.error(`[AUTH] Profile verification failed: ${e.message}`);
         res.status(401).json({ error: "Invalid token" });
+      }
+    });
+
+    app.get("/api/admin/auth0/users", requireRole([ROLES.SUPER_ADMIN, ROLES.ADMIN]), async (req, res) => {
+      const token = await getAuth0ManagementToken();
+      if (!token) return res.status(500).json({ error: "Auth0 Management API unavailable" });
+
+      try {
+        const domain = process.env.AUTH0_DOMAIN;
+        const response = await axios.get(`https://${domain}/api/v2/users`, {
+          headers: { Authorization: `Bearer ${token}` },
+          params: {
+            per_page: 100,
+            sort: "last_login:-1"
+          }
+        });
+        res.json(response.data);
+      } catch (error: any) {
+        console.error("[AUTH0 MGMT] Failed to fetch users:", error.response?.data || error.message);
+        res.status(500).json({ error: "Failed to fetch users from Auth0" });
+      }
+    });
+
+    app.patch("/api/admin/auth0/users/:id", requireRole([ROLES.SUPER_ADMIN, ROLES.ADMIN]), async (req, res) => {
+      const { id } = req.params;
+      const { blocked, user_metadata, app_metadata } = req.body;
+      const token = await getAuth0ManagementToken();
+      if (!token) return res.status(500).json({ error: "Auth0 Management API unavailable" });
+
+      try {
+        const domain = process.env.AUTH0_DOMAIN;
+        const response = await axios.patch(`https://${domain}/api/v2/users/${id}`, {
+          blocked,
+          user_metadata,
+          app_metadata
+        }, {
+          headers: { Authorization: `Bearer ${token}` }
+        });
+        res.json(response.data);
+      } catch (error: any) {
+        console.error("[AUTH0 MGMT] Failed to update user:", error.response?.data || error.message);
+        res.status(500).json({ error: "Failed to update user in Auth0" });
       }
     });
 

@@ -8,7 +8,7 @@ export const AdminLogin: React.FC<{
   onLogin: () => void;
   vibe?: 'technical' | 'vibrant';
 }> = ({ onLogin, vibe = 'technical' }) => {
-  const { login, logout, user, role, status, loading: identityLoading, error: identityError } = useIdentity();
+  const { loginWithPopup, logout, user, role, status, loading: identityLoading, error: identityError } = useIdentity();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [showDiagnostics, setShowDiagnostics] = useState(false);
@@ -33,18 +33,16 @@ export const AdminLogin: React.FC<{
     setLoading(true);
     setError('');
     try {
-      const returnTo = vibe === 'technical' ? '/admin' : '/operations';
-      console.log('🚀 [AdminLogin] Starting Auth0 Login...', { vibe, returnTo });
+      console.log('🚀 [AdminLogin] Starting Auth0 Popup Login...');
       
-      // Save current path to session storage to help recovery if appState is lost
+      // Save current path to session storage to help recovery
       sessionStorage.setItem('auth0_last_path', window.location.pathname);
       
-      await login({ 
-        appState: { returnTo } 
-      });
+      await loginWithPopup();
+      console.log('🚀 [AdminLogin] Popup Login completed, waiting for Identity state...');
     } catch (err: any) {
       console.error('❌ [AdminLogin] Login error:', err);
-      setError(err.message || 'An unexpected error occurred');
+      setError(err.message || 'An unexpected error occurred during popup login');
     } finally {
       setLoading(false);
     }
@@ -206,6 +204,11 @@ export const AdminLogin: React.FC<{
                     <p className="truncate">{import.meta.env.VITE_AUTH0_AUDIENCE || 'Not Set'}</p>
                   </div>
 
+                  <div className="space-y-1">
+                    <p className="opacity-40 uppercase text-[8px]">Redirect URI</p>
+                    <p className="truncate">{window.location.origin}</p>
+                  </div>
+
                   <div className="flex justify-between items-center border-b border-white/5 pb-2 pt-2">
                     <span className="text-neon-cyan uppercase tracking-tighter">Identity Status</span>
                     <span className={`px-1.5 py-0.5 rounded text-[8px] ${status === 'ready' ? 'bg-green-500/20 text-green-400' : 'bg-yellow-500/20 text-yellow-400'}`}>
@@ -234,16 +237,16 @@ export const AdminLogin: React.FC<{
                       </p>
                     </div>
                     <div className="space-y-1">
-                      <p className="opacity-40 uppercase text-[8px]">Auth0 Auth</p>
-                      <p className={isAuthenticated ? 'text-green-400' : 'text-red-400'}>
-                        {isAuthenticated ? 'YES' : 'NO'}
+                      <p className="opacity-40 uppercase text-[8px]">Auth Status</p>
+                      <p className={status === 'ready' ? 'text-green-400' : 'text-red-400'}>
+                        {status.toUpperCase()}
                       </p>
                     </div>
                   </div>
 
                   <div className="pt-2 flex flex-col gap-2">
                     <button 
-                      onClick={() => logout({ logoutParams: { returnTo: window.location.origin + '/admin/login' } })}
+                      onClick={() => logout()}
                       className="w-full py-2 bg-red-500/10 border border-red-500/20 rounded text-red-400 hover:bg-red-500/20 transition-colors uppercase text-[9px] tracking-widest"
                     >
                       Sign Out & Reset
