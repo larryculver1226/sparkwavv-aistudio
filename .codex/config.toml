@@ -1,0 +1,3 @@
+[mcp_servers."gemini-api-docs-mcp.dev"]
+command = "npx"
+args = [ "-y", "gemini-api-docs-mcp.dev" ]

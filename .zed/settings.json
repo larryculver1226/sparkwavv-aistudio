@@ -1,0 +1,13 @@
+{
+  "context_servers": {
+    "gemini-api-docs-mcp.dev": {
+      "source": "custom",
+      "command": "npx",
+      "args": [
+        "-y",
+        "gemini-api-docs-mcp.dev"
+      ],
+      "env": {}
+    }
+  }
+}

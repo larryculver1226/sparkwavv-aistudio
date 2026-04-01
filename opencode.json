@@ -1,0 +1,14 @@
+{
+  "mcp": {
+    "gemini-api-docs-mcp.dev": {
+      "type": "local",
+      "command": [
+        "npx",
+        "-y",
+        "gemini-api-docs-mcp.dev"
+      ],
+      "enabled": true,
+      "environment": {}
+    }
+  }
+}

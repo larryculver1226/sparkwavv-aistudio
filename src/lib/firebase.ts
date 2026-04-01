@@ -4,7 +4,27 @@ import { getFirestore, initializeFirestore } from 'firebase/firestore';
 import firebaseConfig from '../../firebase-applet-config.json';
 
 // Sparkwavv Project (Project 1) - End Users
-const getViteEnv = (key: string) => import.meta.env[key];
+const getViteEnv = (key: string) => {
+  try {
+    // Check import.meta.env (Vite/Client-side)
+    if (typeof import.meta !== 'undefined' && (import.meta as any).env) {
+      return (import.meta as any).env[key];
+    }
+  } catch (e) {
+    // import.meta.env might not be available in Node.js
+  }
+
+  try {
+    // Check process.env (Node.js/Server-side)
+    if (typeof process !== 'undefined' && process.env) {
+      return process.env[key];
+    }
+  } catch (e) {
+    // process.env might not be available in some environments
+  }
+
+  return undefined;
+};
 const isPlaceholder = (val: any) => !val || (typeof val === 'string' && (val.startsWith('PLACEHOLDER') || val === ''));
 
 const config = {

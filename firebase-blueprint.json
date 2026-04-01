@@ -350,6 +350,38 @@
         "createdAt": { "type": "string", "format": "date-time" }
       },
       "required": ["id", "userId", "type", "content", "createdAt"]
+    },
+    "ValidationGateEvent": {
+      "title": "ValidationGateEvent",
+      "description": "A record of a validation gate event in the SPARKWavv journey",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "userId": { "type": "string" },
+        "phase": { "type": "string" },
+        "timestamp": { "type": "string", "format": "date-time" },
+        "status": { "type": "string", "enum": ["passed", "warning", "failed"] },
+        "verdict": { "type": "string" },
+        "integrityHash": { "type": "string" },
+        "previousEventId": { "type": "string" }
+      },
+      "required": ["id", "userId", "phase", "timestamp", "status"]
+    },
+    "DistilledArtifact": {
+      "title": "DistilledArtifact",
+      "description": "A distilled career artifact generated for the user",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "userId": { "type": "string" },
+        "type": { "type": "string", "enum": ["spark", "pie-of-life", "perfect-day", "five-stories", "brand-pillar", "manifesto"] },
+        "title": { "type": "string" },
+        "content": { "type": "object" },
+        "timestamp": { "type": "string", "format": "date-time" },
+        "sourceGateId": { "type": "string" },
+        "metadata": { "type": "object" }
+      },
+      "required": ["id", "userId", "type", "title", "timestamp"]
     }
   },
   "firestore": {
@@ -424,6 +456,14 @@
     "/user_assets/{assetId}": {
       "schema": "UserAsset",
       "description": "Generated high-fidelity assets"
+    },
+    "/wavvault_events/{eventId}": {
+      "schema": "ValidationGateEvent",
+      "description": "Journey validation events"
+    },
+    "/wavvault_artifacts/{artifactId}": {
+      "schema": "DistilledArtifact",
+      "description": "Distilled career artifacts"
     }
   }
 }

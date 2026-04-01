@@ -407,6 +407,30 @@ service cloud.firestore {
              isRecent(data.createdAt);
     }
 
+    function isValidValidationGateEvent(data) {
+      let allowedFields = ['id', 'userId', 'phase', 'timestamp', 'status', 'verdict', 'integrityHash', 'previousEventId', 'serverTimestamp'];
+      return hasRequiredFields(['id', 'userId', 'phase', 'timestamp', 'status']) &&
+             hasOnlyAllowedFields(allowedFields) &&
+             data.id is string && data.id.size() < 128 &&
+             data.userId is string && data.userId.size() < 128 &&
+             data.phase is string && data.phase.size() < 100 &&
+             data.status in ['passed', 'warning', 'failed'] &&
+             (!('verdict' in data) || (data.verdict is string && data.verdict.size() < 1000)) &&
+             (!('integrityHash' in data) || (data.integrityHash is string && data.integrityHash.size() < 128)) &&
+             (!('previousEventId' in data) || (data.previousEventId is string && data.previousEventId.size() < 128));
+    }
+
+    function isValidDistilledArtifact(data) {
+      let allowedFields = ['id', 'userId', 'type', 'title', 'content', 'timestamp', 'sourceGateId', 'metadata', 'serverTimestamp'];
+      return hasRequiredFields(['id', 'userId', 'type', 'title', 'timestamp']) &&
+             hasOnlyAllowedFields(allowedFields) &&
+             data.id is string && data.id.size() < 128 &&
+             data.userId is string && data.userId.size() < 128 &&
+             data.type in ['spark', 'pie-of-life', 'perfect-day', 'five-stories', 'brand-pillar', 'manifesto'] &&
+             data.title is string && data.title.size() < 256 &&
+             (!('sourceGateId' in data) || (data.sourceGateId is string && data.sourceGateId.size() < 128));
+    }
+
     function isValidBrandNarrative(data) {
       let allowedFields = ['userId', 'pillars', 'strengths', 'skillsCloud', 'secretId', 'createdAt', 'updatedAt'];
       return hasRequiredFields(['userId', 'pillars', 'secretId', 'createdAt']) &&
@@ -614,6 +638,20 @@ service cloud.firestore {
     match /brand_narratives/{userId} {
       allow read: if isOwner(userId) || isAdmin();
       allow write: if (isOwner(userId) || isAdmin()) && isValidBrandNarrative(request.resource.data) && unchanged('userId');
+    }
+
+    match /wavvault_events/{eventId} {
+      allow read: if isOwner(resource.data.userId) || isAdmin();
+      allow create: if isAuthenticated() && (isOwner(request.resource.data.userId) || isAdmin()) && isValidValidationGateEvent(request.resource.data);
+      allow update: if isAdmin();
+      allow delete: if isAdmin();
+    }
+
+    match /wavvault_artifacts/{artifactId} {
+      allow read: if isOwner(resource.data.userId) || isAdmin();
+      allow create: if isAuthenticated() && (isOwner(request.resource.data.userId) || isAdmin()) && isValidDistilledArtifact(request.resource.data);
+      allow update: if isAdmin();
+      allow delete: if isAdmin();
     }
   }
 }

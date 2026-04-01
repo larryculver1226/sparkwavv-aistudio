@@ -1,60 +1,10 @@
-import React, { useState, useEffect } from 'react';
-import { collection, query, where, onSnapshot, orderBy } from 'firebase/firestore';
-import { db, auth } from '../lib/firebase';
+import React from 'react';
 import { WavvaultExplorer } from '../components/synthesis/WavvaultExplorer';
-import { ValidationGateEvent, DistilledArtifact } from '../types/wavvault';
-import { Loader2 } from 'lucide-react';
+import { Loader2, XCircle } from 'lucide-react';
+import { useWavvaultData } from '../hooks/useWavvaultData';
 
 export const WavvaultPage: React.FC = () => {
-  const [events, setEvents] = useState<ValidationGateEvent[]>([]);
-  const [artifacts, setArtifacts] = useState<DistilledArtifact[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-
-  useEffect(() => {
-    const user = auth.currentUser;
-    if (!user) {
-      setLoading(false);
-      return;
-    }
-
-    // Listen for events
-    const eventsQuery = query(
-      collection(db, 'wavvault_events'),
-      where('userId', '==', user.uid),
-      orderBy('timestamp', 'desc')
-    );
-
-    const unsubscribeEvents = onSnapshot(eventsQuery, (snapshot) => {
-      const eventData = snapshot.docs.map(doc => doc.data() as ValidationGateEvent);
-      setEvents(eventData);
-    }, (err) => {
-      console.error("Error fetching events:", err);
-      setError("Failed to load journey events.");
-    });
-
-    // Listen for artifacts
-    const artifactsQuery = query(
-      collection(db, 'wavvault_artifacts'),
-      where('userId', '==', user.uid),
-      orderBy('timestamp', 'desc')
-    );
-
-    const unsubscribeArtifacts = onSnapshot(artifactsQuery, (snapshot) => {
-      const artifactData = snapshot.docs.map(doc => doc.data() as DistilledArtifact);
-      setArtifacts(artifactData);
-      setLoading(false);
-    }, (err) => {
-      console.error("Error fetching artifacts:", err);
-      setError("Failed to load distilled artifacts.");
-      setLoading(false);
-    });
-
-    return () => {
-      unsubscribeEvents();
-      unsubscribeArtifacts();
-    };
-  }, []);
+  const { events, artifacts, loading, error, userId } = useWavvaultData();
 
   if (loading) {
     return (
@@ -91,11 +41,9 @@ export const WavvaultPage: React.FC = () => {
 
   return (
     <WavvaultExplorer 
-      userId={auth.currentUser?.uid || ''} 
+      userId={userId} 
       events={events} 
       artifacts={artifacts} 
     />
   );
 };
-
-import { XCircle } from 'lucide-react';
