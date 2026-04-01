@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { motion } from 'framer-motion';
+import { motion } from 'motion/react';
 import { Sparkles, ArrowRight, Brain, Target, Rocket, ShieldCheck } from 'lucide-react';
 import { useIdentity } from '../contexts/IdentityContext';
 

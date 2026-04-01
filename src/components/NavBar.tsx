@@ -55,7 +55,7 @@ export const NavBar: React.FC<NavBarProps> = ({ onNavigate }) => {
   const [isOpen, setIsOpen] = useState(false);
   const [scrolled, setScrolled] = useState(false);
   const [activeDropdown, setActiveDropdown] = useState<string | null>(null);
-  const { user, profile, loading, status, login, logout } = useIdentity();
+  const { user, profile, loading, status, login, loginWithPopup, logout } = useIdentity();
   const isConfirmed = status === 'authenticated' || status === 'ready';
 
   useEffect(() => {
@@ -209,7 +209,7 @@ export const NavBar: React.FC<NavBarProps> = ({ onNavigate }) => {
               ) : (
                 <div className="flex items-center gap-3">
                   <button 
-                    onClick={login}
+                    onClick={() => login()}
                     className="px-4 py-2 rounded-full bg-white/5 border border-white/10 text-white text-sm font-bold hover:bg-white/10 transition-all duration-300"
                   >
                     Dashboard Login

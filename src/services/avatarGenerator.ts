@@ -1,7 +1,8 @@
 import { GoogleGenAI } from "@google/genai";
+import { getGeminiApiKey } from "./aiConfig";
 
 export async function generateSkylarOptions(imageBuffer: string) {
-  const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
+  const ai = new GoogleGenAI({ apiKey: getGeminiApiKey() });
   
   const prompts = [
     "A realistic, high-fidelity professional headshot of the man in the attached image to be used as an AI assistant avatar. He should look friendly, intelligent, and approachable. Background is a blurred modern office with soft blue and white lighting.",

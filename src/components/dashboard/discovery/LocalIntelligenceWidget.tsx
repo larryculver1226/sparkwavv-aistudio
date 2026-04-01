@@ -11,6 +11,8 @@ interface LocalEvent {
   type: 'event' | 'location';
 }
 
+import { getGeminiApiKey } from '../../../services/aiConfig';
+
 export const LocalIntelligenceWidget: React.FC = () => {
   const [radius, setRadius] = useState(25);
   const [loading, setLoading] = useState(false);
@@ -28,7 +30,7 @@ export const LocalIntelligenceWidget: React.FC = () => {
 
       const { latitude, longitude } = position.coords;
 
-      const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
+      const ai = new GoogleGenAI({ apiKey: getGeminiApiKey() });
       const response = await ai.models.generateContent({
         model: "gemini-3-flash-preview",
         contents: `Find networking events, conferences, and industry meetups within ${radius} miles of my location (${latitude}, ${longitude}). Prioritize events over static locations like co-working spaces or company headquarters.`,

@@ -72,8 +72,7 @@ import {
   CAREER_STAGE_ROLES, 
   HIERARCHICAL_ROLES, 
   BRAND_PERSONAS, 
-  BRAND_DNA_ATTRIBUTES,
-  ROLES as APP_ROLES
+  BRAND_DNA_ATTRIBUTES
 } from '../constants';
 
 interface AdminStats {
@@ -127,56 +126,56 @@ interface StorageMetrics {
   quota: number;
 }
 
-const Auth0ManagementPanel = () => {
-  const [auth0Users, setAuth0Users] = useState<any[]>([]);
+const IdentityManagementPanel = () => {
+  const [identityUsers, setIdentityUsers] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
 
-  const fetchAuth0Users = async () => {
+  const fetchIdentityUsers = async () => {
     setLoading(true);
     try {
       const idToken = await auth.currentUser?.getIdToken();
-      const res = await fetch('/api/admin/auth0/users', {
+      const res = await fetch('/api/admin/users-v2', {
         headers: { 'Authorization': `Bearer ${idToken}` }
       });
       if (res.ok) {
         const data = await res.json();
-        setAuth0Users(data);
+        setIdentityUsers(data.users || []);
       }
     } catch (error) {
-      console.error("Failed to fetch Auth0 users:", error);
+      console.error("Failed to fetch Identity users:", error);
     } finally {
       setLoading(false);
     }
   };
 
   useEffect(() => {
-    fetchAuth0Users();
+    fetchIdentityUsers();
   }, []);
 
   const handleToggleBlock = async (user: any) => {
-    const isBlocked = !user.blocked;
+    const isBlocked = !user.disabled;
     try {
       const idToken = await auth.currentUser?.getIdToken();
-      const res = await fetch(`/api/admin/auth0/users/${user.user_id}`, {
-        method: 'PATCH',
+      const res = await fetch(`/api/admin/update-user`, {
+        method: 'POST',
         headers: { 
           'Authorization': `Bearer ${idToken}`,
           'Content-Type': 'application/json'
         },
-        body: JSON.stringify({ blocked: isBlocked })
+        body: JSON.stringify({ uid: user.uid, disabled: isBlocked })
       });
       if (res.ok) {
-        setAuth0Users(auth0Users.map(u => u.user_id === user.user_id ? { ...u, blocked: isBlocked } : u));
+        setIdentityUsers(identityUsers.map(u => u.uid === user.uid ? { ...u, disabled: isBlocked } : u));
       }
     } catch (error) {
       console.error("Failed to toggle block status:", error);
     }
   };
 
-  const filteredUsers = auth0Users.filter(u => 
+  const filteredUsers = identityUsers.filter(u => 
     u.email?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    u.name?.toLowerCase().includes(searchTerm.toLowerCase())
+    u.displayName?.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
   return (
@@ -186,14 +185,14 @@ const Auth0ManagementPanel = () => {
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-white/20" />
           <input 
             type="text"
-            placeholder="Search Auth0 users..."
+            placeholder="Search Identity users..."
             className="w-full bg-white/5 border border-white/10 rounded-xl pl-10 pr-4 py-2 text-sm outline-none focus:ring-2 focus:ring-neon-cyan/50"
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
           />
         </div>
         <button 
-          onClick={fetchAuth0Users}
+          onClick={fetchIdentityUsers}
           className="p-2 rounded-xl bg-white/5 border border-white/10 hover:bg-white/10 transition-all"
         >
           <RefreshCw className={`w-4 h-4 text-neon-cyan ${loading ? 'animate-spin' : ''}`} />
@@ -205,38 +204,40 @@ const Auth0ManagementPanel = () => {
           <thead>
             <tr className="bg-white/5">
               <th className="px-6 py-4 text-[10px] font-bold text-white/40 uppercase tracking-widest">User</th>
-              <th className="px-6 py-4 text-[10px] font-bold text-white/40 uppercase tracking-widest">Connection</th>
-              <th className="px-6 py-4 text-[10px] font-bold text-white/40 uppercase tracking-widest">Last Login</th>
+              <th className="px-6 py-4 text-[10px] font-bold text-white/40 uppercase tracking-widest">Tenant</th>
+              <th className="px-6 py-4 text-[10px] font-bold text-white/40 uppercase tracking-widest">Role</th>
               <th className="px-6 py-4 text-[10px] font-bold text-white/40 uppercase tracking-widest">Status</th>
               <th className="px-6 py-4 text-[10px] font-bold text-white/40 uppercase tracking-widest text-right">Actions</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-white/5">
             {filteredUsers.map(u => (
-              <tr key={u.user_id} className="hover:bg-white/[0.02] transition-colors group">
+              <tr key={u.uid} className="hover:bg-white/[0.02] transition-colors group">
                 <td className="px-6 py-4">
                   <div className="flex items-center gap-3">
-                    <img src={u.picture} alt="" className="w-8 h-8 rounded-full border border-white/10" referrerPolicy="no-referrer" />
+                    <div className="w-8 h-8 rounded-full bg-neon-cyan/10 border border-neon-cyan/20 flex items-center justify-center">
+                      <UserCog className="w-4 h-4 text-neon-cyan" />
+                    </div>
                     <div>
-                      <p className="text-sm font-bold">{u.name || u.nickname}</p>
+                      <p className="text-sm font-bold">{u.displayName}</p>
                       <p className="text-[10px] text-white/40">{u.email}</p>
                     </div>
                   </div>
                 </td>
-                <td className="px-6 py-4 text-xs text-white/60">{u.identities?.[0]?.connection || 'N/A'}</td>
-                <td className="px-6 py-4 text-xs text-white/40">{u.last_login ? new Date(u.last_login).toLocaleString() : 'Never'}</td>
+                <td className="px-6 py-4 text-xs text-white/60">{u.tenantId || 'sparkwavv'}</td>
+                <td className="px-6 py-4 text-xs text-white/40 uppercase tracking-widest">{u.role}</td>
                 <td className="px-6 py-4">
-                  <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-widest ${u.blocked ? 'bg-red-500/10 text-red-500' : 'bg-green-500/10 text-green-500'}`}>
-                    {u.blocked ? 'Blocked' : 'Active'}
+                  <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-widest ${u.disabled ? 'bg-red-500/10 text-red-500' : 'bg-green-500/10 text-green-500'}`}>
+                    {u.disabled ? 'Blocked' : 'Active'}
                   </span>
                 </td>
                 <td className="px-6 py-4 text-right">
                   <button 
                     onClick={() => handleToggleBlock(u)}
-                    className={`p-2 rounded-lg transition-all ${u.blocked ? 'bg-green-500/10 text-green-500 hover:bg-green-500/20' : 'bg-red-500/10 text-red-500 hover:bg-red-500/20'}`}
-                    title={u.blocked ? "Unblock User" : "Block User"}
+                    className={`p-2 rounded-lg transition-all ${u.disabled ? 'bg-green-500/10 text-green-500 hover:bg-green-500/20' : 'bg-red-500/10 text-red-500 hover:bg-red-500/20'}`}
+                    title={u.disabled ? "Unblock User" : "Block User"}
                   >
-                    {u.blocked ? <ShieldCheck className="w-4 h-4" /> : <UserCog className="w-4 h-4" />}
+                    {u.disabled ? <ShieldCheck className="w-4 h-4" /> : <UserCog className="w-4 h-4" />}
                   </button>
                 </td>
               </tr>
@@ -466,11 +467,17 @@ export const AdminDashboard: React.FC<{ onLogout: () => void }> = ({ onLogout })
       
       if (response.ok) {
         const data = await response.json();
+        console.log("[ADMIN] Raw users data:", data.users?.length, "users found");
         // Filter to only show staff (admin, super_admin)
         const staffUsers = (data.users || []).filter((u: any) => {
-          const role = typeof u.role === 'string' ? u.role : u.role?.role;
-          return role === ROLES.ADMIN || role === ROLES.SUPER_ADMIN;
+          const uRole = typeof u.role === 'string' ? u.role : u.role?.role;
+          const isStaff = uRole === ROLES.ADMIN || uRole === ROLES.SUPER_ADMIN;
+          if (u.email?.toLowerCase() === 'larry.culver1226@gmail.com') {
+            console.log("[ADMIN] Found Larry Culver in data:", { uRole, isStaff, ROLES_SUPER_ADMIN: ROLES.SUPER_ADMIN });
+          }
+          return isStaff;
         });
+        console.log("[ADMIN] Staff users filtered:", staffUsers.length);
         setUsers(staffUsers);
       } else {
         setUsers([]);
@@ -984,11 +991,12 @@ export const AdminDashboard: React.FC<{ onLogout: () => void }> = ({ onLogout })
                 <nav className="space-y-2">
                   {[
                     { id: 'overview', label: 'Overview', icon: LayoutDashboard, roles: [ROLES.SUPER_ADMIN, ROLES.ADMIN, ROLES.EDITOR, ROLES.VIEWER] },
-                    { id: 'auth0', label: 'Auth0 Management', icon: UserCog, roles: [ROLES.SUPER_ADMIN, ROLES.ADMIN] },
+                    { id: 'users', label: 'Staff Management', icon: Users, roles: [ROLES.SUPER_ADMIN, ROLES.ADMIN] },
+                    { id: 'identity', label: 'Identity Management', icon: UserCog, roles: [ROLES.SUPER_ADMIN, ROLES.ADMIN] },
                     { id: 'cloud', label: 'Cloud Resources', icon: Cloud, roles: [ROLES.SUPER_ADMIN, ROLES.ADMIN] },
                     { id: 'security', label: 'Security', icon: ShieldCheck, roles: [ROLES.SUPER_ADMIN, ROLES.ADMIN] },
                     { id: 'vertex', label: 'Vertex AI', icon: Brain, roles: [ROLES.SUPER_ADMIN, ROLES.ADMIN] },
-                    { id: 'identity', label: 'Identity Reconciliation', icon: Fingerprint, roles: [ROLES.SUPER_ADMIN, ROLES.ADMIN] },
+                    { id: 'reconciliation', label: 'Identity Reconciliation', icon: Fingerprint, roles: [ROLES.SUPER_ADMIN, ROLES.ADMIN] },
                     { id: 'logs', label: 'System Logs', icon: Activity, roles: [ROLES.SUPER_ADMIN, ROLES.ADMIN] },
                     { id: 'diagnostics', label: 'Diagnostics', icon: ShieldCheck, roles: [ROLES.SUPER_ADMIN, ROLES.ADMIN] },
                     { id: 'firebase-setup', label: 'Firebase Setup', icon: Database, roles: [ROLES.SUPER_ADMIN, ROLES.ADMIN] },
@@ -1049,11 +1057,12 @@ export const AdminDashboard: React.FC<{ onLogout: () => void }> = ({ onLogout })
           <nav className="space-y-2">
             {[
               { id: 'overview', label: 'Overview', icon: LayoutDashboard, roles: [ROLES.SUPER_ADMIN, ROLES.ADMIN, ROLES.EDITOR, ROLES.VIEWER] },
-              { id: 'auth0', label: 'Auth0 Management', icon: UserCog, roles: [ROLES.SUPER_ADMIN, ROLES.ADMIN] },
+              { id: 'users', label: 'Staff Management', icon: Users, roles: [ROLES.SUPER_ADMIN, ROLES.ADMIN] },
+              { id: 'identity', label: 'Identity Management', icon: UserCog, roles: [ROLES.SUPER_ADMIN, ROLES.ADMIN] },
               { id: 'cloud', label: 'Cloud Resources', icon: Cloud, roles: [ROLES.SUPER_ADMIN, ROLES.ADMIN] },
               { id: 'security', label: 'Security', icon: ShieldCheck, roles: [ROLES.SUPER_ADMIN, ROLES.ADMIN] },
               { id: 'vertex', label: 'Vertex AI', icon: Brain, roles: [ROLES.SUPER_ADMIN, ROLES.ADMIN] },
-              { id: 'identity', label: 'Identity Reconciliation', icon: Fingerprint, roles: [ROLES.SUPER_ADMIN, ROLES.ADMIN] },
+              { id: 'reconciliation', label: 'Identity Reconciliation', icon: Fingerprint, roles: [ROLES.SUPER_ADMIN, ROLES.ADMIN] },
               { id: 'logs', label: 'System Logs', icon: Activity, roles: [ROLES.SUPER_ADMIN, ROLES.ADMIN] },
               { id: 'diagnostics', label: 'Diagnostics', icon: ShieldCheck, roles: [ROLES.SUPER_ADMIN, ROLES.ADMIN] },
               { id: 'firebase-setup', label: 'Firebase Setup', icon: Database, roles: [ROLES.SUPER_ADMIN, ROLES.ADMIN] },
@@ -1099,10 +1108,11 @@ export const AdminDashboard: React.FC<{ onLogout: () => void }> = ({ onLogout })
           <div>
             <h2 className="text-3xl font-display font-bold">
               {activeTab === 'overview' && 'System Overview'}
-              {activeTab === 'auth0' && 'Auth0 Identity Management'}
+              {activeTab === 'users' && 'Staff Management'}
+              {activeTab === 'identity' && 'Identity Platform Management'}
               {activeTab === 'cloud' && 'Cloud Infrastructure'}
               {activeTab === 'security' && 'Security Audit'}
-              {activeTab === 'identity' && 'Identity Reconciliation'}
+              {activeTab === 'reconciliation' && 'Identity Reconciliation'}
               {activeTab === 'logs' && 'System Logs'}
               {activeTab === 'vertex' && 'Vertex AI Enterprise Intelligence'}
               {activeTab === 'diagnostics' && 'Connectivity Diagnostics'}
@@ -1110,11 +1120,13 @@ export const AdminDashboard: React.FC<{ onLogout: () => void }> = ({ onLogout })
             </h2>
             <p className="text-white/40">
               {activeTab === 'overview' && 'Real-time metrics and environment status'}
-              {activeTab === 'auth0' && 'Manage Auth0 users, roles, and security status'}
+              {activeTab === 'users' && 'Manage administrative and super admin personnel'}
+              {activeTab === 'identity' && 'Manage Identity Platform users, roles, and security status'}
+              {activeTab === 'reconciliation' && 'Reconcile and sync identities across platforms'}
               {activeTab === 'vertex' && 'Managed RAG, Fine-Tuning, and Model Garden (Track B)'}
               {activeTab === 'diagnostics' && 'Evaluate SPARKWavv & Firebase integration status'}
               {activeTab === 'firebase-setup' && 'Step-by-step guide to connect your Firebase project'}
-              {activeTab !== 'overview' && activeTab !== 'diagnostics' && activeTab !== 'firebase-setup' && 'Detailed system metrics'}
+              {activeTab !== 'overview' && activeTab !== 'diagnostics' && activeTab !== 'firebase-setup' && activeTab !== 'users' && 'Detailed system metrics'}
             </p>
           </div>
           <div className="flex items-center gap-4">
@@ -1329,7 +1341,129 @@ export const AdminDashboard: React.FC<{ onLogout: () => void }> = ({ onLogout })
           </div>
         )}
 
-        {activeTab === 'identity' && (
+        {activeTab === 'users' && (
+          <div className="glass-panel rounded-3xl border border-white/5 bg-white/[0.02] overflow-hidden">
+            <div className="p-6 border-b border-white/5 flex items-center justify-between">
+              <div>
+                <h3 className="text-xl font-display font-bold">Staff Directory</h3>
+                <p className="text-sm text-white/40">Manage administrative access and roles</p>
+              </div>
+              <div className="flex gap-3">
+                <button 
+                  onClick={() => fetchUsers()}
+                  className="p-2 rounded-xl bg-white/5 border border-white/10 hover:bg-white/10 transition-all"
+                  disabled={fetchingUsers}
+                >
+                  <RefreshCw className={`w-4 h-4 ${fetchingUsers ? 'animate-spin' : ''}`} />
+                </button>
+                <button 
+                  onClick={() => setIsAddModalOpen(true)}
+                  className="px-4 py-2 bg-neon-cyan text-black rounded-xl font-bold text-[10px] uppercase tracking-widest flex items-center gap-2 hover:scale-105 transition-all"
+                >
+                  <Plus className="w-4 h-4" />
+                  Add Staff
+                </button>
+              </div>
+            </div>
+            <div className="overflow-x-auto">
+              <table className="w-full text-left border-collapse">
+                <thead>
+                  <tr className="text-xs text-white/20 uppercase tracking-widest border-b border-white/5">
+                    <th className="px-6 py-4 font-medium">User</th>
+                    <th className="px-6 py-4 font-medium">Role</th>
+                    <th className="px-6 py-4 font-medium">Email</th>
+                    <th className="px-6 py-4 font-medium">Joined</th>
+                    <th className="px-6 py-4 font-medium text-right">Actions</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-white/5">
+                  {users.length > 0 ? (
+                    users.map((user, i) => (
+                      <tr key={i} className="hover:bg-white/[0.05] group transition-all">
+                        <td className="px-6 py-4">
+                          <div className="flex items-center gap-3">
+                            <div className="w-8 h-8 rounded-full bg-white/5 flex items-center justify-center text-xs font-bold">
+                              {user.displayName?.charAt(0) || '?'}
+                            </div>
+                            <span className="text-sm font-bold group-hover:text-neon-cyan transition-colors">{user.displayName}</span>
+                          </div>
+                        </td>
+                        <td className="px-6 py-4">
+                          <span className={`text-[10px] font-bold uppercase tracking-widest px-2 py-1 rounded-lg ${
+                            user.role === ROLES.SUPER_ADMIN ? 'bg-neon-magenta/10 text-neon-magenta' : 'bg-neon-cyan/10 text-neon-cyan'
+                          }`}>
+                            {user.role}
+                          </span>
+                        </td>
+                        <td className="px-6 py-4 text-xs text-white/60">{user.email}</td>
+                        <td className="px-6 py-4 text-xs text-white/40">
+                          {user.creationTime ? new Date(user.creationTime).toLocaleDateString() : 'N/A'}
+                        </td>
+                        <td className="px-6 py-4 text-right">
+                          <div className="flex items-center justify-end gap-2">
+                            <button 
+                              onClick={() => {
+                                setEditingUser(user);
+                                setIsEditModalOpen(true);
+                              }}
+                              className="p-2 rounded-lg bg-white/5 hover:bg-white/10 text-white/40 hover:text-white transition-all"
+                            >
+                              <Edit2 className="w-4 h-4" />
+                            </button>
+                            <button 
+                              onClick={() => {
+                                if (user.email === 'larry.culver1226@gmail.com') {
+                                  alert("Cannot delete the primary Super Admin.");
+                                  return;
+                                }
+                                setConfirmModal({
+                                  isOpen: true,
+                                  title: 'Delete Staff Member',
+                                  message: `Are you sure you want to delete ${user.displayName}? This action cannot be undone.`,
+                                  confirmText: 'Delete User',
+                                  onConfirm: async () => {
+                                    try {
+                                      const idToken = auth?.currentUser ? await auth.currentUser.getIdToken() : null;
+                                      const res = await fetch('/api/admin/delete-user', {
+                                        method: 'POST',
+                                        headers: { 
+                                          'Content-Type': 'application/json',
+                                          ...(idToken ? { 'Authorization': `Bearer ${idToken}` } : {})
+                                        },
+                                        body: JSON.stringify({ uid: user.uid })
+                                      });
+                                      if (res.ok) {
+                                        fetchUsers();
+                                        setNotification({ message: 'User deleted successfully', type: 'success' });
+                                      }
+                                    } catch (error) {
+                                      console.error("Delete error:", error);
+                                    }
+                                  }
+                                });
+                              }}
+                              className="p-2 rounded-lg bg-white/5 hover:bg-red-500/10 text-white/40 hover:text-red-500 transition-all"
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    ))
+                  ) : (
+                    <tr>
+                      <td colSpan={5} className="px-6 py-12 text-center text-white/40 italic">
+                        {fetchingUsers ? 'Loading staff directory...' : 'No staff members found.'}
+                      </td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
+
+        {activeTab === 'reconciliation' && (
           <IdentityReconciliation onNotify={(msg, type) => setNotification({ message: msg, type: type as any })} />
         )}
 
@@ -1337,8 +1471,8 @@ export const AdminDashboard: React.FC<{ onLogout: () => void }> = ({ onLogout })
           <VertexDashboard onNotify={(msg, type) => setNotification({ message: msg, type: type as any })} />
         )}
 
-        {activeTab === 'auth0' && (
-          <Auth0ManagementPanel />
+        {activeTab === 'identity' && (
+          <IdentityManagementPanel />
         )}
 
         {activeTab === 'overview' && (
@@ -1939,6 +2073,7 @@ export const AdminDashboard: React.FC<{ onLogout: () => void }> = ({ onLogout })
                     >
                       <option value="user" className="bg-[#111] text-white">User</option>
                       <option value="admin" className="bg-[#111] text-white">Admin</option>
+                      {isSuperAdmin && <option value="super_admin" className="bg-[#111] text-white">Super Admin</option>}
                       <option value="operator" className="bg-[#111] text-white">Operator</option>
                       <option value="mentor" className="bg-[#111] text-white">Mentor</option>
                       <option value="agent" className="bg-[#111] text-white">Agent</option>
@@ -2197,6 +2332,7 @@ export const AdminDashboard: React.FC<{ onLogout: () => void }> = ({ onLogout })
                     >
                       <option value="user" className="bg-[#111] text-white">User</option>
                       <option value="admin" className="bg-[#111] text-white">Admin</option>
+                      {isSuperAdmin && <option value="super_admin" className="bg-[#111] text-white">Super Admin</option>}
                       <option value="operator" className="bg-[#111] text-white">Operator</option>
                       <option value="mentor" className="bg-[#111] text-white">Mentor</option>
                       <option value="agent" className="bg-[#111] text-white">Agent</option>

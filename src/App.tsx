@@ -2,7 +2,7 @@ import React, { useState, useEffect, lazy, Suspense } from 'react';
 import { Routes, Route, Navigate, useParams, useNavigate, useLocation } from 'react-router-dom';
 import { motion, AnimatePresence } from 'motion/react';
 import { 
-  Sparkles, 
+  Sparkles,  
   Rocket, 
   Target, 
   Zap, 
@@ -306,7 +306,7 @@ export function SPARKWavvApp({ isAdmin = false, initialStep }: { isAdmin?: boole
   const [isRegistering, setIsRegistering] = useState(false);
   const [userId, setUserId] = useState<string | null>(null);
   const [dashboardData, setDashboardData] = useState<DashboardData | null>(null);
-  const { user, profile, status: authStatus, loading: authLoading, emailVerified, onboardingComplete, refreshProfile, logout, login, updateProfile: updateIdentityProfile } = useIdentity();
+  const { user, profile, status: authStatus, loading: authLoading, emailVerified, onboardingComplete, refreshProfile, logout, login, loginWithPopup, updateProfile: updateIdentityProfile } = useIdentity();
 
   // Scroll to top on step change
   useEffect(() => {
@@ -350,9 +350,9 @@ export function SPARKWavvApp({ isAdmin = false, initialStep }: { isAdmin?: boole
     }
   }, [authStatus, profile, emailVerified, navigate, location.pathname, step]);
 
-  // OAuth Message Listener (Removed LinkedIn direct OAuth as Auth0 handles it)
+  // OAuth Message Listener (Removed LinkedIn direct OAuth as Identity Platform handles it)
   useEffect(() => {
-    // Auth0 handles social logins automatically
+    // Identity Platform handles social logins automatically
   }, []);
 
   useEffect(() => {
@@ -517,7 +517,7 @@ export function SPARKWavvApp({ isAdmin = false, initialStep }: { isAdmin?: boole
 
 
   const handleSocialLogin = async (provider: 'google' | 'linkedin') => {
-    await login();
+    await loginWithPopup();
   };
 
   const validateModule1 = () => {
@@ -762,8 +762,8 @@ export function SPARKWavvApp({ isAdmin = false, initialStep }: { isAdmin?: boole
         <VerificationBanner 
           user={user} 
           onResend={() => {
-            // Auth0 handles verification resending via their dashboard or universal login
-            setShowToast({ message: "Please check your inbox for the verification email from Auth0.", type: 'success' });
+            // Identity Platform handles verification resending via their dashboard or universal login
+            setShowToast({ message: "Please check your inbox for the verification email from Identity Platform.", type: 'success' });
           }} 
           onRefresh={async () => {
             if (user) {
@@ -1737,7 +1737,7 @@ export function SPARKWavvApp({ isAdmin = false, initialStep }: { isAdmin?: boole
           {step === 'login' && (
             <div className="flex items-center justify-center py-24">
               <Loader2 className="w-12 h-12 text-neon-cyan animate-spin" />
-              <p className="ml-4 text-white/60">Redirecting to Auth0...</p>
+              <p className="ml-4 text-white/60">Redirecting to Identity Platform...</p>
               <LoginRedirect login={login} />
             </div>
           )}
@@ -1857,7 +1857,7 @@ export function SPARKWavvApp({ isAdmin = false, initialStep }: { isAdmin?: boole
 
                   <section className="glass-panel p-8 border-red-500/20 space-y-6">
                     <h3 className="text-xl font-bold text-red-500">Danger Zone</h3>
-                    <p className="text-white/60 text-sm">To delete your account, please contact support or manage your profile via the Auth0 dashboard.</p>
+                    <p className="text-white/60 text-sm">To delete your account, please contact support or manage your profile via the Identity Platform dashboard.</p>
                     <Button 
                       onClick={() => window.open('mailto:support@sparkwavv.ai')}
                       className="bg-red-500/10 text-red-500 border border-red-500/30 hover:bg-red-500/20"
@@ -1909,13 +1909,13 @@ export function SPARKWavvApp({ isAdmin = false, initialStep }: { isAdmin?: boole
 
               <div className="glass-panel p-8 space-y-6 text-center">
                 <p className="text-white/60 mb-8">
-                  We use Auth0 for secure, industry-standard authentication. You'll be redirected to our secure login page to create your account or sign in.
+                  We use Google Identity for secure, industry-standard authentication. You'll be redirected to our secure login page to create your account or sign in.
                 </p>
                 <Button 
-                  onClick={() => login()} 
+                  onClick={() => loginWithPopup()} 
                   className="w-full py-4 text-lg"
                 >
-                  Get Started with Auth0 <ArrowRight className="ml-2 w-5 h-5" />
+                  Get Started with Google <ArrowRight className="ml-2 w-5 h-5" />
                 </Button>
                 <button 
                   onClick={() => setStep('landing')}
@@ -2684,7 +2684,7 @@ export default function App() {
               <span className="text-blue-400 font-mono">{status}</span>
             </div>
             <div className="flex justify-between text-[10px] uppercase tracking-widest text-white/40">
-              <span>Auth0</span>
+              <span>Identity Platform</span>
               <span className={isAuthenticated ? "text-green-500" : "text-yellow-500"}>
                 {isAuthenticated ? "Authenticated" : "Pending"}
               </span>
@@ -2739,8 +2739,8 @@ export default function App() {
         <Routes>
           <Route path="/brand/:secretId" element={<PublicBrandPage />} />
           <Route path="/share/:shareId" element={<ShareView />} />
-          <Route path="/admin/login" element={<AdminLogin vibe="technical" onLogin={() => window.location.href = '/admin'} />} />
-          <Route path="/operations/login" element={<AdminLogin vibe="vibrant" onLogin={() => window.location.href = '/operations'} />} />
+          <Route path="/admin/login" element={<AdminLogin vibe="technical" onLogin={() => {}} />} />
+          <Route path="/operations/login" element={<AdminLogin vibe="vibrant" onLogin={() => {}} />} />
           
           <Route path="/admin" element={
             <AdminRoute requiredRoles={[ROLES.SUPER_ADMIN, ROLES.ADMIN]} requiredEntryPoint="admin">

@@ -1,5 +1,5 @@
 import { GoogleGenAI } from "@google/genai";
-import { getGeminiApiKey } from "../services/aiConfig.js";
+import { getGeminiApiKey } from "../services/aiConfig";
 
 /**
  * Synthetic Methodology Generator

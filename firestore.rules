@@ -459,6 +459,11 @@ service cloud.firestore {
       allow read, write: if false;
     }
 
+    // Connectivity test path (Publicly readable for health checks)
+    match /_system_/connectivity_test {
+      allow read: if true;
+    }
+
     match /admins/{uid} {
       allow read: if isOwner(uid) || isAdmin();
       allow create: if isAdmin() && isValidAdmin(request.resource.data);

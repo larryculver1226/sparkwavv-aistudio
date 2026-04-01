@@ -15,7 +15,6 @@
     "test:e2e": "playwright test"
   },
   "dependencies": {
-    "@auth0/auth0-react": "^2.16.0",
     "@google-cloud/discoveryengine": "^2.6.0",
     "@google-cloud/storage": "^7.19.0",
     "@google-cloud/vertexai": "^1.10.0",
@@ -32,7 +31,6 @@
     "d3": "^7.9.0",
     "dotenv": "^17.2.3",
     "express": "^4.21.2",
-    "express-oauth2-jwt-bearer": "^1.7.4",
     "express-session": "^1.19.0",
     "fast-xml-parser": "^5.5.8",
     "firebase": "^12.9.0",

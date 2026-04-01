@@ -1,6 +1,7 @@
 import { GoogleGenAI } from "@google/genai";
+import { getGeminiApiKey } from "./aiConfig";
 
-const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
+const ai = new GoogleGenAI({ apiKey: getGeminiApiKey() });
 
 export async function removeTextFromImage(base64Image: string) {
   const response = await ai.models.generateContent({

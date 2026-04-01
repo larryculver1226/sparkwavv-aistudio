@@ -5,8 +5,8 @@ import fs from 'fs';
 import path from 'path';
 import crypto from 'crypto';
 import { fileURLToPath } from 'url';
-import { logEvent } from './loggingService.js';
-import { getGeminiApiKey } from './aiConfig.js';
+import { logEvent } from './loggingService';
+import { getGeminiApiKey } from './aiConfig';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);

@@ -323,6 +323,8 @@ export const getTimelineStage = (s: string) => {
   return s;
 };
 
+import { getGeminiApiKey } from '../services/aiConfig';
+
 export const UserDashboard: React.FC<{ userId: string; isAdmin?: boolean }> = ({ userId, isAdmin = false }) => {
   const { user, profile, status, error: authError } = useIdentity();
   const isConfirmed = status === 'authenticated';
@@ -423,7 +425,7 @@ export const UserDashboard: React.FC<{ userId: string; isAdmin?: boolean }> = ({
         
         try {
           const { GoogleGenAI } = await import("@google/genai");
-          const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY || '' });
+          const ai = new GoogleGenAI({ apiKey: getGeminiApiKey() });
           const response = await ai.models.generateContent({
             model: "gemini-3-flash-preview",
             contents: prompt,

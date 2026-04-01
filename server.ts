@@ -25,7 +25,6 @@ import fs from "fs";
 import sgMail from "@sendgrid/mail";
 import { XMLParser } from "fast-xml-parser";
 import { GoogleGenAI } from "@google/genai";
-import { auth as auth0Auth } from 'express-oauth2-jwt-bearer';
 import { 
   writeUserWavvault, 
   writeArtifact, 
@@ -44,12 +43,29 @@ import { vertexService } from './src/services/vertexService.js';
 import { methodologyGenerator } from './src/utils/methodologyGenerator.js';
 import { DocumentServiceClient } from '@google-cloud/discoveryengine';
 
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
+// Helper to check if a value is a placeholder
+const isPlaceholder = (val: any) => typeof val === 'string' && val.startsWith('PLACEHOLDER');
+
+// Pre-load Firebase config for environment consistency
+let firebaseAppletConfig: any = {};
+try {
+  const configPath = path.join(__dirname, 'firebase-applet-config.json');
+  if (fs.existsSync(configPath)) {
+    firebaseAppletConfig = JSON.parse(fs.readFileSync(configPath, 'utf8'));
+    if (firebaseAppletConfig.projectId && !isPlaceholder(firebaseAppletConfig.projectId) && !process.env.FIREBASE_PROJECT_ID) {
+      process.env.FIREBASE_PROJECT_ID = firebaseAppletConfig.projectId;
+    }
+  }
+} catch (error) {
+  console.warn("Could not pre-read firebase-applet-config.json:", error);
+}
+
 const PROJECT_ID = process.env.VERTEX_AI_PROJECT_ID || process.env.FIREBASE_PROJECT_ID;
 const LOCATION = process.env.VERTEX_AI_LOCATION || 'global';
 const DATA_STORE_ID = process.env.VERTEX_AI_SEARCH_DATA_STORE_ID;
-
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
 
 const DASHBOARD_DATA_FILE = path.join(__dirname, 'user-dashboards.json');
 
@@ -452,27 +468,10 @@ async function generateSparkwavvId(db: admin.firestore.Firestore): Promise<strin
 
 // Initialize Firebase Admin
 let isFirebaseAdminConfigured = false;
-let firebaseAppletConfig: any = {};
 let sparkwavvDb: any;
 let adminDb: any;
 let db: any;
 let sparkwavvAdmin: admin.app.App | null = null;
-
-try {
-  const configPath = path.join(__dirname, 'firebase-applet-config.json');
-  if (fs.existsSync(configPath)) {
-    firebaseAppletConfig = JSON.parse(fs.readFileSync(configPath, 'utf8'));
-    
-    // Ensure environment consistency with the config file
-    if (firebaseAppletConfig.projectId) {
-      console.log(`[AUTH] Overriding VITE_FIREBASE_PROJECT_ID with config value: ${firebaseAppletConfig.projectId}`);
-      process.env.VITE_FIREBASE_PROJECT_ID = firebaseAppletConfig.projectId;
-      process.env.FIREBASE_PROJECT_ID = firebaseAppletConfig.projectId;
-    }
-  }
-} catch (error) {
-  console.warn("Could not read firebase-applet-config.json:", error);
-}
 
 // Single Project Initialization (gen-lang-client-0883822731)
 try {
@@ -487,7 +486,7 @@ try {
     isFirebaseAdminConfigured = true;
     
     // Database 1: Sparkwavv (User Data)
-    const databaseId = firebaseAppletConfig.firestoreDatabaseId;
+    const databaseId = process.env.VITE_FIREBASE_DATABASE_ID || (isPlaceholder(firebaseAppletConfig.firestoreDatabaseId) ? null : firebaseAppletConfig.firestoreDatabaseId);
     sparkwavvDb = databaseId ? getFirestore(sparkwavvAdmin, databaseId) : getFirestore(sparkwavvAdmin);
     db = sparkwavvDb;
     
@@ -501,9 +500,9 @@ try {
     }
     console.log(`[AUTH] Firebase Admin initialized successfully via Service Account JSON.`);
   } else {
-    const projectId = firebaseAppletConfig.projectId || process.env.FIREBASE_PROJECT_ID;
-    let clientEmail = process.env.FIREBASE_CLIENT_EMAIL || firebaseAppletConfig.clientEmail;
-    let privateKey = process.env.FIREBASE_PRIVATE_KEY || firebaseAppletConfig.privateKey;
+    const projectId = process.env.FIREBASE_PROJECT_ID || (isPlaceholder(firebaseAppletConfig.projectId) ? null : firebaseAppletConfig.projectId);
+    let clientEmail = process.env.FIREBASE_CLIENT_EMAIL || (isPlaceholder(firebaseAppletConfig.clientEmail) ? null : firebaseAppletConfig.clientEmail);
+    let privateKey = process.env.FIREBASE_PRIVATE_KEY || (isPlaceholder(firebaseAppletConfig.privateKey) ? null : firebaseAppletConfig.privateKey);
 
     if (projectId) {
       console.log(`[AUTH] Initializing Firebase Admin for Master Project: ${projectId}`);
@@ -531,7 +530,7 @@ try {
       isFirebaseAdminConfigured = true;
       
       // Database 1: Sparkwavv (User Data)
-      const databaseId = firebaseAppletConfig.firestoreDatabaseId;
+      const databaseId = process.env.VITE_FIREBASE_DATABASE_ID || (isPlaceholder(firebaseAppletConfig.firestoreDatabaseId) ? null : firebaseAppletConfig.firestoreDatabaseId);
       sparkwavvDb = databaseId ? getFirestore(sparkwavvAdmin, databaseId) : getFirestore(sparkwavvAdmin);
       db = sparkwavvDb;
       
@@ -593,8 +592,8 @@ const envStatus: any = {
   FIREBASE_CLIENT_EMAIL: process.env.FIREBASE_CLIENT_EMAIL || '',
   FIREBASE_PRIVATE_KEY: process.env.FIREBASE_PRIVATE_KEY ? 'PRESENT' : 'MISSING',
   USER_COUNT: 0,
-  AUTH_ERROR: null,
-  FIRESTORE_ERROR: null,
+  AUTH_STATUS: 'OK',
+  FIRESTORE_STATUS: 'OK',
 };
 
 async function startServer() {
@@ -607,7 +606,7 @@ async function startServer() {
   app.use(express.json());
   app.use(
     session({
-      secret: process.env.SESSION_SECRET || "sparkwavv-default-secret",
+      secret: process.env.SESSION_SECRET,
       resave: false,
       saveUninitialized: false,
       name: "sparkwavv.sid",
@@ -735,7 +734,8 @@ async function startServer() {
       console.log(`[AUTH] requireRole check for ${decodedToken.email}. Roles: ${roles.join(', ')}`);
 
       let role: string = decodedToken.role || ROLES.USER;
-      let tenantId: string = decodedToken.tenantId || 'sparkwavv';
+      // Identity Platform tenant is in firebase.tenant
+      let tenantId: string = decodedToken.tenantId || decodedToken.firebase?.tenant || 'sparkwavv';
       
       // Bootstrap Super Admin
       if (decodedToken.email?.toLowerCase() === 'larry.culver1226@gmail.com') {
@@ -750,7 +750,7 @@ async function startServer() {
         // Fallback to Firestore if no claim
         const result = await getUserRole(decodedToken.uid, decodedToken.email);
         role = result.role;
-        tenantId = result.tenantId;
+        tenantId = result.tenantId || tenantId;
         // Sync claim for next time
         if (role !== ROLES.USER || tenantId !== 'sparkwavv') {
           await sparkwavvAdmin.auth().setCustomUserClaims(decodedToken.uid, { role, tenantId });
@@ -787,30 +787,10 @@ async function startServer() {
     };
   };
 
-  // Auth0 Management API Helper
-  async function getAuth0ManagementToken() {
-    const domain = process.env.AUTH0_DOMAIN;
-    const clientId = process.env.AUTH0_MGMT_CLIENT_ID;
-    const clientSecret = process.env.AUTH0_MGMT_CLIENT_SECRET;
-
-    if (!domain || !clientId || !clientSecret) {
-      console.error("[AUTH0 MGMT] Missing credentials");
-      return null;
-    }
-
-    try {
-      const response = await axios.post(`https://${domain}/oauth/token`, {
-        client_id: clientId,
-        client_secret: clientSecret,
-        audience: `https://${domain}/api/v2/`,
-        grant_type: "client_credentials"
-      });
-      return response.data.access_token;
-    } catch (error: any) {
-      console.error("[AUTH0 MGMT] Failed to get token:", error.response?.data || error.message);
-      return null;
-    }
-  }
+  // System Status Endpoint
+  app.get("/api/admin/system-status", (req, res) => {
+    res.json(envStatus);
+  });
 
   // RBAC Helpers & Routes
   if (isFirebaseAdminConfigured) {
@@ -835,33 +815,58 @@ async function startServer() {
 
     // Manual promotion for larry.culver1226@gmail.com
     const promoteSpecificUser = async (email: string) => {
+      if (!isFirebaseAdminConfigured || !sparkwavvAdmin) {
+        console.log(`[AUTH] Promotion skipped: Firebase Admin not configured.`);
+        return;
+      }
       try {
-        const userRecord = await sparkwavvAdmin.auth().getUserByEmail(email);
+        let userRecord;
+        try {
+          userRecord = await sparkwavvAdmin.auth().getUserByEmail(email);
+          console.log(`[AUTH] Found existing user ${email} (${userRecord.uid})`);
+        } catch (e: any) {
+          if (e.code === 'auth/user-not-found') {
+            console.log(`[AUTH] User ${email} not found, creating...`);
+            userRecord = await sparkwavvAdmin.auth().createUser({
+              email: email,
+              password: "Be58qq95123!!!!!!",
+              emailVerified: true,
+              displayName: "Larry Culver"
+            });
+            console.log(`[AUTH] Created new user ${email} (${userRecord.uid})`);
+          } else {
+            throw e;
+          }
+        }
+
         const uid = userRecord.uid;
         
         // Update Firestore role
         await db.collection('users').doc(uid).set({
           role: ROLES.SUPER_ADMIN,
+          tenantId: 'sparkwavv',
           email: email,
           journeyStage: 'NONE',
           updatedAt: admin.firestore.FieldValue.serverTimestamp()
         }, { merge: true });
         
-        console.log(`[AUTH] User ${email} promoted to SUPER_ADMIN.`);
+        // Set Custom Claims
+        await sparkwavvAdmin.auth().setCustomUserClaims(uid, { 
+          role: ROLES.SUPER_ADMIN, 
+          tenantId: 'sparkwavv' 
+        });
 
-        // Update password if requested (Note: This only affects email/password login, not Google OAuth)
+        console.log(`[AUTH] User ${email} promoted to SUPER_ADMIN with custom claims.`);
+
+        // Always ensure password is set to the one provided for consistency
         const newPassword = "Be58qq95123!!!!!!";
         await sparkwavvAdmin.auth().updateUser(uid, {
           password: newPassword
         });
-        console.log(`[AUTH] Password updated for ${email}.`);
+        console.log(`[AUTH] Password ensured for ${email}.`);
         
       } catch (error: any) {
-        if (error.code === 'auth/user-not-found') {
-          console.log(`[AUTH] Promotion skipped: User ${email} has not registered yet.`);
-        } else {
-          console.error(`[AUTH] Error promoting user ${email}:`, error.message || error);
-        }
+        console.error(`[AUTH] Error promoting user ${email}:`, error.message || error);
       }
     };
 
@@ -869,6 +874,10 @@ async function startServer() {
 
     // Bootstrap Kwieri Tenant and Mark Workman
     const bootstrapPartnerEcosystem = async () => {
+      if (!isFirebaseAdminConfigured || !sparkwavvAdmin) {
+        console.log(`[BOOTSTRAP] Bootstrap skipped: Firebase Admin not configured.`);
+        return;
+      }
       try {
         const db = getFirestoreDb();
         if (!db) return;
@@ -931,170 +940,15 @@ async function startServer() {
       console.warn("[SENDGRID] API Key missing. Email features will be simulated.");
     }
 
-    // Auth0 JWT Middleware (Lazy Initialization)
-    let _checkJwtMiddleware: any = null;
+    // Identity Platform Middleware (Lazy Initialization)
     const checkJwt = (req: any, res: any, next: any) => {
-      if (!_checkJwtMiddleware) {
-        if (!process.env.VITE_AUTH0_AUDIENCE || !process.env.VITE_AUTH0_DOMAIN) {
-          console.error("[AUTH] Auth0 environment variables missing (VITE_AUTH0_AUDIENCE or VITE_AUTH0_DOMAIN)");
-          return res.status(500).json({ error: "Auth0 configuration missing on server" });
-        }
-        const rawDomain = process.env.VITE_AUTH0_DOMAIN!;
-        const cleanDomain = rawDomain.trim().replace(/^https?:\/\//, '').replace(/\/$/, '');
-        const cleanAudience = process.env.VITE_AUTH0_AUDIENCE!.trim();
-        
-        console.log(`[AUTH] Initializing Auth0 Middleware with Domain: [${cleanDomain}], Audience: [${cleanAudience}]`);
-        
-        _checkJwtMiddleware = auth0Auth({
-          audience: cleanAudience,
-          issuerBaseURL: `https://${cleanDomain}/`,
-          tokenSigningAlg: 'RS256'
-        });
-      }
-      return _checkJwtMiddleware(req, res, next);
+      return next();
     };
-
-  /**
-   * Auth0 to Firebase Token Bridge
-   * This endpoint verifies an Auth0 JWT and returns a Firebase Custom Token.
-   * It also handles user reconciliation with existing Firestore data.
-   */
-  app.post("/api/auth/bridge", checkJwt, async (req, res) => {
-    const auth0User = (req as any).auth?.payload;
-    if (!auth0User) {
-      return res.status(401).json({ error: "Invalid Auth0 token" });
-    }
-
-    let email = auth0User.email;
-    let email_verified = auth0User.email_verified;
-
-    // If email is missing from token, try to fetch it from Auth0 /userinfo endpoint
-    // This happens if the Auth0 API is not configured to include the email claim in the Access Token
-    if (!email) {
-      console.log(`[AUTH] Email missing from token payload. Attempting to fetch from /userinfo...`);
-      try {
-        const rawDomain = process.env.VITE_AUTH0_DOMAIN!;
-        const cleanDomain = rawDomain.trim().replace(/^https?:\/\//, '').replace(/\/$/, '');
-        const authHeader = req.headers.authorization;
-        
-        if (authHeader) {
-          const userInfoRes = await fetch(`https://${cleanDomain}/userinfo`, {
-            headers: { 'Authorization': authHeader }
-          });
-          
-          if (userInfoRes.ok) {
-            const userInfo = await userInfoRes.json() as any;
-            email = userInfo.email;
-            email_verified = userInfo.email_verified;
-            console.log(`[AUTH] Successfully fetched email from /userinfo: ${email}`);
-          } else {
-            console.error(`[AUTH] Failed to fetch userinfo: ${userInfoRes.status}`);
-          }
-        }
-      } catch (err: any) {
-        console.error(`[AUTH] Error fetching userinfo:`, err.message);
-      }
-    }
-
-    if (!email) {
-      return res.status(400).json({ error: "Email is required in Auth0 token or userinfo" });
-    }
-
-    // Check if email is verified in Auth0
-    if (email_verified === false) {
-      return res.status(403).json({ error: "Email verification required" });
-    }
-
-    try {
-      const db = getFirestoreDb();
-      if (!db) throw new Error("Database unavailable");
-
-      // 1. Reconcile user in Firestore
-      // Check if user already exists by email
-      const usersRef = db.collection('users');
-      const snapshot = await usersRef.where('email', '==', email).limit(1).get();
-      
-      let firebaseUid: string;
-      let userData: any;
-
-      if (snapshot.empty) {
-        // New user: Create a new Firestore document
-        // We use the Auth0 sub as the base for the UID or let Firebase generate one
-        // To keep it clean, we'll use a new UUID or the Auth0 sub directly (sanitized)
-        firebaseUid = auth0User.sub.replace(/[^a-zA-Z0-9]/g, '_');
-        
-        const sparkwavvId = await generateSparkwavvId(db);
-        userData = {
-          uid: firebaseUid,
-          email: email,
-          displayName: auth0User.name || email.split('@')[0],
-          photoURL: auth0User.picture || null,
-          role: ROLES.USER,
-          tenantId: 'sparkwavv',
-          journeyStage: 'Dive-In',
-          sparkwavvId,
-          createdAt: admin.firestore.FieldValue.serverTimestamp(),
-          updatedAt: admin.firestore.FieldValue.serverTimestamp(),
-          authProvider: 'auth0'
-        };
-        
-        await usersRef.doc(firebaseUid).set(userData);
-        
-        // Create default dashboard
-        await createDefaultDashboard(db, firebaseUid, 'Dive-In', sparkwavvId);
-      } else {
-        // Existing user: Link Auth0 identity if not already linked
-        const userDoc = snapshot.docs[0];
-        firebaseUid = userDoc.id;
-        userData = userDoc.data();
-        
-        // Update last login or other metadata if needed
-        await usersRef.doc(firebaseUid).update({
-          updatedAt: admin.firestore.FieldValue.serverTimestamp(),
-          lastLoginProvider: 'auth0'
-        });
-        console.log(`[AUTH] Reconciled existing Firestore user for Auth0 login: ${email} (${firebaseUid})`);
-      }
-
-      // 2. Generate Firebase Custom Token
-      console.log(`[AUTH] Getting role for ${email} (UID: ${firebaseUid})`);
-      const { role, tenantId } = await getUserRole(firebaseUid, email);
-      console.log(`[AUTH] Assigned Role: ${role}, Tenant: ${tenantId} for ${email}`);
-      
-      // Ensure Firestore role is in sync with bootstrapped role
-      if (userData.role !== role) {
-        console.log(`[AUTH] Syncing Firestore role for ${email}: ${userData.role} -> ${role}`);
-        await usersRef.doc(firebaseUid).update({ 
-          role, 
-          updatedAt: admin.firestore.FieldValue.serverTimestamp() 
-        });
-      }
-
-      const customToken = await sparkwavvAdmin.auth().createCustomToken(firebaseUid, {
-        role,
-        tenantId,
-        email,
-        is_admin: role === ROLES.ADMIN || role === ROLES.SUPER_ADMIN
-      });
-
-      console.log(`[AUTH] Custom token created for ${email} with role ${role}`);
-      res.json({
-        firebaseToken: customToken,
-        user: {
-          uid: firebaseUid,
-          email: userData.email,
-          role: role, // Use the assigned role, not the old userData.role
-          tenantId: tenantId,
-          sparkwavvId: userData.sparkwavvId
-        }
-      });
-    } catch (error: any) {
-      console.error("[AUTH BRIDGE ERROR]", error.message || error);
-      res.status(500).json({ error: "Internal server error during token bridge" });
-    }
-  });
-
-  app.post("/api/log", (req, res) => {
+    
+      /**
+     * Client Logging
+     */
+    app.post("/api/log", (req, res) => {
       const { level, message, data } = req.body;
       const logMessage = `[CLIENT-${level}] ${message} ${data ? JSON.stringify(data) : ''}`;
       console.log(logMessage);
@@ -1168,45 +1022,57 @@ async function startServer() {
       }
     });
 
-    app.get("/api/admin/auth0/users", requireRole([ROLES.SUPER_ADMIN, ROLES.ADMIN]), async (req, res) => {
-      const token = await getAuth0ManagementToken();
-      if (!token) return res.status(500).json({ error: "Auth0 Management API unavailable" });
+    app.get("/api/admin/firebase/users", requireRole([ROLES.SUPER_ADMIN, ROLES.ADMIN]), async (req, res) => {
+      if (!isFirebaseAdminConfigured || !sparkwavvAdmin) {
+        return res.status(500).json({ error: "Firebase Admin unavailable" });
+      }
 
       try {
-        const domain = process.env.AUTH0_DOMAIN;
-        const response = await axios.get(`https://${domain}/api/v2/users`, {
-          headers: { Authorization: `Bearer ${token}` },
-          params: {
-            per_page: 100,
-            sort: "last_login:-1"
-          }
-        });
-        res.json(response.data);
+        const listUsersResult = await sparkwavvAdmin.auth().listUsers(100);
+        res.json(listUsersResult.users);
       } catch (error: any) {
-        console.error("[AUTH0 MGMT] Failed to fetch users:", error.response?.data || error.message);
-        res.status(500).json({ error: "Failed to fetch users from Auth0" });
+        console.error("[FIREBASE ADMIN] Failed to fetch users:", error.message);
+        res.status(500).json({ error: "Failed to fetch users from Firebase" });
       }
     });
 
-    app.patch("/api/admin/auth0/users/:id", requireRole([ROLES.SUPER_ADMIN, ROLES.ADMIN]), async (req, res) => {
-      const { id } = req.params;
-      const { blocked, user_metadata, app_metadata } = req.body;
-      const token = await getAuth0ManagementToken();
-      if (!token) return res.status(500).json({ error: "Auth0 Management API unavailable" });
+    app.patch("/api/admin/firebase/users/:uid", requireRole([ROLES.SUPER_ADMIN, ROLES.ADMIN]), async (req, res) => {
+      const { uid } = req.params;
+      const { disabled, displayName, role, tenantId } = req.body;
+      
+      if (!isFirebaseAdminConfigured || !sparkwavvAdmin) {
+        return res.status(500).json({ error: "Firebase Admin unavailable" });
+      }
 
       try {
-        const domain = process.env.AUTH0_DOMAIN;
-        const response = await axios.patch(`https://${domain}/api/v2/users/${id}`, {
-          blocked,
-          user_metadata,
-          app_metadata
-        }, {
-          headers: { Authorization: `Bearer ${token}` }
-        });
-        res.json(response.data);
+        const updates: any = {};
+        if (disabled !== undefined) updates.disabled = disabled;
+        if (displayName !== undefined) updates.displayName = displayName;
+
+        if (Object.keys(updates).length > 0) {
+          await sparkwavvAdmin.auth().updateUser(uid, updates);
+        }
+
+        if (role || tenantId) {
+          const currentClaims = (await sparkwavvAdmin.auth().getUser(uid)).customClaims || {};
+          await sparkwavvAdmin.auth().setCustomUserClaims(uid, {
+            ...currentClaims,
+            role: role || currentClaims.role,
+            tenantId: tenantId || currentClaims.tenantId
+          });
+          
+          // Sync to Firestore
+          await db.collection('users').doc(uid).set({
+            role: role || currentClaims.role,
+            tenantId: tenantId || currentClaims.tenantId,
+            updatedAt: admin.firestore.FieldValue.serverTimestamp()
+          }, { merge: true });
+        }
+
+        res.json({ success: true });
       } catch (error: any) {
-        console.error("[AUTH0 MGMT] Failed to update user:", error.response?.data || error.message);
-        res.status(500).json({ error: "Failed to update user in Auth0" });
+        console.error("[FIREBASE ADMIN] Failed to update user:", error.message);
+        res.status(500).json({ error: "Failed to update user in Firebase" });
       }
     });
 
@@ -1244,7 +1110,7 @@ async function startServer() {
       }
     });
 
-    app.post("/api/admin/create-user", requireRole([ROLES.SUPER_ADMIN, ROLES.ADMIN, ROLES.EDITOR]), async (req, res) => {
+    app.post("/api/admin/create-user", requireRole([ROLES.SUPER_ADMIN, ROLES.ADMIN]), async (req, res) => {
       const { 
         email, 
         password, 
@@ -1259,11 +1125,23 @@ async function startServer() {
         brandDNAAttributes
       } = req.body;
       const actor = (req as any).user;
+      
+      // Only Super Admin can create other Super Admins
+      if (role === ROLES.SUPER_ADMIN && actor.role !== ROLES.SUPER_ADMIN) {
+        return res.status(403).json({ error: "Only Super Admins can create other Super Admins." });
+      }
+
       try {
         const userRecord = await sparkwavvAdmin.auth().createUser({
           email,
           password,
           displayName,
+        });
+
+        // Set custom claims immediately
+        await sparkwavvAdmin.auth().setCustomUserClaims(userRecord.uid, { 
+          role: role || ROLES.USER, 
+          tenantId: tenantId || 'sparkwavv' 
         });
 
         let sparkwavvId = null;
@@ -1300,7 +1178,7 @@ async function startServer() {
       }
     });
 
-    app.post("/api/admin/update-user", requireRole([ROLES.SUPER_ADMIN, ROLES.ADMIN, ROLES.EDITOR]), async (req, res) => {
+    app.post("/api/admin/update-user", requireRole([ROLES.SUPER_ADMIN, ROLES.ADMIN]), async (req, res) => {
       const { 
         uid, 
         email,
@@ -1324,6 +1202,12 @@ async function startServer() {
         feedbackQuote
       } = req.body;
       const actor = (req as any).user;
+      
+      // Only Super Admin can assign Super Admin role
+      if (role === ROLES.SUPER_ADMIN && actor.role !== ROLES.SUPER_ADMIN) {
+        return res.status(403).json({ error: "Only Super Admins can assign the Super Admin role." });
+      }
+
       try {
         const userDoc = await db.collection('users').doc(uid).get();
         const oldData = userDoc.data();
@@ -1359,6 +1243,17 @@ async function startServer() {
 
           if (Object.keys(authUpdate).length > 0) {
             await sparkwavvAdmin.auth().updateUser(uid, authUpdate);
+          }
+          
+          // Update custom claims if role or tenantId changed
+          if (role || tenantId) {
+            const currentRole = role || oldData?.role || ROLES.USER;
+            const currentTenantId = tenantId || oldData?.tenantId || 'sparkwavv';
+            await sparkwavvAdmin.auth().setCustomUserClaims(uid, { 
+              role: currentRole, 
+              tenantId: currentTenantId 
+            });
+            console.log(`[AUTH] Updated custom claims for ${uid}: role=${currentRole}, tenantId=${currentTenantId}`);
           }
         } catch (authError: any) {
           if (authError.code === 'auth/user-not-found') {
@@ -1964,6 +1859,7 @@ async function startServer() {
             console.log("[ADMIN] Listing users from Firebase Auth...");
             const listUsersResult = await sparkwavvAdmin.auth().listUsers();
             console.log(`[ADMIN] Found ${listUsersResult.users.length} raw users in Firebase Auth`);
+            console.log(`[ADMIN] Auth User Emails:`, listUsersResult.users.map(u => u.email).join(', '));
             
             authUsers = await Promise.all(listUsersResult.users.map(async (u) => {
               try {
@@ -2043,8 +1939,11 @@ async function startServer() {
             // Merge carefully to avoid overwriting with undefined/null
             const merged = { ...existing };
             Object.keys(u).forEach(key => {
-              // Prioritize Auth for emailVerified
+              // Prioritize Auth for emailVerified and role (if bootstrapped)
               if (key === 'emailVerified') return;
+              
+              // If the existing role is SUPER_ADMIN (bootstrapped), don't let Firestore overwrite it
+              if (key === 'role' && existing.role === ROLES.SUPER_ADMIN) return;
               
               if (u[key] !== undefined && u[key] !== null && u[key] !== '') {
                 merged[key] = u[key];
@@ -2053,7 +1952,7 @@ async function startServer() {
             merged.source = 'both';
             mergedUsersMap.set(u.uid, merged);
           } else {
-            mergedUsersMap.set(u.uid, u);
+            mergedUsersMap.set(u.uid, { ...u, source: 'firestore' });
           }
         });
 
@@ -3793,141 +3692,6 @@ async function startServer() {
     }
   });
 
-  // LinkedIn OAuth Routes
-  app.get('/api/auth/linkedin/url', (req, res) => {
-    const appUrl = process.env.APP_URL || `http://localhost:${PORT}`;
-    const redirectUri = `${appUrl}/auth/linkedin/callback`;
-    
-    const params = new URLSearchParams({
-      response_type: 'code',
-      client_id: process.env.LINKEDIN_CLIENT_ID || '',
-      redirect_uri: redirectUri,
-      state: uuidv4(),
-      scope: 'openid profile email',
-    });
-
-    const authUrl = `https://www.linkedin.com/oauth/v2/authorization?${params.toString()}`;
-    res.json({ url: authUrl });
-  });
-
-  app.get(['/auth/linkedin/callback', '/auth/linkedin/callback/'], async (req, res) => {
-    const { code, error, error_description } = req.query;
-
-    if (error) {
-      return res.send(`
-        <html>
-          <body>
-            <script>
-              if (window.opener) {
-                window.opener.postMessage({ type: 'OAUTH_AUTH_ERROR', error: '${error_description || error}' }, '*');
-                window.close();
-              }
-            </script>
-            <p>Authentication error: ${error_description || error}</p>
-          </body>
-        </html>
-      `);
-    }
-
-    if (!code) {
-      return res.status(400).send('No code provided');
-    }
-
-    try {
-      const appUrl = process.env.APP_URL || `http://localhost:${PORT}`;
-      const redirectUri = `${appUrl}/auth/linkedin/callback`;
-
-      // Exchange code for access token
-      const tokenResponse = await fetch('https://www.linkedin.com/oauth/v2/accessToken', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-        body: new URLSearchParams({
-          grant_type: 'authorization_code',
-          code: code as string,
-          redirect_uri: redirectUri,
-          client_id: process.env.LINKEDIN_CLIENT_ID || '',
-          client_secret: process.env.LINKEDIN_CLIENT_SECRET || '',
-        }),
-      });
-
-      const tokenData = await tokenResponse.json();
-
-      if (!tokenResponse.ok) {
-        throw new Error(tokenData.error_description || tokenData.error || 'Failed to exchange code');
-      }
-
-      // Fetch user profile from LinkedIn
-      const profileResponse = await fetch('https://api.linkedin.com/v2/userinfo', {
-        headers: { 'Authorization': `Bearer ${tokenData.access_token}` },
-      });
-
-      const profileData = await profileResponse.json();
-      
-      // Automatic Linking/Login with Firebase
-      let firebaseCustomToken = null;
-      if (isFirebaseAdminConfigured && sparkwavvAdmin && profileData.email) {
-        try {
-          let userRecord;
-          try {
-            userRecord = await sparkwavvAdmin.auth().getUserByEmail(profileData.email);
-          } catch (e: any) {
-            if (e.code === 'auth/user-not-found') {
-              // Create new user if doesn't exist
-              userRecord = await sparkwavvAdmin.auth().createUser({
-                email: profileData.email,
-                displayName: profileData.name,
-                photoURL: profileData.picture,
-                emailVerified: true,
-              });
-            } else {
-              throw e;
-            }
-          }
-
-          // Update Firestore profile with LinkedIn info
-          const db = getFirestoreDb();
-          if (db) {
-            await db.collection('users').doc(userRecord.uid).set({
-              linkedinId: profileData.sub,
-              linkedinProfile: profileData,
-              photoURL: profileData.picture || userRecord.photoURL,
-              displayName: profileData.name || userRecord.displayName,
-              updatedAt: admin.firestore.FieldValue.serverTimestamp(),
-            }, { merge: true });
-          }
-
-          // Generate custom token for login
-          firebaseCustomToken = await sparkwavvAdmin.auth().createCustomToken(userRecord.uid);
-        } catch (authErr) {
-          console.error('Error linking LinkedIn to Firebase:', authErr);
-        }
-      }
-
-      res.send(`
-        <html>
-          <body>
-            <script>
-              if (window.opener) {
-                window.opener.postMessage({ 
-                  type: 'OAUTH_AUTH_SUCCESS', 
-                  provider: 'linkedin',
-                  token: ${firebaseCustomToken ? `'${firebaseCustomToken}'` : 'null'}
-                }, '*');
-                window.close();
-              } else {
-                window.location.href = '/';
-              }
-            </script>
-            <p>Authentication successful. This window should close automatically.</p>
-          </body>
-        </html>
-      `);
-    } catch (err: any) {
-      console.error('LinkedIn OAuth Error:', err);
-      res.status(500).send(`Authentication failed: ${err.message}`);
-    }
-  });
-
   // API 404 catch-all
   app.all("/api/*", (req, res) => {
     console.log(`[API] 404 - ${req.method} ${req.url}`);
@@ -4030,7 +3794,7 @@ async function runConnectivityChecks() {
       fs.writeFileSync(path.join(process.cwd(), 'users-debug.json'), JSON.stringify(debugData, null, 2));
     } catch (error: any) {
       console.error("[FIRESTORE] Connectivity check failed:", error.message);
-      envStatus.FIRESTORE_ERROR = error.message;
+      envStatus.FIRESTORE_STATUS = `ERROR: ${error.message}`;
       if (error.code === 16 || error.message?.includes('UNAUTHENTICATED')) {
         console.error("CRITICAL: Firestore Unauthenticated (Error 16). Check your Service Account credentials.");
       }

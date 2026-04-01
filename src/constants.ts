@@ -3,18 +3,39 @@ export type JourneyStage = typeof JOURNEY_STAGES[number];
 
 export const TENANTS = [
   { 
-    id: 'sparkwavv', 
-    name: 'SPARKWavv', 
+    id: 'Admin-oev62', 
+    name: 'Admin Portal', 
     brand: 'sparkwavv',
     logoUrl: '/logo.png',
     primaryColor: '#00FF00'
   },
   { 
-    id: 'kwieri', 
-    name: 'Kwieri', 
-    brand: 'kwieri',
-    logoUrl: 'https://images.leadconnectorhq.com/image/f_webp/q_80/r_1200/u_https://assets.cdn.filesafe.space/3GWNqV7gyYunWoTZF4Vn/media/6794d8d06a58c403bd198b6c.png',
-    primaryColor: '#0F172A'
+    id: 'Operations-ygv9g', 
+    name: 'Operations Center', 
+    brand: 'sparkwavv',
+    logoUrl: '/logo.png',
+    primaryColor: '#00FF00'
+  },
+  { 
+    id: 'Partner-nbbgt', 
+    name: 'Partner Ecosystem', 
+    brand: 'sparkwavv',
+    logoUrl: '/logo.png',
+    primaryColor: '#00FF00'
+  },
+  { 
+    id: 'User-h74jf', 
+    name: 'User Experience', 
+    brand: 'sparkwavv',
+    logoUrl: '/logo.png',
+    primaryColor: '#00FF00'
+  },
+  { 
+    id: 'sparkwavv', 
+    name: 'SPARKWavv', 
+    brand: 'sparkwavv',
+    logoUrl: '/logo.png',
+    primaryColor: '#00FF00'
   }
 ] as const;
 
