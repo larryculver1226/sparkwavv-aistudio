@@ -209,7 +209,7 @@ export const NavBar: React.FC<NavBarProps> = ({ onNavigate }) => {
               ) : (
                 <div className="flex items-center gap-3">
                   <button 
-                    onClick={() => login()}
+                    onClick={() => navigate('/login')}
                     className="px-4 py-2 rounded-full bg-white/5 border border-white/10 text-white text-sm font-bold hover:bg-white/10 transition-all duration-300"
                   >
                     Dashboard Login

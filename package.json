@@ -8,6 +8,7 @@
     "start": "node dist/server.js",
     "build": "vite build && npx esbuild server.ts --bundle --platform=node --target=node20 --outfile=dist/server.js --format=esm --packages=external --minify && cp firebase-applet-config.json dist/",
     "preview": "vite preview",
+    "update-skills": "node scripts/update-skills.js",
     "clean": "rm -rf dist",
     "lint": "tsc --noEmit",
     "test": "vitest run",

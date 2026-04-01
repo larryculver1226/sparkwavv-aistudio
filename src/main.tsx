@@ -41,17 +41,62 @@ if (isFirebasePlaceholder(firebaseProjectId) || isFirebasePlaceholder(firebaseAp
   // Run connection test
   const testFirestore = async () => {
     try {
-      const { db, isFirebaseConfigured } = await import('./lib/firebase');
+      const { db, dbDefault, auth, isFirebaseConfigured } = await import('./lib/firebase');
       const { doc, getDocFromServer } = await import('firebase/firestore');
+      const { onAuthStateChanged } = await import('firebase/auth');
       
       if (!isFirebaseConfigured) return;
       
+      console.log('🛡️ [Main] Testing Firebase Auth connection...');
+      console.log('🛡️ [Main] Current Hostname:', window.location.hostname);
+      console.log('🛡️ [Main] Configured Project ID:', db.app.options.projectId);
+      
+      const authPromise = new Promise((resolve) => {
+        console.log('🛡️ [Main] Waiting for onAuthStateChanged...');
+        const unsubscribe = onAuthStateChanged(auth, (user) => {
+          console.log('🛡️ [Main] onAuthStateChanged resolved:', user ? 'User logged in' : 'No user');
+          unsubscribe();
+          resolve(true);
+        }, (error) => {
+          console.error('❌ [Main] onAuthStateChanged error:', error.message);
+          unsubscribe();
+          resolve(false);
+        });
+        // Timeout after 5s
+        setTimeout(() => {
+          console.warn('⚠️ [Main] onAuthStateChanged timed out after 5s');
+          unsubscribe();
+          resolve(false);
+        }, 5000);
+      });
+      
+      await authPromise;
+      
       console.log('🛡️ [Main] Testing Firestore connection...');
-      // Try to get a non-existent doc just to test connectivity
-      await getDocFromServer(doc(db, '_system_', 'connectivity_test'));
-      console.log('🛡️ [Main] Firestore connection successful.');
+      
+      try {
+        // Try named database first
+        await getDocFromServer(doc(db, '_system_', 'connectivity_test'));
+        console.log('🛡️ [Main] Firestore connection successful (Named Database).');
+      } catch (namedError: any) {
+        console.warn('⚠️ [Main] Named database failed:', namedError.message);
+        
+        if (namedError.message?.includes('offline') || namedError.message?.includes('unavailable')) {
+          console.log('🛡️ [Main] Attempting fallback to (default) database...');
+          try {
+            await getDocFromServer(doc(dbDefault, '_system_', 'connectivity_test'));
+            console.log('🛡️ [Main] Firestore connection successful (Default Database).');
+          } catch (defaultError: any) {
+            console.error('❌ [Main] Default database also failed:', defaultError.message);
+            throw defaultError;
+          }
+        } else {
+          throw namedError;
+        }
+      }
     } catch (error: any) {
       console.error('❌ [Main] Firestore connection failed:', error.message);
+      console.error('❌ [Main] Error Code:', error.code);
       if (error.message?.includes('permission-denied')) {
         console.warn('⚠️ [Main] Firestore permission denied. This is expected if rules are set, but connection is OK.');
       } else if (error.message?.includes('not-found') || error.message?.includes('invalid-argument')) {

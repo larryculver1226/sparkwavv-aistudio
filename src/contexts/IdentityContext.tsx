@@ -10,7 +10,9 @@ import {
   updateProfile as firebaseUpdateProfile,
   sendEmailVerification
 } from 'firebase/auth';
-import { auth, googleProvider, setTenantId } from '../lib/firebase';
+import { auth, setTenantId } from '../lib/firebase';
+import { authService } from '../services/authService';
+import { userService } from '../services/userService';
 import { UserProfile } from '../types/user';
 import { ROLES } from '../constants';
 
@@ -61,7 +63,7 @@ export function IdentityProvider({ children }: { children: React.ReactNode }) {
 
   const logout = useCallback(async () => {
     try {
-      await firebaseSignOut(auth);
+      await authService.logout();
       setUser(null);
       setProfile(null);
       setRole(null);
@@ -76,10 +78,9 @@ export function IdentityProvider({ children }: { children: React.ReactNode }) {
     try {
       setStatus('initializing');
       const effectiveTenant = getEffectiveTenant(providedTenantId);
-      setTenantId(effectiveTenant);
       setLocalTenantId(effectiveTenant);
       
-      await signInWithPopup(auth, googleProvider);
+      await authService.loginWithGoogle(effectiveTenant);
       console.log('🛡️ [Identity] Google Login Success!');
     } catch (err: any) {
       console.error('❌ [Identity] Google Login Error:', err);
@@ -93,7 +94,6 @@ export function IdentityProvider({ children }: { children: React.ReactNode }) {
     try {
       setStatus('initializing');
       const effectiveTenant = getEffectiveTenant(providedTenantId);
-      setTenantId(effectiveTenant);
       setLocalTenantId(effectiveTenant);
 
       if (!email || !pass) {
@@ -101,7 +101,7 @@ export function IdentityProvider({ children }: { children: React.ReactNode }) {
         return loginWithPopup(providedTenantId);
       }
 
-      await signInWithEmailAndPassword(auth, email, pass);
+      await authService.loginWithEmail(email, pass, effectiveTenant);
       console.log('🛡️ [Identity] Email Login Success!');
     } catch (err: any) {
       console.error('❌ [Identity] Login Error:', err);
@@ -115,13 +115,9 @@ export function IdentityProvider({ children }: { children: React.ReactNode }) {
     try {
       setStatus('initializing');
       const effectiveTenant = getEffectiveTenant(providedTenantId);
-      setTenantId(effectiveTenant);
       setLocalTenantId(effectiveTenant);
 
-      const userCredential = await createUserWithEmailAndPassword(auth, email, pass);
-      await firebaseUpdateProfile(userCredential.user, { displayName: name });
-      await sendEmailVerification(userCredential.user);
-      
+      await authService.signUpWithEmail(email, pass, name, effectiveTenant);
       console.log('🛡️ [Identity] Email Sign-up Success!');
     } catch (err: any) {
       console.error('❌ [Identity] Email Sign-up Error:', err);
@@ -136,12 +132,12 @@ export function IdentityProvider({ children }: { children: React.ReactNode }) {
     console.log('👤 [Identity] Fetching for:', firebaseUser.email, { forceRefresh });
     try {
       // 1. Get ID Token Result for Custom Claims (Roles)
-      const tokenResult = await getIdTokenResult(firebaseUser, forceRefresh);
-      console.log('🎫 [Identity] Token Result Claims:', tokenResult.claims);
+      const { token: idToken, claims } = await authService.getIdentityInfo(firebaseUser, forceRefresh);
+      console.log('🎫 [Identity] Token Result Claims:', claims);
       
-      const rawRole = tokenResult.claims.role;
+      const rawRole = claims.role;
       const claimRole = typeof rawRole === 'string' ? rawRole : (rawRole as any)?.role;
-      const claimTenant = tokenResult.claims.tenantId as string;
+      const claimTenant = claims.tenantId as string;
       
       // Safety net for Larry Culver
       let finalRole = claimRole || ROLES.USER;
@@ -155,15 +151,12 @@ export function IdentityProvider({ children }: { children: React.ReactNode }) {
       setLocalTenantId(claimTenant || null);
 
       // 2. Fetch Profile and Wavvault Status
-      const idToken = tokenResult.token;
-      
-      const [profileRes, wavvaultRes] = await Promise.all([
-        fetch('/api/user/profile', { headers: { 'Authorization': `Bearer ${idToken}` } }),
-        fetch('/api/user/wavvault-status', { headers: { 'Authorization': `Bearer ${idToken}` } })
+      const [pData, exists] = await Promise.all([
+        userService.fetchProfile(idToken),
+        userService.fetchWavvaultStatus(idToken)
       ]);
 
-      if (profileRes.ok) {
-        const pData = await profileRes.json();
+      if (pData) {
         setProfile(pData);
         
         if (pData.role && pData.role !== finalRole) {
@@ -172,15 +165,11 @@ export function IdentityProvider({ children }: { children: React.ReactNode }) {
             setRole(String(pData.role));
           }
         }
-      } else if (profileRes.status === 404) {
+      } else {
         setProfile(null);
       }
 
-      if (wavvaultRes.ok) {
-        const { exists } = await wavvaultRes.json();
-        setHasWavvault(exists);
-      }
-
+      setHasWavvault(exists);
       setStatus('ready');
     } catch (err: any) {
       console.error('❌ Identity fetch error:', err);
@@ -225,21 +214,8 @@ export function IdentityProvider({ children }: { children: React.ReactNode }) {
   const updateProfile = useCallback(async (updates: Partial<UserProfile>) => {
     if (!user) return;
     const idToken = await user.getIdToken();
-    const response = await fetch('/api/user/profile', {
-      method: 'PATCH',
-      headers: { 
-        'Authorization': `Bearer ${idToken}`,
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify(updates)
-    });
-
-    if (response.ok) {
-      const updatedProfile = await response.json();
-      setProfile(updatedProfile);
-    } else {
-      throw new Error('Failed to update profile');
-    }
+    const updatedProfile = await userService.updateProfile(idToken, updates);
+    setProfile(updatedProfile);
   }, [user]);
 
   const reloadUser = useCallback(async () => {

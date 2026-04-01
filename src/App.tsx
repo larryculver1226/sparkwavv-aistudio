@@ -41,9 +41,6 @@ import {
   Star
 } from 'lucide-react';
 import { 
-  updateProfile as firebaseUpdateProfile,
-} from 'firebase/auth';
-import { 
   doc, 
   setDoc, 
   getDoc,
@@ -64,6 +61,7 @@ import { AccessDenied } from './components/AccessDenied';
 // Lazy load page components to improve initial load time
 const OperationsDashboard = lazy(() => import('./pages/OperationsDashboard').then(m => ({ default: m.OperationsDashboard })));
 const AdminLogin = lazy(() => import('./pages/AdminLogin').then(m => ({ default: m.AdminLogin })));
+const Login = lazy(() => import('./pages/Login'));
 const AdminDashboard = lazy(() => import('./pages/AdminDashboard').then(m => ({ default: m.AdminDashboard })));
 const UserDashboard = lazy(() => import('./pages/UserDashboard').then(m => ({ default: m.UserDashboard })));
 const PartnerDashboard = lazy(() => import('./pages/PartnerDashboard').then(m => ({ default: m.PartnerDashboard })));
@@ -78,7 +76,9 @@ const ProfilePage = lazy(() => import('./pages/ProfilePage').then(m => ({ defaul
 const CommunityPage = lazy(() => import('./pages/CommunityPage').then(m => ({ default: m.CommunityPage })));
 const CinematicSynthesis = lazy(() => import('./components/synthesis/CinematicSynthesis').then(m => ({ default: m.CinematicSynthesis })));
 const PublicBrandPage = lazy(() => import('./components/sharing/PublicBrandPage').then(m => ({ default: m.PublicBrandPage })));
+const DiveInPage = lazy(() => import('./pages/DiveInPage'));
 
+import ShareView from './pages/ShareView';
 import { generateDiscoverySummary, parseResume, generateBrandImage, UserData } from './services/geminiService';
 import { NavBar } from './components/NavBar';
 import { Footer } from './components/Footer';
@@ -248,6 +248,9 @@ const Toast = ({ message, type = 'success', onClose }: { message: string, type?:
 
 import { PrecisionMatchingCard } from './components/landing/PrecisionMatchingCard';
 
+import { authService } from './services/authService';
+import { OnboardingContainer } from './containers/OnboardingContainer';
+
 const LoginRedirect: React.FC<{ login: () => void }> = ({ login }) => {
   useEffect(() => {
     login();
@@ -258,7 +261,9 @@ const LoginRedirect: React.FC<{ login: () => void }> = ({ login }) => {
 export function SPARKWavvApp({ isAdmin = false, initialStep }: { isAdmin?: boolean, initialStep?: Step }) {
   const navigate = useNavigate();
   const location = useLocation();
-  const { role, status, isAdmin: isIdentityAdmin } = useIdentity();
+  const { role, status, isAdmin: isIdentityAdmin, user, profile, emailVerified, onboardingComplete, refreshProfile, logout, login, loginWithPopup, signUpWithEmail, updateProfile: updateIdentityProfile } = useIdentity();
+  const authStatus = status;
+  const authLoading = status === 'initializing';
 
   useEffect(() => {
     console.log('🚀 [SPARKWavvApp] Render:', { isAdmin, isIdentityAdmin, initialStep, role, status, path: location.pathname });
@@ -302,11 +307,8 @@ export function SPARKWavvApp({ isAdmin = false, initialStep }: { isAdmin?: boole
   }, [discoveryUnlocked]);
   const [showStartOverConfirm, setShowStartOverConfirm] = useState(false);
   const [hasApiKey, setHasApiKey] = useState(false);
-  const [registrationMessage, setRegistrationMessage] = useState<string | null>(null);
-  const [isRegistering, setIsRegistering] = useState(false);
   const [userId, setUserId] = useState<string | null>(null);
   const [dashboardData, setDashboardData] = useState<DashboardData | null>(null);
-  const { user, profile, status: authStatus, loading: authLoading, emailVerified, onboardingComplete, refreshProfile, logout, login, loginWithPopup, updateProfile: updateIdentityProfile } = useIdentity();
 
   // Scroll to top on step change
   useEffect(() => {
@@ -331,6 +333,15 @@ export function SPARKWavvApp({ isAdmin = false, initialStep }: { isAdmin?: boole
           navigate('/sparkwavv-admin');
         }
         return;
+      }
+      
+      // Fallback for new users without a profile yet
+      if (!profile && status === 'ready' && user) {
+        if (step === 'landing' || step === 'onboarding') {
+          console.log('🌱 New user detected, staying on onboarding flow');
+          setStep('onboarding');
+          return;
+        }
       }
       
       // If email is verified but onboarding/ignition is not complete, go to ignition
@@ -380,7 +391,6 @@ export function SPARKWavvApp({ isAdmin = false, initialStep }: { isAdmin?: boole
 
   useEffect(() => {
     // Clear notifications/popups on mount for all users
-    setRegistrationMessage(null);
     setErrors({});
   }, []);
 
@@ -1812,10 +1822,9 @@ export function SPARKWavvApp({ isAdmin = false, initialStep }: { isAdmin?: boole
                     <Button 
                       onClick={async () => {
                         const name = (document.getElementById('settings-display-name') as HTMLInputElement).value;
-                        if (auth?.currentUser) {
-                          await firebaseUpdateProfile(auth.currentUser, { displayName: name });
-                          setRegistrationMessage("Profile updated successfully!");
-                          setTimeout(() => setRegistrationMessage(null), 3000);
+                        if (user) {
+                          await authService.updateDisplayName(user, name);
+                          setShowToast({ message: "Profile updated successfully!", type: "success" });
                         }
                       }}
                       variant="secondary"
@@ -1892,39 +1901,10 @@ export function SPARKWavvApp({ isAdmin = false, initialStep }: { isAdmin?: boole
           )}
 
           {step === 'onboarding' && (
-            <motion.div 
-              key="onboarding"
-              initial={{ opacity: 0, scale: 0.95 }}
-              animate={{ opacity: 1, scale: 1 }}
-              exit={{ opacity: 0, scale: 0.95 }}
-              className="max-w-xl mx-auto px-6 space-y-12 pb-24"
-            >
-              <header className="text-center space-y-4">
-                <div className="w-16 h-16 rounded-2xl bg-neon-cyan/10 border border-neon-cyan/30 flex items-center justify-center mx-auto mb-6">
-                  <Rocket className="w-8 h-8 text-neon-cyan" />
-                </div>
-                <h2 className="text-4xl font-bold">Ready to Dive-In?</h2>
-                <p className="text-white/60">Join SPARKWavv and start building your cinematic career identity.</p>
-              </header>
-
-              <div className="glass-panel p-8 space-y-6 text-center">
-                <p className="text-white/60 mb-8">
-                  We use Google Identity for secure, industry-standard authentication. You'll be redirected to our secure login page to create your account or sign in.
-                </p>
-                <Button 
-                  onClick={() => loginWithPopup()} 
-                  className="w-full py-4 text-lg"
-                >
-                  Get Started with Google <ArrowRight className="ml-2 w-5 h-5" />
-                </Button>
-                <button 
-                  onClick={() => setStep('landing')}
-                  className="mt-4 text-white/40 hover:text-white transition-colors text-sm uppercase tracking-widest font-bold"
-                >
-                  Back to Home
-                </button>
-              </div>
-            </motion.div>
+            <OnboardingContainer 
+              onBackToHome={() => setStep('landing')}
+              onSuccess={(message) => setShowToast({ message, type: 'success' })}
+            />
           )}
 
           {step === 'ignition' && (
@@ -2582,9 +2562,6 @@ function ScrollToTop() {
   return null;
 }
 
-import ShareView from './pages/ShareView';
-const DiveInPage = lazy(() => import('./pages/DiveInPage'));
-
 export default function App() {
   const { user, role, status, loading, error, refreshIdentity, isAuthenticated } = useIdentity();
   const [showRetry, setShowRetry] = useState(false);
@@ -2645,10 +2622,16 @@ export default function App() {
           </div>
           <div className="pt-4 space-y-3">
             <button 
-              onClick={() => window.location.href = '/admin/login'}
+              onClick={() => {
+                if (location.pathname === '/dive-in' || location.pathname === '/') {
+                  window.location.href = '/';
+                } else {
+                  window.location.href = '/admin/login';
+                }
+              }}
               className="w-full py-4 bg-white text-black rounded-2xl font-bold hover:scale-[1.02] transition-transform"
             >
-              Retry Admin Login
+              {location.pathname === '/dive-in' || location.pathname === '/' ? 'Retry Login' : 'Retry Admin Login'}
             </button>
             <button 
               onClick={() => window.location.reload()}
@@ -2741,6 +2724,7 @@ export default function App() {
           <Route path="/share/:shareId" element={<ShareView />} />
           <Route path="/admin/login" element={<AdminLogin vibe="technical" onLogin={() => {}} />} />
           <Route path="/operations/login" element={<AdminLogin vibe="vibrant" onLogin={() => {}} />} />
+          <Route path="/login" element={<Login />} />
           
           <Route path="/admin" element={
             <AdminRoute requiredRoles={[ROLES.SUPER_ADMIN, ROLES.ADMIN]} requiredEntryPoint="admin">

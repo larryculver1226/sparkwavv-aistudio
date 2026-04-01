@@ -500,12 +500,12 @@ try {
     }
     console.log(`[AUTH] Firebase Admin initialized successfully via Service Account JSON.`);
   } else {
-    const projectId = process.env.FIREBASE_PROJECT_ID || (isPlaceholder(firebaseAppletConfig.projectId) ? null : firebaseAppletConfig.projectId);
-    let clientEmail = process.env.FIREBASE_CLIENT_EMAIL || (isPlaceholder(firebaseAppletConfig.clientEmail) ? null : firebaseAppletConfig.clientEmail);
-    let privateKey = process.env.FIREBASE_PRIVATE_KEY || (isPlaceholder(firebaseAppletConfig.privateKey) ? null : firebaseAppletConfig.privateKey);
+    const projectId = (!isPlaceholder(firebaseAppletConfig.projectId) ? firebaseAppletConfig.projectId : null) || process.env.FIREBASE_PROJECT_ID;
+    let clientEmail = (!isPlaceholder(firebaseAppletConfig.clientEmail) ? firebaseAppletConfig.clientEmail : null) || process.env.FIREBASE_CLIENT_EMAIL;
+    let privateKey = (!isPlaceholder(firebaseAppletConfig.privateKey) ? firebaseAppletConfig.privateKey : null) || process.env.FIREBASE_PRIVATE_KEY;
 
     if (projectId) {
-      console.log(`[AUTH] Initializing Firebase Admin for Master Project: ${projectId}`);
+      console.log(`[AUTH] Initializing Firebase Admin for Project: ${projectId}`);
       
       // Normalize private key
       if (privateKey && privateKey.trim().startsWith('{')) {
