@@ -91,11 +91,15 @@ import OnboardingGate from './components/OnboardingGate';
 import { SkylarSidebar } from './components/skylar/SkylarSidebar';
 import { EveningSpark } from './components/skylar/EveningSpark';
 import { DashboardData } from './types/dashboard';
-import { CinematicIntro } from './components/landing/CinematicIntro';
+import { SkylarIntro, SkylarAvatar, SkylarScrollingText } from './components/landing/SkylarIntro';
+import { QuickScan } from './components/landing/QuickScan';
 import { BrainModel } from './components/landing/BrainModel';
 import { Roadmap } from './components/landing/Roadmap';
 import { PricingPlaceholder } from './components/PricingPlaceholder';
 import { TimeoutManager } from './components/TimeoutManager';
+import { PrecisionMatchingCard } from './components/landing/PrecisionMatchingCard';
+import { authService } from './services/authService';
+import { OnboardingContainer } from './containers/OnboardingContainer';
 
 type Step = 'landing' | 'login' | 'onboarding' | 'ignition' | 'settings' | 'module1' | 'module2' | 'module3' | 'module4' | 'module5' | 'processing' | 'synthesis' | 'results' | 'product-skylar' | 'product-features' | 'product-technology' | 'product-wavvault' | 'company-vision' | 'company-about' | 'company-investors' | 'company-give' | 'pricing' | 'documentation' | 'help-center';
 
@@ -246,10 +250,6 @@ const Toast = ({ message, type = 'success', onClose }: { message: string, type?:
   );
 };
 
-import { PrecisionMatchingCard } from './components/landing/PrecisionMatchingCard';
-
-import { authService } from './services/authService';
-import { OnboardingContainer } from './containers/OnboardingContainer';
 
 const LoginRedirect: React.FC<{ login: () => void }> = ({ login }) => {
   useEffect(() => {
@@ -305,6 +305,7 @@ export function SPARKWavvApp({ isAdmin = false, initialStep }: { isAdmin?: boole
     // Dispatch event to notify components
     window.dispatchEvent(new CustomEvent('discovery-status-changed', { detail: { unlocked: discoveryUnlocked } }));
   }, [discoveryUnlocked]);
+  const [showSkylarIntro, setShowSkylarIntro] = useState(true);
   const [showStartOverConfirm, setShowStartOverConfirm] = useState(false);
   const [hasApiKey, setHasApiKey] = useState(false);
   const [userId, setUserId] = useState<string | null>(null);
@@ -763,7 +764,7 @@ export function SPARKWavvApp({ isAdmin = false, initialStep }: { isAdmin?: boole
             if (user) {
               setStep('module1');
             } else {
-              login();
+              navigate('/dive-in');
             }
           } else {
             setStep(s as Step);
@@ -794,51 +795,64 @@ export function SPARKWavvApp({ isAdmin = false, initialStep }: { isAdmin?: boole
           <AnimatePresence mode="wait">
           {step === 'landing' && (
             <div className="space-y-0">
-              <CinematicIntro />
               <motion.div 
                 key="landing"
                 initial={{ opacity: 0 }}
                 whileInView={{ opacity: 1 }}
-                className="text-center space-y-8 pt-8 pb-32 px-6 max-w-7xl mx-auto"
+                className="text-center space-y-4 pt-4 pb-16 px-6 max-w-7xl mx-auto"
               >
-              {errors.general && (
-                <motion.div 
-                  initial={{ opacity: 0, scale: 0.95 }}
-                  animate={{ opacity: 1, scale: 1 }}
-                  className="max-w-2xl mx-auto p-6 rounded-2xl bg-red-500/10 border border-red-500/30 text-red-500 text-center font-bold mb-8"
-                >
-                  {errors.general}
-                </motion.div>
-              )}
-              <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-neon-cyan/10 border border-neon-cyan/20 text-neon-cyan text-sm font-medium mb-4">
-                <Sparkles className="w-4 h-4" />
-                <span>Ignite Your Career Identity</span>
-              </div>
-              <h1 className="text-6xl md:text-7xl font-display font-bold leading-tight tracking-tight">
-                Meet <span className="text-neon-cyan neon-text-cyan italic">Skylar</span>,<br />
-                Your AI Career Guide
-              </h1>
-              <p className="text-neon-cyan font-display uppercase tracking-[0.3em] text-sm font-bold mt-4">
-                The Most Advanced Career Engine Ever Built
-              </p>
-              <p className="text-xl text-white/60 max-w-2xl mx-auto leading-relaxed">
-                A meticulously engineered career branding framework. Move from "overwhelmed" to "market dominant" through cinematic self-discovery.
-              </p>
-              <div className="flex flex-col sm:flex-row items-center justify-center gap-4 pt-8">
-                {!emailVerified && (
-                  <div className="flex flex-col sm:flex-row gap-4 w-full sm:w-auto">
-                    <Button 
-                      onClick={nextStep} 
-                      variant="neon" 
-                      className="w-full sm:w-auto text-lg px-12 py-4"
-                    >
-                      Dive-In <ArrowRight className="w-5 h-5" />
-                    </Button>
-                  </div>
+                {errors.general && (
+                  <motion.div 
+                    initial={{ opacity: 0, scale: 0.95 }}
+                    animate={{ opacity: 1, scale: 1 }}
+                    className="max-w-2xl mx-auto p-6 rounded-2xl bg-red-500/10 border border-red-500/30 text-red-500 text-center font-bold mb-8"
+                  >
+                    {errors.general}
+                  </motion.div>
                 )}
-                <p className="text-sm text-white/40">2-4 weeks to total clarity</p>
-              </div>
-            </motion.div>
+                <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-neon-cyan/10 border border-neon-cyan/20 text-neon-cyan text-sm font-medium mb-4">
+                  <Sparkles className="w-4 h-4" />
+                  <span>Ignite Your Career Identity</span>
+                </div>
+                <h1 className="text-6xl md:text-7xl font-display font-bold leading-tight tracking-tight">
+                  Meet <span className="text-neon-cyan neon-text-cyan italic">Skylar</span>,<br />
+                  Your AI Career Guide
+                </h1>
+                <p className="text-neon-cyan font-display uppercase tracking-[0.3em] text-sm font-bold mt-4">
+                  The Most Advanced Career Engine Ever Built
+                </p>
+                <p className="text-xl text-white/60 max-w-2xl mx-auto leading-relaxed">
+                  A meticulously engineered career branding framework. Move from "overwhelmed" to "market dominant" through cinematic self-discovery.
+                </p>
+
+                {/* Skylar Avatar and Scrolling Text */}
+                <AnimatePresence>
+                  {showSkylarIntro && (
+                    <motion.div
+                      initial={{ opacity: 1, height: 'auto' }}
+                      exit={{ opacity: 0, height: 0, overflow: 'hidden' }}
+                      transition={{ duration: 0.5 }}
+                    >
+                      <SkylarIntro onClose={() => setShowSkylarIntro(false)} />
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+                
+                <div className="flex flex-col sm:flex-row items-center justify-center gap-4 pt-4">
+                  <p className="text-sm text-white/40 max-w-3xl mx-auto leading-relaxed italic">
+                    I operate on strategy, data, and results—not small talk. My objective is to extract your Career DNA, align it with the Market Intelligence Grid, and guide you through the required Validation Gates to achieve your professional goals. If you are ready to begin, we start at Phase 1: **Dive-In**. Tell me your current role, your immediate pain points, and what is driving your need for a career change, or provide a resume/LinkedIn profile so we can establish your baseline. Let's get to work.
+                  </p>
+                </div>
+              </motion.div>
+
+              {/* Quick DNA Scan Section */}
+              <QuickScan onDiveIn={() => {
+                if (user) {
+                  setStep('module1');
+                } else {
+                  navigate('/dive-in');
+                }
+              }} />
 
             <BrainModel />
             <Roadmap />

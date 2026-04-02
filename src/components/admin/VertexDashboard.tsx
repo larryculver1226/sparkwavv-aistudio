@@ -36,6 +36,8 @@ export const VertexDashboard: React.FC<VertexDashboardProps> = ({ onNotify }) =>
   const [gcsUri, setGcsUri] = useState<string | null>(null);
   const [tuningJob, setTuningJob] = useState<any | null>(null);
   const [isTuning, setIsTuning] = useState(false);
+  const [isBootstrapping, setIsBootstrapping] = useState(false);
+  const [bootstrapStatus, setBootstrapStatus] = useState<any | null>(null);
 
   const fetchSyntheticData = async () => {
     setIsLoadingData(true);
@@ -182,6 +184,29 @@ export const VertexDashboard: React.FC<VertexDashboardProps> = ({ onNotify }) =>
     }
   };
 
+  const handleBootstrapVector = async () => {
+    if (!auth.currentUser) return;
+    setIsBootstrapping(true);
+    try {
+      const idToken = await auth.currentUser.getIdToken();
+      const response = await fetch('/api/skylar/bootstrap-vector', {
+        method: 'POST',
+        headers: { 
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${idToken}`
+        },
+        body: JSON.stringify({ userId: auth.currentUser.uid })
+      });
+      const data = await response.json();
+      setBootstrapStatus(data);
+      onNotify('Vector Search bootstrapping initiated.', 'info');
+    } catch (error) {
+      onNotify('Failed to initiate bootstrapping', 'error');
+    } finally {
+      setIsBootstrapping(false);
+    }
+  };
+
   return (
     <div className="space-y-8">
       {/* Header Section */}
@@ -297,13 +322,57 @@ export const VertexDashboard: React.FC<VertexDashboardProps> = ({ onNotify }) =>
         </div>
       </div>
 
+      {/* Vector Search Bootstrapping Section */}
+      <div className="bg-dark-surface/50 border border-white/10 rounded-xl overflow-hidden">
+        <div className="p-6 border-bottom border-white/10 bg-white/5 flex items-center justify-between">
+          <div>
+            <h3 className="text-lg font-display font-bold text-white flex items-center gap-2">
+              <Database className="w-5 h-5 text-neon-cyan" />
+              Vector Search Infrastructure (Wavvault v2)
+            </h3>
+            <p className="text-sm text-gray-400 mt-1">Bootstrap and monitor Vertex AI Vector Search indices.</p>
+          </div>
+          <button
+            onClick={handleBootstrapVector}
+            disabled={isBootstrapping || (bootstrapStatus && bootstrapStatus.status === 'INITIALIZING')}
+            className="flex items-center gap-2 px-4 py-2 bg-neon-cyan/10 border border-neon-cyan/30 text-neon-cyan rounded-lg hover:bg-neon-cyan/20 transition-all disabled:opacity-50"
+          >
+            <RefreshCw className={`w-4 h-4 ${isBootstrapping ? 'animate-spin' : ''}`} />
+            {isBootstrapping ? 'Initiating...' : bootstrapStatus?.status === 'INITIALIZING' ? 'Initializing Index...' : 'Bootstrap Vector Index'}
+          </button>
+        </div>
+        
+        {bootstrapStatus && (
+          <div className="p-6 border-t border-white/10">
+            <div className="flex items-center justify-between mb-4">
+              <div className="flex items-center gap-3">
+                <div className={`w-3 h-3 rounded-full ${bootstrapStatus.status === 'INITIALIZING' ? 'bg-yellow-500 animate-pulse' : 'bg-green-500'}`} />
+                <span className="text-sm font-bold text-white">Status: {bootstrapStatus.status}</span>
+              </div>
+              <span className="text-xs font-mono text-gray-500">Index ID: {bootstrapStatus.id}</span>
+            </div>
+            
+            <div className="w-full bg-white/5 rounded-full h-2 mb-2">
+              <div 
+                className="bg-neon-cyan h-2 rounded-full transition-all duration-500" 
+                style={{ width: `${bootstrapStatus.progress || 10}%` }}
+              />
+            </div>
+            <div className="flex justify-between text-[10px] font-mono text-gray-500">
+              <span>Progress: {bootstrapStatus.progress || 10}%</span>
+              <span>Est. Completion: {bootstrapStatus.estimatedCompletion}</span>
+            </div>
+          </div>
+        )}
+      </div>
+
       {/* Model Garden Status */}
       <div className="bg-dark-surface/50 border border-white/10 rounded-xl p-6">
         <h3 className="text-lg font-display font-bold text-white mb-6 flex items-center gap-2">
           <Zap className="w-5 h-5 text-yellow-500" />
           Vertex AI Model Garden (Sector Intelligence)
         </h3>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <div className="flex items-center justify-between p-4 bg-white/5 border border-white/10 rounded-lg">
             <div className="flex items-center gap-3">
               <div className="w-10 h-10 rounded-full bg-green-500/20 flex items-center justify-center">
@@ -311,23 +380,36 @@ export const VertexDashboard: React.FC<VertexDashboardProps> = ({ onNotify }) =>
               </div>
               <div>
                 <div className="text-white font-bold">Healthcare (MedLM)</div>
-                <div className="text-xs text-gray-500">Active for specialized users</div>
+                <div className="text-xs text-gray-500">Active</div>
               </div>
             </div>
             <div className="px-2 py-1 bg-green-500/20 text-green-500 text-[10px] font-bold rounded uppercase">Running</div>
           </div>
 
-          <div className="flex items-center justify-between p-4 bg-white/5 border border-white/10 rounded-lg opacity-50">
+          <div className="flex items-center justify-between p-4 bg-white/5 border border-white/10 rounded-lg">
             <div className="flex items-center gap-3">
               <div className="w-10 h-10 rounded-full bg-blue-500/20 flex items-center justify-center">
                 <ShieldCheck className="w-5 h-5 text-blue-500" />
               </div>
               <div>
-                <div className="text-white font-bold">Legal (SecLM)</div>
-                <div className="text-xs text-gray-500">Planned for Q3 2026</div>
+                <div className="text-white font-bold">Finance (Vertex)</div>
+                <div className="text-xs text-gray-500">Active</div>
               </div>
             </div>
-            <div className="px-2 py-1 bg-gray-500/20 text-gray-500 text-[10px] font-bold rounded uppercase">Queued</div>
+            <div className="px-2 py-1 bg-blue-500/20 text-blue-500 text-[10px] font-bold rounded uppercase">Running</div>
+          </div>
+
+          <div className="flex items-center justify-between p-4 bg-white/5 border border-white/10 rounded-lg">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-full bg-purple-500/20 flex items-center justify-center">
+                <Zap className="w-5 h-5 text-purple-500" />
+              </div>
+              <div>
+                <div className="text-white font-bold">Tech (Vertex)</div>
+                <div className="text-xs text-gray-500">Active</div>
+              </div>
+            </div>
+            <div className="px-2 py-1 bg-purple-500/20 text-purple-500 text-[10px] font-bold rounded uppercase">Running</div>
           </div>
         </div>
       </div>

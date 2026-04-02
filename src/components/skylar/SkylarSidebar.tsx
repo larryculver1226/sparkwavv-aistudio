@@ -18,12 +18,18 @@ import {
   Settings2,
   CheckCircle2,
   AlertCircle,
-  Lock
+  Lock,
+  FileText,
+  Download
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
+import clsx from 'clsx';
 import { skylar, ChatMessage, SkylarPersona, PERSONA_CONFIG } from '../../services/skylarService';
 import { useIdentity } from '../../contexts/IdentityContext';
 import { useLocation } from 'react-router-dom';
+import { jsPDF } from 'jspdf';
+import { Document, Packer, Paragraph, TextRun } from 'docx';
+import { saveAs } from 'file-saver';
 
 type Methodology = 'lobkowicz' | 'feynman';
 
@@ -44,6 +50,7 @@ export const SkylarSidebar: React.FC<SkylarSidebarProps> = ({ onLogin }) => {
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [isSpeaking, setIsSpeaking] = useState(false);
+  const [isVoiceEnabled, setIsVoiceEnabled] = useState(false);
   const [persona, setPersona] = useState<SkylarPersona>('discovery');
   const [methodology, setMethodology] = useState<Methodology>('lobkowicz');
   const [isListening, setIsListening] = useState(false);
@@ -52,11 +59,15 @@ export const SkylarSidebar: React.FC<SkylarSidebarProps> = ({ onLogin }) => {
   const [error, setError] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<'chat' | 'alerts'>('chat');
   const [alerts, setAlerts] = useState<any[]>([]);
+  const [selectedFile, setSelectedFile] = useState<{ data: string; mimeType: string; name: string } | null>(null);
+  const [atsProposal, setAtsProposal] = useState<{ content: string; format: string } | null>(null);
+  const [toasts, setToasts] = useState<{ id: number; message: string; type: 'success' | 'info' | 'warning' }[]>([]);
   const { user, profile } = useIdentity();
   const location = useLocation();
   const scrollRef = useRef<HTMLDivElement>(null);
   const audioRef = useRef<HTMLAudioElement>(null);
   const recognitionRef = useRef<any>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Initialize Speech Recognition
   useEffect(() => {
@@ -195,17 +206,52 @@ export const SkylarSidebar: React.FC<SkylarSidebarProps> = ({ onLogin }) => {
     }
   }, [messages]);
 
+  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    // Check file size (max 10MB for Gemini)
+    if (file.size > 10 * 1024 * 1024) {
+      setError("File size exceeds 10MB limit.");
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      const base64 = (event.target?.result as string).split(',')[1];
+      setSelectedFile({
+        data: base64,
+        mimeType: file.type,
+        name: file.name
+      });
+    };
+    reader.readAsDataURL(file);
+  };
+
   const handleSend = async () => {
-    if (!input.trim()) return;
+    if (!input.trim() && !selectedFile) return;
+
+    const parts: any[] = [];
+    if (input.trim()) parts.push({ text: input });
+    if (selectedFile) {
+      parts.push({
+        inlineData: {
+          data: selectedFile.data,
+          mimeType: selectedFile.mimeType
+        }
+      });
+    }
 
     const userMessage: ChatMessage = {
       role: 'user',
-      parts: [{ text: input }]
+      parts: parts
     };
 
     setMessages(prev => [...prev, userMessage]);
     const currentInput = input;
+    const currentFile = selectedFile;
     setInput('');
+    setSelectedFile(null);
     setIsLoading(true);
     setError(null);
 
@@ -219,19 +265,68 @@ export const SkylarSidebar: React.FC<SkylarSidebarProps> = ({ onLogin }) => {
         parts: msg.parts
       }));
 
-      const response = await skylar.chatWithVertex(uid === 'anonymous' ? '' : uid, currentInput, vertexHistory, methodology, token);
+      const result = await skylar.chatWithVertex(
+        uid === 'anonymous' ? '' : uid, 
+        currentInput, 
+        vertexHistory, 
+        methodology, 
+        token,
+        currentFile || undefined
+      );
       
+      const { response, executedActions } = result;
+
       const responseText = response.candidates?.[0]?.content?.parts
         ?.filter(part => part.text)
         ?.map(part => part.text)
         ?.join('') || "";
       const calls = response.functionCalls;
       
+      if (executedActions && executedActions.length > 0) {
+        executedActions.forEach((action: any) => {
+          // Show toast for auto-executed actions
+          console.log(`[SKYLAR] Auto-executed: ${action.action}`, action.data);
+          
+          const toastMessage = `✨ Skylar auto-updated: ${action.data.field} to "${action.data.value}"`;
+          
+          // 1. Add to toasts
+          const newToast = {
+            id: Date.now() + Math.random(),
+            message: toastMessage,
+            type: 'success' as const
+          };
+          setToasts(prev => [...prev, newToast]);
+          
+          // 2. Auto-remove toast after 5 seconds
+          setTimeout(() => {
+            setToasts(prev => prev.filter(t => t.id !== newToast.id));
+          }, 5000);
+
+          // 3. Add a system message to the chat
+          const toastMsg: ChatMessage = {
+            role: 'model',
+            type: 'system',
+            parts: [{ text: toastMessage }]
+          };
+          setMessages(prev => [...prev, toastMsg]);
+
+          // 4. Verbal confirmation if voice is enabled
+          if (isVoiceEnabled) {
+            handleSpeak(`I've updated your ${action.data.field} to ${action.data.value}.`);
+          }
+        });
+      }
+
       if (calls && calls.length > 0) {
         for (const call of calls) {
           const { name, args } = call;
           
-          if (name.startsWith('propose_') || name === 'flag_dna_conflict') {
+          if (name === 'generate_ats_optimized_content') {
+            setAtsProposal({
+              content: (args as any).content,
+              format: (args as any).format
+            });
+          } else if (name.startsWith('propose_') || name === 'flag_dna_conflict') {
             const proposal: SkylarProposal = {
               type: name === 'flag_dna_conflict' ? 'CONFLICT' : 'PROPOSAL',
               action: name as any,
@@ -247,8 +342,12 @@ export const SkylarSidebar: React.FC<SkylarSidebarProps> = ({ onLogin }) => {
 
       const modelMessage: ChatMessage = {
         role: 'model',
+        type: 'chat',
         parts: [{ text: responseText || "I've processed your request. How else can I help?" }]
       };
+      
+      // Play chime on model reply
+      playChime();
       
       setMessages(prev => {
         const updatedMessages = [...prev, modelMessage];
@@ -257,6 +356,12 @@ export const SkylarSidebar: React.FC<SkylarSidebarProps> = ({ onLogin }) => {
             skylar.saveChatToWavvault(user.uid, updatedMessages, token);
           });
         }
+        
+        // Auto-speak if voice is enabled
+        if (isVoiceEnabled && responseText) {
+          handleSpeak(responseText);
+        }
+        
         return updatedMessages;
       });
       
@@ -413,6 +518,42 @@ export const SkylarSidebar: React.FC<SkylarSidebarProps> = ({ onLogin }) => {
     }
   };
 
+  const handleDownloadAts = async () => {
+    if (!atsProposal) return;
+    const { content, format } = atsProposal;
+    const filename = `Sparkwavv_ATS_Optimized_${new Date().toISOString().split('T')[0]}`;
+
+    try {
+      if (format === 'text') {
+        const blob = new Blob([content], { type: 'text/plain' });
+        saveAs(blob, `${filename}.txt`);
+      } else if (format === 'markdown') {
+        const blob = new Blob([content], { type: 'text/markdown' });
+        saveAs(blob, `${filename}.md`);
+      } else if (format === 'pdf') {
+        const doc = new jsPDF();
+        const splitText = doc.splitTextToSize(content, 180);
+        doc.text(splitText, 15, 20);
+        doc.save(`${filename}.pdf`);
+      } else if (format === 'word') {
+        const doc = new Document({
+          sections: [{
+            properties: {},
+            children: content.split('\n').map(line => new Paragraph({
+              children: [new TextRun(line)],
+            })),
+          }],
+        });
+        const blob = await Packer.toBlob(doc);
+        saveAs(blob, `${filename}.docx`);
+      }
+      setAtsProposal(null);
+    } catch (err) {
+      console.error("Download Error:", err);
+      setError("Failed to generate download.");
+    }
+  };
+
   const handleSpeak = async (text: string) => {
     if (!text) return;
     if (isSpeaking) {
@@ -448,6 +589,35 @@ export const SkylarSidebar: React.FC<SkylarSidebarProps> = ({ onLogin }) => {
 
   return (
     <>
+      {/* Toast Notifications */}
+      <div className="fixed bottom-24 right-6 z-50 flex flex-col gap-2 pointer-events-none">
+        <AnimatePresence>
+          {toasts.map((toast) => (
+            <motion.div
+              key={toast.id}
+              initial={{ opacity: 0, y: 20, scale: 0.9 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.9, transition: { duration: 0.2 } }}
+              className={clsx(
+                "pointer-events-auto px-4 py-3 rounded-xl shadow-2xl border flex items-center gap-3 min-w-[280px] backdrop-blur-md",
+                toast.type === 'success' ? "bg-green-500/20 border-green-500/30 text-green-400" :
+                toast.type === 'warning' ? "bg-yellow-500/20 border-yellow-500/30 text-yellow-400" :
+                "bg-neon-cyan/20 border-neon-cyan/30 text-neon-cyan"
+              )}
+            >
+              <Zap className="w-4 h-4 flex-shrink-0" />
+              <p className="text-sm font-medium">{toast.message}</p>
+              <button 
+                onClick={() => setToasts(prev => prev.filter(t => t.id !== toast.id))}
+                className="ml-auto p-1 hover:bg-white/10 rounded-lg transition-colors"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </motion.div>
+          ))}
+        </AnimatePresence>
+      </div>
+
       {/* Toggle Button - Only visible when sidebar is closed */}
       {!isOpen && (
         <button 
@@ -514,13 +684,22 @@ export const SkylarSidebar: React.FC<SkylarSidebarProps> = ({ onLogin }) => {
                     </div>
                   </div>
                 </div>
-                <button 
-                  onClick={() => setIsOpen(false)} 
-                  className="w-10 h-10 rounded-full flex items-center justify-center text-white/40 hover:text-white hover:bg-white/5 transition-all"
-                  title="Close Chat"
-                >
-                  <X className="w-6 h-6" />
-                </button>
+                <div className="flex items-center gap-2">
+                  <button 
+                    onClick={() => setIsVoiceEnabled(!isVoiceEnabled)}
+                    className={`w-10 h-10 rounded-full flex items-center justify-center transition-all ${isVoiceEnabled ? 'text-neon-cyan bg-neon-cyan/10 shadow-[0_0_10px_rgba(0,255,255,0.2)]' : 'text-white/40 hover:text-white/60 hover:bg-white/5'}`}
+                    title={isVoiceEnabled ? "Disable Voice" : "Enable Voice"}
+                  >
+                    {isVoiceEnabled ? <Volume2 className="w-5 h-5" /> : <VolumeX className="w-5 h-5" />}
+                  </button>
+                  <button 
+                    onClick={() => setIsOpen(false)} 
+                    className="w-10 h-10 rounded-full flex items-center justify-center text-white/40 hover:text-white hover:bg-white/5 transition-all"
+                    title="Close Chat"
+                  >
+                    <X className="w-6 h-6" />
+                  </button>
+                </div>
               </div>
 
               {/* Tabs */}
@@ -565,80 +744,145 @@ export const SkylarSidebar: React.FC<SkylarSidebarProps> = ({ onLogin }) => {
                 </div>
               )}
 
-              {messages.map((msg, i) => (
-                <div key={i} className="space-y-4">
-                  <div className={`flex items-start gap-3 ${msg.role === 'user' ? 'flex-row-reverse' : 'flex-row'}`}>
-                    {msg.role === 'model' && (
-                      <div className="w-8 h-8 rounded-lg overflow-hidden border border-white/10 shrink-0 mt-1">
-                        <img 
-                          src={PERSONA_CONFIG[persona].avatar} 
-                          alt="Skylar"
-                          className="w-full h-full object-cover object-[center_20%]"
-                          referrerPolicy="no-referrer"
-                        />
-                      </div>
-                    )}
-                    {msg.role === 'user' && (
-                      <div className="w-8 h-8 rounded-lg bg-white/5 flex items-center justify-center border border-white/10 shrink-0 mt-1">
-                        {user?.photoURL ? (
-                          <img src={user.photoURL} alt="User" className="w-full h-full object-cover rounded-lg" referrerPolicy="no-referrer" />
-                        ) : (
-                          <div className="text-[10px] font-bold text-white/40 uppercase">
-                            {user?.displayName?.charAt(0) || 'U'}
-                          </div>
-                        )}
-                      </div>
-                    )}
-                    <div className={`max-w-[85%] p-4 rounded-2xl text-sm leading-relaxed ${
-                      msg.role === 'user' 
-                        ? 'bg-neon-cyan text-black font-medium' 
-                        : 'bg-white/5 text-white/80 border border-white/10'
-                    }`}>
-                      {msg.parts?.[0]?.text}
-                      {msg.role === 'model' && msg.parts?.[0]?.text && (
-                        <button 
-                          onClick={() => handleSpeak(msg.parts?.[0]?.text || '')}
-                          className="mt-2 flex items-center gap-1 text-[10px] uppercase font-bold text-white/40 hover:text-neon-cyan transition-colors"
-                        >
-                          {isSpeaking ? <VolumeX className="w-3 h-3" /> : <Volume2 className="w-3 h-3" />}
-                          {isSpeaking ? 'Stop' : 'Listen'}
-                        </button>
-                      )}
+              {atsProposal && (
+                <motion.div 
+                  initial={{ opacity: 0, scale: 0.95 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  className="mx-6 my-4 p-4 rounded-2xl bg-gradient-to-br from-neon-cyan/10 to-transparent border border-neon-cyan/30 flex flex-col gap-4 shadow-[0_0_20px_rgba(0,255,255,0.1)]"
+                >
+                  <div className="flex items-center gap-4">
+                    <div className="w-12 h-12 rounded-xl bg-neon-cyan/20 flex items-center justify-center text-neon-cyan shadow-[0_0_15px_rgba(0,255,255,0.2)]">
+                      <FileText className="w-6 h-6" />
+                    </div>
+                    <div>
+                      <h4 className="text-sm font-bold text-white">ATS-Optimized Content Ready</h4>
+                      <p className="text-[10px] text-white/40 uppercase tracking-widest mt-0.5">Format: {atsProposal.format.toUpperCase()}</p>
                     </div>
                   </div>
+                  <div className="flex items-center gap-2">
+                    <button 
+                      onClick={() => setAtsProposal(null)}
+                      className="flex-1 py-2.5 text-xs font-bold text-white/40 hover:text-white hover:bg-white/5 rounded-xl transition-all"
+                    >
+                      Dismiss
+                    </button>
+                    <button 
+                      onClick={handleDownloadAts}
+                      className="flex-[2] py-2.5 bg-neon-cyan text-black text-xs font-bold rounded-xl hover:scale-[1.02] active:scale-[0.98] transition-all flex items-center justify-center gap-2 shadow-[0_0_15px_rgba(0,255,255,0.3)]"
+                    >
+                      <Download className="w-4 h-4" />
+                      Download Artifact
+                    </button>
+                  </div>
+                </motion.div>
+              )}
+
+              {messages.map((msg, i) => (
+                <div key={i} className="space-y-4">
+                  {msg.type === 'system' ? (
+                    <div className="w-full flex justify-center my-4">
+                      <motion.div 
+                        initial={{ opacity: 0, scale: 0.9 }}
+                        animate={{ opacity: 1, scale: 1 }}
+                        className="px-4 py-2 rounded-full bg-white/[0.03] border border-white/10 flex items-center gap-3 shadow-lg"
+                      >
+                        <div className="w-6 h-6 rounded-full bg-neon-cyan/20 flex items-center justify-center">
+                          <Zap className="w-3 h-3 text-neon-cyan" />
+                        </div>
+                        <span className="text-[10px] font-bold text-white/60 uppercase tracking-widest">
+                          {msg.parts?.[0]?.text}
+                        </span>
+                      </motion.div>
+                    </div>
+                  ) : (
+                    <div className={`flex items-start gap-3 ${msg.role === 'user' ? 'flex-row-reverse' : 'flex-row'}`}>
+                      {msg.role === 'model' && (
+                        <div className="w-8 h-8 rounded-lg overflow-hidden border border-white/10 shrink-0 mt-1">
+                          <img 
+                            src={PERSONA_CONFIG[persona].avatar} 
+                            alt="Skylar"
+                            className="w-full h-full object-cover object-[center_20%]"
+                            referrerPolicy="no-referrer"
+                          />
+                        </div>
+                      )}
+                      {msg.role === 'user' && (
+                        <div className="w-8 h-8 rounded-lg bg-white/5 flex items-center justify-center border border-white/10 shrink-0 mt-1">
+                          {user?.photoURL ? (
+                            <img src={user.photoURL} alt="User" className="w-full h-full object-cover rounded-lg" referrerPolicy="no-referrer" />
+                          ) : (
+                            <div className="text-[10px] font-bold text-white/40 uppercase">
+                              {user?.displayName?.charAt(0) || 'U'}
+                            </div>
+                          )}
+                        </div>
+                      )}
+                      <div className={`max-w-[85%] p-4 rounded-2xl text-sm leading-relaxed ${
+                        msg.role === 'user' 
+                          ? 'bg-neon-cyan text-black font-medium' 
+                          : 'bg-white/5 text-white/80 border border-white/10'
+                      }`}>
+                        {msg.parts?.[0]?.text}
+                        {msg.role === 'model' && msg.parts?.[0]?.text && (
+                          <button 
+                            onClick={() => handleSpeak(msg.parts?.[0]?.text || '')}
+                            className="mt-2 flex items-center gap-1 text-[10px] uppercase font-bold text-white/40 hover:text-neon-cyan transition-colors"
+                          >
+                            {isSpeaking ? <VolumeX className="w-3 h-3" /> : <Volume2 className="w-3 h-3" />}
+                            {isSpeaking ? 'Stop' : 'Listen'}
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  )}
 
                   {/* Proposal Widget */}
                   {msg.role === 'model' && proposals[i] && (
                     <motion.div 
                       initial={{ opacity: 0, y: 10 }}
                       animate={{ opacity: 1, y: 0 }}
-                      className="ml-4 mr-12 p-4 rounded-2xl bg-white/[0.02] border border-neon-cyan/20 space-y-3"
+                      className="ml-4 mr-12 p-5 rounded-2xl bg-gradient-to-br from-white/[0.03] to-transparent border border-neon-cyan/20 space-y-4 shadow-xl"
                     >
-                      <div className="flex items-center gap-2 text-neon-cyan">
-                        <BrainCircuit className="w-4 h-4" />
-                        <span className="text-[10px] font-bold uppercase tracking-widest">Skylar Proposal</span>
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-2 text-neon-cyan">
+                          <BrainCircuit className="w-4 h-4" />
+                          <span className="text-[10px] font-bold uppercase tracking-widest">Strategic Proposal</span>
+                        </div>
+                        <div className="px-2 py-0.5 rounded-full bg-neon-cyan/10 border border-neon-cyan/20">
+                          <span className="text-[8px] font-bold text-neon-cyan uppercase tracking-tighter">Requires Concurrence</span>
+                        </div>
                       </div>
                       
-                      <div className="space-y-1">
-                        <p className="text-xs font-bold text-white">
-                          {proposals[i].action === 'update_dashboard' 
-                            ? `Update ${proposals[i].data?.field || 'field'} to "${proposals[i].data?.value || 'new value'}"`
-                            : proposals[i].action === 'add_milestone'
-                            ? `Add Milestone: ${proposals[i].data?.title || 'New Milestone'}`
-                            : proposals[i].action === 'propose_major_shift'
-                            ? `New Insight: ${proposals[i].data?.content || 'Strategic Shift'}`
-                            : `Resolve Conflict: ${proposals[i].data?.newInsight?.content || 'Updated Truth'}`
-                          }
-                        </p>
+                      <div className="space-y-2">
+                        <div className="p-3 rounded-xl bg-white/[0.02] border border-white/5">
+                          <p className="text-xs font-bold text-white leading-snug">
+                            {proposals[i].action === 'update_dashboard' 
+                              ? `Update ${proposals[i].data?.field || 'field'} to "${proposals[i].data?.value || 'new value'}"`
+                              : proposals[i].action === 'add_milestone'
+                              ? `Add Milestone: ${proposals[i].data?.title || 'New Milestone'}`
+                              : proposals[i].action === 'propose_major_shift'
+                              ? `Strategic Pivot: ${proposals[i].data?.content || 'New Insight'}`
+                              : `Resolve Conflict: ${proposals[i].data?.newInsight?.content || 'Updated Truth'}`
+                            }
+                          </p>
+                        </div>
+
                         {proposals[i].action === 'flag_dna_conflict' && (
-                          <div className="p-2 bg-red-500/10 border border-red-500/20 rounded-lg mb-2">
-                            <p className="text-[10px] text-red-400 font-bold uppercase mb-1">Conflict Detected</p>
-                            <p className="text-[10px] text-white/40 line-through">Old: {proposals[i].data?.existingInsightContent || 'Existing Truth'}</p>
+                          <div className="p-3 bg-red-500/10 border border-red-500/20 rounded-xl">
+                            <div className="flex items-center gap-2 mb-1">
+                              <AlertCircle className="w-3 h-3 text-red-400" />
+                              <p className="text-[10px] text-red-400 font-bold uppercase">DNA Conflict Detected</p>
+                            </div>
+                            <p className="text-[10px] text-white/40 line-through italic">Old: {proposals[i].data?.existingInsightContent || 'Existing Truth'}</p>
                           </div>
                         )}
-                        <p className="text-[10px] text-white/60 leading-relaxed italic">
-                          "{proposals[i].reasoning}"
-                        </p>
+
+                        <div className="flex gap-2 items-start">
+                          <div className="mt-1 w-1 h-1 rounded-full bg-neon-cyan shrink-0" />
+                          <p className="text-[11px] text-white/60 leading-relaxed italic">
+                            "{proposals[i].reasoning}"
+                          </p>
+                        </div>
                       </div>
 
                       <div className="flex items-center gap-2 pt-2">
@@ -650,21 +894,21 @@ export const SkylarSidebar: React.FC<SkylarSidebarProps> = ({ onLogin }) => {
                         ) : (
                           <>
                             <button 
-                              onClick={() => handleExecuteAction(i)}
-                              disabled={isLoading}
-                              className="flex-1 py-2 bg-neon-cyan/10 hover:bg-neon-cyan text-neon-cyan hover:text-black border border-neon-cyan/20 rounded-lg text-[10px] font-bold uppercase transition-all flex items-center justify-center gap-2"
-                            >
-                              Confirm
-                            </button>
-                            <button 
                               onClick={() => setProposals(prev => {
                                 const next = { ...prev };
                                 delete next[i];
                                 return next;
                               })}
-                              className="px-3 py-2 text-white/20 hover:text-white text-[10px] font-bold uppercase transition-colors"
+                              className="flex-1 py-2 text-[10px] font-bold text-white/40 hover:text-white hover:bg-white/5 rounded-lg transition-all"
                             >
-                              Dismiss
+                              Decline
+                            </button>
+                            <button 
+                              onClick={() => handleExecuteAction(i)}
+                              disabled={isLoading}
+                              className="flex-[2] py-2 bg-neon-cyan text-black text-[10px] font-bold rounded-lg hover:scale-[1.02] active:scale-[0.98] transition-all shadow-[0_0_10px_rgba(0,255,255,0.2)]"
+                            >
+                              Confirm & Execute
                             </button>
                           </>
                         )}
@@ -768,6 +1012,22 @@ export const SkylarSidebar: React.FC<SkylarSidebarProps> = ({ onLogin }) => {
         <div className="p-6 border-t border-white/10 bg-white/[0.02]">
               {activeTab === 'chat' ? (
                 <div className="flex flex-col gap-3">
+                  {selectedFile && (
+                    <div className="flex items-center justify-between bg-white/5 p-2 rounded-lg border border-white/10">
+                      <div className="flex items-center gap-2 overflow-hidden">
+                        <div className="p-1.5 bg-neon-cyan/10 rounded text-neon-cyan shrink-0">
+                          <Briefcase className="w-3 h-3" />
+                        </div>
+                        <span className="text-[10px] text-white/60 truncate">{selectedFile.name}</span>
+                      </div>
+                      <button 
+                        onClick={() => setSelectedFile(null)}
+                        className="text-white/20 hover:text-white"
+                      >
+                        <X className="w-3 h-3" />
+                      </button>
+                    </div>
+                  )}
                   {!user && (
                     <div className="flex items-center justify-center gap-2 text-[9px] text-white/20 uppercase font-bold tracking-widest mb-1">
                       <Lock className="w-2.5 h-2.5" />
@@ -776,14 +1036,28 @@ export const SkylarSidebar: React.FC<SkylarSidebarProps> = ({ onLogin }) => {
                   )}
                   <div className="relative">
                     <input 
+                      type="file"
+                      ref={fileInputRef}
+                      className="hidden"
+                      onChange={handleFileSelect}
+                      accept="image/*,.pdf,.doc,.docx,.txt"
+                    />
+                    <input 
                       type="text" 
                       placeholder="Ask Skylar anything..."
-                      className="w-full bg-black/40 border border-white/10 rounded-2xl px-6 py-4 text-sm focus:border-neon-cyan outline-none pr-24"
+                      className="w-full bg-black/40 border border-white/10 rounded-2xl px-6 py-4 text-sm focus:border-neon-cyan outline-none pr-32"
                       value={input}
                       onChange={e => setInput(e.target.value)}
                       onKeyPress={e => e.key === 'Enter' && handleSend()}
                     />
-                    <div className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-2">
+                    <div className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-1">
+                      <button 
+                        onClick={() => fileInputRef.current?.click()}
+                        className="p-2 text-white/20 hover:text-neon-cyan transition-colors"
+                        title="Upload Resume or Image"
+                      >
+                        <Zap className="w-5 h-5" />
+                      </button>
                       <button 
                         onClick={() => toggleListening(false)}
                         className={`p-2 transition-colors ${isListening ? 'text-neon-cyan animate-pulse' : 'text-white/20 hover:text-neon-cyan'}`}
@@ -793,7 +1067,7 @@ export const SkylarSidebar: React.FC<SkylarSidebarProps> = ({ onLogin }) => {
                       </button>
                       <button 
                         onClick={handleSend}
-                        disabled={!input.trim() || isLoading}
+                        disabled={(!input.trim() && !selectedFile) || isLoading}
                         className="p-2 bg-neon-cyan text-black rounded-xl hover:scale-105 transition-transform disabled:opacity-50 disabled:scale-100"
                       >
                         <Send className="w-5 h-5" />

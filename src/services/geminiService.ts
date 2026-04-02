@@ -247,19 +247,23 @@ export async function parseResume(fileData: string, mimeType: string) {
 
   try {
     const ai = getAI();
+    
+    const contents: any[] = [];
+    if (mimeType === 'text/plain') {
+      contents.push({ text: `Resume Content:\n${fileData}\n\n${prompt}` });
+    } else {
+      contents.push({
+        inlineData: {
+          data: fileData,
+          mimeType: mimeType
+        }
+      });
+      contents.push({ text: prompt });
+    }
+
     const response = await ai.models.generateContent({
       model: "gemini-3-flash-preview",
-      contents: [
-        {
-          inlineData: {
-            data: fileData,
-            mimeType: mimeType
-          }
-        },
-        {
-          text: prompt
-        }
-      ],
+      contents,
       config: {
         responseMimeType: "application/json",
         maxOutputTokens: 16384,

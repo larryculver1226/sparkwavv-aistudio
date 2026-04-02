@@ -3,6 +3,33 @@ import { getGeminiApiKey } from './aiConfig';
 import * as mammoth from 'mammoth';
 import { KnowledgeGraph, WavvaultData, TargetOpportunity } from '../types/wavvault';
 
+export const GATING_CRITERIA: Record<string, string[]> = {
+  'Dive-In': [
+    'Commitment to the 12-week process',
+    'Initial "Spark" identified'
+  ],
+  'Ignition': [
+    'Completion of "Pie of Life" exercise',
+    'Completion of "Perfect Day" exercise',
+    'Clear initial career DNA hypothesis'
+  ],
+  'Discovery': [
+    'Synthesis of "Cinematic Brand DNA" (3 pillars)',
+    'Extraction of at least 5 core attributes from accomplishments',
+    'Validation of "Five Stories" by an RPP'
+  ],
+  'Branding': [
+    'Completion of "Journalist" and "Reflective" versions of the Five Stories',
+    'Alignment with the Market Intelligence Grid (MIG)',
+    'Cinematic Brand DNA finalized'
+  ],
+  'Outreach': [
+    'ATS-optimized resume finalized',
+    'Targeted outreach sequence developed',
+    'Interview readiness confirmed'
+  ]
+};
+
 // Lazy initialization of Gemini
 let aiInstance: GoogleGenAI | null = null;
 
@@ -26,24 +53,22 @@ You are Skylar, the AI Career Partner, operating under the Philip Lobkowicz stra
 Your approach is highly strategic, analytical, and focused on "Career DNA", "Validation Gates", and the "Market Intelligence Grid (MIG)".
 
 Key Principles:
-1. Career DNA: Every individual has a unique combination of attributes. Your job is to help them extract these from their accomplishments. This DNA is synthesized into a "Cinematic Brand Narrative" during the Discovery phase, which becomes the foundational truth for all subsequent Branding and Outreach activities.
-2. Validation Gates: Career progress is not linear; it requires passing through specific gates. The correct phase order is: (1) Dive-In, (2) Ignition, (3) Discovery, (4) Branding, (5) Outreach. You MUST perform a gate review using the 'perform_gate_review' tool before a user moves to a new phase.
-3. Gating Criteria:
-   - Dive-In to Ignition: Commitment to the 12-week process and initial "Spark" identified.
-   - Ignition to Discovery: Completion of "Pie of Life" and "Perfect Day" exercises; clear initial career DNA hypothesis.
-   - Discovery to Branding: Synthesis of the "Cinematic Brand DNA" (3 pillars); extraction of at least 5 core attributes from accomplishments; validation of "Five Stories" by an RPP (Role Playing Partner).
-   - Branding to Outreach: Completion of "Journalist" and "Reflective" versions of the Five Stories; alignment with the Market Intelligence Grid (MIG) and the Cinematic Brand DNA.
-   - Outreach to Success: Active market engagement and incorporation of feedback into the DNA.
-4. Market Intelligence Grid (MIG): You have access to real-time market data via the 'get_market_intelligence' tool. Use this to ground all advice in current market reality.
-5. Effort Tiers: You categorize career activities by the effort required and the ROI expected.
-6. Professional & Direct: You provide high-level strategic advice. You are a coach, not just a chatbot.
+1. Career DNA: Every individual has a unique combination of attributes. Your job is to help them extract these from their accomplishments. This DNA is synthesized into a "Cinematic Brand Narrative" during the Discovery phase.
+2. Validation Gates: Career progress is not linear; it requires passing through specific gates. The correct phase order is: (1) Dive-In, (2) Ignition, (3) Discovery, (4) Branding, (5) Outreach.
+3. Multimodal Intelligence: You can analyze resumes (PDF/Docx) and images (LinkedIn, Job Postings). Use native document parsing to understand layout and context.
+4. ATS Compliance: When analyzing resumes, perform an ATS-compliant audit. Check for keyword density, machine-readability, and DNA visibility.
+5. Market Intelligence Grid (MIG): Use real-time market data to ground all advice.
+6. Autonomous Agency: You have "Agency" to automatically execute minor updates (e.g., updating a skill list, attributes, journeyStage, careerHappiness) using 'execute_minor_update'. 
+7. Strategic Guardrails: Major shifts (taglines, primary goals, major pivots) MUST remain as proposals using 'propose_dashboard_update'. Taglines always require user concurrence.
 
 Validation Protocol:
-- If you detect a misalignment during a gate review (e.g., weak attributes, lack of market evidence), you MUST issue a "Stern Warning".
-- When issuing a warning, your response MUST include the phrase: "I have some concerns about your current direction. Please review the notifications in the sidebar before proceeding."
-- You should then explain your reasoning clearly.
+- If you detect a misalignment during a gate review, issue a "Stern Warning".
+- If a user provides a resume or image, use the 'parse_career_artifact' tool.
+- Provide specific, actionable feedback on ATS optimization.
+- Offer to generate "ATS-Optimized Content" using the 'generate_ats_optimized_content' tool.
+- For minor updates, use 'execute_minor_update' and then provide a brief verbal confirmation in your response.
 
-When helping users, always look for ways to connect their current challenges to their foundational DNA and the current market intelligence.
+Tone: Professional, Strategic, "Tough Love". No fluff.
 `;
 
 const FEYNMAN_PROMPT = `
@@ -217,6 +242,61 @@ const tools = [
           },
           required: ["newInsight", "existingInsightId", "conflictReason"]
         }
+      },
+      {
+        name: "execute_minor_update",
+        description: "Automatically execute a minor update to the user's dashboard (e.g., skills, attributes, journeyStage, careerHappiness). Use this for non-strategic updates.",
+        parameters: {
+          type: Type.OBJECT,
+          properties: {
+            field: {
+              type: Type.STRING,
+              description: "The field to update (e.g., 'skills', 'attributes', 'journeyStage', 'careerHappiness')"
+            },
+            value: {
+              type: Type.STRING,
+              description: "The new value for the field"
+            },
+            reasoning: {
+              type: Type.STRING,
+              description: "The reason why this update was executed"
+            }
+          },
+          required: ["field", "value", "reasoning"]
+        }
+      },
+      {
+        name: "parse_career_artifact",
+        description: "Analyze a resume, LinkedIn profile, or Job Description for DNA and ATS compliance.",
+        parameters: {
+          type: Type.OBJECT,
+          properties: {
+            artifactType: { 
+              type: Type.STRING,
+              enum: ["resume", "linkedin", "job_description", "other"]
+            },
+            atsScore: { type: Type.NUMBER, description: "Score from 0-100 for ATS compliance" },
+            dnaAlignment: { type: Type.NUMBER, description: "Alignment with confirmed DNA from 0-100" },
+            keyFindings: { type: Type.ARRAY, items: { type: Type.STRING } }
+          },
+          required: ["artifactType", "atsScore", "dnaAlignment", "keyFindings"]
+        }
+      },
+      {
+        name: "generate_ats_optimized_content",
+        description: "Generate ATS-optimized content for a resume or cover letter in a specific format.",
+        parameters: {
+          type: Type.OBJECT,
+          properties: {
+            content: { type: Type.STRING, description: "The optimized text content" },
+            format: { 
+              type: Type.STRING, 
+              enum: ["text", "pdf", "word", "markdown"],
+              description: "The desired export format"
+            }
+          },
+          required: ["content", "format"]
+        }
       }
     ]
   }
@@ -227,6 +307,7 @@ export type SkylarPersona = 'discovery' | 'branding' | 'outreach' | 'rpp';
 export interface ChatMessage {
   role: 'user' | 'model';
   parts: { text: string }[];
+  type?: 'chat' | 'system' | 'proposal' | 'conflict';
 }
 
 export const PERSONA_CONFIG = {
@@ -332,7 +413,8 @@ class SkylarService {
     message: string,
     history: any[] = [],
     methodology: 'lobkowicz' | 'feynman' = 'lobkowicz',
-    token?: string
+    token?: string,
+    fileData?: { data: string; mimeType: string }
   ): Promise<any> {
     try {
       const ai = getAI();
@@ -349,7 +431,7 @@ class SkylarService {
       const systemInstruction = `${baseInstruction}${currentTruth}`;
       
       const chat = ai.chats.create({
-        model: "gemini-3-flash-preview",
+        model: "gemini-3.1-pro-preview",
         config: {
           systemInstruction,
           tools: tools as any,
@@ -364,7 +446,18 @@ class SkylarService {
         }))
       });
 
-      let response = await chat.sendMessage({ message });
+      const messageParts: any[] = [{ text: message }];
+      if (fileData) {
+        messageParts.push({
+          inlineData: {
+            data: fileData.data,
+            mimeType: fileData.mimeType
+          }
+        });
+      }
+
+      const executedActions: any[] = [];
+      let response = await chat.sendMessage({ message: messageParts });
       let calls = response.functionCalls;
 
       // Agentic Loop: Handle tool calls (except proposals which go to the user)
@@ -385,6 +478,17 @@ class SkylarService {
                 id
               }
             });
+          } else if (name === 'execute_minor_update') {
+            console.log(`[SKYLAR] Executing tool: execute_minor_update for field: ${typedArgs.field}`);
+            const result = await this.executeAction(userId, 'update_dashboard', typedArgs, token);
+            executedActions.push({ action: 'execute_minor_update', data: typedArgs, result });
+            toolResponses.push({
+              functionResponse: {
+                name: 'execute_minor_update',
+                response: result,
+                id
+              }
+            });
           } else if (name === 'get_market_intelligence') {
             console.log(`[SKYLAR] Executing tool: get_market_intelligence for industry: ${typedArgs.industry}`);
             const marketData = await this.performMarketIntelligenceSearch(typedArgs.industry as string, typedArgs.role as string, token);
@@ -397,20 +501,46 @@ class SkylarService {
             });
           } else if (name === 'perform_gate_review') {
             console.log(`[SKYLAR] Executing tool: perform_gate_review for ${typedArgs.targetPhase}`);
-            // Gate reviews are handled by Skylar's reasoning. 
-            // If she finds issues, she will return a specific warning in her text response.
-            // We'll return a success for the tool call so she can continue her turn.
+            if (userId) {
+              const reviewResult = await this.performGateReview(userId, typedArgs.currentPhase, typedArgs.targetPhase, history);
+              toolResponses.push({
+                functionResponse: {
+                  name: 'perform_gate_review',
+                  response: reviewResult,
+                  id
+                }
+              });
+            } else {
+              const criteria = GATING_CRITERIA[typedArgs.targetPhase] || [];
+              toolResponses.push({
+                functionResponse: {
+                  name: 'perform_gate_review',
+                  response: { 
+                    status: 'warning', 
+                    message: "User context not found. Performing general criteria review.",
+                    criteria: criteria.map(c => ({ label: c, met: false }))
+                  },
+                  id
+                }
+              });
+            }
+          } else if (name === 'parse_career_artifact') {
+            console.log(`[SKYLAR] Executing tool: parse_career_artifact`);
             toolResponses.push({
               functionResponse: {
-                name: 'perform_gate_review',
-                response: { status: 'review_complete', message: 'Review performed. Communicate findings to user.' },
+                name: 'parse_career_artifact',
+                response: { status: 'analyzed', message: 'Artifact analyzed for DNA and ATS compliance.' },
                 id
               }
             });
-          } else if (name.startsWith('propose_')) {
+          } else if (name === 'generate_ats_optimized_content') {
+            console.log(`[SKYLAR] Executing tool: generate_ats_optimized_content`);
+            // This will be returned to the frontend to show download buttons
+            return { response, executedActions };
+          } else if (name.startsWith('propose_') || name === 'flag_dna_conflict') {
             // Proposals are NOT executed automatically. 
             // We return them to the frontend to trigger the UI Widget.
-            return response;
+            return { response, executedActions };
           }
         }
 
@@ -422,7 +552,7 @@ class SkylarService {
         }
       }
       
-      return response;
+      return { response, executedActions };
     } catch (error) {
       console.error("Skylar Chat Error:", error);
       throw error;

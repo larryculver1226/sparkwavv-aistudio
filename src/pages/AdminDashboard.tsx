@@ -65,6 +65,7 @@ import { auth, db, adminDb } from '../lib/firebase';
 import { FirebaseSetup } from './FirebaseSetup';
 import { IdentityReconciliation } from './IdentityReconciliation';
 import { VertexDashboard } from '../components/admin/VertexDashboard';
+import { ValidationGateReview } from '../components/admin/ValidationGateReview';
 import { 
   JOURNEY_STAGES, 
   TENANTS, 
@@ -996,6 +997,7 @@ export const AdminDashboard: React.FC<{ onLogout: () => void }> = ({ onLogout })
                     { id: 'cloud', label: 'Cloud Resources', icon: Cloud, roles: [ROLES.SUPER_ADMIN, ROLES.ADMIN] },
                     { id: 'security', label: 'Security', icon: ShieldCheck, roles: [ROLES.SUPER_ADMIN, ROLES.ADMIN] },
                     { id: 'vertex', label: 'Vertex AI', icon: Brain, roles: [ROLES.SUPER_ADMIN, ROLES.ADMIN] },
+                    { id: 'validation', label: 'Validation Gates', icon: ShieldCheck, roles: [ROLES.SUPER_ADMIN, ROLES.ADMIN] },
                     { id: 'reconciliation', label: 'Identity Reconciliation', icon: Fingerprint, roles: [ROLES.SUPER_ADMIN, ROLES.ADMIN] },
                     { id: 'logs', label: 'System Logs', icon: Activity, roles: [ROLES.SUPER_ADMIN, ROLES.ADMIN] },
                     { id: 'diagnostics', label: 'Diagnostics', icon: ShieldCheck, roles: [ROLES.SUPER_ADMIN, ROLES.ADMIN] },
@@ -1062,6 +1064,7 @@ export const AdminDashboard: React.FC<{ onLogout: () => void }> = ({ onLogout })
               { id: 'cloud', label: 'Cloud Resources', icon: Cloud, roles: [ROLES.SUPER_ADMIN, ROLES.ADMIN] },
               { id: 'security', label: 'Security', icon: ShieldCheck, roles: [ROLES.SUPER_ADMIN, ROLES.ADMIN] },
               { id: 'vertex', label: 'Vertex AI', icon: Brain, roles: [ROLES.SUPER_ADMIN, ROLES.ADMIN] },
+              { id: 'validation', label: 'Validation Gates', icon: ShieldCheck, roles: [ROLES.SUPER_ADMIN, ROLES.ADMIN] },
               { id: 'reconciliation', label: 'Identity Reconciliation', icon: Fingerprint, roles: [ROLES.SUPER_ADMIN, ROLES.ADMIN] },
               { id: 'logs', label: 'System Logs', icon: Activity, roles: [ROLES.SUPER_ADMIN, ROLES.ADMIN] },
               { id: 'diagnostics', label: 'Diagnostics', icon: ShieldCheck, roles: [ROLES.SUPER_ADMIN, ROLES.ADMIN] },
@@ -1115,6 +1118,7 @@ export const AdminDashboard: React.FC<{ onLogout: () => void }> = ({ onLogout })
               {activeTab === 'reconciliation' && 'Identity Reconciliation'}
               {activeTab === 'logs' && 'System Logs'}
               {activeTab === 'vertex' && 'Vertex AI Enterprise Intelligence'}
+              {activeTab === 'validation' && 'Validation Gate Review'}
               {activeTab === 'diagnostics' && 'Connectivity Diagnostics'}
               {activeTab === 'firebase-setup' && 'Firebase Configuration'}
             </h2>
@@ -1124,6 +1128,7 @@ export const AdminDashboard: React.FC<{ onLogout: () => void }> = ({ onLogout })
               {activeTab === 'identity' && 'Manage Identity Platform users, roles, and security status'}
               {activeTab === 'reconciliation' && 'Reconcile and sync identities across platforms'}
               {activeTab === 'vertex' && 'Managed RAG, Fine-Tuning, and Model Garden (Track B)'}
+              {activeTab === 'validation' && 'Human-in-the-Loop (HITL) Lifecycle Gatekeeping'}
               {activeTab === 'diagnostics' && 'Evaluate SPARKWavv & Firebase integration status'}
               {activeTab === 'firebase-setup' && 'Step-by-step guide to connect your Firebase project'}
               {activeTab !== 'overview' && activeTab !== 'diagnostics' && activeTab !== 'firebase-setup' && activeTab !== 'users' && 'Detailed system metrics'}
@@ -1469,6 +1474,10 @@ export const AdminDashboard: React.FC<{ onLogout: () => void }> = ({ onLogout })
 
         {activeTab === 'vertex' && (
           <VertexDashboard onNotify={(msg, type) => setNotification({ message: msg, type: type as any })} />
+        )}
+
+        {activeTab === 'validation' && (
+          <ValidationGateReview onNotify={(msg, type) => setNotification({ message: msg, type: type as any })} />
         )}
 
         {activeTab === 'identity' && (

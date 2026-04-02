@@ -95,6 +95,90 @@ export class VertexService {
   }
 
   /**
+   * Use specialized intelligence for Finance sector
+   */
+  async getFinanceInsight(prompt: string, context?: string): Promise<string | null> {
+    const ai = getVertexAI();
+    const generativeModel = ai.getGenerativeModel({
+      model: 'gemini-3.1-pro-preview',
+    });
+
+    const enhancedPrompt = `
+      You are Skylar's Finance Intelligence module.
+      Provide strategic career advice for finance professionals (Investment Banking, Fintech, Corporate Finance, etc.) using the Philip Lobkowicz methodology.
+      
+      Context: ${context || 'General finance career strategy'}
+      User Question: ${prompt}
+      
+      Instructions:
+      1. Use financial industry precision (e.g., deal flow, regulatory environment, quantitative analysis).
+      2. Apply the "Five Stories" framework.
+      3. Focus on "Career DNA" alignment within financial institutions.
+      4. Maintain a professional, strategic, and "tough love" tone.
+    `;
+
+    try {
+      const result = await generativeModel.generateContent(enhancedPrompt);
+      const response = await result.response;
+      return response.candidates?.[0]?.content?.parts?.[0]?.text || null;
+    } catch (error: any) {
+      console.error('[VERTEX FINANCE ERROR]', error.message || error);
+      return null;
+    }
+  }
+
+  /**
+   * Use specialized intelligence for Tech sector
+   */
+  async getTechInsight(prompt: string, context?: string): Promise<string | null> {
+    const ai = getVertexAI();
+    const generativeModel = ai.getGenerativeModel({
+      model: 'gemini-3.1-pro-preview',
+    });
+
+    const enhancedPrompt = `
+      You are Skylar's Tech Intelligence module.
+      Provide strategic career advice for tech professionals (Software Engineering, Product Management, AI/ML, etc.) using the Philip Lobkowicz methodology.
+      
+      Context: ${context || 'General tech career strategy'}
+      User Question: ${prompt}
+      
+      Instructions:
+      1. Use tech industry precision (e.g., stack alignment, product lifecycle, disruptive innovation).
+      2. Apply the "Five Stories" framework.
+      3. Focus on "Career DNA" alignment within tech ecosystems.
+      4. Maintain a professional, strategic, and "tough love" tone.
+    `;
+
+    try {
+      const result = await generativeModel.generateContent(enhancedPrompt);
+      const response = await result.response;
+      return response.candidates?.[0]?.content?.parts?.[0]?.text || null;
+    } catch (error: any) {
+      console.error('[VERTEX TECH ERROR]', error.message || error);
+      return null;
+    }
+  }
+
+  /**
+   * Bootstrap a new Vertex AI Vector Search index for the Wavvault
+   */
+  async bootstrapVectorSearchIndex(userId: string): Promise<any> {
+    console.log(`[VERTEX] Bootstrapping Vector Search Index for user: ${userId}`);
+    // This is a long-running operation. In a real scenario, this would:
+    // 1. Export Firestore data to GCS
+    // 2. Create an Index and IndexEndpoint
+    // 3. Deploy the Index to the Endpoint
+    
+    return {
+      id: `vector-index-${Date.now()}`,
+      status: 'INITIALIZING',
+      progress: 0,
+      estimatedCompletion: '2-4 hours'
+    };
+  }
+
+  /**
    * Simulate the Philip Lobkowicz Fine-Tuned Model
    * (In a real scenario, this would call a specific Vertex AI endpoint)
    */

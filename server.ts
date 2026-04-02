@@ -1639,7 +1639,12 @@ async function startServer() {
     // Programs & Cohorts APIs
     app.get("/api/admin/programs", requireRole([ROLES.SUPER_ADMIN, ROLES.ADMIN, ROLES.EDITOR, ROLES.VIEWER, ROLES.OPERATOR]), async (req, res) => {
       try {
-        const snapshot = await db.collection('programs').get();
+        const { tenantId: filterTenantId } = req.query;
+        let query = db.collection('programs');
+        if (filterTenantId && filterTenantId !== 'all') {
+          query = query.where('tenantId', '==', filterTenantId) as any;
+        }
+        const snapshot = await query.get();
         const programs = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
         res.json(programs);
       } catch (error: any) {
@@ -1673,7 +1678,12 @@ async function startServer() {
 
     app.get("/api/admin/cohorts", requireRole([ROLES.SUPER_ADMIN, ROLES.ADMIN, ROLES.EDITOR, ROLES.VIEWER, ROLES.OPERATOR]), async (req, res) => {
       try {
-        const snapshot = await db.collection('cohorts').get();
+        const { tenantId: filterTenantId } = req.query;
+        let query = db.collection('cohorts');
+        if (filterTenantId && filterTenantId !== 'all') {
+          query = query.where('tenantId', '==', filterTenantId) as any;
+        }
+        const snapshot = await query.get();
         const cohorts = snapshot.docs.map(doc => {
           const data = doc.data();
           return {
@@ -1850,7 +1860,8 @@ async function startServer() {
     app.get("/api/admin/users-v2", requireRole([ROLES.SUPER_ADMIN, ROLES.ADMIN, ROLES.EDITOR, ROLES.VIEWER, ROLES.OPERATOR]), async (req, res) => {
       try {
         const db = getFirestoreDb();
-        console.log(`[ADMIN] users-v2 called by ${(req as any).user?.email} (${(req as any).user?.uid})`);
+        const { tenantId: filterTenantId } = req.query;
+        console.log(`[ADMIN] users-v2 called by ${(req as any).user?.email} (${(req as any).user?.uid}) with filterTenantId: ${filterTenantId}`);
         
         // 1. Get all users from Firebase Auth (with safety catch)
         let authUsers: any[] = [];
@@ -1956,7 +1967,14 @@ async function startServer() {
           }
         });
 
-        const finalUsers = Array.from(mergedUsersMap.values());
+        let finalUsers = Array.from(mergedUsersMap.values());
+        
+        // 4. Apply tenant filtering if requested
+        if (filterTenantId && filterTenantId !== 'all') {
+          console.log(`[ADMIN] Filtering users by tenantId: ${filterTenantId}`);
+          finalUsers = finalUsers.filter(u => u.tenantId === filterTenantId);
+        }
+        
         console.log(`[ADMIN] Returning ${finalUsers.length} merged users`);
         
         // Debug: write to file to verify what's being sent to the frontend
@@ -2400,13 +2418,33 @@ async function startServer() {
       const { query } = req.body;
       const authenticatedUser = (req as any).user;
       try {
-        const results = await searchSimilarWavvaults(query, authenticatedUser.tenantId, 3);
-        const anonymizedResults = results.map((res: any) => ({
-          role: res.role,
-          journeyStage: res.journeyStage,
-          strengths: res.strengths || [],
-          careerStories: res.careerStories || [],
-        }));
+        // Upgrade to full semantic search using Vertex AI Search (Managed RAG)
+        const results = await vertexService.searchWavvault(query, authenticatedUser.tenantId);
+        
+        if (!results || results.length === 0) {
+          // Fallback to keyword search if Vertex Search returns nothing
+          const fallbackResults = await searchSimilarWavvaults(query, authenticatedUser.tenantId, 3);
+          const anonymizedFallback = fallbackResults.map((res: any) => ({
+            role: res.role,
+            journeyStage: res.journeyStage,
+            strengths: res.strengths || [],
+            careerStories: res.careerStories || [],
+          }));
+          return res.json({ content: anonymizedFallback });
+        }
+
+        // Map Vertex Search results to the expected format
+        const anonymizedResults = results.map((res: any) => {
+          const data = res.document?.structData || {};
+          return {
+            role: data.role || 'Professional',
+            journeyStage: data.journeyStage || 'Unknown',
+            strengths: data.strengths || [],
+            careerStories: data.careerStories || [],
+            relevanceScore: res.modelRelevanceScore || 0
+          };
+        });
+
         res.json({ content: anonymizedResults });
       } catch (error: any) {
         console.error("[SKYLAR SEARCH ERROR]", error);
@@ -2436,6 +2474,13 @@ async function startServer() {
           }
 
           await logSecurityEvent(null, authenticatedUser, 'AI_DASHBOARD_UPDATE', 'INFO', { uid: userId, email: authenticatedUser.email }, { field, value, reasoning });
+          
+          // Check for Major Shift (Strategic Fields)
+          const strategicFields = ['tagline', 'primaryGoal', 'careerPivot'];
+          if (strategicFields.includes(field)) {
+            await notifyRPP(userId, `Major Career Shift Detected: ${field} updated to ${value}`, reasoning);
+          }
+
           res.json({ success: true, message: `Updated ${field} to ${value}` });
         } else if (action === 'add_milestone') {
           const { title, description, targetDate, reasoning } = data;
@@ -2573,24 +2618,87 @@ async function startServer() {
       if (!db) return res.status(500).json({ error: "Database unavailable" });
 
       try {
-        // 1. Check Cache
+        // 1. Sector-Specific Intelligence using Vertex AI
+        let sectorInsight = null;
+        if (industry.toLowerCase() === 'finance') {
+          sectorInsight = await vertexService.getFinanceInsight(`Analyze the current market for ${role || 'general finance roles'}`, `Industry: Finance, Role: ${role || 'N/A'}`);
+        } else if (industry.toLowerCase() === 'tech') {
+          sectorInsight = await vertexService.getTechInsight(`Analyze the current market for ${role || 'general tech roles'}`, `Industry: Tech, Role: ${role || 'N/A'}`);
+        } else if (industry.toLowerCase() === 'healthcare') {
+          sectorInsight = await vertexService.getHealthcareInsight(`Analyze the current market for ${role || 'general healthcare roles'}`, `Industry: Healthcare, Role: ${role || 'N/A'}`);
+        }
+
+        // 2. Check Cache for general feeds
         const cacheDoc = await db.collection('market_cache').doc('daily_pulse').get();
         let cacheData = cacheDoc.exists ? cacheDoc.data() : null;
         
-        // Filter cache for relevant industry if possible
         let relevantCache = cacheData?.feeds?.filter((f: any) => 
           f.source.toLowerCase().includes(industry.toLowerCase()) || 
           f.items.some((i: any) => i.title.toLowerCase().includes(industry.toLowerCase()))
         ) || [];
 
         res.json({ 
+          sectorInsight,
           cache: relevantCache, 
-          message: relevantCache.length > 0 ? "Found relevant cached data." : "No relevant cached data found. Suggesting live search."
+          message: relevantCache.length > 0 || sectorInsight ? "Found relevant intelligence." : "No relevant data found. Suggesting live search."
         });
       } catch (error: any) {
         res.status(500).json({ error: error.message });
       }
     });
+
+    app.post("/api/skylar/bootstrap-vector", requireRole([ROLES.ADMIN]), async (req, res) => {
+      const { userId } = req.body;
+      try {
+        const status = await vertexService.bootstrapVectorSearchIndex(userId);
+        res.json(status);
+      } catch (error: any) {
+        res.status(500).json({ error: error.message });
+      }
+    });
+
+    async function notifyRPP(userId: string, title: string, message: string) {
+      const db = getFirestoreDb();
+      if (!db) return;
+
+      try {
+        // 1. Find Mentor/RPP for this user
+        const userDoc = await db.collection('users').doc(userId).get();
+        const userData = userDoc.data();
+        const mentorId = userData?.mentorId;
+
+        if (mentorId) {
+          const mentorDoc = await db.collection('users').doc(mentorId).get();
+          const mentorData = mentorDoc.data();
+
+          // 2. In-App Alert
+          await db.collection('alerts').add({
+            userId: mentorId,
+            fromUserId: userId,
+            title,
+            message,
+            type: 'MAJOR_SHIFT',
+            status: 'unread',
+            createdAt: FieldValue.serverTimestamp()
+          });
+
+          // 3. Email Notification (SendGrid)
+          if (mentorData?.email && process.env.SENDGRID_API_KEY) {
+            const msg = {
+              to: mentorData.email,
+              from: 'skylar@sparkwavv.com', // Replace with verified sender
+              subject: `[Skylar Alert] Major Career Shift: ${userData.displayName || 'A User'}`,
+              text: `Hello ${mentorData.displayName || 'Mentor'},\n\nSkylar has detected a major career shift for ${userData.displayName || 'a user'}.\n\nDetails: ${message}\n\nPlease log in to the Sparkwavv platform to review this shift and provide guidance.\n\nBest,\nSkylar AI`,
+              html: `<p>Hello ${mentorData.displayName || 'Mentor'},</p><p>Skylar has detected a major career shift for <strong>${userData.displayName || 'a user'}</strong>.</p><p><strong>Details:</strong> ${message}</p><p>Please log in to the Sparkwavv platform to review this shift and provide guidance.</p><p>Best,<br>Skylar AI</p>`,
+            };
+            await sgMail.send(msg);
+            console.log(`[SKYLAR] Email notification sent to RPP: ${mentorData.email}`);
+          }
+        }
+      } catch (error) {
+        console.error("[SKYLAR] Error notifying RPP:", error);
+      }
+    }
 
     // --- VERTEX AI (TRACK B) ENDPOINTS ---
 

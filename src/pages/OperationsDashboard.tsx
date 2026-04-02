@@ -140,20 +140,21 @@ export const OperationsDashboard: React.FC<{ onLogout?: () => void }> = ({ onLog
     if (activeTab === 'users') fetchUsers();
     if (activeTab === 'cohorts') fetchCohorts();
     if (activeTab === 'programs') fetchPrograms();
-  }, [activeTab]);
+  }, [activeTab, selectedTenant]);
 
   const fetchUsers = async () => {
     setLoading(true);
     try {
-      const res = await fetch('/api/admin/users-v2');
+      const res = await fetch(`/api/admin/users-v2?tenantId=${selectedTenant}`);
       if (res.ok) {
         const data = await res.json();
-        // Filter to only show regular users (user, client, guest)
-        const regularUsers = (data.users || []).filter((u: any) => {
+        // Filter to only show relevant users (exclude super_admins if needed, or show all)
+        const filteredUsers = (data.users || []).filter((u: any) => {
           const role = typeof u.role === 'string' ? u.role : u.role?.role;
-          return role === ROLES.USER || role === ROLES.CLIENT || role === ROLES.GUEST;
+          // Show everyone except Super Admins in the Operations Dashboard
+          return role !== ROLES.SUPER_ADMIN;
         });
-        setUsers(regularUsers);
+        setUsers(filteredUsers);
       }
     } catch (e) {
       console.error("Failed to fetch users:", e);
@@ -165,7 +166,7 @@ export const OperationsDashboard: React.FC<{ onLogout?: () => void }> = ({ onLog
   const fetchCohorts = async () => {
     setLoading(true);
     try {
-      const res = await fetch('/api/admin/cohorts');
+      const res = await fetch(`/api/admin/cohorts?tenantId=${selectedTenant}`);
       if (res.ok) {
         const data = await res.json();
         setCohorts(data || []);
@@ -180,7 +181,7 @@ export const OperationsDashboard: React.FC<{ onLogout?: () => void }> = ({ onLog
   const fetchPrograms = async () => {
     setLoading(true);
     try {
-      const res = await fetch('/api/admin/programs');
+      const res = await fetch(`/api/admin/programs?tenantId=${selectedTenant}`);
       if (res.ok) {
         const data = await res.json();
         setPrograms(data || []);
@@ -338,7 +339,8 @@ export const OperationsDashboard: React.FC<{ onLogout?: () => void }> = ({ onLog
                       subscriptionTier: 'DIVE-IN',
                       hasWavvault: false,
                       onboardingProgress: 0,
-                      role: 'user'
+                      role: 'user',
+                      tenantId: selectedTenant !== 'all' ? selectedTenant : 'sparkwavv'
                     });
                     setIsModalOpen(true);
                   }}
