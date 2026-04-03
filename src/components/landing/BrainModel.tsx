@@ -27,14 +27,14 @@ export const BrainModel: React.FC = () => {
         </p>
       </div>
 
-      <div className="grid md:grid-cols-2 gap-12 items-start">
+      <div className="grid md:grid-cols-2 gap-12 items-stretch">
         {/* Left Brain - The Kick */}
         <motion.div 
           initial={{ x: -50, opacity: 0 }}
           whileInView={{ x: 0, opacity: 1 }}
-          className="glass-panel p-8 border-neon-cyan/20 space-y-8"
+          className="glass-panel p-8 border-neon-cyan/20 flex flex-col h-full"
         >
-          <div className="flex items-center gap-4 border-b border-white/10 pb-6">
+          <div className="flex items-center gap-4 border-b border-white/10 pb-6 mb-8">
             <div className="p-3 rounded-xl bg-neon-cyan/10">
               <Brain className="w-8 h-8 text-neon-cyan" />
             </div>
@@ -44,7 +44,7 @@ export const BrainModel: React.FC = () => {
             </div>
           </div>
 
-          <div className="space-y-6">
+          <div className="flex-grow space-y-6">
             <div className="space-y-4">
               <div className="flex justify-between items-end">
                 <label className="text-sm font-medium text-white/60 uppercase tracking-wider">Current Annual Salary</label>
@@ -87,11 +87,11 @@ export const BrainModel: React.FC = () => {
                 description="Avoiding the wrong career move"
               />
             </div>
+          </div>
 
-            <div className="pt-6 border-t border-white/10 flex justify-between items-center">
-              <span className="text-lg font-bold uppercase tracking-widest text-white/40">Total Potential Gain</span>
-              <span className="text-3xl font-bold text-neon-cyan neon-text-cyan">${totalGain.toLocaleString()}</span>
-            </div>
+          <div className="pt-6 mt-8 border-t border-white/10 flex justify-between items-center">
+            <span className="text-lg font-bold uppercase tracking-widest text-white/40">Total Potential Gain</span>
+            <span className="text-3xl font-bold text-neon-cyan neon-text-cyan">${totalGain.toLocaleString()}</span>
           </div>
         </motion.div>
 
@@ -99,9 +99,9 @@ export const BrainModel: React.FC = () => {
         <motion.div 
           initial={{ x: 50, opacity: 0 }}
           whileInView={{ x: 0, opacity: 1 }}
-          className="glass-panel p-8 border-purple-500/20 space-y-8"
+          className="glass-panel p-8 border-purple-500/20 flex flex-col h-full"
         >
-          <div className="flex items-center gap-4 border-b border-white/10 pb-6">
+          <div className="flex items-center gap-4 border-b border-white/10 pb-6 mb-8">
             <div className="p-3 rounded-xl bg-purple-500/10">
               <Lightbulb className="w-8 h-8 text-purple-400" />
             </div>
@@ -111,7 +111,7 @@ export const BrainModel: React.FC = () => {
             </div>
           </div>
 
-          <div className="grid gap-6">
+          <div className="flex-grow grid gap-6">
             <QualitativeCard 
               icon={<Heart className="w-6 h-6" />} 
               label="Inspiration" 
@@ -134,7 +134,7 @@ export const BrainModel: React.FC = () => {
             />
           </div>
 
-          <div className="pt-8 text-center">
+          <div className="pt-8 mt-8 border-t border-white/5 text-center">
             <p className="text-white/40 italic text-sm">
               "Productivity is a shadow of energy. You must learn the art of the reboot." — Skylar
             </p>

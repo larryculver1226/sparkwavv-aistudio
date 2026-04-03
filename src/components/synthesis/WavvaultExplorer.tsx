@@ -24,6 +24,8 @@ export const WavvaultExplorer: React.FC<WavvaultExplorerProps> = ({ userId, even
     setSelectedArtifact,
     searchQuery,
     setSearchQuery,
+    selectedPhase,
+    setSelectedPhase,
     narrativeStage,
     activeArtifactId,
     setActiveArtifactId,
@@ -47,7 +49,12 @@ export const WavvaultExplorer: React.FC<WavvaultExplorerProps> = ({ userId, even
 
       <main className="max-w-7xl mx-auto px-6 py-16 relative z-10">
         {/* Search & Filter Bar */}
-        <ExplorerSearch searchQuery={searchQuery} setSearchQuery={setSearchQuery} />
+        <ExplorerSearch 
+          searchQuery={searchQuery} 
+          setSearchQuery={setSearchQuery} 
+          selectedPhase={selectedPhase}
+          setSelectedPhase={setSelectedPhase}
+        />
 
         <AnimatePresence mode="wait">
           {viewMode === 'linear' ? (

@@ -151,7 +151,7 @@ export const Roadmap: React.FC = () => {
         transition={{ delay: 0.8 }}
         className="mt-16 text-center"
       >
-        <p className="text-[10px] text-white/20 uppercase tracking-[0.5em] font-bold">
+        <p className="text-[11px] text-white/40 uppercase tracking-[0.5em] font-bold">
           A Linear Progression from Internal Assessment to External Market Engagement
         </p>
       </motion.div>

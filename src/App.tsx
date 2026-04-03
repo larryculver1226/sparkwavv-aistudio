@@ -839,7 +839,7 @@ export function SPARKWavvApp({ isAdmin = false, initialStep }: { isAdmin?: boole
                 </AnimatePresence>
                 
                 <div className="flex flex-col sm:flex-row items-center justify-center gap-4 pt-4">
-                  <p className="text-sm text-white/40 max-w-3xl mx-auto leading-relaxed italic">
+                  <p className="text-xl text-white/60 max-w-4xl mx-auto leading-relaxed italic">
                     I operate on strategy, data, and results—not small talk. My objective is to extract your Career DNA, align it with the Market Intelligence Grid, and guide you through the required Validation Gates to achieve your professional goals. If you are ready to begin, we start at Phase 1: **Dive-In**. Tell me your current role, your immediate pain points, and what is driving your need for a career change, or provide a resume/LinkedIn profile so we can establish your baseline. Let's get to work.
                   </p>
                 </div>

@@ -42,6 +42,7 @@ export interface DistilledArtifact {
   id: string;
   type: 'spark' | 'pie-of-life' | 'perfect-day' | 'five-stories' | 'brand-pillar' | 'manifesto';
   title: string;
+  phase?: 'Dive-In' | 'Ignition' | 'Discovery' | 'Branding' | 'Outreach';
   content: any;
   timestamp: string;
   sourceGateId?: string;

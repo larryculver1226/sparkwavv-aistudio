@@ -62,6 +62,9 @@ import { SentimentMotivationModal } from '../components/dashboard/SentimentMotiv
 import { GateReviewModal } from '../components/dashboard/GateReviewModal';
 import { SectorIntelligence } from '../components/dashboard/SectorIntelligence';
 import { InactivityTimeout } from '../components/dashboard/InactivityTimeout';
+import { RequiredActions } from '../components/dashboard/RequiredActions';
+import { WavvaultHighlights } from '../components/dashboard/WavvaultHighlights';
+import { useWavvaultData } from '../hooks/useWavvaultData';
 import { skylar } from '../services/skylarService';
 
 const MiniGauge: React.FC<{ value: number; label: string; color: string }> = ({ value, label, color }) => {
@@ -253,6 +256,16 @@ const JourneyTimeline: React.FC<{ stage: string }> = ({ stage }) => {
                   Active Phase
                 </motion.div>
               )}
+
+              {isNext && (
+                <motion.div 
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  className="mt-2 px-4 py-1.5 rounded-full bg-white/5 border border-white/10 text-white/40 font-black uppercase tracking-widest group-hover:bg-neon-cyan group-hover:text-black group-hover:border-neon-cyan transition-all"
+                >
+                  Validation Gate
+                </motion.div>
+              )}
             </div>
           );
         })}
@@ -329,6 +342,7 @@ export const UserDashboard: React.FC<{ userId: string; isAdmin?: boolean }> = ({
   const { user, profile, status, error: authError } = useIdentity();
   const isConfirmed = status === 'authenticated';
   const navigate = useNavigate();
+  const { artifacts } = useWavvaultData();
   const [data, setData] = useState<DashboardData | null>(null);
   const [insights, setInsights] = useState<UserInsight[]>([]);
   const [showEvolution, setShowEvolution] = useState(false);
@@ -1134,6 +1148,28 @@ export const UserDashboard: React.FC<{ userId: string; isAdmin?: boolean }> = ({
             </motion.div>
           )}
         </AnimatePresence>
+        
+        {/* Journey Progress & Actions */}
+        <div className="mb-12 grid grid-cols-1 lg:grid-cols-2 gap-8">
+          <RequiredActions 
+            milestones={data?.milestones || []}
+            validationPending={data?.validationPending}
+            suggestionsCount={suggestions.length}
+            currentStage={timelineStage}
+            onActionClick={(actionId) => {
+              if (actionId === 'suggestions') {
+                // Scroll to suggestions or handle
+              } else if (actionId === 'validation') {
+                setIsGateModalOpen(true);
+              }
+            }}
+          />
+          <WavvaultHighlights 
+            artifacts={artifacts} 
+            stage="Branding"
+            isLocked={['Dive-In', 'Ignition', 'Discovery'].includes(timelineStage)}
+          />
+        </div>
 
         {/* Neural Synthesis Engine - Prominent Module */}
         <div className="mb-12 grid grid-cols-1 lg:grid-cols-3 gap-8">

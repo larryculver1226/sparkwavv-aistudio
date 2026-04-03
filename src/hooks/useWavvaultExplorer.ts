@@ -6,6 +6,7 @@ export type NarrativeStage = 'idle' | 'sequencing' | 'mapping' | 'spark' | 'comp
 export const useWavvaultExplorer = (events: ValidationGateEvent[], artifacts: DistilledArtifact[]) => {
   const [viewMode, setViewMode] = useState<'linear' | 'branching'>('linear');
   const [selectedArtifact, setSelectedArtifact] = useState<DistilledArtifact | null>(null);
+  const [selectedPhase, setSelectedPhase] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [narrativeStage, setNarrativeStage] = useState<NarrativeStage>('idle');
   const [activeArtifactId, setActiveArtifactId] = useState<string | undefined>();
@@ -23,15 +24,19 @@ export const useWavvaultExplorer = (events: ValidationGateEvent[], artifacts: Di
     sequence();
   }, []);
 
-  const filteredArtifacts = useMemo(() => artifacts.filter(a => 
-    a.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    a.type.toLowerCase().includes(searchQuery.toLowerCase())
-  ), [artifacts, searchQuery]);
+  const filteredArtifacts = useMemo(() => artifacts.filter(a => {
+    const matchesSearch = a.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      a.type.toLowerCase().includes(searchQuery.toLowerCase());
+    const matchesPhase = !selectedPhase || a.phase === selectedPhase;
+    return matchesSearch && matchesPhase;
+  }), [artifacts, searchQuery, selectedPhase]);
 
-  const filteredEvents = useMemo(() => events.filter(e => 
-    e.phase.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    e.verdict.toLowerCase().includes(searchQuery.toLowerCase())
-  ), [events, searchQuery]);
+  const filteredEvents = useMemo(() => events.filter(e => {
+    const matchesSearch = e.phase.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      e.verdict.toLowerCase().includes(searchQuery.toLowerCase());
+    const matchesPhase = !selectedPhase || e.phase === selectedPhase;
+    return matchesSearch && matchesPhase;
+  }), [events, searchQuery, selectedPhase]);
 
   const timelineItems = useMemo(() => [
     ...filteredArtifacts.map(a => ({ type: 'artifact' as const, data: a, timestamp: new Date(a.timestamp) })),
@@ -45,6 +50,8 @@ export const useWavvaultExplorer = (events: ValidationGateEvent[], artifacts: Di
     setSelectedArtifact,
     searchQuery,
     setSearchQuery,
+    selectedPhase,
+    setSelectedPhase,
     narrativeStage,
     activeArtifactId,
     setActiveArtifactId,
