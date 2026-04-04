@@ -1,6 +1,15 @@
 import React from 'react';
 import { motion } from 'motion/react';
-import { Briefcase, Target, Zap, ChevronRight, Star, MapPin, DollarSign, Clock } from 'lucide-react';
+import {
+  Briefcase,
+  Target,
+  Zap,
+  ChevronRight,
+  Star,
+  MapPin,
+  DollarSign,
+  Clock,
+} from 'lucide-react';
 
 interface JobMatch {
   id: string;
@@ -22,7 +31,7 @@ const MOCK_MATCHES: JobMatch[] = [
     salary: '$180k - $240k',
     matchScore: 98.4,
     tags: ['AI/ML', 'Design Systems', 'Product Strategy'],
-    postedAt: '2 hours ago'
+    postedAt: '2 hours ago',
   },
   {
     id: '2',
@@ -32,7 +41,7 @@ const MOCK_MATCHES: JobMatch[] = [
     salary: '$200k - $280k',
     matchScore: 96.2,
     tags: ['Branding', 'Motion Design', 'Leadership'],
-    postedAt: '5 hours ago'
+    postedAt: '5 hours ago',
   },
   {
     id: '3',
@@ -42,8 +51,8 @@ const MOCK_MATCHES: JobMatch[] = [
     salary: '$160k - $210k',
     matchScore: 94.8,
     tags: ['User Research', 'Service Design', 'Innovation'],
-    postedAt: '1 day ago'
-  }
+    postedAt: '1 day ago',
+  },
 ];
 
 interface JobMatchesViewProps {
@@ -55,7 +64,7 @@ export const JobMatchesView: React.FC<JobMatchesViewProps> = ({ onBack }) => {
     <div className="space-y-8">
       <header className="space-y-4">
         <div className="flex items-center gap-4">
-          <button 
+          <button
             onClick={onBack}
             className="p-2 rounded-xl bg-white/5 border border-white/10 text-white/40 hover:text-white transition-colors"
           >
@@ -63,11 +72,14 @@ export const JobMatchesView: React.FC<JobMatchesViewProps> = ({ onBack }) => {
           </button>
           <div className="flex items-center gap-2 text-neon-lime">
             <Target className="w-5 h-5" />
-            <h2 className="text-2xl font-display font-bold uppercase tracking-tight">Precision Job Matches</h2>
+            <h2 className="text-2xl font-display font-bold uppercase tracking-tight">
+              Precision Job Matches
+            </h2>
           </div>
         </div>
         <p className="text-white/40 text-sm max-w-2xl pl-14">
-          Our neural engine has identified these high-value opportunities that align with your unique professional DNA and career trajectory.
+          Our neural engine has identified these high-value opportunities that align with your
+          unique professional DNA and career trajectory.
         </p>
       </header>
 
@@ -87,7 +99,9 @@ export const JobMatchesView: React.FC<JobMatchesViewProps> = ({ onBack }) => {
                     <Briefcase className="w-6 h-6" />
                   </div>
                   <div>
-                    <h3 className="text-xl font-bold group-hover:text-neon-lime transition-colors">{job.title}</h3>
+                    <h3 className="text-xl font-bold group-hover:text-neon-lime transition-colors">
+                      {job.title}
+                    </h3>
                     <p className="text-white/60 font-medium">{job.company}</p>
                   </div>
                 </div>
@@ -108,8 +122,11 @@ export const JobMatchesView: React.FC<JobMatchesViewProps> = ({ onBack }) => {
                 </div>
 
                 <div className="flex flex-wrap gap-2">
-                  {job.tags.map(tag => (
-                    <span key={tag} className="px-3 py-1 rounded-full bg-white/5 border border-white/10 text-[10px] font-bold uppercase tracking-wider text-white/60">
+                  {job.tags.map((tag) => (
+                    <span
+                      key={tag}
+                      className="px-3 py-1 rounded-full bg-white/5 border border-white/10 text-[10px] font-bold uppercase tracking-wider text-white/60"
+                    >
                       {tag}
                     </span>
                   ))}
@@ -120,9 +137,13 @@ export const JobMatchesView: React.FC<JobMatchesViewProps> = ({ onBack }) => {
                 <div className="text-right">
                   <div className="flex items-center gap-2 text-neon-lime mb-1">
                     <Star className="w-4 h-4 fill-neon-lime" />
-                    <span className="text-2xl font-display font-bold tracking-tight">{job.matchScore}%</span>
+                    <span className="text-2xl font-display font-bold tracking-tight">
+                      {job.matchScore}%
+                    </span>
                   </div>
-                  <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-white/20">Match Precision</p>
+                  <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-white/20">
+                    Match Precision
+                  </p>
                 </div>
 
                 <button className="px-6 py-3 rounded-xl bg-neon-lime/10 border border-neon-lime/20 text-neon-lime text-xs font-bold uppercase tracking-widest hover:bg-neon-lime/20 transition-all flex items-center gap-2 group/btn">

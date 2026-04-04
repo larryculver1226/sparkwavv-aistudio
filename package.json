@@ -11,6 +11,9 @@
     "update-skills": "node scripts/update-skills.js",
     "clean": "rm -rf dist",
     "lint": "tsc --noEmit",
+    "qa": "eslint src/ && prettier --check src/",
+    "format": "prettier --write src/",
+    "generate": "gemini --prompt",
     "test": "vitest run",
     "test:watch": "vitest",
     "test:e2e": "playwright test"
@@ -54,6 +57,8 @@
     "vite": "^6.2.0"
   },
   "devDependencies": {
+    "@eslint/js": "^10.0.1",
+    "@google/gemini-cli": "^0.36.0",
     "@playwright/test": "^1.58.2",
     "@testing-library/jest-dom": "^6.9.1",
     "@testing-library/react": "^16.3.2",
@@ -63,10 +68,16 @@
     "@types/uuid": "^10.0.0",
     "@vitest/ui": "^4.1.0",
     "autoprefixer": "^10.4.21",
+    "eslint": "^10.2.0",
+    "eslint-plugin-react-hooks": "^7.0.1",
+    "eslint-plugin-react-refresh": "^0.5.2",
+    "globals": "^17.4.0",
     "jsdom": "^28.1.0",
+    "prettier": "^3.8.1",
     "tailwindcss": "^4.1.14",
     "tsx": "^4.21.0",
     "typescript": "~5.8.2",
+    "typescript-eslint": "^8.58.0",
     "vite": "^6.2.0",
     "vitest": "^4.1.0"
   }

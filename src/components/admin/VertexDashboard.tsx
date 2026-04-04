@@ -1,11 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { 
-  Database, 
-  RefreshCw, 
-  Brain, 
-  Search, 
-  ShieldCheck, 
+import {
+  Database,
+  RefreshCw,
+  Brain,
+  Search,
+  ShieldCheck,
   Activity,
   Zap,
   FileJson,
@@ -15,7 +15,7 @@ import {
   Download,
   CloudUpload,
   ExternalLink,
-  Settings
+  Settings,
 } from 'lucide-react';
 import { auth } from '../../lib/firebase';
 
@@ -44,7 +44,7 @@ export const VertexDashboard: React.FC<VertexDashboardProps> = ({ onNotify }) =>
     try {
       const idToken = await auth.currentUser?.getIdToken();
       const response = await fetch('/api/admin/vertex/synthetic-data', {
-        headers: { 'Authorization': `Bearer ${idToken}` }
+        headers: { Authorization: `Bearer ${idToken}` },
       });
       const data = await response.json();
       if (data.success) {
@@ -84,19 +84,19 @@ export const VertexDashboard: React.FC<VertexDashboardProps> = ({ onNotify }) =>
       const idToken = await auth.currentUser?.getIdToken();
       const response = await fetch('/api/admin/vertex/generate-synthetic', {
         method: 'POST',
-        headers: { 
+        headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${idToken}`
+          Authorization: `Bearer ${idToken}`,
         },
         body: JSON.stringify({
           scenarios: [
-            "Mid-career professional feeling stuck in a plateau",
-            "Senior leader transitioning from corporate to entrepreneurship",
+            'Mid-career professional feeling stuck in a plateau',
+            'Senior leader transitioning from corporate to entrepreneurship',
             "Early-career talent looking to identify their 'Spark'",
-            "Executive facing a major organizational change",
-            "Individual contributor wanting to move into management"
-          ]
-        })
+            'Executive facing a major organizational change',
+            'Individual contributor wanting to move into management',
+          ],
+        }),
       });
       const data = await response.json();
       if (data.success) {
@@ -119,7 +119,7 @@ export const VertexDashboard: React.FC<VertexDashboardProps> = ({ onNotify }) =>
       const response = await fetch('/api/skylar/patterns', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ query: searchQuery })
+        body: JSON.stringify({ query: searchQuery }),
       });
       const data = await response.json();
       if (data.success) {
@@ -140,7 +140,7 @@ export const VertexDashboard: React.FC<VertexDashboardProps> = ({ onNotify }) =>
       const idToken = await auth.currentUser?.getIdToken();
       const response = await fetch('/api/admin/vertex/upload-to-gcs', {
         method: 'POST',
-        headers: { 'Authorization': `Bearer ${idToken}` }
+        headers: { Authorization: `Bearer ${idToken}` },
       });
       const data = await response.json();
       if (data.success) {
@@ -158,17 +158,17 @@ export const VertexDashboard: React.FC<VertexDashboardProps> = ({ onNotify }) =>
 
   const handleStartTuning = async () => {
     if (!gcsUri) return;
-    
+
     setIsTuning(true);
     try {
       const idToken = await auth.currentUser?.getIdToken();
       const response = await fetch('/api/admin/vertex/start-tuning', {
         method: 'POST',
-        headers: { 
-          'Authorization': `Bearer ${idToken}`,
-          'Content-Type': 'application/json'
+        headers: {
+          Authorization: `Bearer ${idToken}`,
+          'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ gcsUri, modelName: 'gemini-1.5-flash-002' })
+        body: JSON.stringify({ gcsUri, modelName: 'gemini-1.5-flash-002' }),
       });
       const data = await response.json();
       if (data.success) {
@@ -191,11 +191,11 @@ export const VertexDashboard: React.FC<VertexDashboardProps> = ({ onNotify }) =>
       const idToken = await auth.currentUser.getIdToken();
       const response = await fetch('/api/skylar/bootstrap-vector', {
         method: 'POST',
-        headers: { 
+        headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${idToken}`
+          Authorization: `Bearer ${idToken}`,
         },
-        body: JSON.stringify({ userId: auth.currentUser.uid })
+        body: JSON.stringify({ userId: auth.currentUser.uid }),
       });
       const data = await response.json();
       setBootstrapStatus(data);
@@ -216,7 +216,9 @@ export const VertexDashboard: React.FC<VertexDashboardProps> = ({ onNotify }) =>
             <Brain className="w-8 h-8 text-neon-cyan" />
             Vertex AI Enterprise Intelligence
           </h2>
-          <p className="text-gray-400 mt-1">Managed RAG, Fine-Tuning, and Sector-Specific Intelligence (Track B)</p>
+          <p className="text-gray-400 mt-1">
+            Managed RAG, Fine-Tuning, and Sector-Specific Intelligence (Track B)
+          </p>
         </div>
         <div className="flex gap-3">
           <button
@@ -246,7 +248,9 @@ export const VertexDashboard: React.FC<VertexDashboardProps> = ({ onNotify }) =>
             <span className="text-xs font-mono text-gray-500 uppercase">Managed RAG</span>
           </div>
           <div className="text-3xl font-display font-bold text-white">Vertex AI Search</div>
-          <p className="text-sm text-gray-400 mt-2">Cross-user "Career DNA" pattern recognition enabled.</p>
+          <p className="text-sm text-gray-400 mt-2">
+            Cross-user "Career DNA" pattern recognition enabled.
+          </p>
         </div>
 
         <div className="bg-dark-surface/50 border border-white/10 p-6 rounded-xl">
@@ -255,7 +259,9 @@ export const VertexDashboard: React.FC<VertexDashboardProps> = ({ onNotify }) =>
             <span className="text-xs font-mono text-gray-500 uppercase">Fine-Tuning</span>
           </div>
           <div className="text-3xl font-display font-bold text-white">Lobkowicz v1</div>
-          <p className="text-sm text-gray-400 mt-2">Methodology fine-tuning in progress (Synthetic Phase).</p>
+          <p className="text-sm text-gray-400 mt-2">
+            Methodology fine-tuning in progress (Synthetic Phase).
+          </p>
         </div>
 
         <div className="bg-dark-surface/50 border border-white/10 p-6 rounded-xl">
@@ -275,7 +281,9 @@ export const VertexDashboard: React.FC<VertexDashboardProps> = ({ onNotify }) =>
             <Search className="w-5 h-5 text-neon-cyan" />
             DNA Pattern Matcher (Managed RAG)
           </h3>
-          <p className="text-sm text-gray-400 mt-1">Test Skylar's ability to find patterns across the entire Wavvault.</p>
+          <p className="text-sm text-gray-400 mt-1">
+            Test Skylar's ability to find patterns across the entire Wavvault.
+          </p>
         </div>
         <div className="p-6">
           <div className="flex gap-4 mb-6">
@@ -306,8 +314,12 @@ export const VertexDashboard: React.FC<VertexDashboardProps> = ({ onNotify }) =>
                   className="p-4 bg-white/5 border border-white/10 rounded-lg"
                 >
                   <div className="flex items-center justify-between mb-2">
-                    <span className="text-xs font-mono text-neon-cyan uppercase">Match Score: {(result.score * 100).toFixed(1)}%</span>
-                    <span className="text-xs text-gray-500">{result.metadata?.industry || 'General'}</span>
+                    <span className="text-xs font-mono text-neon-cyan uppercase">
+                      Match Score: {(result.score * 100).toFixed(1)}%
+                    </span>
+                    <span className="text-xs text-gray-500">
+                      {result.metadata?.industry || 'General'}
+                    </span>
                   </div>
                   <p className="text-gray-300 text-sm leading-relaxed">{result.content}</p>
                 </motion.div>
@@ -330,31 +342,45 @@ export const VertexDashboard: React.FC<VertexDashboardProps> = ({ onNotify }) =>
               <Database className="w-5 h-5 text-neon-cyan" />
               Vector Search Infrastructure (Wavvault v2)
             </h3>
-            <p className="text-sm text-gray-400 mt-1">Bootstrap and monitor Vertex AI Vector Search indices.</p>
+            <p className="text-sm text-gray-400 mt-1">
+              Bootstrap and monitor Vertex AI Vector Search indices.
+            </p>
           </div>
           <button
             onClick={handleBootstrapVector}
-            disabled={isBootstrapping || (bootstrapStatus && bootstrapStatus.status === 'INITIALIZING')}
+            disabled={
+              isBootstrapping || (bootstrapStatus && bootstrapStatus.status === 'INITIALIZING')
+            }
             className="flex items-center gap-2 px-4 py-2 bg-neon-cyan/10 border border-neon-cyan/30 text-neon-cyan rounded-lg hover:bg-neon-cyan/20 transition-all disabled:opacity-50"
           >
             <RefreshCw className={`w-4 h-4 ${isBootstrapping ? 'animate-spin' : ''}`} />
-            {isBootstrapping ? 'Initiating...' : bootstrapStatus?.status === 'INITIALIZING' ? 'Initializing Index...' : 'Bootstrap Vector Index'}
+            {isBootstrapping
+              ? 'Initiating...'
+              : bootstrapStatus?.status === 'INITIALIZING'
+                ? 'Initializing Index...'
+                : 'Bootstrap Vector Index'}
           </button>
         </div>
-        
+
         {bootstrapStatus && (
           <div className="p-6 border-t border-white/10">
             <div className="flex items-center justify-between mb-4">
               <div className="flex items-center gap-3">
-                <div className={`w-3 h-3 rounded-full ${bootstrapStatus.status === 'INITIALIZING' ? 'bg-yellow-500 animate-pulse' : 'bg-green-500'}`} />
-                <span className="text-sm font-bold text-white">Status: {bootstrapStatus.status}</span>
+                <div
+                  className={`w-3 h-3 rounded-full ${bootstrapStatus.status === 'INITIALIZING' ? 'bg-yellow-500 animate-pulse' : 'bg-green-500'}`}
+                />
+                <span className="text-sm font-bold text-white">
+                  Status: {bootstrapStatus.status}
+                </span>
               </div>
-              <span className="text-xs font-mono text-gray-500">Index ID: {bootstrapStatus.id}</span>
+              <span className="text-xs font-mono text-gray-500">
+                Index ID: {bootstrapStatus.id}
+              </span>
             </div>
-            
+
             <div className="w-full bg-white/5 rounded-full h-2 mb-2">
-              <div 
-                className="bg-neon-cyan h-2 rounded-full transition-all duration-500" 
+              <div
+                className="bg-neon-cyan h-2 rounded-full transition-all duration-500"
                 style={{ width: `${bootstrapStatus.progress || 10}%` }}
               />
             </div>
@@ -383,7 +409,9 @@ export const VertexDashboard: React.FC<VertexDashboardProps> = ({ onNotify }) =>
                 <div className="text-xs text-gray-500">Active</div>
               </div>
             </div>
-            <div className="px-2 py-1 bg-green-500/20 text-green-500 text-[10px] font-bold rounded uppercase">Running</div>
+            <div className="px-2 py-1 bg-green-500/20 text-green-500 text-[10px] font-bold rounded uppercase">
+              Running
+            </div>
           </div>
 
           <div className="flex items-center justify-between p-4 bg-white/5 border border-white/10 rounded-lg">
@@ -396,7 +424,9 @@ export const VertexDashboard: React.FC<VertexDashboardProps> = ({ onNotify }) =>
                 <div className="text-xs text-gray-500">Active</div>
               </div>
             </div>
-            <div className="px-2 py-1 bg-blue-500/20 text-blue-500 text-[10px] font-bold rounded uppercase">Running</div>
+            <div className="px-2 py-1 bg-blue-500/20 text-blue-500 text-[10px] font-bold rounded uppercase">
+              Running
+            </div>
           </div>
 
           <div className="flex items-center justify-between p-4 bg-white/5 border border-white/10 rounded-lg">
@@ -409,7 +439,9 @@ export const VertexDashboard: React.FC<VertexDashboardProps> = ({ onNotify }) =>
                 <div className="text-xs text-gray-500">Active</div>
               </div>
             </div>
-            <div className="px-2 py-1 bg-purple-500/20 text-purple-500 text-[10px] font-bold rounded uppercase">Running</div>
+            <div className="px-2 py-1 bg-purple-500/20 text-purple-500 text-[10px] font-bold rounded uppercase">
+              Running
+            </div>
           </div>
         </div>
       </div>
@@ -422,12 +454,14 @@ export const VertexDashboard: React.FC<VertexDashboardProps> = ({ onNotify }) =>
               <FileJson className="w-5 h-5 text-purple-500" />
               Synthetic Training Data Review (Phase 2)
             </h3>
-            <p className="text-sm text-gray-400 mt-1">Review generated dialogues for Philip Lobkowicz fine-tuning.</p>
+            <p className="text-sm text-gray-400 mt-1">
+              Review generated dialogues for Philip Lobkowicz fine-tuning.
+            </p>
           </div>
           <div className="flex items-center gap-2">
             {syntheticData.length > 0 && (
               <>
-                <button 
+                <button
                   onClick={handleUploadToGCS}
                   disabled={isUploading}
                   className="flex items-center gap-2 px-3 py-1.5 bg-purple-500/20 border border-purple-500/30 text-purple-500 text-xs rounded-lg hover:bg-purple-500/30 transition-all disabled:opacity-50"
@@ -436,7 +470,7 @@ export const VertexDashboard: React.FC<VertexDashboardProps> = ({ onNotify }) =>
                   {isUploading ? 'Uploading...' : 'Upload to GCS'}
                 </button>
                 {gcsUri && (
-                  <button 
+                  <button
                     onClick={handleStartTuning}
                     disabled={isTuning || !!tuningJob}
                     className="flex items-center gap-2 px-3 py-1.5 bg-blue-500/20 border border-blue-500/30 text-blue-500 text-xs rounded-lg hover:bg-blue-500/30 transition-all disabled:opacity-50"
@@ -445,9 +479,12 @@ export const VertexDashboard: React.FC<VertexDashboardProps> = ({ onNotify }) =>
                     {isTuning ? 'Starting...' : tuningJob ? 'Job Started' : 'Start Fine-Tuning'}
                   </button>
                 )}
-                <button 
+                <button
                   onClick={() => {
-                    const blob = new Blob([syntheticData.map(d => JSON.stringify(d)).join('\n')], { type: 'application/x-jsonlines' });
+                    const blob = new Blob(
+                      [syntheticData.map((d) => JSON.stringify(d)).join('\n')],
+                      { type: 'application/x-jsonlines' }
+                    );
                     const url = URL.createObjectURL(blob);
                     const a = document.createElement('a');
                     a.href = url;
@@ -473,7 +510,7 @@ export const VertexDashboard: React.FC<VertexDashboardProps> = ({ onNotify }) =>
                   <div className="text-xs text-gray-400 font-mono">{gcsUri}</div>
                 </div>
               </div>
-              <a 
+              <a
                 href={`https://console.cloud.google.com/storage/browser/${gcsUri.replace('gs://', '')}`}
                 target="_blank"
                 rel="noopener noreferrer"
@@ -492,7 +529,7 @@ export const VertexDashboard: React.FC<VertexDashboardProps> = ({ onNotify }) =>
             <div className="space-y-3">
               {syntheticData.map((entry, idx) => (
                 <div key={idx} className="border border-white/5 rounded-lg overflow-hidden">
-                  <button 
+                  <button
                     onClick={() => setExpandedEntry(expandedEntry === idx ? null : idx)}
                     className="w-full flex items-center justify-between p-4 bg-white/5 hover:bg-white/10 transition-all text-left"
                   >
@@ -502,11 +539,15 @@ export const VertexDashboard: React.FC<VertexDashboardProps> = ({ onNotify }) =>
                         {entry.contents[0].parts[0].text}
                       </span>
                     </div>
-                    {expandedEntry === idx ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+                    {expandedEntry === idx ? (
+                      <ChevronUp className="w-4 h-4" />
+                    ) : (
+                      <ChevronDown className="w-4 h-4" />
+                    )}
                   </button>
                   <AnimatePresence>
                     {expandedEntry === idx && (
-                      <motion.div 
+                      <motion.div
                         initial={{ height: 0, opacity: 0 }}
                         animate={{ height: 'auto', opacity: 1 }}
                         exit={{ height: 0, opacity: 0 }}
@@ -514,13 +555,17 @@ export const VertexDashboard: React.FC<VertexDashboardProps> = ({ onNotify }) =>
                       >
                         <div className="p-4 space-y-4">
                           <div className="space-y-1">
-                            <p className="text-[10px] font-mono text-gray-500 uppercase">Client Input</p>
+                            <p className="text-[10px] font-mono text-gray-500 uppercase">
+                              Client Input
+                            </p>
                             <p className="text-sm text-gray-300 bg-white/5 p-3 rounded-lg border border-white/5">
                               {entry.contents[0].parts[0].text}
                             </p>
                           </div>
                           <div className="space-y-1">
-                            <p className="text-[10px] font-mono text-purple-500 uppercase">Philip Lobkowicz Response</p>
+                            <p className="text-[10px] font-mono text-purple-500 uppercase">
+                              Philip Lobkowicz Response
+                            </p>
                             <p className="text-sm text-white bg-purple-500/10 p-3 rounded-lg border border-purple-500/20 italic">
                               {entry.contents[1].parts[0].text}
                             </p>
@@ -535,7 +580,9 @@ export const VertexDashboard: React.FC<VertexDashboardProps> = ({ onNotify }) =>
           ) : (
             <div className="text-center py-12 border border-dashed border-white/10 rounded-lg">
               <AlertCircle className="w-12 h-12 text-gray-600 mx-auto mb-4" />
-              <p className="text-gray-500">No synthetic data generated yet. Click "Generate Synthetic Data" above.</p>
+              <p className="text-gray-500">
+                No synthetic data generated yet. Click "Generate Synthetic Data" above.
+              </p>
             </div>
           )}
         </div>

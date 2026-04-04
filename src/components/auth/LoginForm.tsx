@@ -20,12 +20,14 @@ export function LoginForm({ onEmailLogin, onGoogleLogin, loading, error }: Login
 
   return (
     <div className="glass-panel p-8 space-y-6">
-      <Button 
+      <Button
         onClick={onGoogleLogin}
         disabled={loading}
         className="w-full py-4 text-lg bg-white text-black hover:bg-white/90"
       >
-        {loading ? <Loader2 className="w-5 h-5 animate-spin mx-auto" /> : (
+        {loading ? (
+          <Loader2 className="w-5 h-5 animate-spin mx-auto" />
+        ) : (
           <>
             Sign in with Google <ArrowRight className="ml-2 w-5 h-5" />
           </>
@@ -43,8 +45,10 @@ export function LoginForm({ onEmailLogin, onGoogleLogin, loading, error }: Login
 
       <form onSubmit={handleSubmit} className="space-y-4">
         <div className="space-y-2">
-          <label className="text-xs font-medium text-white/40 uppercase tracking-widest">Email Address</label>
-          <input 
+          <label className="text-xs font-medium text-white/40 uppercase tracking-widest">
+            Email Address
+          </label>
+          <input
             type="email"
             required
             value={email}
@@ -54,8 +58,10 @@ export function LoginForm({ onEmailLogin, onGoogleLogin, loading, error }: Login
           />
         </div>
         <div className="space-y-2">
-          <label className="text-xs font-medium text-white/40 uppercase tracking-widest">Password</label>
-          <input 
+          <label className="text-xs font-medium text-white/40 uppercase tracking-widest">
+            Password
+          </label>
+          <input
             type="password"
             required
             value={password}
@@ -65,11 +71,7 @@ export function LoginForm({ onEmailLogin, onGoogleLogin, loading, error }: Login
           />
         </div>
         {error && <p className="text-xs text-red-500">{error}</p>}
-        <Button 
-          type="submit"
-          disabled={loading}
-          className="w-full py-4 mt-4"
-        >
+        <Button type="submit" disabled={loading} className="w-full py-4 mt-4">
           {loading ? <Loader2 className="w-5 h-5 animate-spin mx-auto" /> : 'Sign In'}
         </Button>
       </form>

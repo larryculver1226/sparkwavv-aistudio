@@ -1,15 +1,15 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { 
-  Play, 
-  Pause, 
-  SkipForward, 
-  Zap, 
-  Brain, 
+import {
+  Play,
+  Pause,
+  SkipForward,
+  Zap,
+  Brain,
   Database,
   Sparkles,
   Volume2,
-  VolumeX
+  VolumeX,
 } from 'lucide-react';
 import { UserInsight } from '../../types/dashboard';
 import { EvolutionVisualizer } from '../EvolutionVisualizer';
@@ -20,16 +20,13 @@ interface SynthesisNarrativeProps {
   onComplete: () => void;
 }
 
-export const SynthesisNarrative: React.FC<SynthesisNarrativeProps> = ({ 
-  insights, 
-  onComplete 
-}) => {
+export const SynthesisNarrative: React.FC<SynthesisNarrativeProps> = ({ insights, onComplete }) => {
   const [currentIndex, setCurrentIndex] = useState(0);
   const [isPaused, setIsPaused] = useState(false);
   const [isMuted, setIsMuted] = useState(false);
   const [narrativeText, setNarrativeText] = useState('');
   const [isTyping, setIsTyping] = useState(false);
-  
+
   const currentInsight = insights[currentIndex];
 
   useEffect(() => {
@@ -46,23 +43,23 @@ export const SynthesisNarrative: React.FC<SynthesisNarrativeProps> = ({
 
     // Generate narrative text (simulated Skylar voice)
     const text = `I've synthesized a new signal from your Wavvault. This ${currentInsight.type.replace('_', ' ')} marker suggests: ${currentInsight.content}. It correlates with your existing DNA filaments.`;
-    
+
     setNarrativeText('');
     setIsTyping(true);
-    
+
     let i = 0;
     const interval = setInterval(() => {
-      setNarrativeText(prev => prev + text[i]);
+      setNarrativeText((prev) => prev + text[i]);
       i++;
       if (i >= text.length) {
         clearInterval(interval);
         setIsTyping(false);
-        
+
         // Auto-advance after a delay if not paused
         if (!isPaused) {
           setTimeout(() => {
             if (currentIndex < insights.length - 1) {
-              setCurrentIndex(prev => prev + 1);
+              setCurrentIndex((prev) => prev + 1);
             } else {
               // Final flare before completing
               audioService.playFusionFlare();
@@ -86,7 +83,7 @@ export const SynthesisNarrative: React.FC<SynthesisNarrativeProps> = ({
   };
 
   return (
-    <motion.div 
+    <motion.div
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       exit={{ opacity: 0 }}
@@ -106,19 +103,23 @@ export const SynthesisNarrative: React.FC<SynthesisNarrativeProps> = ({
             <Brain className="w-6 h-6 text-neon-cyan animate-pulse" />
           </div>
           <div>
-            <h3 className="text-xl font-display font-bold text-white tracking-tight uppercase">Skylar Synthesis</h3>
-            <p className="text-[10px] text-neon-cyan font-bold uppercase tracking-[0.3em]">Ignition Phase Active</p>
+            <h3 className="text-xl font-display font-bold text-white tracking-tight uppercase">
+              Skylar Synthesis
+            </h3>
+            <p className="text-[10px] text-neon-cyan font-bold uppercase tracking-[0.3em]">
+              Ignition Phase Active
+            </p>
           </div>
         </div>
 
         <div className="flex items-center gap-4">
-          <button 
+          <button
             onClick={togglePause}
             className="p-4 rounded-2xl bg-white/5 border border-white/10 text-white/60 hover:text-neon-cyan hover:border-neon-cyan/30 transition-all"
           >
             {isPaused ? <Play className="w-6 h-6" /> : <Pause className="w-6 h-6" />}
           </button>
-          <button 
+          <button
             onClick={onComplete}
             className="p-4 rounded-2xl bg-white/5 border border-white/10 text-white/60 hover:text-white transition-all"
           >
@@ -130,7 +131,7 @@ export const SynthesisNarrative: React.FC<SynthesisNarrativeProps> = ({
       {/* Main Content: Visualizer */}
       <div className="w-full max-w-6xl aspect-video relative z-10 rounded-[3rem] overflow-hidden border border-white/10 shadow-2xl bg-black/40">
         <EvolutionVisualizer insights={insights} />
-        
+
         {/* Narrative Overlay */}
         <div className="absolute bottom-0 left-0 right-0 p-12 bg-gradient-to-t from-black/90 via-black/60 to-transparent">
           <div className="max-w-3xl">
@@ -146,10 +147,12 @@ export const SynthesisNarrative: React.FC<SynthesisNarrativeProps> = ({
                 </div>
                 <div className="h-px flex-1 bg-white/10" />
               </div>
-              
+
               <p className="text-2xl font-display font-medium text-white/90 leading-relaxed min-h-[6rem]">
                 {narrativeText}
-                {isTyping && <span className="inline-block w-1 h-6 bg-neon-cyan ml-1 animate-pulse" />}
+                {isTyping && (
+                  <span className="inline-block w-1 h-6 bg-neon-cyan ml-1 animate-pulse" />
+                )}
               </p>
 
               <div className="flex items-center gap-8 text-[10px] text-white/40 font-bold uppercase tracking-widest">
@@ -170,7 +173,7 @@ export const SynthesisNarrative: React.FC<SynthesisNarrativeProps> = ({
       {/* Progress Indicator */}
       <div className="absolute bottom-12 left-1/2 -translate-x-1/2 flex gap-2">
         {insights.map((_, idx) => (
-          <div 
+          <div
             key={idx}
             className={`h-1 transition-all duration-500 rounded-full ${idx === currentIndex ? 'w-12 bg-neon-cyan' : 'w-4 bg-white/10'}`}
           />

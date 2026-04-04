@@ -14,7 +14,7 @@ export default function DiveInPage() {
         <div className="absolute bottom-1/4 right-1/4 w-96 h-96 bg-purple-500/10 blur-[120px] rounded-full animate-pulse delay-1000" />
       </div>
 
-      <motion.div 
+      <motion.div
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
         className="max-w-2xl w-full text-center space-y-12 relative z-10"
@@ -37,13 +37,14 @@ export default function DiveInPage() {
           <div className="space-y-4">
             <h2 className="text-2xl font-bold">Ready to ignite your brand?</h2>
             <p className="text-white/60 leading-relaxed max-w-md mx-auto">
-              You are currently in the <span className="text-white font-bold">Dive-In</span> phase. 
-              Authenticate your identity to unlock your personal dashboard and start your acceleration.
+              You are currently in the <span className="text-white font-bold">Dive-In</span> phase.
+              Authenticate your identity to unlock your personal dashboard and start your
+              acceleration.
             </p>
           </div>
 
           <div className="pt-4">
-            <button 
+            <button
               onClick={() => loginWithPopup()}
               className="group relative px-8 py-5 bg-white text-black rounded-2xl font-bold text-lg hover:scale-[1.02] transition-all flex items-center gap-3 mx-auto overflow-hidden"
             >

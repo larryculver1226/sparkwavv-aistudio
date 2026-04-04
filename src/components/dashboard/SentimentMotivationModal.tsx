@@ -17,7 +17,7 @@ interface SentimentMotivationModalProps {
 export const SentimentMotivationModal: React.FC<SentimentMotivationModalProps> = ({
   isOpen,
   onClose,
-  data
+  data,
 }) => {
   return (
     <AnimatePresence>
@@ -30,7 +30,7 @@ export const SentimentMotivationModal: React.FC<SentimentMotivationModalProps> =
             onClick={onClose}
             className="absolute inset-0 bg-black/80 backdrop-blur-sm"
           />
-          
+
           <motion.div
             initial={{ opacity: 0, scale: 0.9, y: 20 }}
             animate={{ opacity: 1, scale: 1, y: 0 }}
@@ -44,11 +44,15 @@ export const SentimentMotivationModal: React.FC<SentimentMotivationModalProps> =
                   <Brain className="w-6 h-6 text-neon-magenta" />
                 </div>
                 <div>
-                  <h2 className="text-2xl font-display font-bold text-white">Emotional Intelligence</h2>
-                  <p className="text-xs text-white/40 uppercase tracking-widest font-bold">Sentiment & Motivation Analysis</p>
+                  <h2 className="text-2xl font-display font-bold text-white">
+                    Emotional Intelligence
+                  </h2>
+                  <p className="text-xs text-white/40 uppercase tracking-widest font-bold">
+                    Sentiment & Motivation Analysis
+                  </p>
                 </div>
               </div>
-              <button 
+              <button
                 onClick={onClose}
                 className="p-2 rounded-xl hover:bg-white/5 text-white/40 hover:text-white transition-colors"
               >
@@ -61,11 +65,15 @@ export const SentimentMotivationModal: React.FC<SentimentMotivationModalProps> =
               <div className="grid grid-cols-2 gap-8">
                 <div className="space-y-4">
                   <div className="flex items-center justify-between">
-                    <span className="text-xs font-bold uppercase tracking-widest text-white/40">Current Sentiment</span>
-                    <span className="text-xl font-display font-bold text-neon-cyan">{data.sentiment}%</span>
+                    <span className="text-xs font-bold uppercase tracking-widest text-white/40">
+                      Current Sentiment
+                    </span>
+                    <span className="text-xl font-display font-bold text-neon-cyan">
+                      {data.sentiment}%
+                    </span>
                   </div>
                   <div className="h-2 bg-white/5 rounded-full overflow-hidden">
-                    <motion.div 
+                    <motion.div
                       initial={{ width: 0 }}
                       animate={{ width: `${data.sentiment}%` }}
                       className="h-full bg-neon-cyan shadow-[0_0_10px_rgba(0,243,255,0.5)]"
@@ -78,11 +86,15 @@ export const SentimentMotivationModal: React.FC<SentimentMotivationModalProps> =
 
                 <div className="space-y-4">
                   <div className="flex items-center justify-between">
-                    <span className="text-xs font-bold uppercase tracking-widest text-white/40">Motivation Level</span>
-                    <span className="text-xl font-display font-bold text-neon-magenta">{data.motivation}%</span>
+                    <span className="text-xs font-bold uppercase tracking-widest text-white/40">
+                      Motivation Level
+                    </span>
+                    <span className="text-xl font-display font-bold text-neon-magenta">
+                      {data.motivation}%
+                    </span>
                   </div>
                   <div className="h-2 bg-white/5 rounded-full overflow-hidden">
-                    <motion.div 
+                    <motion.div
                       initial={{ width: 0 }}
                       animate={{ width: `${data.motivation}%` }}
                       className="h-full bg-neon-magenta shadow-[0_0_10px_rgba(255,0,255,0.5)]"
@@ -103,7 +115,10 @@ export const SentimentMotivationModal: React.FC<SentimentMotivationModalProps> =
                   </div>
                   <div className="flex flex-wrap gap-2">
                     {data.topDrivers.map((driver, i) => (
-                      <span key={i} className="px-3 py-1 rounded-lg bg-neon-lime/5 border border-neon-lime/20 text-neon-lime text-[10px] font-bold uppercase tracking-wider">
+                      <span
+                        key={i}
+                        className="px-3 py-1 rounded-lg bg-neon-lime/5 border border-neon-lime/20 text-neon-lime text-[10px] font-bold uppercase tracking-wider"
+                      >
                         {driver}
                       </span>
                     ))}
@@ -113,11 +128,16 @@ export const SentimentMotivationModal: React.FC<SentimentMotivationModalProps> =
                 <div className="space-y-4">
                   <div className="flex items-center gap-2 text-neon-magenta">
                     <Heart className="w-4 h-4" />
-                    <h3 className="text-xs font-bold uppercase tracking-widest">Potential Anxieties</h3>
+                    <h3 className="text-xs font-bold uppercase tracking-widest">
+                      Potential Anxieties
+                    </h3>
                   </div>
                   <div className="flex flex-wrap gap-2">
                     {data.anxieties.map((anxiety, i) => (
-                      <span key={i} className="px-3 py-1 rounded-lg bg-neon-magenta/5 border border-neon-magenta/20 text-neon-magenta text-[10px] font-bold uppercase tracking-wider">
+                      <span
+                        key={i}
+                        className="px-3 py-1 rounded-lg bg-neon-magenta/5 border border-neon-magenta/20 text-neon-magenta text-[10px] font-bold uppercase tracking-wider"
+                      >
                         {anxiety}
                       </span>
                     ))}
@@ -129,11 +149,11 @@ export const SentimentMotivationModal: React.FC<SentimentMotivationModalProps> =
               <div className="p-6 rounded-2xl bg-white/5 border border-white/10 space-y-3">
                 <div className="flex items-center gap-2 text-white/60">
                   <Zap className="w-4 h-4" />
-                  <h3 className="text-[10px] font-bold uppercase tracking-widest">Skylar's EQ Insight</h3>
+                  <h3 className="text-[10px] font-bold uppercase tracking-widest">
+                    Skylar's EQ Insight
+                  </h3>
                 </div>
-                <p className="text-sm text-white/80 leading-relaxed">
-                  {data.summary}
-                </p>
+                <p className="text-sm text-white/80 leading-relaxed">{data.summary}</p>
               </div>
             </div>
 

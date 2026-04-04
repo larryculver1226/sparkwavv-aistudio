@@ -1,14 +1,14 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { 
-  Rocket, 
-  User, 
-  Database, 
-  Upload, 
-  CreditCard, 
-  ChevronRight, 
-  ChevronLeft, 
-  CheckCircle2, 
+import {
+  Rocket,
+  User,
+  Database,
+  Upload,
+  CreditCard,
+  ChevronRight,
+  ChevronLeft,
+  CheckCircle2,
   Sparkles,
   ShieldCheck,
   Zap,
@@ -16,7 +16,7 @@ import {
   Target,
   ArrowRight,
   Loader2,
-  Lock
+  Lock,
 } from 'lucide-react';
 import { useIdentity } from '../contexts/IdentityContext';
 import { Button } from '../components/Button';
@@ -34,7 +34,7 @@ const steps: IgnitionStep[] = [
   { id: 1, title: 'Profile', icon: <User className="w-5 h-5" /> },
   { id: 2, title: 'Wavvault', icon: <Database className="w-5 h-5" /> },
   { id: 3, title: 'Resume', icon: <Upload className="w-5 h-5" /> },
-  { id: 4, title: 'Subscription', icon: <CreditCard className="w-5 h-5" /> }
+  { id: 4, title: 'Subscription', icon: <CreditCard className="w-5 h-5" /> },
 ];
 
 export const IgnitionPage: React.FC<{ onComplete: () => void }> = ({ onComplete }) => {
@@ -54,9 +54,9 @@ export const IgnitionPage: React.FC<{ onComplete: () => void }> = ({ onComplete 
       coreStrength: '',
       primaryGoal: '',
       biggestChallenge: '',
-      idealRole: ''
+      idealRole: '',
     },
-    resumeUploaded: false
+    resumeUploaded: false,
   });
 
   const handleNext = () => {
@@ -79,7 +79,7 @@ export const IgnitionPage: React.FC<{ onComplete: () => void }> = ({ onComplete 
     }
 
     if (currentStep < steps.length) {
-      setCurrentStep(prev => prev + 1);
+      setCurrentStep((prev) => prev + 1);
     } else {
       handleFinalize();
     }
@@ -95,16 +95,16 @@ export const IgnitionPage: React.FC<{ onComplete: () => void }> = ({ onComplete 
       reader.onload = async (event) => {
         const base64 = (event.target?.result as string).split(',')[1];
         const result = await parseResume(base64, file.type);
-        
+
         if (result) {
-          setFormData(prev => ({
+          setFormData((prev) => ({
             ...prev,
             firstName: result.name?.split(' ')[0] || prev.firstName,
             lastName: result.name?.split(' ').slice(1).join(' ') || prev.lastName,
             jobTitle: result.role || prev.jobTitle,
             bio: result.bio || prev.bio,
             industry: result.industry || prev.industry,
-            resumeUploaded: true
+            resumeUploaded: true,
           }));
         }
       };
@@ -119,13 +119,13 @@ export const IgnitionPage: React.FC<{ onComplete: () => void }> = ({ onComplete 
   const handlePayment = async () => {
     setPaymentStatus('processing');
     // Simulate payment delay
-    await new Promise(resolve => setTimeout(resolve, 2000));
+    await new Promise((resolve) => setTimeout(resolve, 2000));
     setPaymentStatus('completed');
   };
 
   const handleBack = () => {
     if (currentStep > 1) {
-      setCurrentStep(prev => prev - 1);
+      setCurrentStep((prev) => prev - 1);
     }
   };
 
@@ -139,7 +139,7 @@ export const IgnitionPage: React.FC<{ onComplete: () => void }> = ({ onComplete 
         bio: formData.bio,
         location: formData.location,
         journeyStage: 'Ignition',
-        onboardingComplete: true // Marking as complete after this flow
+        onboardingComplete: true, // Marking as complete after this flow
       });
 
       // Seed Wavvault in Firestore
@@ -147,7 +147,7 @@ export const IgnitionPage: React.FC<{ onComplete: () => void }> = ({ onComplete 
         await updateDoc(doc(db, 'users', user.uid), {
           wavvaultSeeds: formData.wavvaultSeeds,
           ignitionCompletedAt: serverTimestamp(),
-          journeyStage: 'Discovery' // Move to next stage
+          journeyStage: 'Discovery', // Move to next stage
         });
 
         // Initialize Wavvault entry via API
@@ -155,8 +155,8 @@ export const IgnitionPage: React.FC<{ onComplete: () => void }> = ({ onComplete 
         await fetch('/api/wavvault/user', {
           method: 'POST',
           headers: {
-            'Authorization': `Bearer ${idToken}`,
-            'Content-Type': 'application/json'
+            Authorization: `Bearer ${idToken}`,
+            'Content-Type': 'application/json',
           },
           body: JSON.stringify({
             userId: user.uid,
@@ -164,10 +164,10 @@ export const IgnitionPage: React.FC<{ onComplete: () => void }> = ({ onComplete 
             strengths: [formData.wavvaultSeeds.coreStrength],
             careerStories: [
               `Primary Goal: ${formData.wavvaultSeeds.primaryGoal}`,
-              `Biggest Challenge: ${formData.wavvaultSeeds.biggestChallenge}`
+              `Biggest Challenge: ${formData.wavvaultSeeds.biggestChallenge}`,
             ],
-            isCommit: true
-          })
+            isCommit: true,
+          }),
         });
       }
 
@@ -203,7 +203,8 @@ export const IgnitionPage: React.FC<{ onComplete: () => void }> = ({ onComplete 
             Fuel Your <span className="text-neon-cyan italic">Trajectory</span>
           </h1>
           <p className="text-white/60 text-lg max-w-2xl mx-auto">
-            Complete your profile and seed your Wavvault to unlock the full power of Skylar and the SPARKWavv ecosystem.
+            Complete your profile and seed your Wavvault to unlock the full power of Skylar and the
+            SPARKWavv ecosystem.
           </p>
         </div>
 
@@ -212,16 +213,18 @@ export const IgnitionPage: React.FC<{ onComplete: () => void }> = ({ onComplete 
           <div className="absolute top-1/2 left-0 w-full h-0.5 bg-white/5 -translate-y-1/2 z-0" />
           {steps.map((step) => (
             <div key={step.id} className="relative z-10 flex flex-col items-center gap-3">
-              <div 
+              <div
                 className={`w-12 h-12 rounded-2xl flex items-center justify-center transition-all duration-500 border ${
-                  currentStep >= step.id 
-                    ? 'bg-neon-cyan text-black border-neon-cyan shadow-[0_0_20px_rgba(0,255,255,0.3)]' 
+                  currentStep >= step.id
+                    ? 'bg-neon-cyan text-black border-neon-cyan shadow-[0_0_20px_rgba(0,255,255,0.3)]'
                     : 'bg-dark-surface text-white/40 border-white/10'
                 }`}
               >
                 {currentStep > step.id ? <CheckCircle2 className="w-6 h-6" /> : step.icon}
               </div>
-              <span className={`text-[10px] font-bold uppercase tracking-widest ${currentStep >= step.id ? 'text-neon-cyan' : 'text-white/20'}`}>
+              <span
+                className={`text-[10px] font-bold uppercase tracking-widest ${currentStep >= step.id ? 'text-neon-cyan' : 'text-white/20'}`}
+              >
                 {step.title}
               </span>
             </div>
@@ -241,41 +244,49 @@ export const IgnitionPage: React.FC<{ onComplete: () => void }> = ({ onComplete 
               >
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   <div className="space-y-2">
-                    <label className="text-xs font-bold text-white/40 uppercase tracking-widest ml-1">First Name</label>
-                    <input 
+                    <label className="text-xs font-bold text-white/40 uppercase tracking-widest ml-1">
+                      First Name
+                    </label>
+                    <input
                       type="text"
                       value={formData.firstName}
-                      onChange={(e) => setFormData({...formData, firstName: e.target.value})}
+                      onChange={(e) => setFormData({ ...formData, firstName: e.target.value })}
                       className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white focus:border-neon-cyan/50 focus:ring-1 focus:ring-neon-cyan/50 transition-all outline-none"
                       placeholder="Enter your first name"
                     />
                   </div>
                   <div className="space-y-2">
-                    <label className="text-xs font-bold text-white/40 uppercase tracking-widest ml-1">Last Name</label>
-                    <input 
+                    <label className="text-xs font-bold text-white/40 uppercase tracking-widest ml-1">
+                      Last Name
+                    </label>
+                    <input
                       type="text"
                       value={formData.lastName}
-                      onChange={(e) => setFormData({...formData, lastName: e.target.value})}
+                      onChange={(e) => setFormData({ ...formData, lastName: e.target.value })}
                       className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white focus:border-neon-cyan/50 focus:ring-1 focus:ring-neon-cyan/50 transition-all outline-none"
                       placeholder="Enter your last name"
                     />
                   </div>
                 </div>
                 <div className="space-y-2">
-                  <label className="text-xs font-bold text-white/40 uppercase tracking-widest ml-1">Current Job Title</label>
-                  <input 
+                  <label className="text-xs font-bold text-white/40 uppercase tracking-widest ml-1">
+                    Current Job Title
+                  </label>
+                  <input
                     type="text"
                     value={formData.jobTitle}
-                    onChange={(e) => setFormData({...formData, jobTitle: e.target.value})}
+                    onChange={(e) => setFormData({ ...formData, jobTitle: e.target.value })}
                     className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white focus:border-neon-cyan/50 focus:ring-1 focus:ring-neon-cyan/50 transition-all outline-none"
                     placeholder="e.g. Senior Product Designer"
                   />
                 </div>
                 <div className="space-y-2">
-                  <label className="text-xs font-bold text-white/40 uppercase tracking-widest ml-1">Professional Bio</label>
-                  <textarea 
+                  <label className="text-xs font-bold text-white/40 uppercase tracking-widest ml-1">
+                    Professional Bio
+                  </label>
+                  <textarea
                     value={formData.bio}
-                    onChange={(e) => setFormData({...formData, bio: e.target.value})}
+                    onChange={(e) => setFormData({ ...formData, bio: e.target.value })}
                     className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white focus:border-neon-cyan/50 focus:ring-1 focus:ring-neon-cyan/50 transition-all outline-none min-h-[120px] resize-none"
                     placeholder="Tell us a bit about your journey..."
                   />
@@ -293,30 +304,57 @@ export const IgnitionPage: React.FC<{ onComplete: () => void }> = ({ onComplete 
               >
                 <div className="space-y-6">
                   <div className="space-y-2">
-                    <label className="text-xs font-bold text-white/40 uppercase tracking-widest ml-1">What is your core professional strength?</label>
-                    <input 
+                    <label className="text-xs font-bold text-white/40 uppercase tracking-widest ml-1">
+                      What is your core professional strength?
+                    </label>
+                    <input
                       type="text"
                       value={formData.wavvaultSeeds.coreStrength}
-                      onChange={(e) => setFormData({...formData, wavvaultSeeds: {...formData.wavvaultSeeds, coreStrength: e.target.value}})}
+                      onChange={(e) =>
+                        setFormData({
+                          ...formData,
+                          wavvaultSeeds: {
+                            ...formData.wavvaultSeeds,
+                            coreStrength: e.target.value,
+                          },
+                        })
+                      }
                       className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white focus:border-neon-cyan/50 focus:ring-1 focus:ring-neon-cyan/50 transition-all outline-none"
                       placeholder="e.g. Strategic Problem Solving"
                     />
                   </div>
                   <div className="space-y-2">
-                    <label className="text-xs font-bold text-white/40 uppercase tracking-widest ml-1">What is your primary career goal for the next 12 months?</label>
-                    <input 
+                    <label className="text-xs font-bold text-white/40 uppercase tracking-widest ml-1">
+                      What is your primary career goal for the next 12 months?
+                    </label>
+                    <input
                       type="text"
                       value={formData.wavvaultSeeds.primaryGoal}
-                      onChange={(e) => setFormData({...formData, wavvaultSeeds: {...formData.wavvaultSeeds, primaryGoal: e.target.value}})}
+                      onChange={(e) =>
+                        setFormData({
+                          ...formData,
+                          wavvaultSeeds: { ...formData.wavvaultSeeds, primaryGoal: e.target.value },
+                        })
+                      }
                       className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white focus:border-neon-cyan/50 focus:ring-1 focus:ring-neon-cyan/50 transition-all outline-none"
                       placeholder="e.g. Transition into AI Product Management"
                     />
                   </div>
                   <div className="space-y-2">
-                    <label className="text-xs font-bold text-white/40 uppercase tracking-widest ml-1">What is your biggest professional challenge right now?</label>
-                    <textarea 
+                    <label className="text-xs font-bold text-white/40 uppercase tracking-widest ml-1">
+                      What is your biggest professional challenge right now?
+                    </label>
+                    <textarea
                       value={formData.wavvaultSeeds.biggestChallenge}
-                      onChange={(e) => setFormData({...formData, wavvaultSeeds: {...formData.wavvaultSeeds, biggestChallenge: e.target.value}})}
+                      onChange={(e) =>
+                        setFormData({
+                          ...formData,
+                          wavvaultSeeds: {
+                            ...formData.wavvaultSeeds,
+                            biggestChallenge: e.target.value,
+                          },
+                        })
+                      }
                       className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white focus:border-neon-cyan/50 focus:ring-1 focus:ring-neon-cyan/50 transition-all outline-none min-h-[100px] resize-none"
                       placeholder="Be honest, Skylar is here to help..."
                     />
@@ -341,18 +379,20 @@ export const IgnitionPage: React.FC<{ onComplete: () => void }> = ({ onComplete 
                   <p className="text-white/40 text-sm max-w-xs mx-auto mb-8">
                     Optional: Let Skylar parse your history to build a more accurate DNA profile.
                   </p>
-                  <input 
-                    type="file" 
-                    className="hidden" 
-                    id="resume-upload" 
+                  <input
+                    type="file"
+                    className="hidden"
+                    id="resume-upload"
                     accept=".pdf,.doc,.docx,.txt"
-                    onChange={handleResumeUpload} 
+                    onChange={handleResumeUpload}
                     disabled={parsingResume}
                   />
-                  <label 
+                  <label
                     htmlFor="resume-upload"
                     className={`px-8 py-3 rounded-full font-bold text-sm transition-colors cursor-pointer flex items-center gap-2 mx-auto w-fit ${
-                      parsingResume ? 'bg-white/10 text-white/40 cursor-not-allowed' : 'bg-white text-black hover:bg-neon-cyan'
+                      parsingResume
+                        ? 'bg-white/10 text-white/40 cursor-not-allowed'
+                        : 'bg-white text-black hover:bg-neon-cyan'
                     }`}
                   >
                     {parsingResume ? (
@@ -387,7 +427,8 @@ export const IgnitionPage: React.FC<{ onComplete: () => void }> = ({ onComplete 
                   <Zap className="w-12 h-12 text-neon-cyan mx-auto mb-6" />
                   <h3 className="text-2xl font-bold mb-4">Unlock the Sparkwavv Ecosystem</h3>
                   <p className="text-white/60 mb-8 max-w-md mx-auto">
-                    Subscribe to Sparkwavv to access Skylar Pro, the Wavvault, and our exclusive career acceleration tools.
+                    Subscribe to Sparkwavv to access Skylar Pro, the Wavvault, and our exclusive
+                    career acceleration tools.
                   </p>
                   <div className="flex flex-col gap-4 max-w-sm mx-auto">
                     <div className="flex items-center justify-between p-4 rounded-2xl bg-white/5 border border-white/10">
@@ -396,33 +437,35 @@ export const IgnitionPage: React.FC<{ onComplete: () => void }> = ({ onComplete 
                         <p className="text-xs text-white/40">Full Access to All Features</p>
                       </div>
                       <div className="text-right">
-                        <p className="text-xl font-bold text-neon-cyan">$49<span className="text-xs font-normal text-white/40">/mo</span></p>
+                        <p className="text-xl font-bold text-neon-cyan">
+                          $49<span className="text-xs font-normal text-white/40">/mo</span>
+                        </p>
                       </div>
                     </div>
 
                     {paymentStatus !== 'completed' ? (
                       <div className="space-y-4">
                         <div className="grid grid-cols-1 gap-3">
-                          <input 
-                            type="text" 
-                            placeholder="Card Number" 
+                          <input
+                            type="text"
+                            placeholder="Card Number"
                             className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white outline-none focus:border-neon-cyan/50"
                           />
                           <div className="grid grid-cols-2 gap-3">
-                            <input 
-                              type="text" 
-                              placeholder="MM/YY" 
+                            <input
+                              type="text"
+                              placeholder="MM/YY"
                               className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white outline-none focus:border-neon-cyan/50"
                             />
-                            <input 
-                              type="text" 
-                              placeholder="CVC" 
+                            <input
+                              type="text"
+                              placeholder="CVC"
                               className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white outline-none focus:border-neon-cyan/50"
                             />
                           </div>
                         </div>
-                        <Button 
-                          variant="neon" 
+                        <Button
+                          variant="neon"
                           className="w-full py-4 text-lg flex items-center justify-center gap-2"
                           onClick={handlePayment}
                           disabled={paymentStatus === 'processing'}
@@ -465,11 +508,13 @@ export const IgnitionPage: React.FC<{ onComplete: () => void }> = ({ onComplete 
 
           {/* Navigation Buttons */}
           <div className="flex items-center justify-between mt-12 pt-8 border-t border-white/5">
-            <button 
+            <button
               onClick={handleBack}
               disabled={currentStep === 1 || loading}
               className={`flex items-center gap-2 text-sm font-bold uppercase tracking-widest transition-colors ${
-                currentStep === 1 || loading ? 'text-white/10 cursor-not-allowed' : 'text-white/40 hover:text-white'
+                currentStep === 1 || loading
+                  ? 'text-white/10 cursor-not-allowed'
+                  : 'text-white/40 hover:text-white'
               }`}
             >
               <ChevronLeft className="w-4 h-4" />

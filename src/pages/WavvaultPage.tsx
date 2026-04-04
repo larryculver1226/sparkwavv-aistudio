@@ -28,7 +28,7 @@ export const WavvaultPage: React.FC = () => {
           </div>
           <h2 className="text-2xl font-display font-bold text-white">Vault Access Denied</h2>
           <p className="text-white/40 text-sm">{error}</p>
-          <button 
+          <button
             onClick={() => window.location.reload()}
             className="px-8 py-3 rounded-xl bg-white/5 border border-white/10 text-white font-bold hover:bg-white/10 transition-all"
           >
@@ -39,11 +39,5 @@ export const WavvaultPage: React.FC = () => {
     );
   }
 
-  return (
-    <WavvaultExplorer 
-      userId={userId} 
-      events={events} 
-      artifacts={artifacts} 
-    />
-  );
+  return <WavvaultExplorer userId={userId} events={events} artifacts={artifacts} />;
 };

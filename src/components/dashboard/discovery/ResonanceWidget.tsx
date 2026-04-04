@@ -12,8 +12,12 @@ export const ResonanceWidget: React.FC<{ signals: MarketSignal[] }> = ({ signals
             <Target className="w-5 h-5 text-neon-cyan" />
           </div>
           <div>
-            <h3 className="text-xl font-display font-bold text-white tracking-tight uppercase">Primary Resonance</h3>
-            <p className="text-[10px] text-white/40 uppercase tracking-widest font-bold">Top DNA Matches</p>
+            <h3 className="text-xl font-display font-bold text-white tracking-tight uppercase">
+              Primary Resonance
+            </h3>
+            <p className="text-[10px] text-white/40 uppercase tracking-widest font-bold">
+              Top DNA Matches
+            </p>
           </div>
         </div>
         <div className="px-3 py-1 rounded-full bg-neon-cyan/20 border border-neon-cyan/30 text-[10px] font-bold text-neon-cyan uppercase tracking-widest">
@@ -35,42 +39,54 @@ export const ResonanceWidget: React.FC<{ signals: MarketSignal[] }> = ({ signals
               <div className="text-2xl font-display font-bold text-neon-cyan neon-text-cyan">
                 {signal.resonanceScore}%
               </div>
-              <p className="text-[8px] text-neon-cyan/60 uppercase tracking-tighter text-right font-bold">Resonance</p>
+              <p className="text-[8px] text-neon-cyan/60 uppercase tracking-tighter text-right font-bold">
+                Resonance
+              </p>
             </div>
 
             <div className="mb-4">
-              <h4 className="text-lg font-display font-bold text-white group-hover:text-neon-cyan transition-colors">{signal.title}</h4>
-              <p className="text-sm text-white/40 font-medium">{signal.company} • {signal.location}</p>
+              <h4 className="text-lg font-display font-bold text-white group-hover:text-neon-cyan transition-colors">
+                {signal.title}
+              </h4>
+              <p className="text-sm text-white/40 font-medium">
+                {signal.company} • {signal.location}
+              </p>
             </div>
 
             <div className="flex items-center gap-6 mb-4">
               <div className="flex flex-col">
-                <span className="text-[8px] text-white/20 uppercase font-bold tracking-widest mb-1">Values</span>
+                <span className="text-[8px] text-white/20 uppercase font-bold tracking-widest mb-1">
+                  Values
+                </span>
                 <div className="w-16 h-1 bg-white/5 rounded-full overflow-hidden">
-                  <motion.div 
+                  <motion.div
                     initial={{ width: 0 }}
                     animate={{ width: `${signal.dnaAlignment.values}%` }}
-                    className="h-full bg-neon-magenta" 
+                    className="h-full bg-neon-magenta"
                   />
                 </div>
               </div>
               <div className="flex flex-col">
-                <span className="text-[8px] text-white/20 uppercase font-bold tracking-widest mb-1">Capabilities</span>
+                <span className="text-[8px] text-white/20 uppercase font-bold tracking-widest mb-1">
+                  Capabilities
+                </span>
                 <div className="w-16 h-1 bg-white/5 rounded-full overflow-hidden">
-                  <motion.div 
+                  <motion.div
                     initial={{ width: 0 }}
                     animate={{ width: `${signal.dnaAlignment.capabilities}%` }}
-                    className="h-full bg-neon-cyan" 
+                    className="h-full bg-neon-cyan"
                   />
                 </div>
               </div>
               <div className="flex flex-col">
-                <span className="text-[8px] text-white/20 uppercase font-bold tracking-widest mb-1">Trajectory</span>
+                <span className="text-[8px] text-white/20 uppercase font-bold tracking-widest mb-1">
+                  Trajectory
+                </span>
                 <div className="w-16 h-1 bg-white/5 rounded-full overflow-hidden">
-                  <motion.div 
+                  <motion.div
                     initial={{ width: 0 }}
                     animate={{ width: `${signal.dnaAlignment.trajectory}%` }}
-                    className="h-full bg-neon-lime" 
+                    className="h-full bg-neon-lime"
                   />
                 </div>
               </div>
@@ -78,8 +94,11 @@ export const ResonanceWidget: React.FC<{ signals: MarketSignal[] }> = ({ signals
 
             <div className="flex items-center justify-between">
               <div className="flex flex-wrap gap-2">
-                {signal.tags.map(tag => (
-                  <span key={tag} className="px-2 py-0.5 rounded-md bg-white/5 border border-white/10 text-[8px] text-white/40 uppercase tracking-tighter">
+                {signal.tags.map((tag) => (
+                  <span
+                    key={tag}
+                    className="px-2 py-0.5 rounded-md bg-white/5 border border-white/10 text-[8px] text-white/40 uppercase tracking-tighter"
+                  >
                     #{tag}
                   </span>
                 ))}

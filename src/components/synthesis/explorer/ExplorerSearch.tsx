@@ -8,11 +8,11 @@ interface ExplorerSearchProps {
   setSelectedPhase: (phase: string | null) => void;
 }
 
-export const ExplorerSearch: React.FC<ExplorerSearchProps> = ({ 
-  searchQuery, 
+export const ExplorerSearch: React.FC<ExplorerSearchProps> = ({
+  searchQuery,
   setSearchQuery,
   selectedPhase,
-  setSelectedPhase
+  setSelectedPhase,
 }) => {
   const phases = ['Dive-In', 'Ignition', 'Discovery', 'Branding', 'Outreach'];
 
@@ -39,20 +39,20 @@ export const ExplorerSearch: React.FC<ExplorerSearchProps> = ({
         <button
           onClick={() => setSelectedPhase(null)}
           className={`px-6 py-3 rounded-2xl text-[10px] font-bold uppercase tracking-widest transition-all border ${
-            !selectedPhase 
-              ? 'bg-neon-cyan text-black border-neon-cyan' 
+            !selectedPhase
+              ? 'bg-neon-cyan text-black border-neon-cyan'
               : 'bg-white/5 border-white/10 text-white/40 hover:bg-white/10'
           }`}
         >
           All Phases
         </button>
-        {phases.map(phase => (
+        {phases.map((phase) => (
           <button
             key={phase}
             onClick={() => setSelectedPhase(phase)}
             className={`px-6 py-3 rounded-2xl text-[10px] font-bold uppercase tracking-widest transition-all border ${
               selectedPhase === phase
-                ? 'bg-neon-cyan text-black border-neon-cyan' 
+                ? 'bg-neon-cyan text-black border-neon-cyan'
                 : 'bg-white/5 border-white/10 text-white/40 hover:bg-white/10'
             }`}
           >

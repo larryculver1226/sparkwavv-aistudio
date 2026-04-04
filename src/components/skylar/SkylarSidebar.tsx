@@ -1,13 +1,13 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { 
-  MessageSquare, 
-  X, 
-  Send, 
-  Mic, 
-  Volume2, 
-  VolumeX, 
-  Sparkles, 
-  ShieldCheck, 
+import {
+  MessageSquare,
+  X,
+  Send,
+  Mic,
+  Volume2,
+  VolumeX,
+  Sparkles,
+  ShieldCheck,
   ChevronRight,
   Loader2,
   Zap,
@@ -20,7 +20,7 @@ import {
   AlertCircle,
   Lock,
   FileText,
-  Download
+  Download,
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import clsx from 'clsx';
@@ -59,9 +59,15 @@ export const SkylarSidebar: React.FC<SkylarSidebarProps> = ({ onLogin }) => {
   const [error, setError] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<'chat' | 'alerts'>('chat');
   const [alerts, setAlerts] = useState<any[]>([]);
-  const [selectedFile, setSelectedFile] = useState<{ data: string; mimeType: string; name: string } | null>(null);
+  const [selectedFile, setSelectedFile] = useState<{
+    data: string;
+    mimeType: string;
+    name: string;
+  } | null>(null);
   const [atsProposal, setAtsProposal] = useState<{ content: string; format: string } | null>(null);
-  const [toasts, setToasts] = useState<{ id: number; message: string; type: 'success' | 'info' | 'warning' }[]>([]);
+  const [toasts, setToasts] = useState<
+    { id: number; message: string; type: 'success' | 'info' | 'warning' }[]
+  >([]);
   const { user, profile } = useIdentity();
   const location = useLocation();
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -71,7 +77,8 @@ export const SkylarSidebar: React.FC<SkylarSidebarProps> = ({ onLogin }) => {
 
   // Initialize Speech Recognition
   useEffect(() => {
-    const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+    const SpeechRecognition =
+      (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
     if (SpeechRecognition) {
       recognitionRef.current = new SpeechRecognition();
       recognitionRef.current.continuous = false;
@@ -85,7 +92,7 @@ export const SkylarSidebar: React.FC<SkylarSidebarProps> = ({ onLogin }) => {
       };
 
       recognitionRef.current.onerror = (event: any) => {
-        console.error("Speech recognition error:", event.error);
+        console.error('Speech recognition error:', event.error);
         setIsListening(false);
       };
 
@@ -99,7 +106,7 @@ export const SkylarSidebar: React.FC<SkylarSidebarProps> = ({ onLogin }) => {
     try {
       const AudioContextClass = (window as any).AudioContext || (window as any).webkitAudioContext;
       if (!AudioContextClass) return;
-      
+
       const audioCtx = new AudioContextClass();
       const oscillator = audioCtx.createOscillator();
       const gainNode = audioCtx.createGain();
@@ -119,7 +126,7 @@ export const SkylarSidebar: React.FC<SkylarSidebarProps> = ({ onLogin }) => {
       oscillator.start();
       oscillator.stop(audioCtx.currentTime + 0.4);
     } catch (err) {
-      console.warn("Failed to play chime:", err);
+      console.warn('Failed to play chime:', err);
     }
   };
 
@@ -129,24 +136,26 @@ export const SkylarSidebar: React.FC<SkylarSidebarProps> = ({ onLogin }) => {
       setIsListening(false);
     } else {
       if (!recognitionRef.current) {
-        if (!isAuto) alert("Speech recognition is not supported in your browser.");
+        if (!isAuto) alert('Speech recognition is not supported in your browser.');
         return;
       }
 
       try {
         // Request microphone access explicitly if not already granted
         await navigator.mediaDevices.getUserMedia({ audio: true });
-        
+
         if (isAuto) {
           playChime();
         }
-        
+
         recognitionRef.current.start();
         setIsListening(true);
       } catch (err) {
-        console.error("Microphone access denied:", err);
+        console.error('Microphone access denied:', err);
         if (!isAuto) {
-          setError("Microphone access is required for voice-to-text. Please enable it in your browser settings.");
+          setError(
+            'Microphone access is required for voice-to-text. Please enable it in your browser settings.'
+          );
         }
       }
     }
@@ -165,7 +174,7 @@ export const SkylarSidebar: React.FC<SkylarSidebarProps> = ({ onLogin }) => {
 
   // Listen for external toggle events
   useEffect(() => {
-    const handleToggle = () => setIsOpen(prev => !prev);
+    const handleToggle = () => setIsOpen((prev) => !prev);
     window.addEventListener('toggle-skylar-sidebar', handleToggle);
     return () => window.removeEventListener('toggle-skylar-sidebar', handleToggle);
   }, []);
@@ -212,7 +221,7 @@ export const SkylarSidebar: React.FC<SkylarSidebarProps> = ({ onLogin }) => {
 
     // Check file size (max 10MB for Gemini)
     if (file.size > 10 * 1024 * 1024) {
-      setError("File size exceeds 10MB limit.");
+      setError('File size exceeds 10MB limit.');
       return;
     }
 
@@ -222,7 +231,7 @@ export const SkylarSidebar: React.FC<SkylarSidebarProps> = ({ onLogin }) => {
       setSelectedFile({
         data: base64,
         mimeType: file.type,
-        name: file.name
+        name: file.name,
       });
     };
     reader.readAsDataURL(file);
@@ -237,17 +246,17 @@ export const SkylarSidebar: React.FC<SkylarSidebarProps> = ({ onLogin }) => {
       parts.push({
         inlineData: {
           data: selectedFile.data,
-          mimeType: selectedFile.mimeType
-        }
+          mimeType: selectedFile.mimeType,
+        },
       });
     }
 
     const userMessage: ChatMessage = {
       role: 'user',
-      parts: parts
+      parts: parts,
     };
 
-    setMessages(prev => [...prev, userMessage]);
+    setMessages((prev) => [...prev, userMessage]);
     const currentInput = input;
     const currentFile = selectedFile;
     setInput('');
@@ -258,57 +267,58 @@ export const SkylarSidebar: React.FC<SkylarSidebarProps> = ({ onLogin }) => {
     try {
       const uid = user?.uid || 'anonymous';
       const token = user ? await user.getIdToken() : undefined;
-      
+
       // Convert history to Vertex format
-      const vertexHistory = messages.map(msg => ({
+      const vertexHistory = messages.map((msg) => ({
         role: msg.role,
-        parts: msg.parts
+        parts: msg.parts,
       }));
 
       const result = await skylar.chatWithVertex(
-        uid === 'anonymous' ? '' : uid, 
-        currentInput, 
-        vertexHistory, 
-        methodology, 
+        uid === 'anonymous' ? '' : uid,
+        currentInput,
+        vertexHistory,
+        methodology,
         token,
         currentFile || undefined
       );
-      
+
       const { response, executedActions } = result;
 
-      const responseText = response.candidates?.[0]?.content?.parts
-        ?.filter(part => part.text)
-        ?.map(part => part.text)
-        ?.join('') || "";
+      const responseText =
+        response.candidates?.[0]?.content?.parts
+          ?.filter((part) => part.text)
+          ?.map((part) => part.text)
+          ?.join('') || '';
       const calls = response.functionCalls;
-      
+
       if (executedActions && executedActions.length > 0) {
         executedActions.forEach((action: any) => {
           // Show toast for auto-executed actions
           console.log(`[SKYLAR] Auto-executed: ${action.action}`, action.data);
-          
+
           const toastMessage = `✨ Skylar auto-updated: ${action.data.field} to "${action.data.value}"`;
-          
+
           // 1. Add to toasts
           const newToast = {
             id: Date.now() + Math.random(),
             message: toastMessage,
-            type: 'success' as const
+            type: 'success' as const,
           };
-          setToasts(prev => [...prev, newToast]);
-          
+          setToasts((prev) => [...prev, newToast]);
+
           // 2. Auto-remove toast after 5 seconds
           setTimeout(() => {
-            setToasts(prev => prev.filter(t => t.id !== newToast.id));
+            setToasts((prev) => prev.filter((t) => t.id !== newToast.id));
           }, 5000);
 
           // 3. Add a system message to the chat
           const toastMsg: ChatMessage = {
             role: 'model',
             type: 'system',
-            parts: [{ text: toastMessage }]
+            parts: [{ text: toastMessage }],
           };
-          setMessages(prev => [...prev, toastMsg]);
+          setMessages((prev) => [...prev, toastMsg]);
 
           // 4. Verbal confirmation if voice is enabled
           if (isVoiceEnabled) {
@@ -320,22 +330,25 @@ export const SkylarSidebar: React.FC<SkylarSidebarProps> = ({ onLogin }) => {
       if (calls && calls.length > 0) {
         for (const call of calls) {
           const { name, args } = call;
-          
+
           if (name === 'generate_ats_optimized_content') {
             setAtsProposal({
               content: (args as any).content,
-              format: (args as any).format
+              format: (args as any).format,
             });
           } else if (name.startsWith('propose_') || name === 'flag_dna_conflict') {
             const proposal: SkylarProposal = {
               type: name === 'flag_dna_conflict' ? 'CONFLICT' : 'PROPOSAL',
               action: name as any,
               data: args,
-              reasoning: (args as any).reasoning || (args as any).conflictReason || "Skylar suggests this based on your conversation."
+              reasoning:
+                (args as any).reasoning ||
+                (args as any).conflictReason ||
+                'Skylar suggests this based on your conversation.',
             };
-            
+
             const messageIndex = messages.length + 1;
-            setProposals(prev => ({ ...prev, [messageIndex]: proposal }));
+            setProposals((prev) => ({ ...prev, [messageIndex]: proposal }));
           }
         }
       }
@@ -343,52 +356,55 @@ export const SkylarSidebar: React.FC<SkylarSidebarProps> = ({ onLogin }) => {
       const modelMessage: ChatMessage = {
         role: 'model',
         type: 'chat',
-        parts: [{ text: responseText || "I've processed your request. How else can I help?" }]
+        parts: [{ text: responseText || "I've processed your request. How else can I help?" }],
       };
-      
+
       // Play chime on model reply
       playChime();
-      
-      setMessages(prev => {
+
+      setMessages((prev) => {
         const updatedMessages = [...prev, modelMessage];
         if (user) {
-          user.getIdToken().then(token => {
+          user.getIdToken().then((token) => {
             skylar.saveChatToWavvault(user.uid, updatedMessages, token);
           });
         }
-        
+
         // Auto-speak if voice is enabled
         if (isVoiceEnabled && responseText) {
           handleSpeak(responseText);
         }
-        
+
         return updatedMessages;
       });
-      
+
       // Check for warning phrase
-      const warningPhrase = "I have some concerns about your current direction. Please review the notifications in the sidebar before proceeding.";
+      const warningPhrase =
+        'I have some concerns about your current direction. Please review the notifications in the sidebar before proceeding.';
       if (responseText.includes(warningPhrase)) {
         // 1. Trigger TTS automatically
         handleSpeak(warningPhrase);
-        
+
         // 2. Add to alerts
         const newAlert = {
           id: Date.now(),
           type: 'validation_warning',
-          message: responseText.split(warningPhrase)[1]?.trim() || "Validation Gate misalignment detected. Skylar recommends a strategic review.",
+          message:
+            responseText.split(warningPhrase)[1]?.trim() ||
+            'Validation Gate misalignment detected. Skylar recommends a strategic review.',
           timestamp: new Date().toISOString(),
-          status: 'pending'
+          status: 'pending',
         };
-        setAlerts(prev => [newAlert, ...prev]);
-        
+        setAlerts((prev) => [newAlert, ...prev]);
+
         // 3. Switch to alerts tab
         setActiveTab('alerts');
       } else if (responseText && responseText.length < 200) {
         handleSpeak(responseText);
       }
     } catch (error: any) {
-      console.error("Error generating response:", error);
-      setError(error.message || "Skylar is currently unavailable.");
+      console.error('Error generating response:', error);
+      setError(error.message || 'Skylar is currently unavailable.');
       // Put the input back if it failed
       setInput(currentInput);
     } finally {
@@ -406,7 +422,7 @@ export const SkylarSidebar: React.FC<SkylarSidebarProps> = ({ onLogin }) => {
 
     try {
       const token = await user.getIdToken();
-      
+
       if (proposal.action === 'propose_major_shift') {
         const insight = {
           type: proposal.data?.type || 'strength',
@@ -414,36 +430,36 @@ export const SkylarSidebar: React.FC<SkylarSidebarProps> = ({ onLogin }) => {
           evidence: proposal.data?.evidence || 'Conversation context',
           tags: proposal.data?.tags || [],
           status: 'confirmed',
-          timestamp: new Date().toISOString()
+          timestamp: new Date().toISOString(),
         };
         await fetch('/api/user-insights', {
           method: 'POST',
-          headers: { 
+          headers: {
             'Content-Type': 'application/json',
-            'Authorization': `Bearer ${token}`
+            Authorization: `Bearer ${token}`,
           },
-          body: JSON.stringify({ insight })
+          body: JSON.stringify({ insight }),
         });
       } else if (proposal.action === 'flag_dna_conflict') {
         // 1. Mark existing as superseded
         const existingInsightId = proposal.data?.existingInsightId;
         if (existingInsightId) {
           const existingResponse = await fetch(`/api/user-insights`, {
-            headers: { 'Authorization': `Bearer ${token}` }
+            headers: { Authorization: `Bearer ${token}` },
           });
           const allInsights = await existingResponse.json();
           const existing = allInsights.find((i: any) => i.id === existingInsightId);
-          
+
           if (existing) {
             await fetch('/api/user-insights', {
               method: 'POST',
-              headers: { 
+              headers: {
                 'Content-Type': 'application/json',
-                'Authorization': `Bearer ${token}`
+                Authorization: `Bearer ${token}`,
               },
-              body: JSON.stringify({ 
-                insight: { ...existing, status: 'superseded' } 
-              })
+              body: JSON.stringify({
+                insight: { ...existing, status: 'superseded' },
+              }),
             });
           }
         }
@@ -453,36 +469,43 @@ export const SkylarSidebar: React.FC<SkylarSidebarProps> = ({ onLogin }) => {
           ...(proposal.data?.newInsight || {}),
           status: 'confirmed',
           timestamp: new Date().toISOString(),
-          conflictWith: existingInsightId
+          conflictWith: existingInsightId,
         };
         await fetch('/api/user-insights', {
           method: 'POST',
-          headers: { 
+          headers: {
             'Content-Type': 'application/json',
-            'Authorization': `Bearer ${token}`
+            Authorization: `Bearer ${token}`,
           },
-          body: JSON.stringify({ insight: newInsight })
+          body: JSON.stringify({ insight: newInsight }),
         });
       } else {
         await skylar.executeAction(uid, proposal.action, proposal.data || {}, token);
       }
-      
-      setExecutedActions(prev => ({ ...prev, [index]: true }));
-      
+
+      setExecutedActions((prev) => ({ ...prev, [index]: true }));
+
       // Add a confirmation message from Skylar
       const confirmationMsg: ChatMessage = {
         role: 'model',
-        parts: [{ text: `✅ Action confirmed: ${
-          proposal.action === 'update_dashboard' ? 'Dashboard updated' : 
-          proposal.action === 'add_milestone' ? 'Milestone added' :
-          proposal.action === 'propose_major_shift' ? 'New insight confirmed' :
-          'Conflict resolved and insight updated'
-        }.` }]
+        parts: [
+          {
+            text: `✅ Action confirmed: ${
+              proposal.action === 'update_dashboard'
+                ? 'Dashboard updated'
+                : proposal.action === 'add_milestone'
+                  ? 'Milestone added'
+                  : proposal.action === 'propose_major_shift'
+                    ? 'New insight confirmed'
+                    : 'Conflict resolved and insight updated'
+            }.`,
+          },
+        ],
       };
-      setMessages(prev => [...prev, confirmationMsg]);
+      setMessages((prev) => [...prev, confirmationMsg]);
     } catch (error: any) {
-      console.error("Action execution failed:", error);
-      setError(error.message || "Failed to execute action.");
+      console.error('Action execution failed:', error);
+      setError(error.message || 'Failed to execute action.');
     } finally {
       setIsLoading(false);
     }
@@ -497,22 +520,26 @@ export const SkylarSidebar: React.FC<SkylarSidebarProps> = ({ onLogin }) => {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
+          Authorization: `Bearer ${token}`,
         },
-        body: JSON.stringify({ userId: user.uid, reason: 'User bypassed soft gate warning.' })
+        body: JSON.stringify({ userId: user.uid, reason: 'User bypassed soft gate warning.' }),
       });
-      
-      setAlerts(prev => prev.map(a => a.id === alertId ? { ...a, status: 'bypassed' } : a));
-      
+
+      setAlerts((prev) => prev.map((a) => (a.id === alertId ? { ...a, status: 'bypassed' } : a)));
+
       // Add a confirmation message from Skylar
       const confirmationMsg: ChatMessage = {
         role: 'model',
-        parts: [{ text: "⚠️ Validation bypassed. A human mentor has been notified to review your progress. You may continue, but please check the 'Human Mentor' section on your dashboard for feedback later." }]
+        parts: [
+          {
+            text: "⚠️ Validation bypassed. A human mentor has been notified to review your progress. You may continue, but please check the 'Human Mentor' section on your dashboard for feedback later.",
+          },
+        ],
       };
-      setMessages(prev => [...prev, confirmationMsg]);
+      setMessages((prev) => [...prev, confirmationMsg]);
       setActiveTab('chat');
     } catch (error) {
-      console.error("Bypass failed:", error);
+      console.error('Bypass failed:', error);
     } finally {
       setIsLoading(false);
     }
@@ -537,20 +564,25 @@ export const SkylarSidebar: React.FC<SkylarSidebarProps> = ({ onLogin }) => {
         doc.save(`${filename}.pdf`);
       } else if (format === 'word') {
         const doc = new Document({
-          sections: [{
-            properties: {},
-            children: content.split('\n').map(line => new Paragraph({
-              children: [new TextRun(line)],
-            })),
-          }],
+          sections: [
+            {
+              properties: {},
+              children: content.split('\n').map(
+                (line) =>
+                  new Paragraph({
+                    children: [new TextRun(line)],
+                  })
+              ),
+            },
+          ],
         });
         const blob = await Packer.toBlob(doc);
         saveAs(blob, `${filename}.docx`);
       }
       setAtsProposal(null);
     } catch (err) {
-      console.error("Download Error:", err);
-      setError("Failed to generate download.");
+      console.error('Download Error:', err);
+      setError('Failed to generate download.');
     }
   };
 
@@ -566,24 +598,29 @@ export const SkylarSidebar: React.FC<SkylarSidebarProps> = ({ onLogin }) => {
       const audioUrl = await skylar.generateSpeech(text, persona);
       if (audioUrl && audioRef.current) {
         audioRef.current.src = audioUrl;
-        audioRef.current.play().catch(err => {
-          console.warn("Audio play failed (user interaction required):", err);
+        audioRef.current.play().catch((err) => {
+          console.warn('Audio play failed (user interaction required):', err);
           setIsSpeaking(false);
         });
         setIsSpeaking(true);
       }
     } catch (error) {
-      console.error("Error generating speech:", error);
+      console.error('Error generating speech:', error);
     }
   };
 
   const getPersonaIcon = () => {
     switch (persona) {
-      case 'discovery': return <Compass className="w-5 h-5" />;
-      case 'branding': return <Award className="w-5 h-5" />;
-      case 'outreach': return <Briefcase className="w-5 h-5" />;
-      case 'rpp': return <ShieldCheck className="w-5 h-5" />;
-      default: return <Sparkles className="w-5 h-5" />;
+      case 'discovery':
+        return <Compass className="w-5 h-5" />;
+      case 'branding':
+        return <Award className="w-5 h-5" />;
+      case 'outreach':
+        return <Briefcase className="w-5 h-5" />;
+      case 'rpp':
+        return <ShieldCheck className="w-5 h-5" />;
+      default:
+        return <Sparkles className="w-5 h-5" />;
     }
   };
 
@@ -599,16 +636,18 @@ export const SkylarSidebar: React.FC<SkylarSidebarProps> = ({ onLogin }) => {
               animate={{ opacity: 1, y: 0, scale: 1 }}
               exit={{ opacity: 0, scale: 0.9, transition: { duration: 0.2 } }}
               className={clsx(
-                "pointer-events-auto px-4 py-3 rounded-xl shadow-2xl border flex items-center gap-3 min-w-[280px] backdrop-blur-md",
-                toast.type === 'success' ? "bg-green-500/20 border-green-500/30 text-green-400" :
-                toast.type === 'warning' ? "bg-yellow-500/20 border-yellow-500/30 text-yellow-400" :
-                "bg-neon-cyan/20 border-neon-cyan/30 text-neon-cyan"
+                'pointer-events-auto px-4 py-3 rounded-xl shadow-2xl border flex items-center gap-3 min-w-[280px] backdrop-blur-md',
+                toast.type === 'success'
+                  ? 'bg-green-500/20 border-green-500/30 text-green-400'
+                  : toast.type === 'warning'
+                    ? 'bg-yellow-500/20 border-yellow-500/30 text-yellow-400'
+                    : 'bg-neon-cyan/20 border-neon-cyan/30 text-neon-cyan'
               )}
             >
               <Zap className="w-4 h-4 flex-shrink-0" />
               <p className="text-sm font-medium">{toast.message}</p>
-              <button 
-                onClick={() => setToasts(prev => prev.filter(t => t.id !== toast.id))}
+              <button
+                onClick={() => setToasts((prev) => prev.filter((t) => t.id !== toast.id))}
                 className="ml-auto p-1 hover:bg-white/10 rounded-lg transition-colors"
               >
                 <X className="w-4 h-4" />
@@ -620,12 +659,12 @@ export const SkylarSidebar: React.FC<SkylarSidebarProps> = ({ onLogin }) => {
 
       {/* Toggle Button - Only visible when sidebar is closed */}
       {!isOpen && (
-        <button 
+        <button
           onClick={() => setIsOpen(true)}
           className="fixed bottom-8 right-8 z-50 w-16 h-16 rounded-full bg-[#0a0a0a] border-2 border-neon-cyan/50 text-black flex items-center justify-center shadow-[0_0_20px_rgba(0,255,255,0.3)] hover:scale-110 transition-transform group overflow-hidden"
         >
-          <img 
-            src={PERSONA_CONFIG[persona].avatar} 
+          <img
+            src={PERSONA_CONFIG[persona].avatar}
             alt="Skylar"
             className="w-full h-full object-cover object-[center_20%]"
             referrerPolicy="no-referrer"
@@ -637,7 +676,7 @@ export const SkylarSidebar: React.FC<SkylarSidebarProps> = ({ onLogin }) => {
 
       <AnimatePresence>
         {isOpen && (
-          <motion.div 
+          <motion.div
             initial={{ x: '100%' }}
             animate={{ x: 0 }}
             exit={{ x: '100%' }}
@@ -649,9 +688,11 @@ export const SkylarSidebar: React.FC<SkylarSidebarProps> = ({ onLogin }) => {
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-3">
                   <div className="relative group">
-                    <div className={`w-12 h-12 rounded-xl overflow-hidden border-2 ${isSpeaking ? 'border-neon-cyan shadow-[0_0_15px_rgba(0,255,255,0.3)]' : 'border-white/10'}`}>
-                      <img 
-                        src={PERSONA_CONFIG[persona].avatar} 
+                    <div
+                      className={`w-12 h-12 rounded-xl overflow-hidden border-2 ${isSpeaking ? 'border-neon-cyan shadow-[0_0_15px_rgba(0,255,255,0.3)]' : 'border-white/10'}`}
+                    >
+                      <img
+                        src={PERSONA_CONFIG[persona].avatar}
                         alt={PERSONA_CONFIG[persona].name}
                         className="w-full h-full object-cover object-[center_20%]"
                         referrerPolicy="no-referrer"
@@ -664,60 +705,66 @@ export const SkylarSidebar: React.FC<SkylarSidebarProps> = ({ onLogin }) => {
                       )}
                     </div>
                     <div className="absolute -bottom-1 -right-1 w-4 h-4 rounded-full bg-[#0a0a0a] border border-white/10 flex items-center justify-center">
-                      <div className="text-neon-cyan">
-                        {getPersonaIcon()}
-                      </div>
+                      <div className="text-neon-cyan">{getPersonaIcon()}</div>
                     </div>
                   </div>
                   <div>
                     <h3 className="text-sm font-bold text-white">{PERSONA_CONFIG[persona].name}</h3>
                     <div className="flex items-center gap-2 mt-1">
                       <Settings2 className="w-3 h-3 text-white/20" />
-                      <select 
+                      <select
                         value={methodology}
                         onChange={(e) => setMethodology(e.target.value as Methodology)}
                         className="bg-transparent text-[10px] text-white/40 uppercase font-bold tracking-widest outline-none cursor-pointer hover:text-neon-cyan transition-colors"
                       >
-                        <option value="lobkowicz" className="bg-[#0a0a0a]">Philip Lobkowicz</option>
-                        <option value="feynman" disabled className="bg-[#0a0a0a]">Richard Feynman (Coming Soon)</option>
+                        <option value="lobkowicz" className="bg-[#0a0a0a]">
+                          Philip Lobkowicz
+                        </option>
+                        <option value="feynman" disabled className="bg-[#0a0a0a]">
+                          Richard Feynman (Coming Soon)
+                        </option>
                       </select>
                     </div>
                   </div>
                 </div>
-                <div className="flex items-center gap-2">
-                  <button 
-                    onClick={() => setIsVoiceEnabled(!isVoiceEnabled)}
-                    className={`w-10 h-10 rounded-full flex items-center justify-center transition-all ${isVoiceEnabled ? 'text-neon-cyan bg-neon-cyan/10 shadow-[0_0_10px_rgba(0,255,255,0.2)]' : 'text-white/40 hover:text-white/60 hover:bg-white/5'}`}
-                    title={isVoiceEnabled ? "Disable Voice" : "Enable Voice"}
-                  >
-                    {isVoiceEnabled ? <Volume2 className="w-5 h-5" /> : <VolumeX className="w-5 h-5" />}
-                  </button>
-                  <button 
-                    onClick={() => setIsOpen(false)} 
+                <div className="flex items-center gap-2 mr-6 sm:mr-8">
+                  <button
+                    onClick={() => setIsOpen(false)}
                     className="w-10 h-10 rounded-full flex items-center justify-center text-white/40 hover:text-white hover:bg-white/5 transition-all"
                     title="Close Chat"
                   >
                     <X className="w-6 h-6" />
+                  </button>
+                  <button
+                    onClick={() => setIsVoiceEnabled(!isVoiceEnabled)}
+                    className={`w-10 h-10 rounded-full flex items-center justify-center transition-all ${isVoiceEnabled ? 'text-neon-cyan bg-neon-cyan/10 shadow-[0_0_10px_rgba(0,255,255,0.2)]' : 'text-white/40 hover:text-white/60 hover:bg-white/5'}`}
+                    title={isVoiceEnabled ? 'Disable Voice' : 'Enable Voice'}
+                  >
+                    {isVoiceEnabled ? (
+                      <Volume2 className="w-5 h-5" />
+                    ) : (
+                      <VolumeX className="w-5 h-5" />
+                    )}
                   </button>
                 </div>
               </div>
 
               {/* Tabs */}
               <div className="flex p-1 bg-white/5 rounded-lg">
-                <button 
+                <button
                   onClick={() => setActiveTab('chat')}
                   className={`flex-1 flex items-center justify-center gap-2 py-2 text-xs font-medium rounded-md transition-all ${activeTab === 'chat' ? 'bg-white/10 text-white shadow-lg' : 'text-white/40 hover:text-white/60'}`}
                 >
                   <MessageSquare className="w-4 h-4" />
                   Chat
                 </button>
-                <button 
+                <button
                   onClick={() => setActiveTab('alerts')}
                   className={`flex-1 flex items-center justify-center gap-2 py-2 text-xs font-medium rounded-md transition-all relative ${activeTab === 'alerts' ? 'bg-white/10 text-white shadow-lg' : 'text-white/40 hover:text-white/60'}`}
                 >
                   <AlertCircle className="w-4 h-4" />
                   Alerts
-                  {alerts.some(a => a.status === 'pending') && (
+                  {alerts.some((a) => a.status === 'pending') && (
                     <span className="absolute top-1 right-2 w-2 h-2 bg-neon-magenta rounded-full animate-pulse" />
                   )}
                 </button>
@@ -729,287 +776,330 @@ export const SkylarSidebar: React.FC<SkylarSidebarProps> = ({ onLogin }) => {
               {activeTab === 'chat' ? (
                 <>
                   {/* Messages */}
-                  <div 
+                  <div
                     ref={scrollRef}
                     className="flex-1 overflow-y-auto p-6 space-y-6 custom-scrollbar"
                   >
-              {messages.length === 0 && (
-                <div className="text-center py-12 space-y-4">
-                  <div className="w-16 h-16 rounded-full bg-neon-cyan/10 flex items-center justify-center mx-auto">
-                    <Sparkles className="w-8 h-8 text-neon-cyan" />
-                  </div>
-                  <p className="text-xs text-white/40 italic px-8">
-                    "Hello! I'm Skylar, your AI Career Assistant. I'm currently in {PERSONA_CONFIG[persona].name} mode. How can I help you with your {persona} phase today?"
-                  </p>
-                </div>
-              )}
+                    {messages.length === 0 && (
+                      <div className="text-center py-12 space-y-4">
+                        <div className="w-16 h-16 rounded-full bg-neon-cyan/10 flex items-center justify-center mx-auto">
+                          <Sparkles className="w-8 h-8 text-neon-cyan" />
+                        </div>
+                        <p className="text-xs text-white/40 italic px-8">
+                          "Hello! I'm Skylar, your AI Career Assistant. I'm currently in{' '}
+                          {PERSONA_CONFIG[persona].name} mode. How can I help you with your{' '}
+                          {persona} phase today?"
+                        </p>
+                      </div>
+                    )}
 
-              {atsProposal && (
-                <motion.div 
-                  initial={{ opacity: 0, scale: 0.95 }}
-                  animate={{ opacity: 1, scale: 1 }}
-                  className="mx-6 my-4 p-4 rounded-2xl bg-gradient-to-br from-neon-cyan/10 to-transparent border border-neon-cyan/30 flex flex-col gap-4 shadow-[0_0_20px_rgba(0,255,255,0.1)]"
-                >
-                  <div className="flex items-center gap-4">
-                    <div className="w-12 h-12 rounded-xl bg-neon-cyan/20 flex items-center justify-center text-neon-cyan shadow-[0_0_15px_rgba(0,255,255,0.2)]">
-                      <FileText className="w-6 h-6" />
-                    </div>
-                    <div>
-                      <h4 className="text-sm font-bold text-white">ATS-Optimized Content Ready</h4>
-                      <p className="text-[10px] text-white/40 uppercase tracking-widest mt-0.5">Format: {atsProposal.format.toUpperCase()}</p>
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <button 
-                      onClick={() => setAtsProposal(null)}
-                      className="flex-1 py-2.5 text-xs font-bold text-white/40 hover:text-white hover:bg-white/5 rounded-xl transition-all"
-                    >
-                      Dismiss
-                    </button>
-                    <button 
-                      onClick={handleDownloadAts}
-                      className="flex-[2] py-2.5 bg-neon-cyan text-black text-xs font-bold rounded-xl hover:scale-[1.02] active:scale-[0.98] transition-all flex items-center justify-center gap-2 shadow-[0_0_15px_rgba(0,255,255,0.3)]"
-                    >
-                      <Download className="w-4 h-4" />
-                      Download Artifact
-                    </button>
-                  </div>
-                </motion.div>
-              )}
-
-              {messages.map((msg, i) => (
-                <div key={i} className="space-y-4">
-                  {msg.type === 'system' ? (
-                    <div className="w-full flex justify-center my-4">
-                      <motion.div 
-                        initial={{ opacity: 0, scale: 0.9 }}
+                    {atsProposal && (
+                      <motion.div
+                        initial={{ opacity: 0, scale: 0.95 }}
                         animate={{ opacity: 1, scale: 1 }}
-                        className="px-4 py-2 rounded-full bg-white/[0.03] border border-white/10 flex items-center gap-3 shadow-lg"
+                        className="mx-6 my-4 p-4 rounded-2xl bg-gradient-to-br from-neon-cyan/10 to-transparent border border-neon-cyan/30 flex flex-col gap-4 shadow-[0_0_20px_rgba(0,255,255,0.1)]"
                       >
-                        <div className="w-6 h-6 rounded-full bg-neon-cyan/20 flex items-center justify-center">
-                          <Zap className="w-3 h-3 text-neon-cyan" />
-                        </div>
-                        <span className="text-[10px] font-bold text-white/60 uppercase tracking-widest">
-                          {msg.parts?.[0]?.text}
-                        </span>
-                      </motion.div>
-                    </div>
-                  ) : (
-                    <div className={`flex items-start gap-3 ${msg.role === 'user' ? 'flex-row-reverse' : 'flex-row'}`}>
-                      {msg.role === 'model' && (
-                        <div className="w-8 h-8 rounded-lg overflow-hidden border border-white/10 shrink-0 mt-1">
-                          <img 
-                            src={PERSONA_CONFIG[persona].avatar} 
-                            alt="Skylar"
-                            className="w-full h-full object-cover object-[center_20%]"
-                            referrerPolicy="no-referrer"
-                          />
-                        </div>
-                      )}
-                      {msg.role === 'user' && (
-                        <div className="w-8 h-8 rounded-lg bg-white/5 flex items-center justify-center border border-white/10 shrink-0 mt-1">
-                          {user?.photoURL ? (
-                            <img src={user.photoURL} alt="User" className="w-full h-full object-cover rounded-lg" referrerPolicy="no-referrer" />
-                          ) : (
-                            <div className="text-[10px] font-bold text-white/40 uppercase">
-                              {user?.displayName?.charAt(0) || 'U'}
-                            </div>
-                          )}
-                        </div>
-                      )}
-                      <div className={`max-w-[85%] p-4 rounded-2xl text-sm leading-relaxed ${
-                        msg.role === 'user' 
-                          ? 'bg-neon-cyan text-black font-medium' 
-                          : 'bg-white/5 text-white/80 border border-white/10'
-                      }`}>
-                        {msg.parts?.[0]?.text}
-                        {msg.role === 'model' && msg.parts?.[0]?.text && (
-                          <button 
-                            onClick={() => handleSpeak(msg.parts?.[0]?.text || '')}
-                            className="mt-2 flex items-center gap-1 text-[10px] uppercase font-bold text-white/40 hover:text-neon-cyan transition-colors"
-                          >
-                            {isSpeaking ? <VolumeX className="w-3 h-3" /> : <Volume2 className="w-3 h-3" />}
-                            {isSpeaking ? 'Stop' : 'Listen'}
-                          </button>
-                        )}
-                      </div>
-                    </div>
-                  )}
-
-                  {/* Proposal Widget */}
-                  {msg.role === 'model' && proposals[i] && (
-                    <motion.div 
-                      initial={{ opacity: 0, y: 10 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      className="ml-4 mr-12 p-5 rounded-2xl bg-gradient-to-br from-white/[0.03] to-transparent border border-neon-cyan/20 space-y-4 shadow-xl"
-                    >
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-2 text-neon-cyan">
-                          <BrainCircuit className="w-4 h-4" />
-                          <span className="text-[10px] font-bold uppercase tracking-widest">Strategic Proposal</span>
-                        </div>
-                        <div className="px-2 py-0.5 rounded-full bg-neon-cyan/10 border border-neon-cyan/20">
-                          <span className="text-[8px] font-bold text-neon-cyan uppercase tracking-tighter">Requires Concurrence</span>
-                        </div>
-                      </div>
-                      
-                      <div className="space-y-2">
-                        <div className="p-3 rounded-xl bg-white/[0.02] border border-white/5">
-                          <p className="text-xs font-bold text-white leading-snug">
-                            {proposals[i].action === 'update_dashboard' 
-                              ? `Update ${proposals[i].data?.field || 'field'} to "${proposals[i].data?.value || 'new value'}"`
-                              : proposals[i].action === 'add_milestone'
-                              ? `Add Milestone: ${proposals[i].data?.title || 'New Milestone'}`
-                              : proposals[i].action === 'propose_major_shift'
-                              ? `Strategic Pivot: ${proposals[i].data?.content || 'New Insight'}`
-                              : `Resolve Conflict: ${proposals[i].data?.newInsight?.content || 'Updated Truth'}`
-                            }
-                          </p>
-                        </div>
-
-                        {proposals[i].action === 'flag_dna_conflict' && (
-                          <div className="p-3 bg-red-500/10 border border-red-500/20 rounded-xl">
-                            <div className="flex items-center gap-2 mb-1">
-                              <AlertCircle className="w-3 h-3 text-red-400" />
-                              <p className="text-[10px] text-red-400 font-bold uppercase">DNA Conflict Detected</p>
-                            </div>
-                            <p className="text-[10px] text-white/40 line-through italic">Old: {proposals[i].data?.existingInsightContent || 'Existing Truth'}</p>
+                        <div className="flex items-center gap-4">
+                          <div className="w-12 h-12 rounded-xl bg-neon-cyan/20 flex items-center justify-center text-neon-cyan shadow-[0_0_15px_rgba(0,255,255,0.2)]">
+                            <FileText className="w-6 h-6" />
                           </div>
-                        )}
-
-                        <div className="flex gap-2 items-start">
-                          <div className="mt-1 w-1 h-1 rounded-full bg-neon-cyan shrink-0" />
-                          <p className="text-[11px] text-white/60 leading-relaxed italic">
-                            "{proposals[i].reasoning}"
-                          </p>
+                          <div>
+                            <h4 className="text-sm font-bold text-white">
+                              ATS-Optimized Content Ready
+                            </h4>
+                            <p className="text-[10px] text-white/40 uppercase tracking-widest mt-0.5">
+                              Format: {atsProposal.format.toUpperCase()}
+                            </p>
+                          </div>
                         </div>
-                      </div>
+                        <div className="flex items-center gap-2">
+                          <button
+                            onClick={() => setAtsProposal(null)}
+                            className="flex-1 py-2.5 text-xs font-bold text-white/40 hover:text-white hover:bg-white/5 rounded-xl transition-all"
+                          >
+                            Dismiss
+                          </button>
+                          <button
+                            onClick={handleDownloadAts}
+                            className="flex-[2] py-2.5 bg-neon-cyan text-black text-xs font-bold rounded-xl hover:scale-[1.02] active:scale-[0.98] transition-all flex items-center justify-center gap-2 shadow-[0_0_15px_rgba(0,255,255,0.3)]"
+                          >
+                            <Download className="w-4 h-4" />
+                            Download Artifact
+                          </button>
+                        </div>
+                      </motion.div>
+                    )}
 
-                      <div className="flex items-center gap-2 pt-2">
-                        {executedActions[i] ? (
-                          <div className="flex items-center gap-2 text-emerald-400 text-[10px] font-bold uppercase">
-                            <CheckCircle2 className="w-3 h-3" />
-                            Executed
+                    {messages.map((msg, i) => (
+                      <div key={i} className="space-y-4">
+                        {msg.type === 'system' ? (
+                          <div className="w-full flex justify-center my-4">
+                            <motion.div
+                              initial={{ opacity: 0, scale: 0.9 }}
+                              animate={{ opacity: 1, scale: 1 }}
+                              className="px-4 py-2 rounded-full bg-white/[0.03] border border-white/10 flex items-center gap-3 shadow-lg"
+                            >
+                              <div className="w-6 h-6 rounded-full bg-neon-cyan/20 flex items-center justify-center">
+                                <Zap className="w-3 h-3 text-neon-cyan" />
+                              </div>
+                              <span className="text-[10px] font-bold text-white/60 uppercase tracking-widest">
+                                {msg.parts?.[0]?.text}
+                              </span>
+                            </motion.div>
                           </div>
                         ) : (
-                          <>
-                            <button 
-                              onClick={() => setProposals(prev => {
-                                const next = { ...prev };
-                                delete next[i];
-                                return next;
-                              })}
-                              className="flex-1 py-2 text-[10px] font-bold text-white/40 hover:text-white hover:bg-white/5 rounded-lg transition-all"
+                          <div
+                            className={`flex items-start gap-3 ${msg.role === 'user' ? 'flex-row-reverse' : 'flex-row'}`}
+                          >
+                            {msg.role === 'model' && (
+                              <div className="w-8 h-8 rounded-lg overflow-hidden border border-white/10 shrink-0 mt-1">
+                                <img
+                                  src={PERSONA_CONFIG[persona].avatar}
+                                  alt="Skylar"
+                                  className="w-full h-full object-cover object-[center_20%]"
+                                  referrerPolicy="no-referrer"
+                                />
+                              </div>
+                            )}
+                            {msg.role === 'user' && (
+                              <div className="w-8 h-8 rounded-lg bg-white/5 flex items-center justify-center border border-white/10 shrink-0 mt-1">
+                                {user?.photoURL ? (
+                                  <img
+                                    src={user.photoURL}
+                                    alt="User"
+                                    className="w-full h-full object-cover rounded-lg"
+                                    referrerPolicy="no-referrer"
+                                  />
+                                ) : (
+                                  <div className="text-[10px] font-bold text-white/40 uppercase">
+                                    {user?.displayName?.charAt(0) || 'U'}
+                                  </div>
+                                )}
+                              </div>
+                            )}
+                            <div
+                              className={`max-w-[85%] p-4 rounded-2xl text-sm leading-relaxed ${
+                                msg.role === 'user'
+                                  ? 'bg-neon-cyan text-black font-medium'
+                                  : 'bg-white/5 text-white/80 border border-white/10'
+                              }`}
                             >
-                              Decline
-                            </button>
-                            <button 
-                              onClick={() => handleExecuteAction(i)}
-                              disabled={isLoading}
-                              className="flex-[2] py-2 bg-neon-cyan text-black text-[10px] font-bold rounded-lg hover:scale-[1.02] active:scale-[0.98] transition-all shadow-[0_0_10px_rgba(0,255,255,0.2)]"
-                            >
-                              Confirm & Execute
-                            </button>
-                          </>
+                              {msg.parts?.[0]?.text}
+                              {msg.role === 'model' && msg.parts?.[0]?.text && (
+                                <button
+                                  onClick={() => handleSpeak(msg.parts?.[0]?.text || '')}
+                                  className="mt-2 flex items-center gap-1 text-[10px] uppercase font-bold text-white/40 hover:text-neon-cyan transition-colors"
+                                >
+                                  {isSpeaking ? (
+                                    <VolumeX className="w-3 h-3" />
+                                  ) : (
+                                    <Volume2 className="w-3 h-3" />
+                                  )}
+                                  {isSpeaking ? 'Stop' : 'Listen'}
+                                </button>
+                              )}
+                            </div>
+                          </div>
+                        )}
+
+                        {/* Proposal Widget */}
+                        {msg.role === 'model' && proposals[i] && (
+                          <motion.div
+                            initial={{ opacity: 0, y: 10 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            className="ml-4 mr-12 p-5 rounded-2xl bg-gradient-to-br from-white/[0.03] to-transparent border border-neon-cyan/20 space-y-4 shadow-xl"
+                          >
+                            <div className="flex items-center justify-between">
+                              <div className="flex items-center gap-2 text-neon-cyan">
+                                <BrainCircuit className="w-4 h-4" />
+                                <span className="text-[10px] font-bold uppercase tracking-widest">
+                                  Strategic Proposal
+                                </span>
+                              </div>
+                              <div className="px-2 py-0.5 rounded-full bg-neon-cyan/10 border border-neon-cyan/20">
+                                <span className="text-[8px] font-bold text-neon-cyan uppercase tracking-tighter">
+                                  Requires Concurrence
+                                </span>
+                              </div>
+                            </div>
+
+                            <div className="space-y-2">
+                              <div className="p-3 rounded-xl bg-white/[0.02] border border-white/5">
+                                <p className="text-xs font-bold text-white leading-snug">
+                                  {proposals[i].action === 'update_dashboard'
+                                    ? `Update ${proposals[i].data?.field || 'field'} to "${proposals[i].data?.value || 'new value'}"`
+                                    : proposals[i].action === 'add_milestone'
+                                      ? `Add Milestone: ${proposals[i].data?.title || 'New Milestone'}`
+                                      : proposals[i].action === 'propose_major_shift'
+                                        ? `Strategic Pivot: ${proposals[i].data?.content || 'New Insight'}`
+                                        : `Resolve Conflict: ${proposals[i].data?.newInsight?.content || 'Updated Truth'}`}
+                                </p>
+                              </div>
+
+                              {proposals[i].action === 'flag_dna_conflict' && (
+                                <div className="p-3 bg-red-500/10 border border-red-500/20 rounded-xl">
+                                  <div className="flex items-center gap-2 mb-1">
+                                    <AlertCircle className="w-3 h-3 text-red-400" />
+                                    <p className="text-[10px] text-red-400 font-bold uppercase">
+                                      DNA Conflict Detected
+                                    </p>
+                                  </div>
+                                  <p className="text-[10px] text-white/40 line-through italic">
+                                    Old:{' '}
+                                    {proposals[i].data?.existingInsightContent || 'Existing Truth'}
+                                  </p>
+                                </div>
+                              )}
+
+                              <div className="flex gap-2 items-start">
+                                <div className="mt-1 w-1 h-1 rounded-full bg-neon-cyan shrink-0" />
+                                <p className="text-[11px] text-white/60 leading-relaxed italic">
+                                  "{proposals[i].reasoning}"
+                                </p>
+                              </div>
+                            </div>
+
+                            <div className="flex items-center gap-2 pt-2">
+                              {executedActions[i] ? (
+                                <div className="flex items-center gap-2 text-emerald-400 text-[10px] font-bold uppercase">
+                                  <CheckCircle2 className="w-3 h-3" />
+                                  Executed
+                                </div>
+                              ) : (
+                                <>
+                                  <button
+                                    onClick={() =>
+                                      setProposals((prev) => {
+                                        const next = { ...prev };
+                                        delete next[i];
+                                        return next;
+                                      })
+                                    }
+                                    className="flex-1 py-2 text-[10px] font-bold text-white/40 hover:text-white hover:bg-white/5 rounded-lg transition-all"
+                                  >
+                                    Decline
+                                  </button>
+                                  <button
+                                    onClick={() => handleExecuteAction(i)}
+                                    disabled={isLoading}
+                                    className="flex-[2] py-2 bg-neon-cyan text-black text-[10px] font-bold rounded-lg hover:scale-[1.02] active:scale-[0.98] transition-all shadow-[0_0_10px_rgba(0,255,255,0.2)]"
+                                  >
+                                    Confirm & Execute
+                                  </button>
+                                </>
+                              )}
+                            </div>
+                          </motion.div>
                         )}
                       </div>
-                    </motion.div>
+                    ))}
+                    {isLoading && (
+                      <div className="flex justify-start">
+                        <div className="bg-white/5 p-4 rounded-2xl border border-white/10">
+                          <Loader2 className="w-4 h-4 text-neon-cyan animate-spin" />
+                        </div>
+                      </div>
+                    )}
+
+                    {error && (
+                      <div className="flex justify-center">
+                        <div className="bg-red-500/10 border border-red-500/20 p-3 rounded-xl flex items-center gap-3 max-w-[90%]">
+                          <AlertCircle className="w-4 h-4 text-red-500 shrink-0" />
+                          <p className="text-[10px] text-red-200">{error}</p>
+                          <button
+                            onClick={() => setError(null)}
+                            className="text-white/40 hover:text-white"
+                          >
+                            <X className="w-3 h-3" />
+                          </button>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </>
+              ) : (
+                /* Alerts Tab */
+                <div className="flex-1 overflow-y-auto p-6 space-y-4 custom-scrollbar">
+                  <div className="flex items-center justify-between mb-2">
+                    <h4 className="text-xs font-bold text-white/40 uppercase tracking-widest font-mono">
+                      System Alerts
+                    </h4>
+                    <span className="text-[10px] text-white/20">{alerts.length} total</span>
+                  </div>
+
+                  {alerts.length === 0 ? (
+                    <div className="h-full flex flex-col items-center justify-center text-center p-8">
+                      <div className="w-12 h-12 rounded-full bg-white/5 flex items-center justify-center mb-4">
+                        <CheckCircle2 className="w-6 h-6 text-white/20" />
+                      </div>
+                      <p className="text-sm text-white/40">
+                        No active alerts. Your career path is currently aligned.
+                      </p>
+                    </div>
+                  ) : (
+                    alerts.map((alert) => (
+                      <div
+                        key={alert.id}
+                        className={`p-4 rounded-xl border ${alert.status === 'pending' ? 'bg-neon-magenta/5 border-neon-magenta/20' : 'bg-white/5 border-white/10 opacity-60'}`}
+                      >
+                        <div className="flex items-start gap-3">
+                          <div
+                            className={`mt-1 p-1.5 rounded-lg ${alert.status === 'pending' ? 'bg-neon-magenta text-white' : 'bg-white/10 text-white/40'}`}
+                          >
+                            <AlertCircle className="w-4 h-4" />
+                          </div>
+                          <div className="flex-1">
+                            <div className="flex items-center justify-between mb-1">
+                              <span
+                                className={`text-[10px] font-bold uppercase tracking-wider ${alert.status === 'pending' ? 'text-neon-magenta' : 'text-white/40'}`}
+                              >
+                                {alert.type.replace('_', ' ')}
+                              </span>
+                              <span className="text-[10px] text-white/20">
+                                {new Date(alert.timestamp).toLocaleTimeString([], {
+                                  hour: '2-digit',
+                                  minute: '2-digit',
+                                })}
+                              </span>
+                            </div>
+                            <p className="text-sm text-white/80 mb-3 leading-relaxed">
+                              {alert.message}
+                            </p>
+
+                            {alert.status === 'pending' && (
+                              <div className="flex gap-2">
+                                <button
+                                  onClick={() => setActiveTab('chat')}
+                                  className="flex-1 py-2 bg-white/10 hover:bg-white/20 text-white text-[10px] font-bold uppercase tracking-wider rounded-lg transition-colors"
+                                >
+                                  Review in Chat
+                                </button>
+                                <button
+                                  onClick={() => handleBypass(alert.id)}
+                                  className="flex-1 py-2 bg-neon-magenta/20 hover:bg-neon-magenta/30 text-neon-magenta text-[10px] font-bold uppercase tracking-wider rounded-lg transition-colors border border-neon-magenta/30"
+                                >
+                                  Proceed Anyway
+                                </button>
+                              </div>
+                            )}
+
+                            {alert.status === 'bypassed' && (
+                              <div className="flex items-center gap-2 text-[10px] text-neon-magenta font-bold uppercase tracking-wider">
+                                <CheckCircle2 className="w-3 h-3" />
+                                Validation Pending (Human Review)
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    ))
                   )}
                 </div>
-              ))}
-              {isLoading && (
-                <div className="flex justify-start">
-                  <div className="bg-white/5 p-4 rounded-2xl border border-white/10">
-                    <Loader2 className="w-4 h-4 text-neon-cyan animate-spin" />
-                  </div>
-                </div>
-              )}
-
-              {error && (
-                <div className="flex justify-center">
-                  <div className="bg-red-500/10 border border-red-500/20 p-3 rounded-xl flex items-center gap-3 max-w-[90%]">
-                    <AlertCircle className="w-4 h-4 text-red-500 shrink-0" />
-                    <p className="text-[10px] text-red-200">{error}</p>
-                    <button onClick={() => setError(null)} className="text-white/40 hover:text-white">
-                      <X className="w-3 h-3" />
-                    </button>
-                  </div>
-                </div>
               )}
             </div>
-          </>
-        ) : (
-            /* Alerts Tab */
-            <div className="flex-1 overflow-y-auto p-6 space-y-4 custom-scrollbar">
-              <div className="flex items-center justify-between mb-2">
-                <h4 className="text-xs font-bold text-white/40 uppercase tracking-widest font-mono">System Alerts</h4>
-                <span className="text-[10px] text-white/20">{alerts.length} total</span>
-              </div>
-              
-              {alerts.length === 0 ? (
-                <div className="h-full flex flex-col items-center justify-center text-center p-8">
-                  <div className="w-12 h-12 rounded-full bg-white/5 flex items-center justify-center mb-4">
-                    <CheckCircle2 className="w-6 h-6 text-white/20" />
-                  </div>
-                  <p className="text-sm text-white/40">No active alerts. Your career path is currently aligned.</p>
-                </div>
-              ) : (
-                alerts.map((alert) => (
-                  <div 
-                    key={alert.id}
-                    className={`p-4 rounded-xl border ${alert.status === 'pending' ? 'bg-neon-magenta/5 border-neon-magenta/20' : 'bg-white/5 border-white/10 opacity-60'}`}
-                  >
-                    <div className="flex items-start gap-3">
-                      <div className={`mt-1 p-1.5 rounded-lg ${alert.status === 'pending' ? 'bg-neon-magenta text-white' : 'bg-white/10 text-white/40'}`}>
-                        <AlertCircle className="w-4 h-4" />
-                      </div>
-                      <div className="flex-1">
-                        <div className="flex items-center justify-between mb-1">
-                          <span className={`text-[10px] font-bold uppercase tracking-wider ${alert.status === 'pending' ? 'text-neon-magenta' : 'text-white/40'}`}>
-                            {alert.type.replace('_', ' ')}
-                          </span>
-                          <span className="text-[10px] text-white/20">
-                            {new Date(alert.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                          </span>
-                        </div>
-                        <p className="text-sm text-white/80 mb-3 leading-relaxed">
-                          {alert.message}
-                        </p>
-                        
-                        {alert.status === 'pending' && (
-                          <div className="flex gap-2">
-                            <button 
-                              onClick={() => setActiveTab('chat')}
-                              className="flex-1 py-2 bg-white/10 hover:bg-white/20 text-white text-[10px] font-bold uppercase tracking-wider rounded-lg transition-colors"
-                            >
-                              Review in Chat
-                            </button>
-                            <button 
-                              onClick={() => handleBypass(alert.id)}
-                              className="flex-1 py-2 bg-neon-magenta/20 hover:bg-neon-magenta/30 text-neon-magenta text-[10px] font-bold uppercase tracking-wider rounded-lg transition-colors border border-neon-magenta/30"
-                            >
-                              Proceed Anyway
-                            </button>
-                          </div>
-                        )}
-                        
-                        {alert.status === 'bypassed' && (
-                          <div className="flex items-center gap-2 text-[10px] text-neon-magenta font-bold uppercase tracking-wider">
-                            <CheckCircle2 className="w-3 h-3" />
-                            Validation Pending (Human Review)
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                  </div>
-                ))
-              )}
-            </div>
-          )}
-        </div>
 
-        {/* Input */}
-        <div className="p-6 border-t border-white/10 bg-white/[0.02]">
+            {/* Input */}
+            <div className="p-6 border-t border-white/10 bg-white/[0.02]">
               {activeTab === 'chat' ? (
                 <div className="flex flex-col gap-3">
                   {selectedFile && (
@@ -1018,9 +1108,11 @@ export const SkylarSidebar: React.FC<SkylarSidebarProps> = ({ onLogin }) => {
                         <div className="p-1.5 bg-neon-cyan/10 rounded text-neon-cyan shrink-0">
                           <Briefcase className="w-3 h-3" />
                         </div>
-                        <span className="text-[10px] text-white/60 truncate">{selectedFile.name}</span>
+                        <span className="text-[10px] text-white/60 truncate">
+                          {selectedFile.name}
+                        </span>
                       </div>
-                      <button 
+                      <button
                         onClick={() => setSelectedFile(null)}
                         className="text-white/20 hover:text-white"
                       >
@@ -1035,37 +1127,37 @@ export const SkylarSidebar: React.FC<SkylarSidebarProps> = ({ onLogin }) => {
                     </div>
                   )}
                   <div className="relative">
-                    <input 
+                    <input
                       type="file"
                       ref={fileInputRef}
                       className="hidden"
                       onChange={handleFileSelect}
                       accept="image/*,.pdf,.doc,.docx,.txt"
                     />
-                    <input 
-                      type="text" 
+                    <input
+                      type="text"
                       placeholder="Ask Skylar anything..."
                       className="w-full bg-black/40 border border-white/10 rounded-2xl px-6 py-4 text-sm focus:border-neon-cyan outline-none pr-32"
                       value={input}
-                      onChange={e => setInput(e.target.value)}
-                      onKeyPress={e => e.key === 'Enter' && handleSend()}
+                      onChange={(e) => setInput(e.target.value)}
+                      onKeyPress={(e) => e.key === 'Enter' && handleSend()}
                     />
                     <div className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-1">
-                      <button 
+                      <button
                         onClick={() => fileInputRef.current?.click()}
                         className="p-2 text-white/20 hover:text-neon-cyan transition-colors"
                         title="Upload Resume or Image"
                       >
                         <Zap className="w-5 h-5" />
                       </button>
-                      <button 
+                      <button
                         onClick={() => toggleListening(false)}
                         className={`p-2 transition-colors ${isListening ? 'text-neon-cyan animate-pulse' : 'text-white/20 hover:text-neon-cyan'}`}
                         title={isListening ? 'Listening...' : 'Start Voice-to-Text'}
                       >
                         <Mic className="w-5 h-5" />
                       </button>
-                      <button 
+                      <button
                         onClick={handleSend}
                         disabled={(!input.trim() && !selectedFile) || isLoading}
                         className="p-2 bg-neon-cyan text-black rounded-xl hover:scale-105 transition-transform disabled:opacity-50 disabled:scale-100"

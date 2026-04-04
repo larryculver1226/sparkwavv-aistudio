@@ -9,7 +9,7 @@ interface PricingPlaceholderProps {
 
 export const PricingPlaceholder: React.FC<PricingPlaceholderProps> = ({ onBack }) => {
   return (
-    <motion.div 
+    <motion.div
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
       exit={{ opacity: 0, y: -20 }}
@@ -24,7 +24,8 @@ export const PricingPlaceholder: React.FC<PricingPlaceholderProps> = ({ onBack }
           Pricing <span className="text-neon-cyan italic">Under Construction</span>
         </h2>
         <p className="text-xl text-white/60 max-w-2xl mx-auto leading-relaxed">
-          We are meticulously engineering our investment tiers to ensure absolute market dominance for our users. The SPARKWavv pricing engine will be live shortly.
+          We are meticulously engineering our investment tiers to ensure absolute market dominance
+          for our users. The SPARKWavv pricing engine will be live shortly.
         </p>
       </header>
 
@@ -36,32 +37,33 @@ export const PricingPlaceholder: React.FC<PricingPlaceholderProps> = ({ onBack }
           </div>
           <div className="space-y-2">
             <h3 className="text-2xl font-bold">Something Big is Arriving</h3>
-            <p className="text-white/40">Our team is finalizing the Founder's Lifetime Pass and strategic subscription models.</p>
+            <p className="text-white/40">
+              Our team is finalizing the Founder's Lifetime Pass and strategic subscription models.
+            </p>
           </div>
-          
+
           <div className="flex flex-col items-center gap-4 pt-4">
             <div className="h-1.5 w-64 bg-white/5 rounded-full overflow-hidden relative">
-              <motion.div 
-                animate={{ x: ["-100%", "100%"] }}
-                transition={{ duration: 3, repeat: Infinity, ease: "easeInOut" }}
+              <motion.div
+                animate={{ x: ['-100%', '100%'] }}
+                transition={{ duration: 3, repeat: Infinity, ease: 'easeInOut' }}
                 className="absolute inset-0 w-1/2 bg-gradient-to-r from-transparent via-neon-cyan to-transparent shadow-[0_0_15px_#00f3ff]"
               />
             </div>
-            <span className="text-[10px] font-mono text-neon-cyan uppercase tracking-widest">Architecting Value... 85%</span>
+            <span className="text-[10px] font-mono text-neon-cyan uppercase tracking-widest">
+              Architecting Value... 85%
+            </span>
           </div>
         </div>
       </div>
 
       <div className="flex flex-col items-center gap-8">
-        <Button 
-          onClick={onBack} 
-          variant="neon"
-          className="px-12 py-6 text-lg"
-        >
+        <Button onClick={onBack} variant="neon" className="px-12 py-6 text-lg">
           Back to Home
         </Button>
         <p className="text-sm text-white/40 italic">
-          Want to be notified when we launch? <span className="text-neon-cyan cursor-pointer hover:underline">Join the waitlist</span>
+          Want to be notified when we launch?{' '}
+          <span className="text-neon-cyan cursor-pointer hover:underline">Join the waitlist</span>
         </p>
       </div>
     </motion.div>

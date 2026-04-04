@@ -1,6 +1,14 @@
 import React from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { X, ShieldCheck, ShieldAlert, CheckCircle2, AlertTriangle, ArrowRight, Loader2 } from 'lucide-react';
+import {
+  X,
+  ShieldCheck,
+  ShieldAlert,
+  CheckCircle2,
+  AlertTriangle,
+  ArrowRight,
+  Loader2,
+} from 'lucide-react';
 
 interface GateReviewModalProps {
   isOpen: boolean;
@@ -23,7 +31,7 @@ export const GateReviewModal: React.FC<GateReviewModalProps> = ({
   onConfirm,
   onOverride,
   isAdmin = false,
-  data
+  data,
 }) => {
   const isApproved = data.status === 'approved';
   const isWarning = data.status === 'warning';
@@ -41,7 +49,7 @@ export const GateReviewModal: React.FC<GateReviewModalProps> = ({
             onClick={onClose}
             className="absolute inset-0 bg-black/80 backdrop-blur-sm"
           />
-          
+
           <motion.div
             initial={{ opacity: 0, scale: 0.9, y: 20 }}
             animate={{ opacity: 1, scale: 1, y: 0 }}
@@ -49,27 +57,38 @@ export const GateReviewModal: React.FC<GateReviewModalProps> = ({
             className="relative w-full max-w-xl bg-dark-surface border border-white/10 rounded-[2.5rem] overflow-hidden shadow-2xl"
           >
             {/* Header */}
-            <div className={`p-8 border-b border-white/5 flex items-center justify-between ${
-              isApproved ? 'bg-neon-lime/5' : isDenied ? 'bg-neon-magenta/5' : 'bg-neon-cyan/5'
-            }`}>
+            <div
+              className={`p-8 border-b border-white/5 flex items-center justify-between ${
+                isApproved ? 'bg-neon-lime/5' : isDenied ? 'bg-neon-magenta/5' : 'bg-neon-cyan/5'
+              }`}
+            >
               <div className="flex items-center gap-4">
-                <div className={`w-12 h-12 rounded-2xl border flex items-center justify-center ${
-                  isApproved ? 'bg-neon-lime/10 border-neon-lime/20 text-neon-lime' : 
-                  isDenied ? 'bg-neon-magenta/10 border-neon-magenta/20 text-neon-magenta' : 
-                  'bg-neon-cyan/10 border-neon-cyan/20 text-neon-cyan'
-                }`}>
-                  {isApproved ? <ShieldCheck className="w-6 h-6" /> : 
-                   isDenied ? <ShieldAlert className="w-6 h-6" /> : 
-                   <ShieldAlert className="w-6 h-6" />}
+                <div
+                  className={`w-12 h-12 rounded-2xl border flex items-center justify-center ${
+                    isApproved
+                      ? 'bg-neon-lime/10 border-neon-lime/20 text-neon-lime'
+                      : isDenied
+                        ? 'bg-neon-magenta/10 border-neon-magenta/20 text-neon-magenta'
+                        : 'bg-neon-cyan/10 border-neon-cyan/20 text-neon-cyan'
+                  }`}
+                >
+                  {isApproved ? (
+                    <ShieldCheck className="w-6 h-6" />
+                  ) : isDenied ? (
+                    <ShieldAlert className="w-6 h-6" />
+                  ) : (
+                    <ShieldAlert className="w-6 h-6" />
+                  )}
                 </div>
                 <div>
                   <h2 className="text-2xl font-display font-bold text-white">Validation Gate</h2>
                   <p className="text-xs text-white/40 uppercase tracking-widest font-bold">
-                    {data.currentPhase} <ArrowRight className="inline w-3 h-3 mx-1" /> {data.targetPhase}
+                    {data.currentPhase} <ArrowRight className="inline w-3 h-3 mx-1" />{' '}
+                    {data.targetPhase}
                   </p>
                 </div>
               </div>
-              <button 
+              <button
                 onClick={onClose}
                 className="p-2 rounded-xl hover:bg-white/5 text-white/40 hover:text-white transition-colors"
               >
@@ -84,25 +103,36 @@ export const GateReviewModal: React.FC<GateReviewModalProps> = ({
                   {isApproved ? (
                     <CheckCircle2 className="w-5 h-5 text-neon-lime" />
                   ) : (
-                    <AlertTriangle className={`w-5 h-5 ${isDenied ? 'text-neon-magenta' : 'text-neon-cyan'}`} />
+                    <AlertTriangle
+                      className={`w-5 h-5 ${isDenied ? 'text-neon-magenta' : 'text-neon-cyan'}`}
+                    />
                   )}
-                  <h3 className={`text-lg font-bold ${
-                    isApproved ? 'text-neon-lime' : isDenied ? 'text-neon-magenta' : 'text-neon-cyan'
-                  }`}>
+                  <h3
+                    className={`text-lg font-bold ${
+                      isApproved
+                        ? 'text-neon-lime'
+                        : isDenied
+                          ? 'text-neon-magenta'
+                          : 'text-neon-cyan'
+                    }`}
+                  >
                     {isApproved ? 'Gate Cleared' : isDenied ? 'Gate Locked' : 'Stern Warning'}
                   </h3>
                 </div>
-                <p className="text-sm text-white/80 leading-relaxed">
-                  {data.message}
-                </p>
+                <p className="text-sm text-white/80 leading-relaxed">{data.message}</p>
               </div>
 
               {/* Criteria List */}
               <div className="space-y-4">
-                <h4 className="text-[10px] font-bold uppercase tracking-widest text-white/40">Gating Criteria</h4>
+                <h4 className="text-[10px] font-bold uppercase tracking-widest text-white/40">
+                  Gating Criteria
+                </h4>
                 <div className="grid gap-3">
                   {data.criteria.map((c, i) => (
-                    <div key={i} className="flex items-center justify-between p-4 rounded-xl bg-white/5 border border-white/10">
+                    <div
+                      key={i}
+                      className="flex items-center justify-between p-4 rounded-xl bg-white/5 border border-white/10"
+                    >
                       <span className="text-sm text-white/80">{c.label}</span>
                       {c.met ? (
                         <CheckCircle2 className="w-5 h-5 text-neon-lime" />

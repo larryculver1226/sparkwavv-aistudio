@@ -10,7 +10,7 @@ export const CommunityPage: React.FC = () => {
     <div className="min-h-screen bg-[#050505] text-white font-sans selection:bg-neon-cyan selection:text-black">
       <header className="h-24 border-b border-white/5 px-6 md:px-12 flex items-center justify-between bg-black/20 backdrop-blur-xl sticky top-0 z-50">
         <div className="flex items-center gap-6">
-          <button 
+          <button
             onClick={() => navigate(-1)}
             className="w-12 h-12 rounded-2xl bg-white/5 border border-white/10 flex items-center justify-center hover:bg-white/10 transition-all group"
           >
@@ -18,9 +18,14 @@ export const CommunityPage: React.FC = () => {
           </button>
           <div className="flex flex-col">
             <h1 className="text-2xl font-display font-bold tracking-tight italic">
-              Sparkwavv <span className="text-neon-cyan text-sm not-italic ml-2 uppercase tracking-widest">Community</span>
+              Sparkwavv{' '}
+              <span className="text-neon-cyan text-sm not-italic ml-2 uppercase tracking-widest">
+                Community
+              </span>
             </h1>
-            <p className="text-[10px] text-white/40 uppercase tracking-[0.3em] font-bold">Connect & Collaborate with Global Talent</p>
+            <p className="text-[10px] text-white/40 uppercase tracking-[0.3em] font-bold">
+              Connect & Collaborate with Global Talent
+            </p>
           </div>
         </div>
       </header>
@@ -35,22 +40,31 @@ export const CommunityPage: React.FC = () => {
                   Global Feed
                 </h2>
                 <div className="flex gap-2">
-                  <span className="px-3 py-1 rounded-full bg-neon-cyan/10 border border-neon-cyan/20 text-[10px] font-bold text-neon-cyan uppercase tracking-widest">Trending</span>
+                  <span className="px-3 py-1 rounded-full bg-neon-cyan/10 border border-neon-cyan/20 text-[10px] font-bold text-neon-cyan uppercase tracking-widest">
+                    Trending
+                  </span>
                 </div>
               </div>
-              
+
               <div className="space-y-6">
                 {[1, 2, 3].map((i) => (
-                  <div key={i} className="p-6 rounded-2xl bg-white/5 border border-white/5 hover:border-white/10 transition-all">
+                  <div
+                    key={i}
+                    className="p-6 rounded-2xl bg-white/5 border border-white/5 hover:border-white/10 transition-all"
+                  >
                     <div className="flex items-center gap-4 mb-4">
                       <div className="w-10 h-10 rounded-xl bg-neon-cyan/20 border border-neon-cyan/40" />
                       <div>
                         <h4 className="text-sm font-bold">Strategic Designer #{i}</h4>
-                        <p className="text-[10px] text-white/40 font-medium">2 hours ago • Product Strategy</p>
+                        <p className="text-[10px] text-white/40 font-medium">
+                          2 hours ago • Product Strategy
+                        </p>
                       </div>
                     </div>
                     <p className="text-sm text-white/60 mb-4">
-                      Just completed a major synthesis milestone! The alignment with my core professional DNA is incredible. Looking for partners in the Fintech space for collaboration.
+                      Just completed a major synthesis milestone! The alignment with my core
+                      professional DNA is incredible. Looking for partners in the Fintech space for
+                      collaboration.
                     </p>
                     <div className="flex items-center gap-6">
                       <button className="flex items-center gap-2 text-[10px] font-bold text-white/40 hover:text-neon-cyan transition-colors">
@@ -70,10 +84,15 @@ export const CommunityPage: React.FC = () => {
 
           <div className="space-y-8">
             <div className="glass-panel p-8 rounded-[2rem] border border-white/5 bg-black/40">
-              <h3 className="text-xs font-bold text-white/40 uppercase tracking-[0.3em] mb-6">Active Partners</h3>
+              <h3 className="text-xs font-bold text-white/40 uppercase tracking-[0.3em] mb-6">
+                Active Partners
+              </h3>
               <div className="space-y-4">
                 {[1, 2, 4, 5].map((i) => (
-                  <div key={i} className="flex items-center justify-between p-4 rounded-xl bg-white/5 border border-white/5">
+                  <div
+                    key={i}
+                    className="flex items-center justify-between p-4 rounded-xl bg-white/5 border border-white/5"
+                  >
                     <div className="flex items-center gap-3">
                       <div className="relative">
                         <div className="w-8 h-8 rounded-lg bg-neon-magenta/20 border border-neon-magenta/40" />
@@ -81,22 +100,30 @@ export const CommunityPage: React.FC = () => {
                       </div>
                       <span className="text-xs font-bold text-white/80">Partner Alpha-{i}</span>
                     </div>
-                    <button className="text-[10px] font-bold text-neon-cyan uppercase tracking-widest hover:underline">Message</button>
+                    <button className="text-[10px] font-bold text-neon-cyan uppercase tracking-widest hover:underline">
+                      Message
+                    </button>
                   </div>
                 ))}
               </div>
             </div>
 
             <div className="glass-panel p-8 rounded-[2rem] border border-white/5 bg-black/40">
-              <h3 className="text-xs font-bold text-white/40 uppercase tracking-[0.3em] mb-6">Community Stats</h3>
+              <h3 className="text-xs font-bold text-white/40 uppercase tracking-[0.3em] mb-6">
+                Community Stats
+              </h3>
               <div className="grid grid-cols-2 gap-4">
                 <div className="p-4 rounded-xl bg-white/5 border border-white/5 text-center">
                   <div className="text-xl font-display font-bold text-neon-cyan italic">1.2k</div>
-                  <div className="text-[8px] font-bold text-white/40 uppercase tracking-widest">Members</div>
+                  <div className="text-[8px] font-bold text-white/40 uppercase tracking-widest">
+                    Members
+                  </div>
                 </div>
                 <div className="p-4 rounded-xl bg-white/5 border border-white/5 text-center">
                   <div className="text-xl font-display font-bold text-neon-magenta italic">450</div>
-                  <div className="text-[8px] font-bold text-white/40 uppercase tracking-widest">Collaborations</div>
+                  <div className="text-[8px] font-bold text-white/40 uppercase tracking-widest">
+                    Collaborations
+                  </div>
                 </div>
               </div>
             </div>

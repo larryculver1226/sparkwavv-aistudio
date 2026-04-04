@@ -3,7 +3,7 @@ import { motion, AnimatePresence } from 'motion/react';
 import { Sparkles, Moon, RefreshCw, ChevronRight, Loader2, Quote } from 'lucide-react';
 import { Button } from './Button';
 import { useIdentity } from '../contexts/IdentityContext';
-import { GoogleGenAI } from "@google/genai";
+import { GoogleGenAI } from '@google/genai';
 import { getGeminiApiKey } from '../services/aiConfig';
 
 interface SparkPrompt {
@@ -24,12 +24,12 @@ export const EveningSpark: React.FC<{ currentStage: string }> = ({ currentStage 
     try {
       const apiKey = getGeminiApiKey();
       if (!apiKey) {
-        throw new Error("Gemini API key is missing. Please check your AI Studio settings.");
+        throw new Error('Gemini API key is missing. Please check your AI Studio settings.');
       }
 
       const ai = new GoogleGenAI({ apiKey });
-      const model = "gemini-3-flash-preview";
-      
+      const model = 'gemini-3-flash-preview';
+
       const prompt = `
         You are the Sparkwavv AI Companion, Skylar. 
         The user, ${profile?.displayName || 'Sparker'}, is currently in the "${currentStage || 'Discovery'}" stage of their career journey.
@@ -51,23 +51,24 @@ export const EveningSpark: React.FC<{ currentStage: string }> = ({ currentStage 
         model,
         contents: prompt,
         config: {
-          responseMimeType: "application/json"
-        }
+          responseMimeType: 'application/json',
+        },
       });
 
       const text = response.text;
-      if (!text) throw new Error("No response from Skylar");
-      
+      if (!text) throw new Error('No response from Skylar');
+
       const result = JSON.parse(text);
       setSparkData(result);
     } catch (err: any) {
-      console.error("Error generating spark:", err);
+      console.error('Error generating spark:', err);
       // Fallback if AI fails
       setSparkData({
-        title: "Quiet Reflection",
-        prompt: "Take a moment to breathe and acknowledge one small win from today, no matter how small.",
-        protocolStage: "Reflect",
-        skylarMessage: "I'm here with you. Even small steps are progress."
+        title: 'Quiet Reflection',
+        prompt:
+          'Take a moment to breathe and acknowledge one small win from today, no matter how small.',
+        protocolStage: 'Reflect',
+        skylarMessage: "I'm here with you. Even small steps are progress.",
       });
     } finally {
       setLoading(false);
@@ -78,7 +79,7 @@ export const EveningSpark: React.FC<{ currentStage: string }> = ({ currentStage 
     <div className="bg-zinc-900/50 border border-zinc-800 rounded-3xl p-8 relative overflow-hidden group">
       {/* Background Glow */}
       <div className="absolute top-0 right-0 w-64 h-64 bg-neon-lime/5 blur-[100px] -mr-32 -mt-32 group-hover:bg-neon-lime/10 transition-colors duration-500" />
-      
+
       <div className="relative z-10">
         <div className="flex items-center justify-between mb-8">
           <div className="flex items-center gap-3">
@@ -91,13 +92,17 @@ export const EveningSpark: React.FC<{ currentStage: string }> = ({ currentStage 
             </div>
           </div>
           {!sparkData && (
-            <Button 
-              onClick={generateSpark} 
+            <Button
+              onClick={generateSpark}
               disabled={loading}
-              variant="outline" 
+              variant="outline"
               className="gap-2 border-zinc-700 hover:border-neon-lime/50"
             >
-              {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Sparkles className="w-4 h-4 text-neon-lime" />}
+              {loading ? (
+                <Loader2 className="w-4 h-4 animate-spin" />
+              ) : (
+                <Sparkles className="w-4 h-4 text-neon-lime" />
+              )}
               Ignite
             </Button>
           )}
@@ -112,7 +117,8 @@ export const EveningSpark: React.FC<{ currentStage: string }> = ({ currentStage 
               className="space-y-6"
             >
               <p className="text-zinc-400 leading-relaxed">
-                Ready for your nightly R4 reflection? Skylar will generate a personalized prompt based on your current journey stage.
+                Ready for your nightly R4 reflection? Skylar will generate a personalized prompt
+                based on your current journey stage.
               </p>
               <div className="flex flex-wrap gap-2">
                 {['reflective', 'tired', 'inspired', 'uncertain', 'focused'].map((m) => (
@@ -120,8 +126,8 @@ export const EveningSpark: React.FC<{ currentStage: string }> = ({ currentStage 
                     key={m}
                     onClick={() => setMood(m)}
                     className={`px-3 py-1.5 rounded-full text-xs font-medium transition-all ${
-                      mood === m 
-                        ? 'bg-neon-lime text-black shadow-[0_0_15px_rgba(0,255,159,0.3)]' 
+                      mood === m
+                        ? 'bg-neon-lime text-black shadow-[0_0_15px_rgba(0,255,159,0.3)]'
                         : 'bg-zinc-800 text-zinc-400 hover:bg-zinc-700'
                     }`}
                   >
@@ -141,16 +147,12 @@ export const EveningSpark: React.FC<{ currentStage: string }> = ({ currentStage 
                   {sparkData.protocolStage}
                 </span>
               </div>
-              
-              <h4 className="text-2xl font-bold text-white leading-tight">
-                {sparkData.title}
-              </h4>
+
+              <h4 className="text-2xl font-bold text-white leading-tight">{sparkData.title}</h4>
 
               <div className="relative p-6 bg-zinc-800/30 rounded-2xl border border-zinc-700/30">
                 <Quote className="absolute -top-3 -left-3 w-8 h-8 text-neon-lime/20" />
-                <p className="text-lg text-zinc-300 italic leading-relaxed">
-                  {sparkData.prompt}
-                </p>
+                <p className="text-lg text-zinc-300 italic leading-relaxed">{sparkData.prompt}</p>
               </div>
 
               <div className="flex items-start gap-4 p-4 bg-neon-cyan/5 rounded-2xl border border-neon-cyan/10">
@@ -163,9 +165,9 @@ export const EveningSpark: React.FC<{ currentStage: string }> = ({ currentStage 
               </div>
 
               <div className="flex gap-3 pt-2">
-                <Button 
-                  onClick={() => setSparkData(null)} 
-                  variant="outline" 
+                <Button
+                  onClick={() => setSparkData(null)}
+                  variant="outline"
                   className="flex-1 gap-2 border-zinc-800"
                 >
                   <RefreshCw className="w-4 h-4" />

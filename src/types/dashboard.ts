@@ -38,7 +38,7 @@ export interface DashboardData {
   effortTier?: '3.5' | '7'; // Hours per week
   energyTrough?: {
     start: string; // HH:mm
-    end: string;   // HH:mm
+    end: string; // HH:mm
   };
   financialExpenses?: Expense[];
   validationGateMode?: 'soft-warning' | 'hard-block';

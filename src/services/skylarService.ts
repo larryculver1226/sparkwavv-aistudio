@@ -1,33 +1,30 @@
-import { GoogleGenAI, Modality, Type, FunctionDeclaration, ThinkingLevel } from "@google/genai";
+import { GoogleGenAI, Modality, Type, FunctionDeclaration, ThinkingLevel } from '@google/genai';
 import { getGeminiApiKey } from './aiConfig';
 import * as mammoth from 'mammoth';
 import { KnowledgeGraph, WavvaultData, TargetOpportunity } from '../types/wavvault';
 
 export const GATING_CRITERIA: Record<string, string[]> = {
-  'Dive-In': [
-    'Commitment to the 12-week process',
-    'Initial "Spark" identified'
-  ],
-  'Ignition': [
+  'Dive-In': ['Commitment to the 12-week process', 'Initial "Spark" identified'],
+  Ignition: [
     'Completion of "Pie of Life" exercise',
     'Completion of "Perfect Day" exercise',
-    'Clear initial career DNA hypothesis'
+    'Clear initial career DNA hypothesis',
   ],
-  'Discovery': [
+  Discovery: [
     'Synthesis of "Cinematic Brand DNA" (3 pillars)',
     'Extraction of at least 5 core attributes from accomplishments',
-    'Validation of "Five Stories" by an RPP'
+    'Validation of "Five Stories" by an RPP',
   ],
-  'Branding': [
+  Branding: [
     'Completion of "Journalist" and "Reflective" versions of the Five Stories',
     'Alignment with the Market Intelligence Grid (MIG)',
-    'Cinematic Brand DNA finalized'
+    'Cinematic Brand DNA finalized',
   ],
-  'Outreach': [
+  Outreach: [
     'ATS-optimized resume finalized',
     'Targeted outreach sequence developed',
-    'Interview readiness confirmed'
-  ]
+    'Interview readiness confirmed',
+  ],
 };
 
 // Lazy initialization of Gemini
@@ -37,11 +34,18 @@ const getAI = () => {
   if (!aiInstance) {
     const apiKey = getGeminiApiKey();
     if (!apiKey) {
-      console.error("SkylarService: GEMINI_API_KEY is missing.");
-      throw new Error("GEMINI_API_KEY is not configured in the environment variables. Please check your AI Studio settings.");
+      console.error('SkylarService: GEMINI_API_KEY is missing.');
+      throw new Error(
+        'GEMINI_API_KEY is not configured in the environment variables. Please check your AI Studio settings.'
+      );
     } else {
-      const maskedKey = apiKey.length > 8 ? `${apiKey.substring(0, 4)}...${apiKey.substring(apiKey.length - 4)}` : "****";
-      console.log(`SkylarService: Initializing GoogleGenAI with key: ${maskedKey} (length: ${apiKey.length})`);
+      const maskedKey =
+        apiKey.length > 8
+          ? `${apiKey.substring(0, 4)}...${apiKey.substring(apiKey.length - 4)}`
+          : '****';
+      console.log(
+        `SkylarService: Initializing GoogleGenAI with key: ${maskedKey} (length: ${apiKey.length})`
+      );
     }
     aiInstance = new GoogleGenAI({ apiKey });
   }
@@ -88,137 +92,152 @@ const tools = [
   {
     functionDeclarations: [
       {
-        name: "search_wavvault",
-        description: "Search the collective, anonymized Wavvault for similar career paths, strengths, and stories from other users to provide comparative insights.",
+        name: 'search_wavvault',
+        description:
+          'Search the collective, anonymized Wavvault for similar career paths, strengths, and stories from other users to provide comparative insights.',
         parameters: {
           type: Type.OBJECT,
           properties: {
             query: {
               type: Type.STRING,
-              description: "The career-related query to search for (e.g., 'career switch from nursing to tech')"
-            }
+              description:
+                "The career-related query to search for (e.g., 'career switch from nursing to tech')",
+            },
           },
-          required: ["query"]
-        }
+          required: ['query'],
+        },
       },
       {
-        name: "propose_dashboard_update",
-        description: "Propose an update to a specific field in the user's dashboard based on the conversation progress. This will NOT execute until the user confirms.",
+        name: 'propose_dashboard_update',
+        description:
+          "Propose an update to a specific field in the user's dashboard based on the conversation progress. This will NOT execute until the user confirms.",
         parameters: {
           type: Type.OBJECT,
           properties: {
             field: {
               type: Type.STRING,
-              description: "The field to update (e.g., 'journeyStage', 'careerHappiness', 'resumeStatus')"
+              description:
+                "The field to update (e.g., 'journeyStage', 'careerHappiness', 'resumeStatus')",
             },
             value: {
               type: Type.STRING,
-              description: "The new value for the field"
+              description: 'The new value for the field',
             },
             reasoning: {
               type: Type.STRING,
-              description: "The reason why this update is being proposed"
-            }
+              description: 'The reason why this update is being proposed',
+            },
           },
-          required: ["field", "value", "reasoning"]
-        }
+          required: ['field', 'value', 'reasoning'],
+        },
       },
       {
-        name: "propose_milestone_addition",
-        description: "Propose adding a new milestone to the user's career roadmap. This will NOT execute until the user confirms.",
+        name: 'propose_milestone_addition',
+        description:
+          "Propose adding a new milestone to the user's career roadmap. This will NOT execute until the user confirms.",
         parameters: {
           type: Type.OBJECT,
           properties: {
             title: {
               type: Type.STRING,
-              description: "The title of the milestone"
+              description: 'The title of the milestone',
             },
             description: {
               type: Type.STRING,
-              description: "Detailed description of the milestone"
+              description: 'Detailed description of the milestone',
             },
             targetDate: {
               type: Type.STRING,
-              description: "Expected completion date (ISO format or descriptive)"
+              description: 'Expected completion date (ISO format or descriptive)',
             },
             reasoning: {
               type: Type.STRING,
-              description: "The reason why this milestone is being proposed"
-            }
+              description: 'The reason why this milestone is being proposed',
+            },
           },
-          required: ["title", "description", "targetDate", "reasoning"]
-        }
+          required: ['title', 'description', 'targetDate', 'reasoning'],
+        },
       },
       {
-        name: "get_market_intelligence",
-        description: "Fetch real-time market trends, industry shifts, and skill demand data from the Market Intelligence Grid (MIG).",
+        name: 'get_market_intelligence',
+        description:
+          'Fetch real-time market trends, industry shifts, and skill demand data from the Market Intelligence Grid (MIG).',
         parameters: {
           type: Type.OBJECT,
           properties: {
             industry: {
               type: Type.STRING,
-              description: "The industry to search for (e.g., 'Tech', 'Healthcare', 'Finance')"
+              description: "The industry to search for (e.g., 'Tech', 'Healthcare', 'Finance')",
             },
             role: {
               type: Type.STRING,
-              description: "The specific role to analyze (e.g., 'Software Architect', 'Nurse Practitioner')"
-            }
+              description:
+                "The specific role to analyze (e.g., 'Software Architect', 'Nurse Practitioner')",
+            },
           },
-          required: ["industry"]
-        }
+          required: ['industry'],
+        },
       },
       {
-        name: "perform_gate_review",
-        description: "Perform a 'Validation Gate' review to ensure the user is ready to move to the next phase. Phases: Dive-In, Ignition, Discovery, Branding, Outreach.",
+        name: 'perform_gate_review',
+        description:
+          "Perform a 'Validation Gate' review to ensure the user is ready to move to the next phase. Phases: Dive-In, Ignition, Discovery, Branding, Outreach.",
         parameters: {
           type: Type.OBJECT,
           properties: {
             currentPhase: {
               type: Type.STRING,
-              description: "The current phase the user is in (Dive-In, Ignition, Discovery, Branding, Outreach)"
+              description:
+                'The current phase the user is in (Dive-In, Ignition, Discovery, Branding, Outreach)',
             },
             targetPhase: {
               type: Type.STRING,
-              description: "The phase the user wants to move to (Dive-In, Ignition, Discovery, Branding, Outreach)"
+              description:
+                'The phase the user wants to move to (Dive-In, Ignition, Discovery, Branding, Outreach)',
             },
             userData: {
               type: Type.STRING,
-              description: "A summary of the user's progress and data relevant to the gate criteria"
-            }
+              description:
+                "A summary of the user's progress and data relevant to the gate criteria",
+            },
           },
-          required: ["currentPhase", "targetPhase", "userData"]
-        }
+          required: ['currentPhase', 'targetPhase', 'userData'],
+        },
       },
       {
-        name: "propose_major_shift",
-        description: "Propose a major shift in the user's professional DNA (e.g., a pivot, a new core value, or a change in primary goal).",
+        name: 'propose_major_shift',
+        description:
+          "Propose a major shift in the user's professional DNA (e.g., a pivot, a new core value, or a change in primary goal).",
         parameters: {
           type: Type.OBJECT,
           properties: {
             type: {
               type: Type.STRING,
-              description: "The type of shift: 'pivot', 'core_value', 'primary_goal', or 'strength'"
+              description:
+                "The type of shift: 'pivot', 'core_value', 'primary_goal', or 'strength'",
             },
             content: {
               type: Type.STRING,
-              description: "The description of the proposed shift"
+              description: 'The description of the proposed shift',
             },
             evidence: {
               type: Type.STRING,
-              description: "The reasoning or evidence from the conversation that led to this proposal"
+              description:
+                'The reasoning or evidence from the conversation that led to this proposal',
             },
             tags: {
               type: Type.ARRAY,
               items: { type: Type.STRING },
-              description: "Optional tags for categorization"
-            }
+              description: 'Optional tags for categorization',
+            },
           },
-          required: ["type", "content", "evidence"]
-        }
+          required: ['type', 'content', 'evidence'],
+        },
       },
       {
-        name: "flag_dna_conflict",
-        description: "Flag a conflict between a new insight and an existing confirmed 'Current Truth' in the user's professional DNA.",
+        name: 'flag_dna_conflict',
+        description:
+          "Flag a conflict between a new insight and an existing confirmed 'Current Truth' in the user's professional DNA.",
         parameters: {
           type: Type.OBJECT,
           properties: {
@@ -227,79 +246,86 @@ const tools = [
               properties: {
                 type: { type: Type.STRING },
                 content: { type: Type.STRING },
-                evidence: { type: Type.STRING }
+                evidence: { type: Type.STRING },
               },
-              required: ["type", "content", "evidence"]
+              required: ['type', 'content', 'evidence'],
             },
             existingInsightId: {
               type: Type.STRING,
-              description: "The ID of the existing confirmed insight that is being conflicted"
+              description: 'The ID of the existing confirmed insight that is being conflicted',
             },
             conflictReason: {
               type: Type.STRING,
-              description: "Explanation of why these two insights are in conflict"
-            }
+              description: 'Explanation of why these two insights are in conflict',
+            },
           },
-          required: ["newInsight", "existingInsightId", "conflictReason"]
-        }
+          required: ['newInsight', 'existingInsightId', 'conflictReason'],
+        },
       },
       {
-        name: "execute_minor_update",
-        description: "Automatically execute a minor update to the user's dashboard (e.g., skills, attributes, journeyStage, careerHappiness). Use this for non-strategic updates.",
+        name: 'execute_minor_update',
+        description:
+          "Automatically execute a minor update to the user's dashboard (e.g., skills, attributes, journeyStage, careerHappiness). Use this for non-strategic updates.",
         parameters: {
           type: Type.OBJECT,
           properties: {
             field: {
               type: Type.STRING,
-              description: "The field to update (e.g., 'skills', 'attributes', 'journeyStage', 'careerHappiness')"
+              description:
+                "The field to update (e.g., 'skills', 'attributes', 'journeyStage', 'careerHappiness')",
             },
             value: {
               type: Type.STRING,
-              description: "The new value for the field"
+              description: 'The new value for the field',
             },
             reasoning: {
               type: Type.STRING,
-              description: "The reason why this update was executed"
-            }
-          },
-          required: ["field", "value", "reasoning"]
-        }
-      },
-      {
-        name: "parse_career_artifact",
-        description: "Analyze a resume, LinkedIn profile, or Job Description for DNA and ATS compliance.",
-        parameters: {
-          type: Type.OBJECT,
-          properties: {
-            artifactType: { 
-              type: Type.STRING,
-              enum: ["resume", "linkedin", "job_description", "other"]
+              description: 'The reason why this update was executed',
             },
-            atsScore: { type: Type.NUMBER, description: "Score from 0-100 for ATS compliance" },
-            dnaAlignment: { type: Type.NUMBER, description: "Alignment with confirmed DNA from 0-100" },
-            keyFindings: { type: Type.ARRAY, items: { type: Type.STRING } }
           },
-          required: ["artifactType", "atsScore", "dnaAlignment", "keyFindings"]
-        }
+          required: ['field', 'value', 'reasoning'],
+        },
       },
       {
-        name: "generate_ats_optimized_content",
-        description: "Generate ATS-optimized content for a resume or cover letter in a specific format.",
+        name: 'parse_career_artifact',
+        description:
+          'Analyze a resume, LinkedIn profile, or Job Description for DNA and ATS compliance.',
         parameters: {
           type: Type.OBJECT,
           properties: {
-            content: { type: Type.STRING, description: "The optimized text content" },
-            format: { 
-              type: Type.STRING, 
-              enum: ["text", "pdf", "word", "markdown"],
-              description: "The desired export format"
-            }
+            artifactType: {
+              type: Type.STRING,
+              enum: ['resume', 'linkedin', 'job_description', 'other'],
+            },
+            atsScore: { type: Type.NUMBER, description: 'Score from 0-100 for ATS compliance' },
+            dnaAlignment: {
+              type: Type.NUMBER,
+              description: 'Alignment with confirmed DNA from 0-100',
+            },
+            keyFindings: { type: Type.ARRAY, items: { type: Type.STRING } },
           },
-          required: ["content", "format"]
-        }
-      }
-    ]
-  }
+          required: ['artifactType', 'atsScore', 'dnaAlignment', 'keyFindings'],
+        },
+      },
+      {
+        name: 'generate_ats_optimized_content',
+        description:
+          'Generate ATS-optimized content for a resume or cover letter in a specific format.',
+        parameters: {
+          type: Type.OBJECT,
+          properties: {
+            content: { type: Type.STRING, description: 'The optimized text content' },
+            format: {
+              type: Type.STRING,
+              enum: ['text', 'pdf', 'word', 'markdown'],
+              description: 'The desired export format',
+            },
+          },
+          required: ['content', 'format'],
+        },
+      },
+    ],
+  },
 ];
 
 export type SkylarPersona = 'discovery' | 'branding' | 'outreach' | 'rpp';
@@ -314,27 +340,35 @@ export const PERSONA_CONFIG = {
   discovery: {
     name: 'Skylar Discovery Architect',
     voice: 'Kore',
-    avatar: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=400&h=400&fit=crop&crop=faces', 
-    instruction: "You are the Skylar Discovery Architect. Your goal is to help the user identify their 'best self' through attribute extraction from their accomplishments and exercises. Be professional, clear, and analytical. Focus on 'bringing attributes to life'."
+    avatar:
+      'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=400&h=400&fit=crop&crop=faces',
+    instruction:
+      "You are the Skylar Discovery Architect. Your goal is to help the user identify their 'best self' through attribute extraction from their accomplishments and exercises. Be professional, clear, and analytical. Focus on 'bringing attributes to life'.",
   },
   branding: {
     name: 'Skylar Narrative Journalist',
     voice: 'Zephyr',
-    avatar: 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=400&h=400&fit=crop&crop=faces',
-    instruction: "You are the Skylar Narrative Journalist. Your goal is to help the user transform their accomplishments into dual-perspective stories: a factual 'Journalist' version and an emotional 'Reflective' version. Be calm, steady, and encouraging of emotional depth."
+    avatar:
+      'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=400&h=400&fit=crop&crop=faces',
+    instruction:
+      "You are the Skylar Narrative Journalist. Your goal is to help the user transform their accomplishments into dual-perspective stories: a factual 'Journalist' version and an emotional 'Reflective' version. Be calm, steady, and encouraging of emotional depth.",
   },
   outreach: {
     name: 'Skylar Kickspark Drill Master',
     voice: 'Puck',
-    avatar: 'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=400&h=400&fit=crop&crop=faces',
-    instruction: "You are the Skylar Kickspark Drill Master. Your goal is to enforce the 80/20 rule and ensure the user is maintaining their 3.5-7 hour weekly commitment. Be energetic, bright, and focused on execution and financial ROI."
+    avatar:
+      'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=400&h=400&fit=crop&crop=faces',
+    instruction:
+      'You are the Skylar Kickspark Drill Master. Your goal is to enforce the 80/20 rule and ensure the user is maintaining their 3.5-7 hour weekly commitment. Be energetic, bright, and focused on execution and financial ROI.',
   },
   rpp: {
     name: 'Skylar Role Playing Partner',
-    voice: 'Kore', 
-    avatar: 'https://images.unsplash.com/photo-1519085360753-af0119f7cbe7?w=400&h=400&fit=crop&crop=faces',
-    instruction: "You are acting as the user's Role Playing Partner (RPP). Your job is to audit their 'Five Stories' for factual accuracy and emotional depth. Be a 'Hard Trainer' for facts and a 'Soft Coach' for feelings. You must validate their work before they can proceed."
-  }
+    voice: 'Kore',
+    avatar:
+      'https://images.unsplash.com/photo-1519085360753-af0119f7cbe7?w=400&h=400&fit=crop&crop=faces',
+    instruction:
+      "You are acting as the user's Role Playing Partner (RPP). Your job is to audit their 'Five Stories' for factual accuracy and emotional depth. Be a 'Hard Trainer' for facts and a 'Soft Coach' for feelings. You must validate their work before they can proceed.",
+  },
 };
 
 class SkylarService {
@@ -347,26 +381,26 @@ class SkylarService {
   ): Promise<string> {
     const ai = getAI();
     const config = PERSONA_CONFIG[persona];
-    
-    let currentTruth = "";
+
+    let currentTruth = '';
     if (userId) {
       const insights = await this.fetchConfirmedInsights(userId);
       if (insights.length > 0) {
-        currentTruth = `\n\nConfirmed Professional DNA (Current Truth):\n${insights.map(i => `- [${i.type.toUpperCase()}] ${i.content}`).join('\n')}`;
+        currentTruth = `\n\nConfirmed Professional DNA (Current Truth):\n${insights.map((i) => `- [${i.type.toUpperCase()}] ${i.content}`).join('\n')}`;
       }
     }
 
     const systemInstruction = `${config.instruction}\n\nContext from Wavvault: ${JSON.stringify(wavvaultContext || {})}${currentTruth}\n\nRemember interactions from previous journeys if relevant.`;
 
     const chat = ai.chats.create({
-      model: "gemini-3-flash-preview",
+      model: 'gemini-3-flash-preview',
       config: {
         systemInstruction,
       },
-      history: history.map(msg => ({
+      history: history.map((msg) => ({
         role: msg.role,
-        parts: msg.parts
-      }))
+        parts: msg.parts,
+      })),
     });
 
     const response = await chat.sendMessage({ message });
@@ -381,7 +415,7 @@ class SkylarService {
       }
       return [];
     } catch (error) {
-      console.error("Error fetching confirmed insights:", error);
+      console.error('Error fetching confirmed insights:', error);
       return [];
     }
   }
@@ -389,9 +423,9 @@ class SkylarService {
   async generateSpeech(text: string, persona: SkylarPersona): Promise<string> {
     const ai = getAI();
     const voiceName = PERSONA_CONFIG[persona].voice;
-    
+
     const response = await ai.models.generateContent({
-      model: "gemini-2.5-flash-preview-tts",
+      model: 'gemini-2.5-flash-preview-tts',
       contents: [{ parts: [{ text }] }],
       config: {
         responseModalities: [Modality.AUDIO],
@@ -418,32 +452,32 @@ class SkylarService {
   ): Promise<any> {
     try {
       const ai = getAI();
-      
-      let currentTruth = "";
+
+      let currentTruth = '';
       if (userId) {
         const insights = await this.fetchConfirmedInsights(userId);
         if (insights.length > 0) {
-          currentTruth = `\n\nConfirmed Professional DNA (Current Truth):\n${insights.map(i => `- [${i.type.toUpperCase()}] ${i.content}`).join('\n')}`;
+          currentTruth = `\n\nConfirmed Professional DNA (Current Truth):\n${insights.map((i) => `- [${i.type.toUpperCase()}] ${i.content}`).join('\n')}`;
         }
       }
 
       const baseInstruction = methodology === 'lobkowicz' ? LOBKOWICZ_PROMPT : FEYNMAN_PROMPT;
       const systemInstruction = `${baseInstruction}${currentTruth}`;
-      
+
       const chat = ai.chats.create({
-        model: "gemini-3.1-pro-preview",
+        model: 'gemini-3.1-pro-preview',
         config: {
           systemInstruction,
           tools: tools as any,
           maxOutputTokens: 16384,
           thinkingConfig: {
-            thinkingLevel: ThinkingLevel.LOW
-          }
+            thinkingLevel: ThinkingLevel.LOW,
+          },
         },
-        history: history.map(h => ({
+        history: history.map((h) => ({
           role: h.role,
-          parts: h.parts
-        }))
+          parts: h.parts,
+        })),
       });
 
       const messageParts: any[] = [{ text: message }];
@@ -451,8 +485,8 @@ class SkylarService {
         messageParts.push({
           inlineData: {
             data: fileData.data,
-            mimeType: fileData.mimeType
-          }
+            mimeType: fileData.mimeType,
+          },
         });
       }
 
@@ -470,58 +504,76 @@ class SkylarService {
 
           if (name === 'search_wavvault') {
             console.log(`[SKYLAR] Executing tool: search_wavvault with query: ${typedArgs.query}`);
-            const searchResults = await this.performAnonymizedSearch(typedArgs.query as string, token);
+            const searchResults = await this.performAnonymizedSearch(
+              typedArgs.query as string,
+              token
+            );
             toolResponses.push({
               functionResponse: {
                 name: 'search_wavvault',
                 response: { content: searchResults },
-                id
-              }
+                id,
+              },
             });
           } else if (name === 'execute_minor_update') {
-            console.log(`[SKYLAR] Executing tool: execute_minor_update for field: ${typedArgs.field}`);
+            console.log(
+              `[SKYLAR] Executing tool: execute_minor_update for field: ${typedArgs.field}`
+            );
             const result = await this.executeAction(userId, 'update_dashboard', typedArgs, token);
             executedActions.push({ action: 'execute_minor_update', data: typedArgs, result });
             toolResponses.push({
               functionResponse: {
                 name: 'execute_minor_update',
                 response: result,
-                id
-              }
+                id,
+              },
             });
           } else if (name === 'get_market_intelligence') {
-            console.log(`[SKYLAR] Executing tool: get_market_intelligence for industry: ${typedArgs.industry}`);
-            const marketData = await this.performMarketIntelligenceSearch(typedArgs.industry as string, typedArgs.role as string, token);
+            console.log(
+              `[SKYLAR] Executing tool: get_market_intelligence for industry: ${typedArgs.industry}`
+            );
+            const marketData = await this.performMarketIntelligenceSearch(
+              typedArgs.industry as string,
+              typedArgs.role as string,
+              token
+            );
             toolResponses.push({
               functionResponse: {
                 name: 'get_market_intelligence',
                 response: marketData,
-                id
-              }
+                id,
+              },
             });
           } else if (name === 'perform_gate_review') {
-            console.log(`[SKYLAR] Executing tool: perform_gate_review for ${typedArgs.targetPhase}`);
+            console.log(
+              `[SKYLAR] Executing tool: perform_gate_review for ${typedArgs.targetPhase}`
+            );
             if (userId) {
-              const reviewResult = await this.performGateReview(userId, typedArgs.currentPhase, typedArgs.targetPhase, history);
+              const reviewResult = await this.performGateReview(
+                userId,
+                typedArgs.currentPhase,
+                typedArgs.targetPhase,
+                history
+              );
               toolResponses.push({
                 functionResponse: {
                   name: 'perform_gate_review',
                   response: reviewResult,
-                  id
-                }
+                  id,
+                },
               });
             } else {
               const criteria = GATING_CRITERIA[typedArgs.targetPhase] || [];
               toolResponses.push({
                 functionResponse: {
                   name: 'perform_gate_review',
-                  response: { 
-                    status: 'warning', 
-                    message: "User context not found. Performing general criteria review.",
-                    criteria: criteria.map(c => ({ label: c, met: false }))
+                  response: {
+                    status: 'warning',
+                    message: 'User context not found. Performing general criteria review.',
+                    criteria: criteria.map((c) => ({ label: c, met: false })),
                   },
-                  id
-                }
+                  id,
+                },
               });
             }
           } else if (name === 'parse_career_artifact') {
@@ -529,16 +581,19 @@ class SkylarService {
             toolResponses.push({
               functionResponse: {
                 name: 'parse_career_artifact',
-                response: { status: 'analyzed', message: 'Artifact analyzed for DNA and ATS compliance.' },
-                id
-              }
+                response: {
+                  status: 'analyzed',
+                  message: 'Artifact analyzed for DNA and ATS compliance.',
+                },
+                id,
+              },
             });
           } else if (name === 'generate_ats_optimized_content') {
             console.log(`[SKYLAR] Executing tool: generate_ats_optimized_content`);
             // This will be returned to the frontend to show download buttons
             return { response, executedActions };
           } else if (name.startsWith('propose_') || name === 'flag_dna_conflict') {
-            // Proposals are NOT executed automatically. 
+            // Proposals are NOT executed automatically.
             // We return them to the frontend to trigger the UI Widget.
             return { response, executedActions };
           }
@@ -551,10 +606,10 @@ class SkylarService {
           break;
         }
       }
-      
+
       return { response, executedActions };
     } catch (error) {
-      console.error("Skylar Chat Error:", error);
+      console.error('Skylar Chat Error:', error);
       throw error;
     }
   }
@@ -567,14 +622,14 @@ class SkylarService {
       const response = await fetch('/api/skylar/search-wavvault', {
         method: 'POST',
         headers,
-        body: JSON.stringify({ query })
+        body: JSON.stringify({ query }),
       });
-      
+
       if (!response.ok) return [];
       const data = await response.json();
       return data.content || [];
     } catch (error) {
-      console.error("Wavvault Search Error:", error);
+      console.error('Wavvault Search Error:', error);
       return [];
     }
   }
@@ -587,14 +642,14 @@ class SkylarService {
       const response = await fetch('/api/skylar/market-intelligence', {
         method: 'POST',
         headers,
-        body: JSON.stringify({ industry, role })
+        body: JSON.stringify({ industry, role }),
       });
-      
-      if (!response.ok) return { error: "Failed to fetch market intelligence." };
+
+      if (!response.ok) return { error: 'Failed to fetch market intelligence.' };
       return await response.json();
     } catch (error) {
-      console.error("Market Intelligence Search Error:", error);
-      return { error: "Failed to fetch market intelligence." };
+      console.error('Market Intelligence Search Error:', error);
+      return { error: 'Failed to fetch market intelligence.' };
     }
   }
 
@@ -610,17 +665,17 @@ class SkylarService {
       const response = await fetch(url, {
         method: 'POST',
         headers,
-        body: JSON.stringify({ userId, action, data })
+        body: JSON.stringify({ userId, action, data }),
       });
-      
+
       if (!response.ok) {
         const error = await response.json();
         throw new Error(error.error || 'Failed to execute action');
       }
-      
+
       return await response.json();
     } catch (error) {
-      console.error("Action Execution Error:", error);
+      console.error('Action Execution Error:', error);
       throw error;
     }
   }
@@ -635,10 +690,10 @@ class SkylarService {
       await fetch('/api/wavvault/chat', {
         method: 'POST',
         headers,
-        body: JSON.stringify({ userId, history })
+        body: JSON.stringify({ userId, history }),
       });
     } catch (error) {
-      console.error("Error saving chat:", error);
+      console.error('Error saving chat:', error);
     }
   }
 
@@ -654,7 +709,7 @@ class SkylarService {
       }
       return [];
     } catch (error) {
-      console.error("Error fetching chat history:", error);
+      console.error('Error fetching chat history:', error);
       return [];
     }
   }
@@ -670,23 +725,23 @@ class SkylarService {
       const pdfjs = await import('pdfjs-dist');
       // Set worker source
       pdfjs.GlobalWorkerOptions.workerSrc = `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjs.version}/pdf.worker.min.js`;
-      
+
       const arrayBuffer = await file.arrayBuffer();
       const loadingTask = pdfjs.getDocument({ data: arrayBuffer });
       const pdf = await loadingTask.promise;
-      
-      let fullText = "";
+
+      let fullText = '';
       for (let i = 1; i <= pdf.numPages; i++) {
         const page = await pdf.getPage(i);
         const textContent = await page.getTextContent();
-        const pageText = textContent.items.map((item: any) => item.str).join(" ");
-        fullText += pageText + "\n";
+        const pageText = textContent.items.map((item: any) => item.str).join(' ');
+        fullText += pageText + '\n';
       }
-      
+
       return fullText;
     } catch (error) {
-      console.error("PDF Parsing Error:", error);
-      throw new Error("Failed to parse PDF document.");
+      console.error('PDF Parsing Error:', error);
+      throw new Error('Failed to parse PDF document.');
     }
   }
 
@@ -697,7 +752,7 @@ class SkylarService {
     currentGraph?: KnowledgeGraph
   ): Promise<KnowledgeGraph> {
     const ai = getAI();
-    
+
     const prompt = `
       You are the Skylar Analytical Architect. Your task is to perform a "Neural Synthesis" of the user's career data.
       Analyze the provided chat history and document content to extract a structured Knowledge Graph of the user's professional identity.
@@ -724,18 +779,18 @@ class SkylarService {
     `;
 
     const response = await ai.models.generateContent({
-      model: "gemini-3.1-pro-preview",
+      model: 'gemini-3.1-pro-preview',
       contents: [{ parts: [{ text: prompt }] }],
       config: {
-        responseMimeType: "application/json",
-      }
+        responseMimeType: 'application/json',
+      },
     });
 
     try {
       const graph = JSON.parse(response.text || '{}');
       return graph as KnowledgeGraph;
     } catch (error) {
-      console.error("Synthesis Parsing Error:", error);
+      console.error('Synthesis Parsing Error:', error);
       return currentGraph || { nodes: [], links: [] };
     }
   }
@@ -745,22 +800,24 @@ class SkylarService {
       await fetch('/api/wavvault/user', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ ...data, isCommit })
+        body: JSON.stringify({ ...data, isCommit }),
       });
     } catch (error) {
-      console.error("Error saving Wavvault data:", error);
+      console.error('Error saving Wavvault data:', error);
     }
   }
 
-  async verifyWavvaultIntegrity(userId: string): Promise<{ valid: boolean; expectedHash: string; actualHash: string }> {
+  async verifyWavvaultIntegrity(
+    userId: string
+  ): Promise<{ valid: boolean; expectedHash: string; actualHash: string }> {
     try {
       const response = await fetch(`/api/wavvault/verify?userId=${userId}`);
       if (response.ok) {
         return await response.json();
       }
-      throw new Error("Failed to verify integrity");
+      throw new Error('Failed to verify integrity');
     } catch (error) {
-      console.error("Error verifying Wavvault integrity:", error);
+      console.error('Error verifying Wavvault integrity:', error);
       return { valid: false, expectedHash: '', actualHash: '' };
     }
   }
@@ -773,7 +830,7 @@ class SkylarService {
       }
       return null;
     } catch (error) {
-      console.error("Error fetching Wavvault data:", error);
+      console.error('Error fetching Wavvault data:', error);
       return null;
     }
   }
@@ -786,22 +843,22 @@ class SkylarService {
   ): Promise<string> {
     const ai = getAI();
     const insights = await this.fetchConfirmedInsights(userId);
-    const dnaContext = insights.map(i => `${i.type}: ${i.content}`).join(', ');
+    const dnaContext = insights.map((i) => `${i.type}: ${i.content}`).join(', ');
 
     const prompt = `
       Generate a cinematic brand portrait for a professional with the following DNA: ${dnaContext}.
       The style should be: ${style}.
       The image should convey authority, innovation, and strategic depth.
-      ${referencePhoto ? "Use the provided reference photo to maintain the likeness of the person." : ""}
+      ${referencePhoto ? 'Use the provided reference photo to maintain the likeness of the person.' : ''}
     `;
 
     const parts: any[] = [{ text: prompt }];
     if (referencePhoto) {
       parts.push({
         inlineData: {
-          mimeType: "image/jpeg",
-          data: referencePhoto.split(',')[1] // Assuming base64 data URL
-        }
+          mimeType: 'image/jpeg',
+          data: referencePhoto.split(',')[1], // Assuming base64 data URL
+        },
       });
     }
 
@@ -817,7 +874,7 @@ class SkylarService {
         }
       }
     }
-    throw new Error("Failed to generate image");
+    throw new Error('Failed to generate image');
   }
 
   async generateTargetedSequence(
@@ -828,7 +885,7 @@ class SkylarService {
   ): Promise<any> {
     const ai = getAI();
     const insights = await this.fetchConfirmedInsights(userId);
-    const dnaContext = insights.map(i => `${i.type}: ${i.content}`).join(', ');
+    const dnaContext = insights.map((i) => `${i.type}: ${i.content}`).join(', ');
 
     const prompt = `
       Generate a targeted professional outreach sequence for ${targetRole} at ${targetCompany}.
@@ -854,11 +911,11 @@ class SkylarService {
     `;
 
     const response = await ai.models.generateContent({
-      model: "gemini-3.1-pro-preview",
+      model: 'gemini-3.1-pro-preview',
       contents: [{ parts: [{ text: prompt }] }],
       config: {
-        responseMimeType: "application/json",
-      }
+        responseMimeType: 'application/json',
+      },
     });
 
     return JSON.parse(response.text || '{}');
@@ -872,7 +929,7 @@ class SkylarService {
   ): Promise<any> {
     const ai = getAI();
     const insights = await this.fetchConfirmedInsights(userId);
-    const dnaContext = insights.map(i => `${i.type}: ${i.content}`).join(', ');
+    const dnaContext = insights.map((i) => `${i.type}: ${i.content}`).join(', ');
 
     const prompt = `
       You are the Skylar Validation Architect. Perform a "Validation Gate" review for the user moving from ${currentPhase} to ${targetPhase}.
@@ -897,31 +954,34 @@ class SkylarService {
     `;
 
     const response = await ai.models.generateContent({
-      model: "gemini-3.1-pro-preview",
+      model: 'gemini-3.1-pro-preview',
       contents: [{ parts: [{ text: prompt }] }],
       config: {
-        responseMimeType: "application/json",
-      }
+        responseMimeType: 'application/json',
+      },
     });
 
     const result = JSON.parse(response.text || '{}');
-    
+
     // Record the gate event in the Wavvault Ledger
     await this.recordGateEvent(userId, {
       phase: targetPhase,
       status: result.status,
-      verdict: result.message
+      verdict: result.message,
     });
 
     return result;
   }
 
-  async recordGateEvent(userId: string, event: { phase: string; status: 'passed' | 'warning' | 'failed'; verdict: string }) {
+  async recordGateEvent(
+    userId: string,
+    event: { phase: string; status: 'passed' | 'warning' | 'failed'; verdict: string }
+  ) {
     try {
       const timestamp = new Date().toISOString();
       const combined = `${userId}-${event.phase}-${event.status}-${timestamp}`;
       const hash = await this.generateFrontendHash(combined);
-      
+
       const response = await fetch('/api/wavvault/events', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -930,26 +990,29 @@ class SkylarService {
           event: {
             ...event,
             timestamp,
-            integrityHash: hash
-          }
-        })
+            integrityHash: hash,
+          },
+        }),
       });
       return await response.json();
     } catch (error) {
-      console.error("Error recording gate event:", error);
+      console.error('Error recording gate event:', error);
     }
   }
 
-  async recordDistilledArtifact(userId: string, artifact: { type: string; title: string; content: any; sourceGateId?: string }) {
+  async recordDistilledArtifact(
+    userId: string,
+    artifact: { type: string; title: string; content: any; sourceGateId?: string }
+  ) {
     try {
       const response = await fetch('/api/wavvault/artifacts', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ userId, artifact })
+        body: JSON.stringify({ userId, artifact }),
       });
       return await response.json();
     } catch (error) {
-      console.error("Error recording distilled artifact:", error);
+      console.error('Error recording distilled artifact:', error);
     }
   }
 
@@ -957,12 +1020,12 @@ class SkylarService {
     const msgUint8 = new TextEncoder().encode(message);
     const hashBuffer = await crypto.subtle.digest('SHA-256', msgUint8);
     const hashArray = Array.from(new Uint8Array(hashBuffer));
-    return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+    return hashArray.map((b) => b.toString(16).padStart(2, '0')).join('');
   }
 
   async getEmotionalIntelligence(userId: string, history: ChatMessage[]): Promise<any> {
     const ai = getAI();
-    
+
     const prompt = `
       Analyze the user's emotional state and motivation based on their career journey and chat history.
       
@@ -979,11 +1042,11 @@ class SkylarService {
     `;
 
     const response = await ai.models.generateContent({
-      model: "gemini-3.1-pro-preview",
+      model: 'gemini-3.1-pro-preview',
       contents: [{ parts: [{ text: prompt }] }],
       config: {
-        responseMimeType: "application/json",
-      }
+        responseMimeType: 'application/json',
+      },
     });
 
     return JSON.parse(response.text || '{}');
@@ -997,11 +1060,11 @@ class SkylarService {
       const response = await fetch('/api/user-assets', {
         method: 'POST',
         headers,
-        body: JSON.stringify({ asset })
+        body: JSON.stringify({ asset }),
       });
       return await response.json();
     } catch (error) {
-      console.error("Error saving user asset:", error);
+      console.error('Error saving user asset:', error);
     }
   }
 
@@ -1015,7 +1078,7 @@ class SkylarService {
       if (response.ok) return await response.json();
       return [];
     } catch (error) {
-      console.error("Error fetching user assets:", error);
+      console.error('Error fetching user assets:', error);
       return [];
     }
   }
@@ -1023,36 +1086,41 @@ class SkylarService {
   async startInterviewSession(userId: string, persona: string): Promise<any> {
     const ai = getAI();
     const insights = await this.fetchConfirmedInsights(userId);
-    
+
     const response = await ai.models.generateContent({
-      model: "gemini-3.1-pro-preview",
+      model: 'gemini-3.1-pro-preview',
       contents: `You are Skylar, but for this session, you are masking as ${persona}. 
       Based on the user's professional DNA: ${JSON.stringify(insights)}, 
       start a high-stakes interview. Introduce yourself in character and ask the first challenging question.
       Keep the tone professional and consistent with the ${persona} archetype.`,
       config: {
-        responseMimeType: "application/json",
+        responseMimeType: 'application/json',
         responseSchema: {
           type: Type.OBJECT,
           properties: {
             question: { type: Type.STRING },
             personaContext: { type: Type.STRING },
-            initialResonance: { type: Type.NUMBER }
+            initialResonance: { type: Type.NUMBER },
           },
-          required: ["question", "personaContext", "initialResonance"]
-        }
-      }
+          required: ['question', 'personaContext', 'initialResonance'],
+        },
+      },
     });
 
     return JSON.parse(response.text || '{}');
   }
 
-  async sendInterviewResponse(userId: string, persona: string, history: any[], userResponse: string): Promise<any> {
+  async sendInterviewResponse(
+    userId: string,
+    persona: string,
+    history: any[],
+    userResponse: string
+  ): Promise<any> {
     const ai = getAI();
     const insights = await this.fetchConfirmedInsights(userId);
-    
+
     const response = await ai.models.generateContent({
-      model: "gemini-3.1-pro-preview",
+      model: 'gemini-3.1-pro-preview',
       contents: `You are Skylar masking as ${persona}. 
       User DNA: ${JSON.stringify(insights)}
       Conversation History: ${JSON.stringify(history)}
@@ -1061,18 +1129,18 @@ class SkylarService {
       Evaluate the response for DNA resonance (0-100) and provide the next interview question or follow-up.
       Maintain the ${persona} character strictly.`,
       config: {
-        responseMimeType: "application/json",
+        responseMimeType: 'application/json',
         responseSchema: {
           type: Type.OBJECT,
           properties: {
             feedback: { type: Type.STRING },
             nextQuestion: { type: Type.STRING },
             resonanceScore: { type: Type.NUMBER },
-            dnaAlignment: { type: Type.ARRAY, items: { type: Type.STRING } }
+            dnaAlignment: { type: Type.ARRAY, items: { type: Type.STRING } },
           },
-          required: ["feedback", "nextQuestion", "resonanceScore", "dnaAlignment"]
-        }
-      }
+          required: ['feedback', 'nextQuestion', 'resonanceScore', 'dnaAlignment'],
+        },
+      },
     });
 
     return JSON.parse(response.text || '{}');
@@ -1081,43 +1149,49 @@ class SkylarService {
   async getInterviewDebrief(userId: string, sessionHistory: any[]): Promise<any> {
     const ai = getAI();
     const response = await ai.models.generateContent({
-      model: "gemini-3.1-pro-preview",
+      model: 'gemini-3.1-pro-preview',
       contents: `Analyze this interview session history: ${JSON.stringify(sessionHistory)}.
       Provide a "Strategic Debrief" including a "Narrative Heatmap" of DNA signal strength, 
       key areas of resonance, and specific tactical improvements for future high-stakes conversations.`,
       config: {
-        responseMimeType: "application/json",
+        responseMimeType: 'application/json',
         responseSchema: {
           type: Type.OBJECT,
           properties: {
-            heatmap: { type: Type.ARRAY, items: { 
-              type: Type.OBJECT, 
-              properties: {
-                pillar: { type: Type.STRING },
-                strength: { type: Type.NUMBER },
-                insight: { type: Type.STRING }
-              }
-            }},
+            heatmap: {
+              type: Type.ARRAY,
+              items: {
+                type: Type.OBJECT,
+                properties: {
+                  pillar: { type: Type.STRING },
+                  strength: { type: Type.NUMBER },
+                  insight: { type: Type.STRING },
+                },
+              },
+            },
             overallVerdict: { type: Type.STRING },
-            tacticalAdvice: { type: Type.ARRAY, items: { type: Type.STRING } }
+            tacticalAdvice: { type: Type.ARRAY, items: { type: Type.STRING } },
           },
-          required: ["heatmap", "overallVerdict", "tacticalAdvice"]
-        }
-      }
+          required: ['heatmap', 'overallVerdict', 'tacticalAdvice'],
+        },
+      },
     });
 
     return JSON.parse(response.text || '{}');
   }
 
-  async logOutreachAction(userId: string, action: { 
-    type: 'sent' | 'opened' | 'engaged' | 'nurturing', 
-    recipient: string, 
-    platform: string, 
-    templateId: string,
-    notes?: string
-  }): Promise<void> {
+  async logOutreachAction(
+    userId: string,
+    action: {
+      type: 'sent' | 'opened' | 'engaged' | 'nurturing';
+      recipient: string;
+      platform: string;
+      templateId: string;
+      notes?: string;
+    }
+  ): Promise<void> {
     // In a real app, this would persist to Firestore
-    console.log("Logging outreach action:", action);
+    console.log('Logging outreach action:', action);
     // For now, we'll simulate persistence via local storage or just a mock
     const actions = JSON.parse(localStorage.getItem(`outreach_${userId}`) || '[]');
     actions.push({ ...action, timestamp: new Date().toISOString() });
@@ -1136,7 +1210,7 @@ class SkylarService {
         { name: 'Opened', value: actions.filter((a: any) => a.type === 'opened').length },
         { name: 'Engaged', value: actions.filter((a: any) => a.type === 'engaged').length },
         { name: 'Nurturing', value: actions.filter((a: any) => a.type === 'nurturing').length },
-      ]
+      ],
     };
     return metrics;
   }
@@ -1144,7 +1218,7 @@ class SkylarService {
   async generateLiveResume(userId: string): Promise<any> {
     const ai = getAI();
     const insights = await this.fetchConfirmedInsights(userId);
-    const dnaContext = insights.map(i => `${i.type}: ${i.content}`).join(', ');
+    const dnaContext = insights.map((i) => `${i.type}: ${i.content}`).join(', ');
 
     const prompt = `
       You are the Skylar Narrative Journalist. Generate a high-fidelity "Live Resume" content based on the user's professional DNA: ${dnaContext}.
@@ -1162,12 +1236,12 @@ class SkylarService {
     `;
 
     const response = await ai.models.generateContent({
-      model: "gemini-3.1-pro-preview",
+      model: 'gemini-3.1-pro-preview',
       contents: [{ parts: [{ text: prompt }] }],
       config: {
-        responseMimeType: "application/json",
+        responseMimeType: 'application/json',
         maxOutputTokens: 16384,
-      }
+      },
     });
 
     return JSON.parse(response.text || '{}');
@@ -1176,7 +1250,7 @@ class SkylarService {
   async generateInteractivePortfolio(userId: string): Promise<any> {
     const ai = getAI();
     const insights = await this.fetchConfirmedInsights(userId);
-    const dnaContext = insights.map(i => `${i.type}: ${i.content}`).join(', ');
+    const dnaContext = insights.map((i) => `${i.type}: ${i.content}`).join(', ');
 
     const prompt = `
       You are the Skylar Narrative Journalist. Generate content for a multi-page "Interactive Portfolio" based on the user's professional DNA: ${dnaContext}.
@@ -1208,12 +1282,12 @@ class SkylarService {
     `;
 
     const response = await ai.models.generateContent({
-      model: "gemini-3.1-pro-preview",
+      model: 'gemini-3.1-pro-preview',
       contents: [{ parts: [{ text: prompt }] }],
       config: {
-        responseMimeType: "application/json",
+        responseMimeType: 'application/json',
         maxOutputTokens: 16384,
-      }
+      },
     });
 
     return JSON.parse(response.text || '{}');
@@ -1222,7 +1296,7 @@ class SkylarService {
   async getResonanceFeedback(userId: string, content: string, targetRole: string): Promise<any> {
     const ai = getAI();
     const insights = await this.fetchConfirmedInsights(userId);
-    const dnaContext = insights.map(i => `${i.type}: ${i.content}`).join(', ');
+    const dnaContext = insights.map((i) => `${i.type}: ${i.content}`).join(', ');
 
     const prompt = `
       You are Skylar, the Strategic Conductor. Provide real-time resonance feedback on the following branding content:
@@ -1242,15 +1316,15 @@ class SkylarService {
     `;
 
     const response = await ai.models.generateContent({
-      model: "gemini-3-flash-preview",
+      model: 'gemini-3-flash-preview',
       contents: [{ parts: [{ text: prompt }] }],
       config: {
-        responseMimeType: "application/json",
+        responseMimeType: 'application/json',
         maxOutputTokens: 16384,
         thinkingConfig: {
-          thinkingLevel: ThinkingLevel.LOW
-        }
-      }
+          thinkingLevel: ThinkingLevel.LOW,
+        },
+      },
     });
 
     return JSON.parse(response.text || '{}');
@@ -1259,16 +1333,16 @@ class SkylarService {
   async connectLive(config: any, callbacks: any) {
     const ai = getAI();
     return ai.live.connect({
-      model: "gemini-2.5-flash-native-audio-preview-12-2025",
+      model: 'gemini-2.5-flash-native-audio-preview-12-2025',
       config,
-      callbacks
+      callbacks,
     });
   }
 
   async analyzeJobUrl(userId: string, url: string): Promise<TargetOpportunity> {
     const ai = getAI();
     const insights = await this.fetchConfirmedInsights(userId);
-    const dnaContext = insights.map(i => `${i.type}: ${i.content}`).join(', ');
+    const dnaContext = insights.map((i) => `${i.type}: ${i.content}`).join(', ');
 
     const prompt = `
       Analyze the job description at the following URL: ${url}
@@ -1306,26 +1380,30 @@ class SkylarService {
     `;
 
     const response = await ai.models.generateContent({
-      model: "gemini-3-flash-preview",
+      model: 'gemini-3-flash-preview',
       contents: [{ parts: [{ text: prompt }] }],
       config: {
         tools: [{ urlContext: {} }],
-        responseMimeType: "application/json",
+        responseMimeType: 'application/json',
         maxOutputTokens: 16384,
         thinkingConfig: {
-          thinkingLevel: ThinkingLevel.LOW
-        }
-      }
+          thinkingLevel: ThinkingLevel.LOW,
+        },
+      },
     });
 
     const result = JSON.parse(response.text || '{}');
     result.userId = userId;
     result.id = `opp_${Date.now()}`;
-    
+
     return result as TargetOpportunity;
   }
 
-  async saveTargetOpportunity(userId: string, opportunity: TargetOpportunity, token?: string): Promise<void> {
+  async saveTargetOpportunity(
+    userId: string,
+    opportunity: TargetOpportunity,
+    token?: string
+  ): Promise<void> {
     try {
       const headers: Record<string, string> = { 'Content-Type': 'application/json' };
       if (token) headers['Authorization'] = `Bearer ${token}`;
@@ -1333,10 +1411,10 @@ class SkylarService {
       await fetch('/api/wavvault/opportunities', {
         method: 'POST',
         headers,
-        body: JSON.stringify({ userId, opportunity })
+        body: JSON.stringify({ userId, opportunity }),
       });
     } catch (error) {
-      console.error("Error saving target opportunity:", error);
+      console.error('Error saving target opportunity:', error);
     }
   }
 
@@ -1352,7 +1430,7 @@ class SkylarService {
       }
       return [];
     } catch (error) {
-      console.error("Error fetching target opportunities:", error);
+      console.error('Error fetching target opportunities:', error);
       return [];
     }
   }

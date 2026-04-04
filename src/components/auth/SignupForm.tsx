@@ -22,8 +22,10 @@ export function SignupForm({ onSubmit, onCancel, loading, error }: SignupFormPro
   return (
     <form onSubmit={handleSubmit} className="space-y-4 text-left">
       <div className="space-y-2">
-        <label className="text-xs font-medium text-white/40 uppercase tracking-widest">Full Name</label>
-        <input 
+        <label className="text-xs font-medium text-white/40 uppercase tracking-widest">
+          Full Name
+        </label>
+        <input
           type="text"
           required
           value={name}
@@ -33,8 +35,10 @@ export function SignupForm({ onSubmit, onCancel, loading, error }: SignupFormPro
         />
       </div>
       <div className="space-y-2">
-        <label className="text-xs font-medium text-white/40 uppercase tracking-widest">Email Address</label>
-        <input 
+        <label className="text-xs font-medium text-white/40 uppercase tracking-widest">
+          Email Address
+        </label>
+        <input
           type="email"
           required
           value={email}
@@ -44,8 +48,10 @@ export function SignupForm({ onSubmit, onCancel, loading, error }: SignupFormPro
         />
       </div>
       <div className="space-y-2">
-        <label className="text-xs font-medium text-white/40 uppercase tracking-widest">Password</label>
-        <input 
+        <label className="text-xs font-medium text-white/40 uppercase tracking-widest">
+          Password
+        </label>
+        <input
           type="password"
           required
           value={password}
@@ -55,14 +61,10 @@ export function SignupForm({ onSubmit, onCancel, loading, error }: SignupFormPro
         />
       </div>
       {error && <p className="text-xs text-red-500">{error}</p>}
-      <Button 
-        type="submit"
-        disabled={loading}
-        className="w-full py-4 mt-4"
-      >
+      <Button type="submit" disabled={loading} className="w-full py-4 mt-4">
         {loading ? <Loader2 className="w-5 h-5 animate-spin mx-auto" /> : 'Create Account'}
       </Button>
-      <button 
+      <button
         type="button"
         onClick={onCancel}
         className="w-full text-white/40 hover:text-white transition-colors text-xs uppercase tracking-widest font-bold mt-4"

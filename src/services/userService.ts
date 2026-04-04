@@ -3,7 +3,7 @@ import { UserProfile } from '../types/user';
 export const userService = {
   async fetchProfile(idToken: string): Promise<UserProfile | null> {
     const response = await fetch('/api/user/profile', {
-      headers: { 'Authorization': `Bearer ${idToken}` }
+      headers: { Authorization: `Bearer ${idToken}` },
     });
 
     if (response.ok) {
@@ -16,7 +16,7 @@ export const userService = {
 
   async fetchWavvaultStatus(idToken: string): Promise<boolean> {
     const response = await fetch('/api/user/wavvault-status', {
-      headers: { 'Authorization': `Bearer ${idToken}` }
+      headers: { Authorization: `Bearer ${idToken}` },
     });
 
     if (response.ok) {
@@ -29,16 +29,16 @@ export const userService = {
   async updateProfile(idToken: string, updates: Partial<UserProfile>): Promise<UserProfile> {
     const response = await fetch('/api/user/profile', {
       method: 'PATCH',
-      headers: { 
-        'Authorization': `Bearer ${idToken}`,
-        'Content-Type': 'application/json'
+      headers: {
+        Authorization: `Bearer ${idToken}`,
+        'Content-Type': 'application/json',
       },
-      body: JSON.stringify(updates)
+      body: JSON.stringify(updates),
     });
 
     if (response.ok) {
       return response.json();
     }
     throw new Error('Failed to update profile');
-  }
+  },
 };

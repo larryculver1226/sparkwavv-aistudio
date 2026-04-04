@@ -11,24 +11,24 @@ interface ButtonProps {
   type?: 'button' | 'submit' | 'reset';
 }
 
-export const Button: React.FC<ButtonProps> = ({ 
-  children, 
-  onClick, 
-  variant = 'primary', 
-  className = '', 
+export const Button: React.FC<ButtonProps> = ({
+  children,
+  onClick,
+  variant = 'primary',
+  className = '',
   disabled = false,
   loading = false,
-  type = 'button'
+  type = 'button',
 }) => {
   const variants = {
     primary: 'bg-white text-black hover:bg-gray-200',
     secondary: 'bg-black text-white border border-white/10 hover:bg-white/5',
     outline: 'border border-white/20 text-white hover:border-white/40',
-    neon: 'bg-[#00f3ff]/10 text-[#00f3ff] border border-[#00f3ff]/50 hover:bg-[#00f3ff]/20 shadow-[0_0_15px_rgba(0,243,255,0.3)]'
+    neon: 'bg-[#00f3ff]/10 text-[#00f3ff] border border-[#00f3ff]/50 hover:bg-[#00f3ff]/20 shadow-[0_0_15px_rgba(0,243,255,0.3)]',
   };
 
   return (
-    <button 
+    <button
       type={type}
       onClick={onClick}
       disabled={disabled || loading}

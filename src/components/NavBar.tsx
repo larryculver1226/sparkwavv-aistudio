@@ -1,8 +1,17 @@
-"use client";
+'use client';
 
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Menu, X, Sparkles, ChevronDown, LayoutDashboard, LogOut, Settings, Database } from 'lucide-react';
+import {
+  Menu,
+  X,
+  Sparkles,
+  ChevronDown,
+  LayoutDashboard,
+  LogOut,
+  Settings,
+  Database,
+} from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { useIdentity } from '../contexts/IdentityContext';
 
@@ -14,25 +23,25 @@ interface NavItem {
 
 const navItems: NavItem[] = [
   { label: 'Home', href: 'landing' },
-  { 
-    label: 'Product', 
+  {
+    label: 'Product',
     href: '#product',
     subItems: [
       { label: 'Skylar', href: 'product-skylar' },
       { label: 'Features', href: 'product-features' },
       { label: 'Technology', href: 'product-technology' },
       { label: 'Wavvault', href: 'product-wavvault' },
-    ]
+    ],
   },
-  { 
-    label: 'Company', 
+  {
+    label: 'Company',
     href: '#company',
     subItems: [
       { label: 'Vision', href: 'company-vision' },
       { label: 'About Us', href: 'company-about' },
       { label: 'Investors', href: 'company-investors' },
       { label: 'Give a Little', href: 'company-give' },
-    ]
+    ],
   },
   { label: 'Pricing', href: 'pricing' },
 ];
@@ -43,11 +52,11 @@ interface NavBarProps {
 
 /**
  * NavBar Component
- * 
+ *
  * A highly responsive, modern Top Navigation Bar for SPARKWavv.
  * Integrates with Firebase Auth for dynamic login/dashboard states.
- * 
- * Note: Uses standard anchor tags for preview compatibility. 
+ *
+ * Note: Uses standard anchor tags for preview compatibility.
  * In a Next.js environment, replace <a> with <Link> from 'next/link'.
  */
 export const NavBar: React.FC<NavBarProps> = ({ onNavigate }) => {
@@ -71,27 +80,29 @@ export const NavBar: React.FC<NavBarProps> = ({ onNavigate }) => {
       e.preventDefault();
       return;
     }
-    
+
     e.preventDefault();
     if (href.startsWith('/')) {
       navigate(href);
     } else {
       onNavigate(href);
     }
-    
+
     setIsOpen(false);
     setActiveDropdown(null);
   };
 
   return (
-    <nav 
+    <nav
       className={`fixed top-0 left-0 right-0 z-[100] transition-all duration-500 ${
-        scrolled ? 'py-4 bg-black/90 backdrop-blur-xl border-b border-white/10' : 'py-8 bg-transparent'
+        scrolled
+          ? 'py-4 bg-black/90 backdrop-blur-xl border-b border-white/10'
+          : 'py-8 bg-transparent'
       }`}
     >
       <div className="max-w-[1600px] mx-auto px-12 flex items-center justify-between">
         {/* Logo */}
-        <div 
+        <div
           className="flex items-center gap-4 group cursor-pointer"
           onClick={() => onNavigate('landing')}
         >
@@ -107,8 +118,8 @@ export const NavBar: React.FC<NavBarProps> = ({ onNavigate }) => {
         <div className="hidden md:flex items-center gap-12">
           <div className="flex items-center gap-8 lg:gap-12">
             {navItems.map((item) => (
-              <div 
-                key={item.label} 
+              <div
+                key={item.label}
                 className="relative group"
                 onMouseEnter={() => item.subItems && setActiveDropdown(item.label)}
                 onMouseLeave={() => setActiveDropdown(null)}
@@ -120,10 +131,12 @@ export const NavBar: React.FC<NavBarProps> = ({ onNavigate }) => {
                 >
                   {item.label}
                   {item.subItems && (
-                    <ChevronDown className={`w-4 h-4 transition-transform duration-300 ${activeDropdown === item.label ? 'rotate-180' : ''}`} />
+                    <ChevronDown
+                      className={`w-4 h-4 transition-transform duration-300 ${activeDropdown === item.label ? 'rotate-180' : ''}`}
+                    />
                   )}
                 </a>
-                
+
                 {/* Dropdown Menu */}
                 <AnimatePresence>
                   {item.subItems && activeDropdown === item.label && (
@@ -151,7 +164,7 @@ export const NavBar: React.FC<NavBarProps> = ({ onNavigate }) => {
                     </motion.div>
                   )}
                 </AnimatePresence>
-                
+
                 {!item.subItems && (
                   <span className="absolute -bottom-1 left-0 w-0 h-0.5 bg-neon-cyan transition-all duration-300 group-hover:w-full shadow-[0_0_10px_#00f3ff]" />
                 )}
@@ -161,32 +174,32 @@ export const NavBar: React.FC<NavBarProps> = ({ onNavigate }) => {
 
           {/* Auth Button */}
           <div className="flex justify-end items-center gap-3">
-            {!loading && (
-              user ? (
+            {!loading &&
+              (user ? (
                 isConfirmed ? (
                   <>
-                    <button 
+                    <button
                       onClick={() => navigate(`/dashboard/${profile?.uid || user.uid}`)}
                       className="flex items-center gap-2 px-4 py-2 rounded-full bg-white/5 border border-white/10 text-white text-sm font-bold hover:bg-white/10 hover:border-white/20 transition-all duration-300 group"
                     >
                       <LayoutDashboard className="w-3.5 h-3.5 text-neon-cyan" />
                       <span>Dashboard Login</span>
                     </button>
-                    <button 
+                    <button
                       onClick={() => navigate('/vault')}
                       className="flex items-center gap-2 px-4 py-2 rounded-full bg-white/5 border border-white/10 text-white text-sm font-bold hover:bg-white/10 hover:border-white/20 transition-all duration-300 group"
                     >
                       <Database className="w-3.5 h-3.5 text-neon-magenta" />
                       <span>Vault</span>
                     </button>
-                    <button 
+                    <button
                       onClick={() => onNavigate('settings')}
                       className="p-2 rounded-full bg-white/5 border border-white/10 text-white/60 hover:text-neon-cyan hover:border-neon-cyan/30 transition-all duration-300"
                       title="Settings"
                     >
                       <Settings className="w-4 h-4" />
                     </button>
-                    <button 
+                    <button
                       onClick={logout}
                       className="p-2 rounded-full bg-white/5 border border-white/10 text-white/60 hover:text-neon-magenta hover:border-neon-magenta/30 transition-all duration-300"
                       title="Sign Out"
@@ -197,7 +210,7 @@ export const NavBar: React.FC<NavBarProps> = ({ onNavigate }) => {
                 ) : (
                   <div className="flex items-center gap-3">
                     <span className="text-xs text-white/40 italic">Awaiting Verification</span>
-                    <button 
+                    <button
                       onClick={logout}
                       className="p-2 rounded-full bg-white/5 border border-white/10 text-white/60 hover:text-neon-magenta hover:border-neon-magenta/30 transition-all duration-300"
                       title="Sign Out"
@@ -208,21 +221,20 @@ export const NavBar: React.FC<NavBarProps> = ({ onNavigate }) => {
                 )
               ) : (
                 <div className="flex items-center gap-3">
-                  <button 
+                  <button
                     onClick={() => navigate('/login')}
                     className="px-4 py-2 rounded-full bg-white/5 border border-white/10 text-white text-sm font-bold hover:bg-white/10 transition-all duration-300"
                   >
                     Dashboard Login
                   </button>
                 </div>
-              )
-            )}
+              ))}
           </div>
         </div>
 
         {/* Mobile Toggle */}
         <div className="md:hidden flex justify-end col-start-3">
-          <button 
+          <button
             className="p-2 text-white hover:text-neon-cyan transition-colors"
             onClick={() => setIsOpen(!isOpen)}
           >
@@ -272,12 +284,12 @@ export const NavBar: React.FC<NavBarProps> = ({ onNavigate }) => {
                   )}
                 </div>
               ))}
-              
+
               <div className="pt-8 border-t border-white/10">
-                {!loading && (
-                  user ? (
+                {!loading &&
+                  (user ? (
                     isConfirmed ? (
-                      <button 
+                      <button
                         onClick={() => {
                           navigate(`/dashboard/${profile?.uid || user.uid}`);
                           setIsOpen(false);
@@ -291,9 +303,11 @@ export const NavBar: React.FC<NavBarProps> = ({ onNavigate }) => {
                       <div className="flex flex-col gap-4">
                         <div className="text-center py-4 px-6 rounded-2xl bg-neon-cyan/10 border border-neon-cyan/20">
                           <p className="text-neon-cyan font-bold text-xl">Awaiting Verification</p>
-                          <p className="text-white/40 text-sm mt-1">Please check your email to activate your account.</p>
+                          <p className="text-white/40 text-sm mt-1">
+                            Please check your email to activate your account.
+                          </p>
                         </div>
-                        <button 
+                        <button
                           onClick={() => {
                             logout();
                             setIsOpen(false);
@@ -307,7 +321,7 @@ export const NavBar: React.FC<NavBarProps> = ({ onNavigate }) => {
                     )
                   ) : (
                     <div className="flex flex-col gap-4">
-                      <button 
+                      <button
                         onClick={() => {
                           login();
                           setIsOpen(false);
@@ -317,8 +331,7 @@ export const NavBar: React.FC<NavBarProps> = ({ onNavigate }) => {
                         Dashboard Login
                       </button>
                     </div>
-                  )
-                )}
+                  ))}
               </div>
             </div>
           </motion.div>

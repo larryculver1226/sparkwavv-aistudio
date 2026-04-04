@@ -28,7 +28,7 @@ export const PartnerLogin: React.FC = () => {
 
   return (
     <div className="min-h-screen bg-slate-950 flex items-center justify-center p-4">
-      <motion.div 
+      <motion.div
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
         className="max-w-md w-full bg-slate-900 border border-slate-800 rounded-2xl p-8 shadow-2xl"
@@ -89,7 +89,9 @@ export const PartnerLogin: React.FC = () => {
             disabled={loading}
             className="w-full bg-slate-100 hover:bg-white text-slate-950 font-semibold py-3 rounded-xl flex items-center justify-center gap-2 transition-all disabled:opacity-50"
           >
-            {loading ? 'Authenticating...' : (
+            {loading ? (
+              'Authenticating...'
+            ) : (
               <>
                 Sign In <ArrowRight className="w-4 h-4" />
               </>
@@ -99,7 +101,13 @@ export const PartnerLogin: React.FC = () => {
 
         <div className="mt-8 pt-6 border-t border-slate-800 text-center">
           <p className="text-slate-500 text-sm">
-            Not a partner yet? <button onClick={() => navigate('/')} className="text-slate-300 hover:text-white underline underline-offset-4">Apply to join</button>
+            Not a partner yet?{' '}
+            <button
+              onClick={() => navigate('/')}
+              className="text-slate-300 hover:text-white underline underline-offset-4"
+            >
+              Apply to join
+            </button>
           </p>
         </div>
       </motion.div>

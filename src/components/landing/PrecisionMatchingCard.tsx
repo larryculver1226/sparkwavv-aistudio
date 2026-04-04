@@ -11,7 +11,10 @@ interface PrecisionMatchingCardProps {
   dashboardData?: DashboardData | null;
 }
 
-export const PrecisionMatchingCard: React.FC<PrecisionMatchingCardProps> = ({ userId, dashboardData }) => {
+export const PrecisionMatchingCard: React.FC<PrecisionMatchingCardProps> = ({
+  userId,
+  dashboardData,
+}) => {
   const navigate = useNavigate();
   const { profile } = useIdentity();
   const [isHovered, setIsHovered] = useState(false);
@@ -26,7 +29,7 @@ export const PrecisionMatchingCard: React.FC<PrecisionMatchingCardProps> = ({ us
       if (!audioCtxRef.current) {
         audioCtxRef.current = new (window.AudioContext || (window as any).webkitAudioContext)();
       }
-      
+
       if (audioCtxRef.current.state === 'suspended') {
         audioCtxRef.current.resume();
       }
@@ -36,7 +39,7 @@ export const PrecisionMatchingCard: React.FC<PrecisionMatchingCardProps> = ({ us
 
       oscillatorRef.current.type = 'sine';
       oscillatorRef.current.frequency.setValueAtTime(110, audioCtxRef.current.currentTime); // Low hum
-      
+
       gainNodeRef.current.gain.setValueAtTime(0, audioCtxRef.current.currentTime);
       gainNodeRef.current.gain.linearRampToValueAtTime(0.05, audioCtxRef.current.currentTime + 0.5);
 
@@ -64,13 +67,14 @@ export const PrecisionMatchingCard: React.FC<PrecisionMatchingCardProps> = ({ us
     if (isHovered) {
       startHum();
       setStatus('SCANNING DNA');
-      
+
       // Animate score
       let targetScore = 98.4;
       if (profile?.alignmentScore) {
         targetScore = profile.alignmentScore;
       } else if (dashboardData?.alignmentMatrix) {
-        const { identityClarity, strengthsAlignment, marketResonance } = dashboardData.alignmentMatrix;
+        const { identityClarity, strengthsAlignment, marketResonance } =
+          dashboardData.alignmentMatrix;
         targetScore = (identityClarity + strengthsAlignment + marketResonance) / 3;
       } else if (userId) {
         // Mock a high score if logged in but no data
@@ -80,11 +84,11 @@ export const PrecisionMatchingCard: React.FC<PrecisionMatchingCardProps> = ({ us
       const controls = animate(0, targetScore, {
         duration: 1.5,
         onUpdate: (value) => setScore(value),
-        onComplete: () => setStatus('MATCH IDENTIFIED')
+        onComplete: () => setStatus('MATCH IDENTIFIED'),
       });
 
       const statusInterval = setInterval(() => {
-        setStatus(prev => {
+        setStatus((prev) => {
           if (prev === 'SCANNING DNA') return 'MAPPING SYNAPSES';
           if (prev === 'MAPPING SYNAPSES') return 'MATCH IDENTIFIED';
           return prev;
@@ -114,7 +118,7 @@ export const PrecisionMatchingCard: React.FC<PrecisionMatchingCardProps> = ({ us
   };
 
   return (
-    <div 
+    <div
       className="glass-panel p-8 space-y-6 group hover:border-neon-lime/40 transition-all duration-500 cursor-pointer relative overflow-hidden"
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}
@@ -130,20 +134,24 @@ export const PrecisionMatchingCard: React.FC<PrecisionMatchingCardProps> = ({ us
             strokeWidth="1"
             className="text-neon-lime"
             initial={{ pathLength: 0, opacity: 0 }}
-            animate={{ 
-              pathLength: isHovered ? 1 : 0.3, 
+            animate={{
+              pathLength: isHovered ? 1 : 0.3,
               opacity: isHovered ? 0.8 : 0.3,
-              transition: { duration: 2, repeat: Infinity, repeatType: "reverse" }
+              transition: { duration: 2, repeat: Infinity, repeatType: 'reverse' },
             }}
           />
           <motion.circle
-            cx="20" cy="50" r="3"
+            cx="20"
+            cy="50"
+            r="3"
             className="fill-neon-lime"
             animate={{ scale: isHovered ? [1, 1.5, 1] : 1 }}
             transition={{ duration: 1, repeat: Infinity }}
           />
           <motion.circle
-            cx="280" cy="50" r="3"
+            cx="280"
+            cy="50"
+            r="3"
             className="fill-neon-lime"
             animate={{ scale: isHovered ? [1, 1.5, 1] : 1 }}
             transition={{ duration: 1, repeat: Infinity, delay: 0.5 }}
@@ -151,7 +159,9 @@ export const PrecisionMatchingCard: React.FC<PrecisionMatchingCardProps> = ({ us
         </svg>
       </div>
 
-      <div className={`w-12 h-12 rounded-xl bg-white/5 border border-white/10 flex items-center justify-center text-neon-lime group-hover:neon-border-lime transition-all duration-500`}>
+      <div
+        className={`w-12 h-12 rounded-xl bg-white/5 border border-white/10 flex items-center justify-center text-neon-lime group-hover:neon-border-lime transition-all duration-500`}
+      >
         <Target className={`w-6 h-6 ${isHovered ? 'animate-pulse' : ''}`} />
       </div>
 
@@ -160,7 +170,7 @@ export const PrecisionMatchingCard: React.FC<PrecisionMatchingCardProps> = ({ us
           <h3 className="text-xl font-bold">Precision Matching</h3>
           <AnimatePresence>
             {isHovered && (
-              <motion.div 
+              <motion.div
                 initial={{ opacity: 0, x: 10 }}
                 animate={{ opacity: 1, x: 0 }}
                 exit={{ opacity: 0, x: 10 }}
@@ -180,9 +190,9 @@ export const PrecisionMatchingCard: React.FC<PrecisionMatchingCardProps> = ({ us
       <div className="h-4 flex items-center gap-2">
         {isHovered ? (
           <>
-            <motion.div 
+            <motion.div
               animate={{ rotate: 360 }}
-              transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
+              transition={{ duration: 1, repeat: Infinity, ease: 'linear' }}
             >
               <Zap className="w-3 h-3 text-neon-lime" />
             </motion.div>
@@ -198,11 +208,19 @@ export const PrecisionMatchingCard: React.FC<PrecisionMatchingCardProps> = ({ us
       </div>
 
       {/* Hover Glow Effect */}
-      <motion.div 
+      <motion.div
         className="absolute inset-0 bg-neon-lime/5 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none"
-        animate={isHovered ? {
-          boxShadow: ['inset 0 0 20px rgba(163, 230, 53, 0.1)', 'inset 0 0 40px rgba(163, 230, 53, 0.2)', 'inset 0 0 20px rgba(163, 230, 53, 0.1)']
-        } : {}}
+        animate={
+          isHovered
+            ? {
+                boxShadow: [
+                  'inset 0 0 20px rgba(163, 230, 53, 0.1)',
+                  'inset 0 0 40px rgba(163, 230, 53, 0.2)',
+                  'inset 0 0 20px rgba(163, 230, 53, 0.1)',
+                ],
+              }
+            : {}
+        }
         transition={{ duration: 2, repeat: Infinity }}
       />
     </div>

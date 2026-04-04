@@ -1,12 +1,12 @@
-import { 
-  signInWithPopup, 
-  signInWithEmailAndPassword, 
-  createUserWithEmailAndPassword, 
+import {
+  signInWithPopup,
+  signInWithEmailAndPassword,
+  createUserWithEmailAndPassword,
   signOut as firebaseSignOut,
   updateProfile as firebaseUpdateProfile,
   sendEmailVerification,
   getIdTokenResult,
-  User
+  User,
 } from 'firebase/auth';
 import { auth, googleProvider, setTenantId } from '../lib/firebase';
 
@@ -41,7 +41,7 @@ export const authService = {
     const tokenResult = await getIdTokenResult(user, forceRefresh);
     return {
       token: tokenResult.token,
-      claims: tokenResult.claims
+      claims: tokenResult.claims,
     };
-  }
+  },
 };

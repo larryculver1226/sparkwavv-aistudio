@@ -1,5 +1,5 @@
-import { GoogleGenAI } from "@google/genai";
-import { getGeminiApiKey } from "./aiConfig";
+import { GoogleGenAI } from '@google/genai';
+import { getGeminiApiKey } from './aiConfig';
 
 const ai = new GoogleGenAI({ apiKey: getGeminiApiKey() });
 

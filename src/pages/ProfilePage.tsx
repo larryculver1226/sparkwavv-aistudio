@@ -1,16 +1,16 @@
 import React, { useState, useEffect } from 'react';
 import { motion } from 'motion/react';
-import { 
-  User as UserIcon, 
-  Mail, 
-  Briefcase, 
-  MapPin, 
-  Globe, 
-  Save, 
-  Loader2, 
+import {
+  User as UserIcon,
+  Mail,
+  Briefcase,
+  MapPin,
+  Globe,
+  Save,
+  Loader2,
   ArrowLeft,
   ShieldCheck,
-  Check
+  Check,
 } from 'lucide-react';
 import { useIdentity } from '../contexts/IdentityContext';
 import { useNavigate } from 'react-router-dom';
@@ -29,7 +29,7 @@ export const ProfilePage: React.FC = () => {
     jobTitle: '',
     location: '',
     website: '',
-    bio: ''
+    bio: '',
   });
 
   useEffect(() => {
@@ -39,7 +39,7 @@ export const ProfilePage: React.FC = () => {
         jobTitle: profile.jobTitle || '',
         location: profile.location || '',
         website: profile.website || '',
-        bio: profile.bio || ''
+        bio: profile.bio || '',
       });
     }
   }, [profile]);
@@ -97,7 +97,7 @@ export const ProfilePage: React.FC = () => {
       <div className="max-w-4xl mx-auto space-y-12">
         <header className="flex items-center justify-between">
           <div className="flex items-center gap-6">
-            <button 
+            <button
               onClick={() => navigate(-1)}
               className="w-12 h-12 rounded-2xl bg-white/5 border border-white/10 flex items-center justify-center hover:bg-white/10 transition-all"
             >
@@ -105,12 +105,14 @@ export const ProfilePage: React.FC = () => {
             </button>
             <div>
               <h1 className="text-4xl font-display font-bold tracking-tight">Profile Settings</h1>
-              <p className="text-white/40 text-sm uppercase tracking-widest font-bold mt-1">Manage your career identity</p>
+              <p className="text-white/40 text-sm uppercase tracking-widest font-bold mt-1">
+                Manage your career identity
+              </p>
             </div>
           </div>
-          
+
           {showSuccess && (
-            <motion.div 
+            <motion.div
               initial={{ opacity: 0, x: 20 }}
               animate={{ opacity: 1, x: 0 }}
               className="flex items-center gap-2 px-4 py-2 rounded-full bg-neon-lime/10 border border-neon-lime/20 text-neon-lime text-sm font-bold"
@@ -124,13 +126,15 @@ export const ProfilePage: React.FC = () => {
           {/* Left Column: Photo & Quick Info */}
           <div className="lg:col-span-4 space-y-8">
             <div className="glass-panel p-8 rounded-[2.5rem] border border-white/5 bg-black/40 flex flex-col items-center text-center space-y-6">
-              <ProfilePhotoUpload 
-                currentPhotoURL={profile?.photoURL || user?.photoURL} 
-                onSave={handlePhotoSave} 
+              <ProfilePhotoUpload
+                currentPhotoURL={profile?.photoURL || user?.photoURL}
+                onSave={handlePhotoSave}
               />
               <div>
                 <h3 className="text-xl font-bold">{formData.displayName || 'User'}</h3>
-                <p className="text-neon-cyan text-xs uppercase tracking-widest font-bold mt-1">{formData.jobTitle || 'Member'}</p>
+                <p className="text-neon-cyan text-xs uppercase tracking-widest font-bold mt-1">
+                  {formData.jobTitle || 'Member'}
+                </p>
               </div>
               <div className="w-full pt-6 border-t border-white/5 space-y-4">
                 <div className="flex items-center gap-3 text-white/40 text-sm">
@@ -149,21 +153,30 @@ export const ProfilePage: React.FC = () => {
             <div className="glass-panel p-8 rounded-[2rem] border border-white/5 bg-black/40 space-y-4">
               <div className="flex items-center gap-3 text-neon-lime">
                 <ShieldCheck className="w-5 h-5" />
-                <span className="text-sm font-bold uppercase tracking-widest">Verified Account</span>
+                <span className="text-sm font-bold uppercase tracking-widest">
+                  Verified Account
+                </span>
               </div>
-              <p className="text-xs text-white/40 leading-relaxed">Your profile is secured and verified by Sparkwavv's career engine.</p>
+              <p className="text-xs text-white/40 leading-relaxed">
+                Your profile is secured and verified by Sparkwavv's career engine.
+              </p>
             </div>
           </div>
 
           {/* Right Column: Form */}
           <div className="lg:col-span-8">
-            <form onSubmit={handleSave} className="glass-panel p-10 rounded-[2.5rem] border border-white/5 bg-black/40 space-y-8">
+            <form
+              onSubmit={handleSave}
+              className="glass-panel p-10 rounded-[2.5rem] border border-white/5 bg-black/40 space-y-8"
+            >
               <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
                 <div className="space-y-2">
-                  <label className="text-[10px] text-white/40 uppercase tracking-[0.2em] font-bold ml-1">Display Name</label>
+                  <label className="text-[10px] text-white/40 uppercase tracking-[0.2em] font-bold ml-1">
+                    Display Name
+                  </label>
                   <div className="relative">
                     <UserIcon className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-white/20" />
-                    <input 
+                    <input
                       type="text"
                       value={formData.displayName}
                       onChange={(e) => setFormData({ ...formData, displayName: e.target.value })}
@@ -174,10 +187,12 @@ export const ProfilePage: React.FC = () => {
                 </div>
 
                 <div className="space-y-2">
-                  <label className="text-[10px] text-white/40 uppercase tracking-[0.2em] font-bold ml-1">Current Role</label>
+                  <label className="text-[10px] text-white/40 uppercase tracking-[0.2em] font-bold ml-1">
+                    Current Role
+                  </label>
                   <div className="relative">
                     <Briefcase className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-white/20" />
-                    <input 
+                    <input
                       type="text"
                       value={formData.jobTitle}
                       onChange={(e) => setFormData({ ...formData, jobTitle: e.target.value })}
@@ -188,10 +203,12 @@ export const ProfilePage: React.FC = () => {
                 </div>
 
                 <div className="space-y-2">
-                  <label className="text-[10px] text-white/40 uppercase tracking-[0.2em] font-bold ml-1">Location</label>
+                  <label className="text-[10px] text-white/40 uppercase tracking-[0.2em] font-bold ml-1">
+                    Location
+                  </label>
                   <div className="relative">
                     <MapPin className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-white/20" />
-                    <input 
+                    <input
                       type="text"
                       value={formData.location}
                       onChange={(e) => setFormData({ ...formData, location: e.target.value })}
@@ -202,10 +219,12 @@ export const ProfilePage: React.FC = () => {
                 </div>
 
                 <div className="space-y-2">
-                  <label className="text-[10px] text-white/40 uppercase tracking-[0.2em] font-bold ml-1">Website / Portfolio</label>
+                  <label className="text-[10px] text-white/40 uppercase tracking-[0.2em] font-bold ml-1">
+                    Website / Portfolio
+                  </label>
                   <div className="relative">
                     <Globe className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-white/20" />
-                    <input 
+                    <input
                       type="url"
                       value={formData.website}
                       onChange={(e) => setFormData({ ...formData, website: e.target.value })}
@@ -217,8 +236,10 @@ export const ProfilePage: React.FC = () => {
               </div>
 
               <div className="space-y-2">
-                <label className="text-[10px] text-white/40 uppercase tracking-[0.2em] font-bold ml-1">Professional Bio</label>
-                <textarea 
+                <label className="text-[10px] text-white/40 uppercase tracking-[0.2em] font-bold ml-1">
+                  Professional Bio
+                </label>
+                <textarea
                   value={formData.bio}
                   onChange={(e) => setFormData({ ...formData, bio: e.target.value })}
                   rows={4}
@@ -228,13 +249,19 @@ export const ProfilePage: React.FC = () => {
               </div>
 
               <div className="pt-4">
-                <Button 
+                <Button
                   type="submit"
-                  variant="neon" 
+                  variant="neon"
                   className="w-full py-5 text-lg"
                   disabled={isSaving}
                 >
-                  {isSaving ? <Loader2 className="w-6 h-6 animate-spin" /> : <><Save className="w-5 h-5" /> Save Changes</>}
+                  {isSaving ? (
+                    <Loader2 className="w-6 h-6 animate-spin" />
+                  ) : (
+                    <>
+                      <Save className="w-5 h-5" /> Save Changes
+                    </>
+                  )}
                 </Button>
               </div>
             </form>

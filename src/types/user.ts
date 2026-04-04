@@ -1,4 +1,12 @@
-export type UserRole = 'admin' | 'super_admin' | 'editor' | 'viewer' | 'user' | 'operator' | 'mentor' | 'agent';
+export type UserRole =
+  | 'admin'
+  | 'super_admin'
+  | 'editor'
+  | 'viewer'
+  | 'user'
+  | 'operator'
+  | 'mentor'
+  | 'agent';
 
 export type JourneyStage = 'Dive-In' | 'Ignition' | 'Discovery' | 'Branding' | 'Outreach' | 'NONE';
 

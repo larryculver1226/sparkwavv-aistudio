@@ -9,7 +9,10 @@ interface ProfilePhotoUploadProps {
   onSave: (blob: Blob) => Promise<void>;
 }
 
-export const ProfilePhotoUpload: React.FC<ProfilePhotoUploadProps> = ({ currentPhotoURL, onSave }) => {
+export const ProfilePhotoUpload: React.FC<ProfilePhotoUploadProps> = ({
+  currentPhotoURL,
+  onSave,
+}) => {
   const [image, setImage] = useState<string | null>(null);
   const [crop, setCrop] = useState({ x: 0, y: 0 });
   const [zoom, setZoom] = useState(1);
@@ -87,9 +90,9 @@ export const ProfilePhotoUpload: React.FC<ProfilePhotoUploadProps> = ({ currentP
   return (
     <div className="relative group">
       <div className="w-32 h-32 rounded-full overflow-hidden border-2 border-neon-cyan/20 bg-white/5 relative">
-        <img 
-          src={currentPhotoURL || "https://picsum.photos/seed/user/200"} 
-          alt="Profile" 
+        <img
+          src={currentPhotoURL || 'https://picsum.photos/seed/user/200'}
+          alt="Profile"
           className="w-full h-full object-cover"
           referrerPolicy="no-referrer"
         />
@@ -103,7 +106,7 @@ export const ProfilePhotoUpload: React.FC<ProfilePhotoUploadProps> = ({ currentP
       <AnimatePresence>
         {showCropper && (
           <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 sm:p-6 bg-black/90 backdrop-blur-md overflow-y-auto">
-            <motion.div 
+            <motion.div
               initial={{ opacity: 0, scale: 0.9, y: 20 }}
               animate={{ opacity: 1, scale: 1, y: 0 }}
               exit={{ opacity: 0, scale: 0.9, y: 20 }}
@@ -111,7 +114,10 @@ export const ProfilePhotoUpload: React.FC<ProfilePhotoUploadProps> = ({ currentP
             >
               <div className="flex items-center justify-between">
                 <h3 className="text-xl sm:text-2xl font-display font-bold">Crop Profile Photo</h3>
-                <button onClick={() => setShowCropper(false)} className="text-white/40 hover:text-white transition-colors">
+                <button
+                  onClick={() => setShowCropper(false)}
+                  className="text-white/40 hover:text-white transition-colors"
+                >
                   <X className="w-6 h-6" />
                 </button>
               </div>
@@ -132,7 +138,9 @@ export const ProfilePhotoUpload: React.FC<ProfilePhotoUploadProps> = ({ currentP
 
               <div className="space-y-6">
                 <div className="flex items-center gap-4">
-                  <span className="text-[10px] text-white/40 uppercase tracking-[0.2em] font-bold">Zoom</span>
+                  <span className="text-[10px] text-white/40 uppercase tracking-[0.2em] font-bold">
+                    Zoom
+                  </span>
                   <input
                     type="range"
                     value={zoom}
@@ -146,20 +154,26 @@ export const ProfilePhotoUpload: React.FC<ProfilePhotoUploadProps> = ({ currentP
                 </div>
 
                 <div className="flex flex-col sm:flex-row gap-3 sm:gap-4">
-                  <Button 
-                    variant="secondary" 
+                  <Button
+                    variant="secondary"
                     className="flex-1 py-4"
                     onClick={() => setShowCropper(false)}
                   >
                     Cancel
                   </Button>
-                  <Button 
-                    variant="neon" 
+                  <Button
+                    variant="neon"
                     className="flex-1 py-4"
                     onClick={handleSave}
                     disabled={isUploading}
                   >
-                    {isUploading ? <Loader2 className="w-5 h-5 animate-spin" /> : <><Check className="w-5 h-5" /> Save Photo</>}
+                    {isUploading ? (
+                      <Loader2 className="w-5 h-5 animate-spin" />
+                    ) : (
+                      <>
+                        <Check className="w-5 h-5" /> Save Photo
+                      </>
+                    )}
                   </Button>
                 </div>
               </div>

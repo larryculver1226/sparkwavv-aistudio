@@ -11,27 +11,14 @@ export const TimeoutManager: React.FC = () => {
   const { user, logout } = useIdentity();
   const [showWarning, setShowWarning] = useState(false);
   const [timeLeft, setTimeLeft] = useState(WARNING_TIMEOUT / 1000);
-  
+
   const inactivityTimerRef = useRef<NodeJS.Timeout | null>(null);
   const warningTimerRef = useRef<NodeJS.Timeout | null>(null);
   const countdownIntervalRef = useRef<NodeJS.Timeout | null>(null);
 
-  const resetInactivityTimer = useCallback(() => {
-    if (showWarning) return; // Don't reset if warning is already showing
-
-    if (inactivityTimerRef.current) {
-      clearTimeout(inactivityTimerRef.current);
-    }
-
-    inactivityTimerRef.current = setTimeout(() => {
-      setShowWarning(true);
-      startWarningCountdown();
-    }, INACTIVITY_TIMEOUT);
-  }, [showWarning]);
-
   const startWarningCountdown = useCallback(() => {
     setTimeLeft(WARNING_TIMEOUT / 1000);
-    
+
     if (warningTimerRef.current) clearTimeout(warningTimerRef.current);
     if (countdownIntervalRef.current) clearInterval(countdownIntervalRef.current);
 
@@ -50,6 +37,19 @@ export const TimeoutManager: React.FC = () => {
     }, 1000);
   }, [logout]);
 
+  const resetInactivityTimer = useCallback(() => {
+    if (showWarning) return; // Don't reset if warning is already showing
+
+    if (inactivityTimerRef.current) {
+      clearTimeout(inactivityTimerRef.current);
+    }
+
+    inactivityTimerRef.current = setTimeout(() => {
+      setShowWarning(true);
+      startWarningCountdown();
+    }, INACTIVITY_TIMEOUT);
+  }, [showWarning, startWarningCountdown]);
+
   const handleContinue = () => {
     setShowWarning(false);
     if (warningTimerRef.current) clearTimeout(warningTimerRef.current);
@@ -66,16 +66,16 @@ export const TimeoutManager: React.FC = () => {
     }
 
     const events = ['mousedown', 'mousemove', 'keypress', 'scroll', 'touchstart'];
-    
+
     const handleActivity = () => {
       resetInactivityTimer();
     };
 
-    events.forEach(event => window.addEventListener(event, handleActivity));
+    events.forEach((event) => window.addEventListener(event, handleActivity));
     resetInactivityTimer();
 
     return () => {
-      events.forEach(event => window.removeEventListener(event, handleActivity));
+      events.forEach((event) => window.removeEventListener(event, handleActivity));
       if (inactivityTimerRef.current) clearTimeout(inactivityTimerRef.current);
       if (warningTimerRef.current) clearTimeout(warningTimerRef.current);
       if (countdownIntervalRef.current) clearInterval(countdownIntervalRef.current);
@@ -104,29 +104,28 @@ export const TimeoutManager: React.FC = () => {
               </div>
               <div>
                 <h3 className="text-xl font-bold">Session Timeout</h3>
-                <p className="text-xs text-white/40 uppercase tracking-widest">Security Protocol Active</p>
+                <p className="text-xs text-white/40 uppercase tracking-widest">
+                  Security Protocol Active
+                </p>
               </div>
             </div>
 
             <div className="space-y-4">
               <p className="text-white/60 leading-relaxed">
-                Your session is about to expire due to inactivity. For your security, you will be automatically logged out in:
+                Your session is about to expire due to inactivity. For your security, you will be
+                automatically logged out in:
               </p>
-              
+
               <div className="text-4xl font-mono font-bold text-center py-4 bg-white/5 rounded-2xl border border-white/10 text-neon-cyan">
                 {formatTime(timeLeft)}
               </div>
             </div>
 
             <div className="flex flex-col gap-3">
-              <Button 
-                onClick={handleContinue}
-                variant="neon"
-                className="w-full py-4"
-              >
+              <Button onClick={handleContinue} variant="neon" className="w-full py-4">
                 Continue Session
               </Button>
-              <button 
+              <button
                 onClick={() => logout()}
                 className="w-full py-3 text-sm text-white/40 hover:text-neon-magenta transition-colors font-bold uppercase tracking-widest"
               >
@@ -137,7 +136,8 @@ export const TimeoutManager: React.FC = () => {
             <div className="flex items-center gap-2 p-3 rounded-xl bg-neon-magenta/5 border border-neon-magenta/10">
               <ShieldAlert className="w-4 h-4 text-neon-magenta" />
               <p className="text-[10px] text-white/40 leading-tight">
-                This security measure helps protect your professional DNA and Wavvault assets from unauthorized access.
+                This security measure helps protect your professional DNA and Wavvault assets from
+                unauthorized access.
               </p>
             </div>
           </motion.div>

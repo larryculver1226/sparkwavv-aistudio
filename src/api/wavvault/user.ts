@@ -14,7 +14,7 @@ export default async function handler(req: any, res: any) {
     const tenantId = req.headers['x-tenant-id'] || 'sparkwavv';
     const result = await writeUserWavvault({
       ...req.body,
-      tenantId: req.body.tenantId || tenantId
+      tenantId: req.body.tenantId || tenantId,
     });
     return res.status(200).json(result);
   } catch (error: any) {

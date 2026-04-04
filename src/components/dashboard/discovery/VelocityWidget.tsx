@@ -11,8 +11,12 @@ export const VelocityWidget: React.FC = () => {
             <TrendingUp className="w-5 h-5 text-neon-magenta" />
           </div>
           <div>
-            <h3 className="text-xl font-display font-bold text-white tracking-tight uppercase">Market Velocity</h3>
-            <p className="text-[10px] text-white/40 uppercase tracking-widest font-bold">Industry Momentum</p>
+            <h3 className="text-xl font-display font-bold text-white tracking-tight uppercase">
+              Market Velocity
+            </h3>
+            <p className="text-[10px] text-white/40 uppercase tracking-widest font-bold">
+              Industry Momentum
+            </p>
           </div>
         </div>
       </div>
@@ -22,7 +26,9 @@ export const VelocityWidget: React.FC = () => {
           <div className="flex items-center justify-between">
             <div className="flex flex-col">
               <span className="text-sm text-white/80 font-bold">AI Strategy</span>
-              <span className="text-[10px] text-white/40 uppercase tracking-widest">Global Demand</span>
+              <span className="text-[10px] text-white/40 uppercase tracking-widest">
+                Global Demand
+              </span>
             </div>
             <div className="flex items-center gap-2">
               <span className="text-lg font-display font-bold text-neon-lime">+24%</span>
@@ -33,7 +39,9 @@ export const VelocityWidget: React.FC = () => {
           <div className="flex items-center justify-between">
             <div className="flex flex-col">
               <span className="text-sm text-white/80 font-bold">FinTech Innovation</span>
-              <span className="text-[10px] text-white/40 uppercase tracking-widest">Global Demand</span>
+              <span className="text-[10px] text-white/40 uppercase tracking-widest">
+                Global Demand
+              </span>
             </div>
             <div className="flex items-center gap-2">
               <span className="text-lg font-display font-bold text-neon-cyan">+12%</span>
@@ -44,7 +52,8 @@ export const VelocityWidget: React.FC = () => {
 
         <div className="mt-8 p-4 rounded-xl bg-white/5 border border-white/10">
           <p className="text-[10px] text-white/60 leading-relaxed italic">
-            "Market signals indicate a significant surge in AI Strategy roles matching your DNA. Your velocity is currently 15% above the industry average."
+            "Market signals indicate a significant surge in AI Strategy roles matching your DNA.
+            Your velocity is currently 15% above the industry average."
           </p>
         </div>
       </div>

@@ -37,10 +37,9 @@ export const Footer: React.FC<FooterProps> = ({ onNavigate }) => {
     <footer className="relative mt-20 border-t border-white/5 bg-black/40 backdrop-blur-xl">
       <div className="max-w-[1600px] mx-auto px-12 py-20">
         <div className="space-y-16">
-          
           {/* Brand Section */}
           <div className="flex flex-col items-center text-center space-y-8">
-            <div 
+            <div
               className="flex items-center gap-4 group cursor-pointer"
               onClick={() => onNavigate('landing')}
             >
@@ -52,19 +51,36 @@ export const Footer: React.FC<FooterProps> = ({ onNavigate }) => {
               </span>
             </div>
             <p className="text-white/40 leading-relaxed text-lg w-full max-w-2xl">
-              The most advanced career engine ever built. Transforming personal history into market dominance through cinematic self-discovery.
+              The most advanced career engine ever built. Transforming personal history into market
+              dominance through cinematic self-discovery.
             </p>
             <div className="flex items-center justify-center gap-4">
-              <a href="#" aria-label="Follow us on Twitter" className="w-10 h-10 rounded-full bg-white/5 border border-white/10 flex items-center justify-center text-white/40 hover:text-neon-cyan hover:border-neon-cyan/30 transition-all">
+              <a
+                href="#"
+                aria-label="Follow us on Twitter"
+                className="w-10 h-10 rounded-full bg-white/5 border border-white/10 flex items-center justify-center text-white/40 hover:text-neon-cyan hover:border-neon-cyan/30 transition-all"
+              >
                 <Twitter className="w-5 h-5" />
               </a>
-              <a href="#" aria-label="Follow us on LinkedIn" className="w-10 h-10 rounded-full bg-white/5 border border-white/10 flex items-center justify-center text-white/40 hover:text-neon-cyan hover:border-neon-cyan/30 transition-all">
+              <a
+                href="#"
+                aria-label="Follow us on LinkedIn"
+                className="w-10 h-10 rounded-full bg-white/5 border border-white/10 flex items-center justify-center text-white/40 hover:text-neon-cyan hover:border-neon-cyan/30 transition-all"
+              >
                 <Linkedin className="w-5 h-5" />
               </a>
-              <a href="#" aria-label="Follow us on GitHub" className="w-10 h-10 rounded-full bg-white/5 border border-white/10 flex items-center justify-center text-white/40 hover:text-neon-cyan hover:border-neon-cyan/30 transition-all">
+              <a
+                href="#"
+                aria-label="Follow us on GitHub"
+                className="w-10 h-10 rounded-full bg-white/5 border border-white/10 flex items-center justify-center text-white/40 hover:text-neon-cyan hover:border-neon-cyan/30 transition-all"
+              >
                 <Github className="w-5 h-5" />
               </a>
-              <a href="#" aria-label="Send us an email" className="w-10 h-10 rounded-full bg-white/5 border border-white/10 flex items-center justify-center text-white/40 hover:text-neon-cyan hover:border-neon-cyan/30 transition-all">
+              <a
+                href="#"
+                aria-label="Send us an email"
+                className="w-10 h-10 rounded-full bg-white/5 border border-white/10 flex items-center justify-center text-white/40 hover:text-neon-cyan hover:border-neon-cyan/30 transition-all"
+              >
                 <Mail className="w-5 h-5" />
               </a>
             </div>
@@ -73,11 +89,13 @@ export const Footer: React.FC<FooterProps> = ({ onNavigate }) => {
           {/* Links Sections */}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-12 lg:gap-8 text-center">
             <div className="flex flex-col items-center">
-              <h4 className="text-white font-display font-bold uppercase tracking-widest text-xs mb-8">Product</h4>
+              <h4 className="text-white font-display font-bold uppercase tracking-widest text-xs mb-8">
+                Product
+              </h4>
               <ul className="space-y-4 flex flex-col items-center">
                 {footerLinks.product.map((link) => (
                   <li key={link.label}>
-                    <button 
+                    <button
                       onClick={() => onNavigate(link.href)}
                       className="text-white/40 hover:text-neon-cyan transition-colors flex items-center gap-2 group"
                     >
@@ -90,11 +108,13 @@ export const Footer: React.FC<FooterProps> = ({ onNavigate }) => {
             </div>
 
             <div className="flex flex-col items-center">
-              <h4 className="text-white font-display font-bold uppercase tracking-widest text-xs mb-8">Company</h4>
+              <h4 className="text-white font-display font-bold uppercase tracking-widest text-xs mb-8">
+                Company
+              </h4>
               <ul className="space-y-4 flex flex-col items-center">
                 {footerLinks.company.map((link) => (
                   <li key={link.label}>
-                    <button 
+                    <button
                       onClick={() => onNavigate(link.href)}
                       className="text-white/40 hover:text-neon-cyan transition-colors flex items-center gap-2 group"
                     >
@@ -107,12 +127,14 @@ export const Footer: React.FC<FooterProps> = ({ onNavigate }) => {
             </div>
 
             <div className="flex flex-col items-center">
-              <h4 className="text-white font-display font-bold uppercase tracking-widest text-xs mb-8">Resources</h4>
+              <h4 className="text-white font-display font-bold uppercase tracking-widest text-xs mb-8">
+                Resources
+              </h4>
               <ul className="space-y-4 flex flex-col items-center">
                 {footerLinks.resources.map((link) => (
                   <li key={link.label}>
                     {link.href === 'partner-join' ? (
-                      <button 
+                      <button
                         onClick={() => setIsPartnerFormOpen(true)}
                         className="text-white/40 hover:text-neon-cyan transition-colors flex items-center gap-2 group"
                       >
@@ -120,7 +142,7 @@ export const Footer: React.FC<FooterProps> = ({ onNavigate }) => {
                         <ArrowUpRight className="w-3 h-3 opacity-0 -translate-y-1 translate-x-1 group-hover:opacity-100 group-hover:translate-y-0 group-hover:translate-x-0 transition-all" />
                       </button>
                     ) : link.href.startsWith('#') ? (
-                      <a 
+                      <a
                         href={link.href}
                         className="text-white/40 hover:text-neon-cyan transition-colors flex items-center gap-2 group"
                       >
@@ -128,7 +150,7 @@ export const Footer: React.FC<FooterProps> = ({ onNavigate }) => {
                         <ArrowUpRight className="w-3 h-3 opacity-0 -translate-y-1 translate-x-1 group-hover:opacity-100 group-hover:translate-y-0 group-hover:translate-x-0 transition-all" />
                       </a>
                     ) : (
-                      <button 
+                      <button
                         onClick={() => onNavigate(link.href)}
                         className="text-white/40 hover:text-neon-cyan transition-colors flex items-center gap-2 group"
                       >
@@ -149,17 +171,34 @@ export const Footer: React.FC<FooterProps> = ({ onNavigate }) => {
             © {currentYear} SPARKWavv Inc. All rights reserved.
           </p>
           <div className="flex items-center gap-8">
-            <Link to="/privacy" className="text-white/20 hover:text-white text-sm transition-colors">Privacy Policy</Link>
-            <Link to="/terms" className="text-white/20 hover:text-white text-sm transition-colors">Terms of Service</Link>
-            <Link to="/cookies" className="text-white/20 hover:text-white text-sm transition-colors">Cookie Settings</Link>
-            <Link to="/partner/login" className="text-white/20 hover:text-white text-sm transition-colors">Partner Login</Link>
+            <Link
+              to="/privacy"
+              className="text-white/20 hover:text-white text-sm transition-colors"
+            >
+              Privacy Policy
+            </Link>
+            <Link to="/terms" className="text-white/20 hover:text-white text-sm transition-colors">
+              Terms of Service
+            </Link>
+            <Link
+              to="/cookies"
+              className="text-white/20 hover:text-white text-sm transition-colors"
+            >
+              Cookie Settings
+            </Link>
+            <Link
+              to="/partner/login"
+              className="text-white/20 hover:text-white text-sm transition-colors"
+            >
+              Partner Login
+            </Link>
           </div>
         </div>
       </div>
 
-      <PartnerApplicationForm 
-        isOpen={isPartnerFormOpen} 
-        onClose={() => setIsPartnerFormOpen(false)} 
+      <PartnerApplicationForm
+        isOpen={isPartnerFormOpen}
+        onClose={() => setIsPartnerFormOpen(false)}
       />
 
       {/* Decorative Gradient */}

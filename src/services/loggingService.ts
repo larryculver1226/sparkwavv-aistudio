@@ -15,7 +15,7 @@ try {
     firebaseAppletConfig = JSON.parse(fs.readFileSync(configPath, 'utf8'));
   }
 } catch (error) {
-  console.warn("LoggingService: Could not read firebase-applet-config.json", error);
+  console.warn('LoggingService: Could not read firebase-applet-config.json', error);
 }
 
 const getDb = () => {
@@ -56,12 +56,12 @@ export const logEvent = async (
       level,
       serviceName,
       message,
-      details: details || {}
+      details: details || {},
     };
 
     await db.collection('system_logs').doc(logId).set(log);
     console.log(`[${serviceName}] [${level}] ${message}`);
   } catch (error) {
-    console.error("Failed to log system event:", error);
+    console.error('Failed to log system event:', error);
   }
 };

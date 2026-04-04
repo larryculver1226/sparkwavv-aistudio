@@ -1,15 +1,15 @@
 import React, { useState, useEffect } from 'react';
 import { motion } from 'motion/react';
-import { 
-  Target, 
-  TrendingUp, 
-  Brain, 
-  Compass, 
-  Zap, 
+import {
+  Target,
+  TrendingUp,
+  Brain,
+  Compass,
+  Zap,
   Database,
   ArrowUpRight,
   ShieldCheck,
-  AlertCircle
+  AlertCircle,
 } from 'lucide-react';
 import { marketSignalService } from '../../../services/marketSignalService';
 import { MarketSignal, DNAGap, ResonanceHistory } from '../../../types/dashboard';
@@ -31,7 +31,7 @@ export const DiscoveryBento: React.FC<{ userId: string }> = ({ userId }) => {
       const [s, g, h] = await Promise.all([
         marketSignalService.fetchSignals(userId),
         marketSignalService.getDNAGaps(userId),
-        marketSignalService.getResonanceHistory(userId)
+        marketSignalService.getResonanceHistory(userId),
       ]);
       setSignals(s);
       setGaps(g);
@@ -46,7 +46,9 @@ export const DiscoveryBento: React.FC<{ userId: string }> = ({ userId }) => {
       <div className="w-full h-[600px] flex items-center justify-center">
         <div className="flex flex-col items-center gap-4">
           <div className="w-12 h-12 border-4 border-neon-cyan border-t-transparent rounded-full animate-spin" />
-          <p className="text-[10px] text-white/40 uppercase tracking-[0.3em] font-bold animate-pulse">Scanning Market Signals...</p>
+          <p className="text-[10px] text-white/40 uppercase tracking-[0.3em] font-bold animate-pulse">
+            Scanning Market Signals...
+          </p>
         </div>
       </div>
     );

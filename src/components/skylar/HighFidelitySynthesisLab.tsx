@@ -1,10 +1,27 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { 
-  Camera, Send, Sliders, Shield, Image as ImageIcon, 
-  Download, RefreshCw, Check, AlertCircle, Key, 
-  User, Building2, Briefcase, ChevronRight, 
-  X, Upload, Sparkles, Info, FileText, Globe, Zap
+import {
+  Camera,
+  Send,
+  Sliders,
+  Shield,
+  Image as ImageIcon,
+  Download,
+  RefreshCw,
+  Check,
+  AlertCircle,
+  Key,
+  User,
+  Building2,
+  Briefcase,
+  ChevronRight,
+  X,
+  Upload,
+  Sparkles,
+  Info,
+  FileText,
+  Globe,
+  Zap,
 } from 'lucide-react';
 import { skylar } from '../../services/skylarService';
 import { useIdentity } from '../../contexts/IdentityContext';
@@ -22,10 +39,12 @@ interface UserAsset {
 
 export const HighFidelitySynthesisLab: React.FC = () => {
   const { user } = useIdentity();
-  const [activeTab, setActiveTab] = useState<'portrait' | 'outreach' | 'branding' | 'kit'>('portrait');
+  const [activeTab, setActiveTab] = useState<'portrait' | 'outreach' | 'branding' | 'kit'>(
+    'portrait'
+  );
   const [loading, setLoading] = useState(false);
   const [assets, setAssets] = useState<UserAsset[]>([]);
-  
+
   // Portrait Studio State
   const [selectedStyle, setSelectedStyle] = useState('Cinematic Professional');
   const [referencePhoto, setReferencePhoto] = useState<string | null>(null);
@@ -51,7 +70,7 @@ export const HighFidelitySynthesisLab: React.FC = () => {
     'Tech Visionary',
     'Minimalist Executive',
     'Creative Pioneer',
-    'Modern Academic'
+    'Modern Academic',
   ];
 
   useEffect(() => {
@@ -82,7 +101,7 @@ export const HighFidelitySynthesisLab: React.FC = () => {
     setLoading(true);
     try {
       const modelId = useHighFidelity ? 'gemini-3.1-flash-image-preview' : 'gemini-2.5-flash-image';
-      
+
       if (useHighFidelity && window.aistudio) {
         const hasKey = await window.aistudio.hasSelectedApiKey();
         if (!hasKey) {
@@ -97,15 +116,15 @@ export const HighFidelitySynthesisLab: React.FC = () => {
         modelId
       );
       setGeneratedPortrait(portrait);
-      
+
       await skylar.saveUserAsset(user.uid, {
         type: 'portrait',
         content: portrait,
-        metadata: { style: selectedStyle, modelId, usedReference: !!referencePhoto }
+        metadata: { style: selectedStyle, modelId, usedReference: !!referencePhoto },
       });
       fetchAssets();
     } catch (error) {
-      console.error("Portrait generation failed:", error);
+      console.error('Portrait generation failed:', error);
     } finally {
       setLoading(false);
     }
@@ -122,15 +141,15 @@ export const HighFidelitySynthesisLab: React.FC = () => {
         tone
       );
       setGeneratedSequence(sequence);
-      
+
       await skylar.saveUserAsset(user.uid, {
         type: 'outreach_sequence',
         content: JSON.stringify(sequence),
-        metadata: { targetCompany, targetRole, tone }
+        metadata: { targetCompany, targetRole, tone },
       });
       fetchAssets();
     } catch (error) {
-      console.error("Sequence generation failed:", error);
+      console.error('Sequence generation failed:', error);
     } finally {
       setLoading(false);
     }
@@ -146,7 +165,7 @@ export const HighFidelitySynthesisLab: React.FC = () => {
         await skylar.saveUserAsset(user.uid, {
           type: 'live_resume',
           content: JSON.stringify(resume),
-          metadata: { style: 'Editorial / Magazine' }
+          metadata: { style: 'Editorial / Magazine' },
         });
       } else {
         const portfolio = await skylar.generateInteractivePortfolio(user.uid);
@@ -154,7 +173,7 @@ export const HighFidelitySynthesisLab: React.FC = () => {
         await skylar.saveUserAsset(user.uid, {
           type: 'interactive_portfolio',
           content: JSON.stringify(portfolio),
-          metadata: { style: 'Editorial / Magazine' }
+          metadata: { style: 'Editorial / Magazine' },
         });
       }
       fetchAssets();
@@ -167,7 +186,11 @@ export const HighFidelitySynthesisLab: React.FC = () => {
 
   const getFeedback = async (content: string) => {
     if (!user?.uid) return;
-    const feedback = await skylar.getResonanceFeedback(user.uid, content, targetRole || "Strategic Leader");
+    const feedback = await skylar.getResonanceFeedback(
+      user.uid,
+      content,
+      targetRole || 'Strategic Leader'
+    );
     setResonanceFeedback(feedback);
   };
 
@@ -178,16 +201,18 @@ export const HighFidelitySynthesisLab: React.FC = () => {
         <div className="flex items-center justify-between">
           <div>
             <h1 className="text-5xl font-serif italic tracking-tighter">Synthesis Lab</h1>
-            <p className="text-xs opacity-40 mt-1 uppercase tracking-[0.3em] font-mono font-bold">High-Fidelity Asset Generation</p>
+            <p className="text-xs opacity-40 mt-1 uppercase tracking-[0.3em] font-mono font-bold">
+              High-Fidelity Asset Generation
+            </p>
           </div>
           <div className="flex gap-2">
             {[
               { id: 'portrait', label: 'Portrait Studio', icon: Camera },
               { id: 'branding', label: 'Branding Studio', icon: Sparkles },
               { id: 'outreach', label: 'Outreach Forge', icon: Send },
-              { id: 'kit', label: `Brand Kit (${assets.length})`, icon: Briefcase }
-            ].map(tab => (
-              <button 
+              { id: 'kit', label: `Brand Kit (${assets.length})`, icon: Briefcase },
+            ].map((tab) => (
+              <button
                 key={tab.id}
                 onClick={() => setActiveTab(tab.id as any)}
                 className={`px-6 py-3 text-[10px] uppercase tracking-widest font-bold border-2 border-[#141414] transition-all flex items-center gap-3 ${activeTab === tab.id ? 'bg-[#141414] text-[#E4E3E0]' : 'hover:bg-[#141414] hover:text-[#E4E3E0]'}`}
@@ -203,7 +228,7 @@ export const HighFidelitySynthesisLab: React.FC = () => {
       <div className="flex-1 overflow-y-auto p-12">
         <AnimatePresence mode="wait">
           {activeTab === 'portrait' && (
-            <motion.div 
+            <motion.div
               key="portrait"
               initial={{ opacity: 0, scale: 0.98 }}
               animate={{ opacity: 1, scale: 1 }}
@@ -215,45 +240,57 @@ export const HighFidelitySynthesisLab: React.FC = () => {
                 <section>
                   <div className="flex items-center gap-4 mb-6">
                     <span className="text-4xl font-serif italic opacity-20">01</span>
-                    <h2 className="text-3xl font-serif italic tracking-tight">Likeness Preservation</h2>
+                    <h2 className="text-3xl font-serif italic tracking-tight">
+                      Likeness Preservation
+                    </h2>
                   </div>
                   <div className="border-2 border-[#141414] p-8 bg-white space-y-6">
                     <div className="flex items-start gap-4 p-4 bg-[#141414] text-[#E4E3E0]">
                       <Shield className="w-5 h-5 mt-0.5" />
                       <div>
-                        <p className="text-[10px] font-bold uppercase tracking-widest">Privacy Shield Active</p>
+                        <p className="text-[10px] font-bold uppercase tracking-widest">
+                          Privacy Shield Active
+                        </p>
                         <p className="text-xs opacity-60 mt-1">
-                          Reference photos are used solely for profile synthesis. 
-                          Encrypted at rest.
+                          Reference photos are used solely for profile synthesis. Encrypted at rest.
                         </p>
                       </div>
                     </div>
-                    
+
                     <div className="flex items-center gap-8">
-                      <div 
+                      <div
                         className="w-40 h-40 border-2 border-dashed border-[#141414] flex items-center justify-center cursor-pointer overflow-hidden bg-[#F5F5F0] group"
                         onClick={() => fileInputRef.current?.click()}
                       >
                         {referencePhoto ? (
-                          <img src={referencePhoto} alt="Reference" className="w-full h-full object-cover" />
+                          <img
+                            src={referencePhoto}
+                            alt="Reference"
+                            className="w-full h-full object-cover"
+                          />
                         ) : (
                           <div className="text-center p-4 group-hover:scale-110 transition-transform">
                             <Upload className="w-8 h-8 mx-auto mb-2 opacity-20" />
-                            <span className="text-[10px] uppercase tracking-widest font-bold opacity-40">Upload Photo</span>
+                            <span className="text-[10px] uppercase tracking-widest font-bold opacity-40">
+                              Upload Photo
+                            </span>
                           </div>
                         )}
                       </div>
                       <div className="flex-1">
-                        <p className="text-sm font-serif italic opacity-60 mb-4">Upload a clear headshot to help Skylar maintain your likeness in generated portraits.</p>
-                        <input 
-                          type="file" 
-                          ref={fileInputRef} 
-                          onChange={handlePhotoUpload} 
-                          className="hidden" 
+                        <p className="text-sm font-serif italic opacity-60 mb-4">
+                          Upload a clear headshot to help Skylar maintain your likeness in generated
+                          portraits.
+                        </p>
+                        <input
+                          type="file"
+                          ref={fileInputRef}
+                          onChange={handlePhotoUpload}
+                          className="hidden"
                           accept="image/*"
                         />
                         {referencePhoto && (
-                          <button 
+                          <button
                             onClick={() => setReferencePhoto(null)}
                             className="text-[10px] uppercase tracking-widest font-bold text-red-600 hover:underline"
                           >
@@ -271,13 +308,15 @@ export const HighFidelitySynthesisLab: React.FC = () => {
                     <h2 className="text-3xl font-serif italic tracking-tight">Style Selection</h2>
                   </div>
                   <div className="grid grid-cols-2 gap-4">
-                    {styles.map(style => (
+                    {styles.map((style) => (
                       <button
                         key={style}
                         onClick={() => setSelectedStyle(style)}
                         className={`p-6 text-left border-2 border-[#141414] transition-all ${selectedStyle === style ? 'bg-[#141414] text-[#E4E3E0]' : 'bg-white hover:bg-white/80'}`}
                       >
-                        <span className="text-[10px] uppercase tracking-widest font-bold">{style}</span>
+                        <span className="text-[10px] uppercase tracking-widest font-bold">
+                          {style}
+                        </span>
                       </button>
                     ))}
                   </div>
@@ -293,7 +332,9 @@ export const HighFidelitySynthesisLab: React.FC = () => {
                   ) : (
                     <>
                       <Sparkles className="w-8 h-8 group-hover:rotate-12 transition-transform" />
-                      <span className="text-lg uppercase tracking-[0.3em] font-bold">Synthesize Portrait</span>
+                      <span className="text-lg uppercase tracking-[0.3em] font-bold">
+                        Synthesize Portrait
+                      </span>
                     </>
                   )}
                 </button>
@@ -308,10 +349,14 @@ export const HighFidelitySynthesisLab: React.FC = () => {
                 <div className="flex-1 border-2 border-[#141414] bg-white relative flex items-center justify-center overflow-hidden min-h-[500px] shadow-2xl">
                   {generatedPortrait ? (
                     <>
-                      <img src={generatedPortrait} alt="Generated" className="w-full h-full object-cover" />
+                      <img
+                        src={generatedPortrait}
+                        alt="Generated"
+                        className="w-full h-full object-cover"
+                      />
                       <div className="absolute bottom-8 right-8 flex gap-4">
-                        <a 
-                          href={generatedPortrait} 
+                        <a
+                          href={generatedPortrait}
                           download="sparkwavv-portrait.png"
                           className="p-4 bg-white border-2 border-[#141414] hover:bg-[#141414] hover:text-[#E4E3E0] transition-all"
                         >
@@ -322,7 +367,9 @@ export const HighFidelitySynthesisLab: React.FC = () => {
                   ) : (
                     <div className="text-center opacity-10">
                       <ImageIcon className="w-32 h-32 mx-auto mb-6" />
-                      <p className="text-xs uppercase tracking-[0.4em] font-bold">Awaiting Synthesis</p>
+                      <p className="text-xs uppercase tracking-[0.4em] font-bold">
+                        Awaiting Synthesis
+                      </p>
                     </div>
                   )}
                 </div>
@@ -331,7 +378,7 @@ export const HighFidelitySynthesisLab: React.FC = () => {
           )}
 
           {activeTab === 'branding' && (
-            <motion.div 
+            <motion.div
               key="branding"
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
@@ -342,7 +389,9 @@ export const HighFidelitySynthesisLab: React.FC = () => {
                 <section>
                   <div className="flex items-center gap-4 mb-6">
                     <span className="text-4xl font-serif italic opacity-20">01</span>
-                    <h2 className="text-3xl font-serif italic tracking-tight">Cinematic Branding</h2>
+                    <h2 className="text-3xl font-serif italic tracking-tight">
+                      Cinematic Branding
+                    </h2>
                   </div>
                   <div className="grid grid-cols-1 gap-6">
                     <button
@@ -355,7 +404,9 @@ export const HighFidelitySynthesisLab: React.FC = () => {
                         <ChevronRight className="w-6 h-6 opacity-0 group-hover:opacity-100 transition-all" />
                       </div>
                       <h3 className="text-2xl font-serif italic mb-2">Live Resume</h3>
-                      <p className="text-xs opacity-60 uppercase tracking-widest font-bold">Editorial / Interactive / PDF Optimized</p>
+                      <p className="text-xs opacity-60 uppercase tracking-widest font-bold">
+                        Editorial / Interactive / PDF Optimized
+                      </p>
                     </button>
 
                     <button
@@ -368,13 +419,15 @@ export const HighFidelitySynthesisLab: React.FC = () => {
                         <ChevronRight className="w-6 h-6 opacity-0 group-hover:opacity-100 transition-all" />
                       </div>
                       <h3 className="text-2xl font-serif italic mb-2">Interactive Portfolio</h3>
-                      <p className="text-xs opacity-60 uppercase tracking-widest font-bold">Multi-page / Narrative Driven / Cinematic</p>
+                      <p className="text-xs opacity-60 uppercase tracking-widest font-bold">
+                        Multi-page / Narrative Driven / Cinematic
+                      </p>
                     </button>
                   </div>
                 </section>
 
                 {resonanceFeedback && (
-                  <motion.div 
+                  <motion.div
                     initial={{ opacity: 0, scale: 0.95 }}
                     animate={{ opacity: 1, scale: 1 }}
                     className="p-8 border-2 border-[#141414] bg-[#141414] text-[#E4E3E0]"
@@ -382,14 +435,23 @@ export const HighFidelitySynthesisLab: React.FC = () => {
                     <div className="flex items-center justify-between mb-6">
                       <div className="flex items-center gap-3">
                         <Zap className="w-5 h-5 text-neon-cyan" />
-                        <span className="text-[10px] uppercase tracking-widest font-bold">Skylar's Resonance Feedback</span>
+                        <span className="text-[10px] uppercase tracking-widest font-bold">
+                          Skylar's Resonance Feedback
+                        </span>
                       </div>
-                      <span className="text-2xl font-mono font-bold text-neon-cyan">{resonanceFeedback.resonanceScore}%</span>
+                      <span className="text-2xl font-mono font-bold text-neon-cyan">
+                        {resonanceFeedback.resonanceScore}%
+                      </span>
                     </div>
-                    <p className="text-lg font-serif italic mb-6 opacity-80">"{resonanceFeedback.feedback}"</p>
+                    <p className="text-lg font-serif italic mb-6 opacity-80">
+                      "{resonanceFeedback.feedback}"
+                    </p>
                     <div className="space-y-2">
                       {resonanceFeedback.suggestions.map((s: string, i: number) => (
-                        <div key={i} className="flex items-center gap-3 text-[10px] uppercase tracking-widest font-bold opacity-40">
+                        <div
+                          key={i}
+                          className="flex items-center gap-3 text-[10px] uppercase tracking-widest font-bold opacity-40"
+                        >
                           <div className="w-1 h-1 bg-neon-cyan rounded-full" />
                           {s}
                         </div>
@@ -404,14 +466,16 @@ export const HighFidelitySynthesisLab: React.FC = () => {
                   <h2 className="text-3xl font-serif italic tracking-tight">Branding Preview</h2>
                   <div className="h-[1px] flex-1 bg-[#141414] opacity-10" />
                 </div>
-                
+
                 <div className="grid grid-cols-1 gap-8">
                   {generatedResume && (
                     <div className="border-2 border-[#141414] bg-white p-8 group">
                       <div className="flex justify-between items-center mb-8">
-                        <span className="text-[10px] uppercase tracking-widest font-bold opacity-40">Live Resume Ready</span>
+                        <span className="text-[10px] uppercase tracking-widest font-bold opacity-40">
+                          Live Resume Ready
+                        </span>
                         <div className="flex gap-2">
-                          <button 
+                          <button
                             onClick={() => setShowLiveResume(true)}
                             className="p-3 border border-[#141414] hover:bg-[#141414] hover:text-[#E4E3E0] transition-all"
                           >
@@ -422,16 +486,22 @@ export const HighFidelitySynthesisLab: React.FC = () => {
                           </button>
                         </div>
                       </div>
-                      <h3 className="text-4xl font-serif italic mb-4">{generatedResume.spark.title}</h3>
-                      <p className="text-sm font-serif italic opacity-60 line-clamp-3">{generatedResume.spark.narrative}</p>
+                      <h3 className="text-4xl font-serif italic mb-4">
+                        {generatedResume.spark.title}
+                      </h3>
+                      <p className="text-sm font-serif italic opacity-60 line-clamp-3">
+                        {generatedResume.spark.narrative}
+                      </p>
                     </div>
                   )}
 
                   {generatedPortfolio && (
                     <div className="border-2 border-[#141414] bg-white p-8 group">
                       <div className="flex justify-between items-center mb-8">
-                        <span className="text-[10px] uppercase tracking-widest font-bold opacity-40">Portfolio Ready</span>
-                        <button 
+                        <span className="text-[10px] uppercase tracking-widest font-bold opacity-40">
+                          Portfolio Ready
+                        </span>
+                        <button
                           onClick={() => setShowPortfolio(true)}
                           className="p-3 border border-[#141414] hover:bg-[#141414] hover:text-[#E4E3E0] transition-all"
                         >
@@ -439,7 +509,9 @@ export const HighFidelitySynthesisLab: React.FC = () => {
                         </button>
                       </div>
                       <h3 className="text-4xl font-serif italic mb-4">The Cinematic Narrative</h3>
-                      <p className="text-sm font-serif italic opacity-60 line-clamp-3">{generatedPortfolio.pages[0].content}</p>
+                      <p className="text-sm font-serif italic opacity-60 line-clamp-3">
+                        {generatedPortfolio.pages[0].content}
+                      </p>
                     </div>
                   )}
 
@@ -447,7 +519,9 @@ export const HighFidelitySynthesisLab: React.FC = () => {
                     <div className="h-[400px] border-2 border-dashed border-[#141414] flex items-center justify-center opacity-10">
                       <div className="text-center">
                         <Sparkles className="w-24 h-24 mx-auto mb-6" />
-                        <p className="text-xs uppercase tracking-[0.4em] font-bold">Awaiting Branding Synthesis</p>
+                        <p className="text-xs uppercase tracking-[0.4em] font-bold">
+                          Awaiting Branding Synthesis
+                        </p>
                       </div>
                     </div>
                   )}
@@ -456,12 +530,10 @@ export const HighFidelitySynthesisLab: React.FC = () => {
             </motion.div>
           )}
 
-          {activeTab === 'outreach' && (
-            <OutreachForge userId={user?.uid || ''} />
-          )}
+          {activeTab === 'outreach' && <OutreachForge userId={user?.uid || ''} />}
 
           {activeTab === 'kit' && (
-            <motion.div 
+            <motion.div
               key="kit"
               initial={{ opacity: 0, scale: 0.98 }}
               animate={{ opacity: 1, scale: 1 }}
@@ -469,17 +541,28 @@ export const HighFidelitySynthesisLab: React.FC = () => {
               className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-12"
             >
               {assets.length > 0 ? (
-                assets.map(asset => (
-                  <div key={asset.id} className="border-2 border-[#141414] bg-white group overflow-hidden shadow-lg hover:shadow-2xl transition-all">
+                assets.map((asset) => (
+                  <div
+                    key={asset.id}
+                    className="border-2 border-[#141414] bg-white group overflow-hidden shadow-lg hover:shadow-2xl transition-all"
+                  >
                     <div className="aspect-square bg-[#F5F5F0] relative overflow-hidden">
                       {asset.type === 'portrait' ? (
-                        <img src={asset.content} alt="Portrait" className="w-full h-full object-cover" />
+                        <img
+                          src={asset.content}
+                          alt="Portrait"
+                          className="w-full h-full object-cover"
+                        />
                       ) : (
                         <div className="p-12 h-full flex items-center justify-center text-center">
                           <div>
-                            {asset.type === 'live_resume' ? <FileText className="w-16 h-16 mx-auto mb-6 opacity-10" /> :
-                             asset.type === 'interactive_portfolio' ? <Globe className="w-16 h-16 mx-auto mb-6 opacity-10" /> :
-                             <Send className="w-16 h-16 mx-auto mb-6 opacity-10" />}
+                            {asset.type === 'live_resume' ? (
+                              <FileText className="w-16 h-16 mx-auto mb-6 opacity-10" />
+                            ) : asset.type === 'interactive_portfolio' ? (
+                              <Globe className="w-16 h-16 mx-auto mb-6 opacity-10" />
+                            ) : (
+                              <Send className="w-16 h-16 mx-auto mb-6 opacity-10" />
+                            )}
                             <p className="text-xs uppercase tracking-widest font-bold">
                               {asset.metadata?.targetCompany || asset.type.replace('_', ' ')}
                             </p>
@@ -487,7 +570,7 @@ export const HighFidelitySynthesisLab: React.FC = () => {
                         </div>
                       )}
                       <div className="absolute inset-0 bg-[#141414]/90 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-6">
-                        <button 
+                        <button
                           onClick={() => {
                             if (asset.type === 'portrait') {
                               setGeneratedPortrait(asset.content);
@@ -507,8 +590,12 @@ export const HighFidelitySynthesisLab: React.FC = () => {
                         >
                           <RefreshCw className="w-6 h-6" />
                         </button>
-                        <a 
-                          href={asset.type === 'portrait' ? asset.content : `data:text/plain;base64,${btoa(asset.content)}`}
+                        <a
+                          href={
+                            asset.type === 'portrait'
+                              ? asset.content
+                              : `data:text/plain;base64,${btoa(asset.content)}`
+                          }
                           download={`sparkwavv-${asset.type}-${asset.id}.${asset.type === 'portrait' ? 'png' : 'txt'}`}
                           className="p-4 bg-white text-[#141414] hover:bg-neon-cyan transition-all"
                         >
@@ -518,8 +605,12 @@ export const HighFidelitySynthesisLab: React.FC = () => {
                     </div>
                     <div className="p-6 border-t-2 border-[#141414]">
                       <div className="flex items-center justify-between">
-                        <span className="text-[10px] uppercase tracking-widest font-bold">{asset.type.replace('_', ' ')}</span>
-                        <span className="text-[10px] opacity-40 font-mono">{new Date(asset.createdAt).toLocaleDateString()}</span>
+                        <span className="text-[10px] uppercase tracking-widest font-bold">
+                          {asset.type.replace('_', ' ')}
+                        </span>
+                        <span className="text-[10px] opacity-40 font-mono">
+                          {new Date(asset.createdAt).toLocaleDateString()}
+                        </span>
                       </div>
                     </div>
                   </div>
@@ -538,17 +629,14 @@ export const HighFidelitySynthesisLab: React.FC = () => {
       {/* Overlays */}
       <AnimatePresence>
         {showLiveResume && generatedResume && (
-          <motion.div 
+          <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             className="fixed inset-0 z-50 overflow-y-auto"
           >
-            <LiveResume 
-              data={generatedResume} 
-              onDownload={() => window.print()} 
-            />
-            <button 
+            <LiveResume data={generatedResume} onDownload={() => window.print()} />
+            <button
               onClick={() => setShowLiveResume(false)}
               className="fixed top-12 right-12 p-4 bg-[#141414] text-[#E4E3E0] rounded-full z-[60] hover:scale-110 transition-transform"
             >
@@ -558,10 +646,7 @@ export const HighFidelitySynthesisLab: React.FC = () => {
         )}
 
         {showPortfolio && generatedPortfolio && (
-          <InteractivePortfolio 
-            data={generatedPortfolio} 
-            onClose={() => setShowPortfolio(false)} 
-          />
+          <InteractivePortfolio data={generatedPortfolio} onClose={() => setShowPortfolio(false)} />
         )}
       </AnimatePresence>
     </div>

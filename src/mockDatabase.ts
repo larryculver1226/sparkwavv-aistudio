@@ -15,30 +15,32 @@ export const MOCK_PROGRAMS: Program[] = [
     description: 'A transition and self-discovery program featuring a 3-Step Curriculum.',
     type: 'Kickspark',
     curriculum: ['Discovery', 'Branding', 'Outreach'],
-    tenantId: 'sparkwavv'
+    tenantId: 'sparkwavv',
   },
   {
     id: 'career-discovery',
     name: 'SPARKWavv Career Discovery Track',
-    description: 'A 2–4 week interactive, cinematic module program designed to help users identify aligned career directions.',
+    description:
+      'A 2–4 week interactive, cinematic module program designed to help users identify aligned career directions.',
     type: 'SPARKWavv Track',
     duration: '2-4 weeks',
-    tenantId: 'sparkwavv'
+    tenantId: 'sparkwavv',
   },
   {
     id: 'wave-rider-program',
     name: 'Wave Rider',
-    description: 'A specific SPARKWavv program track tailored for Gen Z & early-career individuals.',
+    description:
+      'A specific SPARKWavv program track tailored for Gen Z & early-career individuals.',
     type: 'SPARKWavv Track',
-    tenantId: 'sparkwavv'
+    tenantId: 'sparkwavv',
   },
   {
     id: 'kwieri-platform',
     name: 'Kwieri Platform',
     description: 'An AI-powered learning and collaboration platform program.',
     type: 'Kwieri',
-    tenantId: 'kwieri'
-  }
+    tenantId: 'kwieri',
+  },
 ];
 
 export interface Cohort {
@@ -64,7 +66,7 @@ export const MOCK_COHORTS: Cohort[] = [
     targetAudience: 'Gen Z & Early-Career (0-5 years out of school)',
     startDate: '2026-03-01T00:00:00Z',
     endDate: '2026-05-31T00:00:00Z',
-    tenantId: 'sparkwavv'
+    tenantId: 'sparkwavv',
   },
   {
     id: 'pepperdine-exec-2026',
@@ -76,8 +78,8 @@ export const MOCK_COHORTS: Cohort[] = [
     startDate: '2026-04-15T00:00:00Z',
     endDate: '2026-04-17T00:00:00Z',
     institution: 'Pepperdine University',
-    tenantId: 'kwieri'
-  }
+    tenantId: 'kwieri',
+  },
 ];
 
 export interface Journey {
@@ -106,10 +108,10 @@ export const MOCK_JOURNEYS: Journey[] = [
     steps: [
       { name: 'Discovery', status: 'completed', completedAt: '2026-02-15T10:00:00Z' },
       { name: 'Branding', status: 'in-progress' },
-      { name: 'Outreach', status: 'pending' }
+      { name: 'Outreach', status: 'pending' },
     ],
     startedAt: '2026-02-01T09:00:00Z',
-    tenantId: 'sparkwavv'
+    tenantId: 'sparkwavv',
   },
   {
     id: 'journey-genz-wave-rider',
@@ -121,10 +123,10 @@ export const MOCK_JOURNEYS: Journey[] = [
       { name: 'Dive-In', status: 'completed', completedAt: '2026-01-10T10:00:00Z' },
       { name: 'Discovery', status: 'completed', completedAt: '2026-01-25T10:00:00Z' },
       { name: 'Design', status: 'completed', completedAt: '2026-02-10T10:00:00Z' },
-      { name: 'Deployment', status: 'completed', completedAt: '2026-02-28T10:00:00Z' }
+      { name: 'Deployment', status: 'completed', completedAt: '2026-02-28T10:00:00Z' },
     ],
     startedAt: '2026-01-01T09:00:00Z',
     completedAt: '2026-02-28T10:00:00Z',
-    tenantId: 'sparkwavv'
-  }
+    tenantId: 'sparkwavv',
+  },
 ];

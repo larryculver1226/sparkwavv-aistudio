@@ -36,12 +36,10 @@ export default function Login() {
           <h1 className="text-4xl font-display font-bold text-white tracking-tight mb-2">
             Dashboard Login
           </h1>
-          <p className="text-white/60">
-            Welcome back to SPARKWavv.
-          </p>
+          <p className="text-white/60">Welcome back to SPARKWavv.</p>
         </div>
 
-        <LoginForm 
+        <LoginForm
           onEmailLogin={handleEmailLogin}
           onGoogleLogin={handleGoogleLogin}
           loading={loading}
@@ -49,7 +47,7 @@ export default function Login() {
         />
 
         <div className="text-center">
-          <button 
+          <button
             onClick={() => navigate('/')}
             className="text-white/40 hover:text-white transition-colors text-sm uppercase tracking-widest font-bold"
           >

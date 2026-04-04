@@ -24,12 +24,16 @@ export const PieOfLife: React.FC<PieOfLifeProps> = ({ data, onUpdate }) => {
   return (
     <div className="space-y-8">
       <div className="flex items-center justify-between">
-        <h3 className="text-sm font-bold text-white/40 uppercase tracking-widest">Pie of Life (Current vs Target)</h3>
+        <h3 className="text-sm font-bold text-white/40 uppercase tracking-widest">
+          Pie of Life (Current vs Target)
+        </h3>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-8 h-[300px]">
         <div className="relative">
-          <p className="absolute top-0 left-1/2 -translate-x-1/2 text-[10px] text-white/40 uppercase font-bold z-10">Current State</p>
+          <p className="absolute top-0 left-1/2 -translate-x-1/2 text-[10px] text-white/40 uppercase font-bold z-10">
+            Current State
+          </p>
           <ResponsiveContainer width="100%" height="100%">
             <PieChart>
               <Pie
@@ -45,8 +49,12 @@ export const PieOfLife: React.FC<PieOfLifeProps> = ({ data, onUpdate }) => {
                   <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} opacity={0.8} />
                 ))}
               </Pie>
-              <Tooltip 
-                contentStyle={{ backgroundColor: '#000', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '12px' }}
+              <Tooltip
+                contentStyle={{
+                  backgroundColor: '#000',
+                  border: '1px solid rgba(255,255,255,0.1)',
+                  borderRadius: '12px',
+                }}
                 itemStyle={{ color: '#fff' }}
               />
             </PieChart>
@@ -54,7 +62,9 @@ export const PieOfLife: React.FC<PieOfLifeProps> = ({ data, onUpdate }) => {
         </div>
 
         <div className="relative">
-          <p className="absolute top-0 left-1/2 -translate-x-1/2 text-[10px] text-neon-cyan uppercase font-bold z-10">Target State</p>
+          <p className="absolute top-0 left-1/2 -translate-x-1/2 text-[10px] text-neon-cyan uppercase font-bold z-10">
+            Target State
+          </p>
           <ResponsiveContainer width="100%" height="100%">
             <PieChart>
               <Pie
@@ -70,8 +80,12 @@ export const PieOfLife: React.FC<PieOfLifeProps> = ({ data, onUpdate }) => {
                   <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
                 ))}
               </Pie>
-              <Tooltip 
-                contentStyle={{ backgroundColor: '#000', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '12px' }}
+              <Tooltip
+                contentStyle={{
+                  backgroundColor: '#000',
+                  border: '1px solid rgba(255,255,255,0.1)',
+                  borderRadius: '12px',
+                }}
                 itemStyle={{ color: '#fff' }}
               />
             </PieChart>
@@ -83,7 +97,10 @@ export const PieOfLife: React.FC<PieOfLifeProps> = ({ data, onUpdate }) => {
         {data.map((item, i) => (
           <div key={i} className="p-4 rounded-2xl bg-white/5 border border-white/5 space-y-3">
             <div className="flex items-center gap-2">
-              <div className="w-2 h-2 rounded-full" style={{ backgroundColor: COLORS[i % COLORS.length] }} />
+              <div
+                className="w-2 h-2 rounded-full"
+                style={{ backgroundColor: COLORS[i % COLORS.length] }}
+              />
               <span className="text-xs font-bold">{item.category}</span>
             </div>
             <div className="space-y-4">
@@ -92,10 +109,10 @@ export const PieOfLife: React.FC<PieOfLifeProps> = ({ data, onUpdate }) => {
                   <span>Current</span>
                   <span>{item.current}%</span>
                 </div>
-                <input 
-                  type="range" 
-                  min="0" 
-                  max="100" 
+                <input
+                  type="range"
+                  min="0"
+                  max="100"
                   value={item.current}
                   onChange={(e) => handleValueChange(i, 'current', parseInt(e.target.value))}
                   className="w-full accent-white/20"
@@ -106,10 +123,10 @@ export const PieOfLife: React.FC<PieOfLifeProps> = ({ data, onUpdate }) => {
                   <span>Target</span>
                   <span>{item.target}%</span>
                 </div>
-                <input 
-                  type="range" 
-                  min="0" 
-                  max="100" 
+                <input
+                  type="range"
+                  min="0"
+                  max="100"
                   value={item.target}
                   onChange={(e) => handleValueChange(i, 'target', parseInt(e.target.value))}
                   className="w-full accent-neon-cyan"

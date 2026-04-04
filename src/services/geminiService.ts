@@ -1,4 +1,4 @@
-import { GoogleGenAI, Type, ThinkingLevel } from "@google/genai";
+import { GoogleGenAI, Type, ThinkingLevel } from '@google/genai';
 import { getGeminiApiKey } from './aiConfig';
 
 // Lazy initialization of Gemini
@@ -8,11 +8,18 @@ const getAI = () => {
   if (!aiInstance) {
     const apiKey = getGeminiApiKey();
     if (!apiKey) {
-      console.error("GeminiService: GEMINI_API_KEY is missing.");
-      throw new Error("GEMINI_API_KEY is not configured in the environment variables. Please check your AI Studio settings.");
+      console.error('GeminiService: GEMINI_API_KEY is missing.');
+      throw new Error(
+        'GEMINI_API_KEY is not configured in the environment variables. Please check your AI Studio settings.'
+      );
     } else {
-      const maskedKey = apiKey.length > 8 ? `${apiKey.substring(0, 4) }...${apiKey.substring(apiKey.length - 4)}` : "****";
-      console.log(`GeminiService: Initializing GoogleGenAI with key: ${maskedKey} (length: ${apiKey.length})`);
+      const maskedKey =
+        apiKey.length > 8
+          ? `${apiKey.substring(0, 4)}...${apiKey.substring(apiKey.length - 4)}`
+          : '****';
+      console.log(
+        `GeminiService: Initializing GoogleGenAI with key: ${maskedKey} (length: ${apiKey.length})`
+      );
     }
     aiInstance = new GoogleGenAI({ apiKey });
   }
@@ -54,20 +61,20 @@ export interface UserData {
 }
 
 export async function generateBrandImage(
-  prompt: string, 
-  base64Image?: string, 
+  prompt: string,
+  base64Image?: string,
   mimeType?: string,
-  size: "512px" | "1K" | "2K" | "4K" = "1K"
+  size: '512px' | '1K' | '2K' | '4K' = '1K'
 ) {
   const ai = getAI();
-  
+
   const parts: any[] = [{ text: prompt }];
   if (base64Image && mimeType) {
     parts.push({
       inlineData: {
         data: base64Image,
-        mimeType: mimeType
-      }
+        mimeType: mimeType,
+      },
     });
   }
 
@@ -77,9 +84,9 @@ export async function generateBrandImage(
       contents: { parts },
       config: {
         imageConfig: {
-          aspectRatio: "1:1",
-          imageSize: size
-        }
+          aspectRatio: '1:1',
+          imageSize: size,
+        },
       },
     });
 
@@ -90,9 +97,9 @@ export async function generateBrandImage(
     }
     return null;
   } catch (error: any) {
-    console.error("Error generating image:", error);
-    if (error.message?.includes("Requested entity was not found")) {
-      throw new Error("API_KEY_RESET");
+    console.error('Error generating image:', error);
+    if (error.message?.includes('Requested entity was not found')) {
+      throw new Error('API_KEY_RESET');
     }
     throw error;
   }
@@ -109,12 +116,12 @@ export async function generateDiscoverySummary(userData: UserData) {
     - Industry: ${userData.onboarding.industry}
     - Current Role/Background: ${userData.onboarding.role}
     - Bio: ${userData.onboarding.bio}
-    - Accomplishments: ${userData.accomplishments.map(a => `${a.title}: ${a.description}`).join("; ")}
+    - Accomplishments: ${userData.accomplishments.map((a) => `${a.title}: ${a.description}`).join('; ')}
     - Perfect Day: ${userData.environment.perfectDay}
-    - Extinguishers (Deal-breakers): ${userData.environment.extinguishers.join(", ")}
-    - Passions/Energizers: ${userData.passions.energizers.join(", ")}
+    - Extinguishers (Deal-breakers): ${userData.environment.extinguishers.join(', ')}
+    - Passions/Energizers: ${userData.passions.energizers.join(', ')}
     - Best-When Conditions: ${userData.passions.bestWhen}
-    - Brand Attributes: ${userData.attributes.join(", ")}
+    - Brand Attributes: ${userData.attributes.join(', ')}
     - Career Tagline: ${userData.tagline}
 
     Output a JSON object with:
@@ -129,13 +136,13 @@ export async function generateDiscoverySummary(userData: UserData) {
   try {
     const ai = getAI();
     const response = await ai.models.generateContent({
-      model: "gemini-3-flash-preview",
+      model: 'gemini-3-flash-preview',
       contents: prompt,
       config: {
-        responseMimeType: "application/json",
+        responseMimeType: 'application/json',
         maxOutputTokens: 16384,
         thinkingConfig: {
-          thinkingLevel: ThinkingLevel.LOW
+          thinkingLevel: ThinkingLevel.LOW,
         },
         responseSchema: {
           type: Type.OBJECT,
@@ -151,21 +158,28 @@ export async function generateDiscoverySummary(userData: UserData) {
                 properties: {
                   title: { type: Type.STRING },
                   description: { type: Type.STRING },
-                  actionLabel: { type: Type.STRING }
+                  actionLabel: { type: Type.STRING },
                 },
-                required: ["title", "description", "actionLabel"]
-              }
+                required: ['title', 'description', 'actionLabel'],
+              },
             },
-            skillsCloud: { type: Type.ARRAY, items: { type: Type.STRING } }
+            skillsCloud: { type: Type.ARRAY, items: { type: Type.STRING } },
           },
-          required: ["brandPortrait", "strengths", "careerClusters", "nextExperiments", "nextSteps", "skillsCloud"]
-        }
-      }
+          required: [
+            'brandPortrait',
+            'strengths',
+            'careerClusters',
+            'nextExperiments',
+            'nextSteps',
+            'skillsCloud',
+          ],
+        },
+      },
     });
 
-    return JSON.parse(response.text || "{}");
+    return JSON.parse(response.text || '{}');
   } catch (error) {
-    console.error("Error generating summary:", error);
+    console.error('Error generating summary:', error);
     return null;
   }
 }
@@ -179,8 +193,8 @@ export async function generateCinematicManifesto(userData: UserData) {
     - Name: ${userData.onboarding.name}
     - Industry: ${userData.onboarding.industry}
     - Bio: ${userData.onboarding.bio}
-    - Accomplishments: ${userData.accomplishments.map(a => `${a.title}: ${a.description}`).join("; ")}
-    - Brand Attributes: ${userData.attributes.join(", ")}
+    - Accomplishments: ${userData.accomplishments.map((a) => `${a.title}: ${a.description}`).join('; ')}
+    - Brand Attributes: ${userData.attributes.join(', ')}
     - Career Tagline: ${userData.tagline}
 
     Generate 3 "Brand Pillars". Each pillar must have:
@@ -194,13 +208,13 @@ export async function generateCinematicManifesto(userData: UserData) {
   try {
     const ai = getAI();
     const response = await ai.models.generateContent({
-      model: "gemini-3-flash-preview",
+      model: 'gemini-3-flash-preview',
       contents: prompt,
       config: {
-        responseMimeType: "application/json",
+        responseMimeType: 'application/json',
         maxOutputTokens: 16384,
         thinkingConfig: {
-          thinkingLevel: ThinkingLevel.LOW
+          thinkingLevel: ThinkingLevel.LOW,
         },
         responseSchema: {
           type: Type.OBJECT,
@@ -212,20 +226,20 @@ export async function generateCinematicManifesto(userData: UserData) {
                 properties: {
                   quote: { type: Type.STRING },
                   tagline: { type: Type.STRING },
-                  visualPrompt: { type: Type.STRING }
+                  visualPrompt: { type: Type.STRING },
                 },
-                required: ["quote", "tagline", "visualPrompt"]
-              }
-            }
+                required: ['quote', 'tagline', 'visualPrompt'],
+              },
+            },
           },
-          required: ["pillars"]
-        }
-      }
+          required: ['pillars'],
+        },
+      },
     });
 
-    return JSON.parse(response.text || "{}");
+    return JSON.parse(response.text || '{}');
   } catch (error) {
-    console.error("Error generating cinematic manifesto:", error);
+    console.error('Error generating cinematic manifesto:', error);
     return null;
   }
 }
@@ -247,7 +261,7 @@ export async function parseResume(fileData: string, mimeType: string) {
 
   try {
     const ai = getAI();
-    
+
     const contents: any[] = [];
     if (mimeType === 'text/plain') {
       contents.push({ text: `Resume Content:\n${fileData}\n\n${prompt}` });
@@ -255,20 +269,20 @@ export async function parseResume(fileData: string, mimeType: string) {
       contents.push({
         inlineData: {
           data: fileData,
-          mimeType: mimeType
-        }
+          mimeType: mimeType,
+        },
       });
       contents.push({ text: prompt });
     }
 
     const response = await ai.models.generateContent({
-      model: "gemini-3-flash-preview",
+      model: 'gemini-3-flash-preview',
       contents,
       config: {
-        responseMimeType: "application/json",
+        responseMimeType: 'application/json',
         maxOutputTokens: 16384,
         thinkingConfig: {
-          thinkingLevel: ThinkingLevel.LOW
+          thinkingLevel: ThinkingLevel.LOW,
         },
         responseSchema: {
           type: Type.OBJECT,
@@ -284,22 +298,22 @@ export async function parseResume(fileData: string, mimeType: string) {
                 type: Type.OBJECT,
                 properties: {
                   title: { type: Type.STRING },
-                  description: { type: Type.STRING }
+                  description: { type: Type.STRING },
                 },
-                required: ["title", "description"]
-              }
+                required: ['title', 'description'],
+              },
             },
             skills: { type: Type.ARRAY, items: { type: Type.STRING } },
-            attributes: { type: Type.ARRAY, items: { type: Type.STRING } }
+            attributes: { type: Type.ARRAY, items: { type: Type.STRING } },
           },
-          required: ["name", "role", "bio", "accomplishments", "skills", "attributes", "industry"]
-        }
-      }
+          required: ['name', 'role', 'bio', 'accomplishments', 'skills', 'attributes', 'industry'],
+        },
+      },
     });
 
-    return JSON.parse(response.text || "{}");
+    return JSON.parse(response.text || '{}');
   } catch (error) {
-    console.error("Error parsing resume:", error);
+    console.error('Error parsing resume:', error);
     return null;
   }
 }

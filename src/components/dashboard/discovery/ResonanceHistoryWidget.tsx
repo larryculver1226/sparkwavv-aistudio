@@ -12,8 +12,12 @@ export const ResonanceHistoryWidget: React.FC<{ history: ResonanceHistory[] }> =
             <Compass className="w-5 h-5 text-neon-cyan" />
           </div>
           <div>
-            <h3 className="text-xl font-display font-bold text-white tracking-tight uppercase">Resonance History</h3>
-            <p className="text-[10px] text-white/40 uppercase tracking-widest font-bold">DNA Evolution Over Time</p>
+            <h3 className="text-xl font-display font-bold text-white tracking-tight uppercase">
+              Resonance History
+            </h3>
+            <p className="text-[10px] text-white/40 uppercase tracking-widest font-bold">
+              DNA Evolution Over Time
+            </p>
           </div>
         </div>
       </div>
@@ -29,23 +33,27 @@ export const ResonanceHistoryWidget: React.FC<{ history: ResonanceHistory[] }> =
           >
             <div className="mb-6">
               <h4 className="text-sm font-bold text-white mb-1">{item.industry}</h4>
-              <p className="text-[10px] text-white/40 uppercase tracking-widest font-bold">Industry Focus</p>
+              <p className="text-[10px] text-white/40 uppercase tracking-widest font-bold">
+                Industry Focus
+              </p>
             </div>
 
             <div className="flex items-end justify-between gap-4">
               <div className="flex-1 flex items-end gap-1 h-12">
                 {item.dataPoints.map((dp, sIdx) => (
                   <div key={sIdx} className="flex-1 flex flex-col items-center gap-1">
-                    <motion.div 
+                    <motion.div
                       initial={{ height: 0 }}
                       animate={{ height: `${dp.score}%` }}
-                      className={`w-full rounded-t-sm ${sIdx === item.dataPoints.length - 1 ? 'bg-neon-cyan' : 'bg-white/10'}`} 
+                      className={`w-full rounded-t-sm ${sIdx === item.dataPoints.length - 1 ? 'bg-neon-cyan' : 'bg-white/10'}`}
                     />
                   </div>
                 ))}
               </div>
               <div className="flex flex-col items-end">
-                <span className="text-2xl font-display font-bold text-white">{Math.round(item.dataPoints[item.dataPoints.length - 1].score)}%</span>
+                <span className="text-2xl font-display font-bold text-white">
+                  {Math.round(item.dataPoints[item.dataPoints.length - 1].score)}%
+                </span>
                 <div className="flex items-center gap-1">
                   <TrendingUp className="w-3 h-3 text-neon-lime" />
                   <span className="text-[10px] font-bold text-neon-lime">+8%</span>

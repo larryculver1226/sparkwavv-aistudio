@@ -19,31 +19,33 @@ export const CinematicReader: React.FC<CinematicReaderProps> = ({ artifact, onCl
         exit={{ opacity: 0 }}
         className="fixed inset-0 z-[200] flex items-center justify-center p-4 md:p-8 bg-black/95 backdrop-blur-2xl"
       >
-          <motion.div
-            initial={{ scale: 0.9, opacity: 0, y: 20 }}
-            animate={{ scale: 1, opacity: 1, y: 0 }}
-            exit={{ scale: 0.9, opacity: 0, y: 20 }}
-            className="relative w-full max-w-5xl max-h-[90vh] overflow-hidden rounded-3xl border border-neon-cyan/30 bg-[#0A0A0A] shadow-[0_0_50px_rgba(0,243,255,0.1)] flex flex-col"
-          >
-            {/* Header */}
-            <div className="p-6 border-b border-white/5 bg-gradient-to-r from-[#1A1A1A] to-[#0A0A0A] flex items-center justify-between">
-              <div className="flex items-center gap-4">
-                <div className="w-12 h-12 rounded-xl bg-neon-cyan/10 flex items-center justify-center text-neon-cyan border border-neon-cyan/20">
-                  <Sparkles className="w-6 h-6" />
-                </div>
-                <div>
-                  <h2 className="text-xl font-display font-bold text-white tracking-tight italic">{artifact.title}</h2>
-                  <div className="flex items-center gap-3 mt-1">
-                    <span className="text-[10px] font-mono text-neon-cyan uppercase tracking-widest bg-neon-cyan/10 px-2 py-0.5 rounded border border-neon-cyan/20">
-                      {artifact.type.replace('-', ' ')}
-                    </span>
-                    <div className="flex items-center gap-1 text-[10px] text-white/40 font-mono">
-                      <Clock className="w-3 h-3" />
-                      {new Date(artifact.timestamp).toLocaleDateString()}
-                    </div>
+        <motion.div
+          initial={{ scale: 0.9, opacity: 0, y: 20 }}
+          animate={{ scale: 1, opacity: 1, y: 0 }}
+          exit={{ scale: 0.9, opacity: 0, y: 20 }}
+          className="relative w-full max-w-5xl max-h-[90vh] overflow-hidden rounded-3xl border border-neon-cyan/30 bg-[#0A0A0A] shadow-[0_0_50px_rgba(0,243,255,0.1)] flex flex-col"
+        >
+          {/* Header */}
+          <div className="p-6 border-b border-white/5 bg-gradient-to-r from-[#1A1A1A] to-[#0A0A0A] flex items-center justify-between">
+            <div className="flex items-center gap-4">
+              <div className="w-12 h-12 rounded-xl bg-neon-cyan/10 flex items-center justify-center text-neon-cyan border border-neon-cyan/20">
+                <Sparkles className="w-6 h-6" />
+              </div>
+              <div>
+                <h2 className="text-xl font-display font-bold text-white tracking-tight italic">
+                  {artifact.title}
+                </h2>
+                <div className="flex items-center gap-3 mt-1">
+                  <span className="text-[10px] font-mono text-neon-cyan uppercase tracking-widest bg-neon-cyan/10 px-2 py-0.5 rounded border border-neon-cyan/20">
+                    {artifact.type.replace('-', ' ')}
+                  </span>
+                  <div className="flex items-center gap-1 text-[10px] text-white/40 font-mono">
+                    <Clock className="w-3 h-3" />
+                    {new Date(artifact.timestamp).toLocaleDateString()}
                   </div>
                 </div>
               </div>
+            </div>
             <button
               onClick={onClose}
               className="p-2 rounded-full hover:bg-white/5 text-white/40 hover:text-white transition-all"
@@ -93,7 +95,7 @@ export const CinematicReader: React.FC<CinematicReaderProps> = ({ artifact, onCl
                         </p>
                       </blockquote>
                     )}
-                    
+
                     {artifact.content.tagline && (
                       <p className="text-sm uppercase tracking-[0.3em] text-neon-cyan font-black">
                         {artifact.content.tagline}
@@ -108,11 +110,14 @@ export const CinematicReader: React.FC<CinematicReaderProps> = ({ artifact, onCl
 
                     {/* Render other structured content as needed */}
                     {Object.entries(artifact.content).map(([key, value]) => {
-                      if (['imageUrl', 'quote', 'tagline', 'description'].includes(key)) return null;
+                      if (['imageUrl', 'quote', 'tagline', 'description'].includes(key))
+                        return null;
                       if (typeof value === 'string') {
                         return (
                           <div key={key} className="space-y-2">
-                            <h4 className="text-[10px] font-black text-neon-cyan uppercase tracking-widest">{key}</h4>
+                            <h4 className="text-[10px] font-black text-neon-cyan uppercase tracking-widest">
+                              {key}
+                            </h4>
                             <p className="text-white/70">{value}</p>
                           </div>
                         );

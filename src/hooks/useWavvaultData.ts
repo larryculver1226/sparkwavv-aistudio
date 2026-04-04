@@ -27,7 +27,7 @@ export const useWavvaultData = () => {
         setEvents(eventData);
       },
       (err) => {
-        setError("Failed to load journey events.");
+        setError('Failed to load journey events.');
       }
     );
 
@@ -38,7 +38,7 @@ export const useWavvaultData = () => {
         setLoading(false);
       },
       (err) => {
-        setError("Failed to load distilled artifacts.");
+        setError('Failed to load distilled artifacts.');
         setLoading(false);
       }
     );
@@ -54,6 +54,6 @@ export const useWavvaultData = () => {
     artifacts,
     loading,
     error,
-    userId: user?.uid || ''
+    userId: user?.uid || '',
   };
 };

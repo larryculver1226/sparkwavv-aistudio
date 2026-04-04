@@ -18,7 +18,11 @@ export default async function handler(req: any, res: any) {
   try {
     // In a real implementation, we'd get tenantId from session/auth
     const tenantId = req.headers['x-tenant-id'] || 'sparkwavv';
-    const result = await searchSimilarWavvaults(q, tenantId as string, limit ? parseInt(limit as string) : 5);
+    const result = await searchSimilarWavvaults(
+      q,
+      tenantId as string,
+      limit ? parseInt(limit as string) : 5
+    );
     return res.status(200).json(result);
   } catch (error: any) {
     return res.status(500).json({ error: error.message });

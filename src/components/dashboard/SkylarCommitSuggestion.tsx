@@ -9,7 +9,12 @@ interface SkylarCommitSuggestionProps {
   onDismiss: () => void;
 }
 
-const SkylarCommitSuggestion: React.FC<SkylarCommitSuggestionProps> = ({ show, reason, onCommit, onDismiss }) => {
+const SkylarCommitSuggestion: React.FC<SkylarCommitSuggestionProps> = ({
+  show,
+  reason,
+  onCommit,
+  onDismiss,
+}) => {
   return (
     <AnimatePresence>
       {show && (
@@ -22,8 +27,8 @@ const SkylarCommitSuggestion: React.FC<SkylarCommitSuggestionProps> = ({ show, r
           <div className="bg-white/10 backdrop-blur-2xl border border-white/20 rounded-3xl p-6 shadow-2xl overflow-hidden relative group">
             {/* Animated Background Glow */}
             <div className="absolute -top-24 -right-24 w-48 h-48 bg-green-400/20 blur-[60px] group-hover:bg-green-400/30 transition-colors duration-500" />
-            
-            <button 
+
+            <button
               onClick={onDismiss}
               className="absolute top-4 right-4 p-1 rounded-full hover:bg-white/10 transition-colors opacity-50 hover:opacity-100"
             >
@@ -34,13 +39,11 @@ const SkylarCommitSuggestion: React.FC<SkylarCommitSuggestionProps> = ({ show, r
               <div className="w-12 h-12 rounded-2xl bg-green-400/20 flex items-center justify-center shrink-0">
                 <Sparkles className="w-6 h-6 text-green-400" />
               </div>
-              
+
               <div className="space-y-2">
                 <h4 className="text-lg font-bold text-white tracking-tight">Skylar Insight</h4>
-                <p className="text-sm text-white/70 leading-relaxed">
-                  {reason}
-                </p>
-                
+                <p className="text-sm text-white/70 leading-relaxed">{reason}</p>
+
                 <div className="pt-4 flex items-center gap-3">
                   <button
                     onClick={onCommit}

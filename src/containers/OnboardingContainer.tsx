@@ -19,14 +19,14 @@ export function OnboardingContainer({ onBackToHome, onSuccess }: OnboardingConta
   const handleSignup = async (email: string, pass: string, name: string) => {
     try {
       await signUp(email, pass, name);
-      onSuccess("Account created! Please check your email for verification.");
+      onSuccess('Account created! Please check your email for verification.');
     } catch (err) {
       // Error is handled by useAuthActions
     }
   };
 
   return (
-    <motion.div 
+    <motion.div
       key="onboarding"
       initial={{ opacity: 0, scale: 0.95 }}
       animate={{ opacity: 1, scale: 1 }}
@@ -38,29 +38,31 @@ export function OnboardingContainer({ onBackToHome, onSuccess }: OnboardingConta
           <Rocket className="w-8 h-8 text-neon-cyan" />
         </div>
         <h2 className="text-4xl font-bold">Ready to Dive-In?</h2>
-        <p className="text-white/60">Join SPARKWavv and start building your cinematic career identity.</p>
+        <p className="text-white/60">
+          Join SPARKWavv and start building your cinematic career identity.
+        </p>
       </header>
 
       <div className="glass-panel p-8 space-y-6 text-center">
         {!showEmailSignup ? (
-          <SocialAuth 
+          <SocialAuth
             onGoogleLogin={loginWithPopup}
             onEmailSignup={() => setShowEmailSignup(true)}
             loading={loading}
           />
         ) : (
-          <SignupForm 
+          <SignupForm
             onSubmit={handleSignup}
             onCancel={() => setShowEmailSignup(false)}
             loading={loading}
             error={error}
           />
         )}
-        
+
         {!showEmailSignup && (
           <p className="text-white/40 text-xs mt-6">
             Already have an account?{' '}
-            <button 
+            <button
               onClick={() => navigate('/login')}
               className="text-neon-cyan hover:underline font-bold"
             >
@@ -69,7 +71,7 @@ export function OnboardingContainer({ onBackToHome, onSuccess }: OnboardingConta
           </p>
         )}
 
-        <button 
+        <button
           onClick={onBackToHome}
           className="mt-4 text-white/40 hover:text-white transition-colors text-sm uppercase tracking-widest font-bold"
         >

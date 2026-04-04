@@ -9,8 +9,12 @@ interface PartnerSelectionModalProps {
   onSelect: (tenantId: string) => void;
 }
 
-export const PartnerSelectionModal: React.FC<PartnerSelectionModalProps> = ({ isOpen, onClose, onSelect }) => {
-  const partners = TENANTS.filter(t => t.id !== 'sparkwavv');
+export const PartnerSelectionModal: React.FC<PartnerSelectionModalProps> = ({
+  isOpen,
+  onClose,
+  onSelect,
+}) => {
+  const partners = TENANTS.filter((t) => t.id !== 'sparkwavv');
 
   return (
     <AnimatePresence>
@@ -32,9 +36,11 @@ export const PartnerSelectionModal: React.FC<PartnerSelectionModalProps> = ({ is
             <div className="p-8 border-b border-white/5 flex items-center justify-between">
               <div>
                 <h2 className="text-2xl font-display font-bold text-white">Find an RPP Partner</h2>
-                <p className="text-zinc-400 text-sm mt-1">Connect with a certified Role-Playing Partner organization.</p>
+                <p className="text-zinc-400 text-sm mt-1">
+                  Connect with a certified Role-Playing Partner organization.
+                </p>
               </div>
-              <button 
+              <button
                 onClick={onClose}
                 className="p-2 hover:bg-white/5 rounded-full transition-colors"
               >
@@ -52,14 +58,24 @@ export const PartnerSelectionModal: React.FC<PartnerSelectionModalProps> = ({ is
                   >
                     <div className="w-16 h-16 bg-black/40 rounded-xl flex items-center justify-center border border-white/5 overflow-hidden">
                       {partner.logoUrl ? (
-                        <img src={partner.logoUrl} alt={partner.name} className="w-full h-full object-contain p-2" referrerPolicy="no-referrer" />
+                        <img
+                          src={partner.logoUrl}
+                          alt={partner.name}
+                          className="w-full h-full object-contain p-2"
+                          referrerPolicy="no-referrer"
+                        />
                       ) : (
                         <Shield className="w-8 h-8 text-zinc-600" />
                       )}
                     </div>
                     <div className="flex-1">
-                      <h3 className="text-lg font-bold text-white group-hover:text-neon-cyan transition-colors">{partner.name}</h3>
-                      <p className="text-sm text-zinc-400 mt-1 line-clamp-2">Certified Sparkwavv Partner providing expert RPP coaching and DNA synthesis support.</p>
+                      <h3 className="text-lg font-bold text-white group-hover:text-neon-cyan transition-colors">
+                        {partner.name}
+                      </h3>
+                      <p className="text-sm text-zinc-400 mt-1 line-clamp-2">
+                        Certified Sparkwavv Partner providing expert RPP coaching and DNA synthesis
+                        support.
+                      </p>
                     </div>
                     <ArrowRight className="w-5 h-5 text-zinc-600 group-hover:text-neon-cyan group-hover:translate-x-1 transition-all" />
                   </button>
@@ -74,7 +90,10 @@ export const PartnerSelectionModal: React.FC<PartnerSelectionModalProps> = ({ is
                   <div>
                     <h4 className="text-sm font-bold text-white">Partner Permissions</h4>
                     <p className="text-xs text-zinc-400 mt-1 leading-relaxed">
-                      By connecting with a partner, you grant them <span className="text-white font-medium">Read-Only</span> access to your journey. You can optionally authorize them to propose DNA shifts and milestones later.
+                      By connecting with a partner, you grant them{' '}
+                      <span className="text-white font-medium">Read-Only</span> access to your
+                      journey. You can optionally authorize them to propose DNA shifts and
+                      milestones later.
                     </p>
                   </div>
                 </div>
@@ -82,7 +101,7 @@ export const PartnerSelectionModal: React.FC<PartnerSelectionModalProps> = ({ is
             </div>
 
             <div className="p-8 bg-black/40 border-t border-white/5 flex justify-end gap-4">
-              <button 
+              <button
                 onClick={onClose}
                 className="px-6 py-2 text-sm font-bold text-zinc-400 hover:text-white transition-colors"
               >

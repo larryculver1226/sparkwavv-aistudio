@@ -1,15 +1,15 @@
 import { db } from '../lib/firebase';
-import { 
-  collection, 
-  doc, 
-  setDoc, 
-  getDoc, 
-  updateDoc, 
-  query, 
-  where, 
+import {
+  collection,
+  doc,
+  setDoc,
+  getDoc,
+  updateDoc,
+  query,
+  where,
   getDocs,
   Timestamp,
-  serverTimestamp
+  serverTimestamp,
 } from 'firebase/firestore';
 
 export interface PrivacySettings {
@@ -38,12 +38,16 @@ export const PrivacyService = {
   async updateSettings(userId: string, settings: Partial<PrivacySettings>): Promise<void> {
     try {
       const docRef = doc(db, 'privacy_settings', userId);
-      await setDoc(docRef, {
-        ...settings,
-        userId,
-        lastUpdated: serverTimestamp(),
-        version: (settings.version || 0) + 1
-      }, { merge: true });
+      await setDoc(
+        docRef,
+        {
+          ...settings,
+          userId,
+          lastUpdated: serverTimestamp(),
+          version: (settings.version || 0) + 1,
+        },
+        { merge: true }
+      );
     } catch (error) {
       console.error('Error updating privacy settings:', error);
       throw error;
@@ -58,10 +62,10 @@ export const PrivacyService = {
       userId,
       encryptionEnabled: false,
       lastUpdated: serverTimestamp(),
-      version: 1
+      version: 1,
     };
 
     await this.updateSettings(userId, initial);
     return initial;
-  }
+  },
 };

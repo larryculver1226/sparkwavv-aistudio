@@ -169,12 +169,12 @@ export class VertexService {
     // 1. Export Firestore data to GCS
     // 2. Create an Index and IndexEndpoint
     // 3. Deploy the Index to the Endpoint
-    
+
     return {
       id: `vector-index-${Date.now()}`,
       status: 'INITIALIZING',
       progress: 0,
-      estimatedCompletion: '2-4 hours'
+      estimatedCompletion: '2-4 hours',
     };
   }
 
@@ -221,7 +221,7 @@ export class VertexService {
 
     // Try to get bucket from env, then from firebase config, then fallback to project-id-fine-tuning
     let bucketName = process.env.VERTEX_AI_FINE_TUNING_BUCKET;
-    
+
     if (!bucketName) {
       try {
         const configPath = './firebase-applet-config.json';
@@ -252,12 +252,12 @@ export class VertexService {
           });
         } catch (createError: any) {
           console.error(`[VERTEX] Failed to create bucket ${bucketName}:`, createError.message);
-          
+
           if (createError.message.includes('storage.buckets.create')) {
             throw new Error(
               `Permission denied: The service account lacks 'storage.buckets.create' access. ` +
-              `Please manually create a bucket named '${bucketName}' in the Google Cloud Console, ` +
-              `or set the VERTEX_AI_FINE_TUNING_BUCKET environment variable to an existing bucket you have access to.`
+                `Please manually create a bucket named '${bucketName}' in the Google Cloud Console, ` +
+                `or set the VERTEX_AI_FINE_TUNING_BUCKET environment variable to an existing bucket you have access to.`
             );
           }
           throw createError;
@@ -282,16 +282,16 @@ export class VertexService {
   async createTuningJob(gcsUri: string, modelName: string = 'gemini-1.5-flash-002') {
     const vertexAI = getVertexAI();
     console.log(`[VERTEX] Creating tuning job for ${modelName} using data from ${gcsUri}`);
-    
+
     // In a real implementation, this would call the Vertex AI Tuning API
     // return await vertexAI.tuningJobs.create({ ... });
-    
+
     return {
       id: `tuning-job-${Date.now()}`,
       state: 'PENDING',
       createTime: new Date().toISOString(),
       model: modelName,
-      dataset: gcsUri
+      dataset: gcsUri,
     };
   }
 }

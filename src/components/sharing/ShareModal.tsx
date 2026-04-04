@@ -1,13 +1,13 @@
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { 
-  X, 
-  ShieldCheck, 
-  Calendar, 
-  Eye, 
-  Link as LinkIcon, 
-  Copy, 
-  CheckCircle2, 
+import {
+  X,
+  ShieldCheck,
+  Calendar,
+  Eye,
+  Link as LinkIcon,
+  Copy,
+  CheckCircle2,
   Loader2,
   Lock,
   Share2,
@@ -16,7 +16,7 @@ import {
   Clock,
   Zap,
   FileText,
-  Layout
+  Layout,
 } from 'lucide-react';
 import { createShare } from '../../services/assetEngineService';
 import { SynthesizedAsset } from '../../types/wavvault';
@@ -30,7 +30,7 @@ const ShareModal: React.FC<ShareModalProps> = ({ asset, onClose }) => {
   const [isCreating, setIsCreating] = useState(false);
   const [shareLink, setShareLink] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
-  
+
   const [expiryDays, setExpiryDays] = useState(7);
   const [maxViews, setMaxViews] = useState(10);
   const [requireAccessKey, setRequireAccessKey] = useState(true);
@@ -51,7 +51,7 @@ const ShareModal: React.FC<ShareModalProps> = ({ asset, onClose }) => {
       const fullLink = `${window.location.origin}/share/${shareId}?key=${accessKey}`;
       setShareLink(fullLink);
     } catch (err) {
-      console.error("Failed to create share:", err);
+      console.error('Failed to create share:', err);
     } finally {
       setIsCreating(false);
     }
@@ -67,14 +67,14 @@ const ShareModal: React.FC<ShareModalProps> = ({ asset, onClose }) => {
 
   return (
     <div className="fixed inset-0 z-[200] flex items-center justify-center p-4">
-      <motion.div 
+      <motion.div
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         exit={{ opacity: 0 }}
         onClick={onClose}
         className="absolute inset-0 bg-black/80 backdrop-blur-xl"
       />
-      
+
       <motion.div
         initial={{ opacity: 0, scale: 0.9, y: 20 }}
         animate={{ opacity: 1, scale: 1, y: 0 }}
@@ -88,13 +88,15 @@ const ShareModal: React.FC<ShareModalProps> = ({ asset, onClose }) => {
                 <Share2 className="w-6 h-6" />
               </div>
               <div>
-                <h3 className="text-xl font-bold text-white tracking-tight">Secure Asset Sharing</h3>
+                <h3 className="text-xl font-bold text-white tracking-tight">
+                  Secure Asset Sharing
+                </h3>
                 <p className="text-xs text-white/40 uppercase tracking-widest font-mono mt-1">
                   [STATUS: ENCRYPTED_CHANNEL]
                 </p>
               </div>
             </div>
-            <button 
+            <button
               onClick={onClose}
               className="p-2 rounded-full hover:bg-white/10 transition-colors opacity-50 hover:opacity-100"
             >
@@ -105,12 +107,20 @@ const ShareModal: React.FC<ShareModalProps> = ({ asset, onClose }) => {
           {!shareLink ? (
             <div className="space-y-6">
               <div className="p-4 rounded-2xl bg-white/5 border border-white/10 flex items-center gap-4">
-                <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${asset.type === 'resume' ? 'bg-green-400/10 text-green-400' : 'bg-blue-400/10 text-blue-400'}`}>
-                  {asset.type === 'resume' ? <FileText className="w-5 h-5" /> : <Layout className="w-5 h-5" />}
+                <div
+                  className={`w-10 h-10 rounded-xl flex items-center justify-center ${asset.type === 'resume' ? 'bg-green-400/10 text-green-400' : 'bg-blue-400/10 text-blue-400'}`}
+                >
+                  {asset.type === 'resume' ? (
+                    <FileText className="w-5 h-5" />
+                  ) : (
+                    <Layout className="w-5 h-5" />
+                  )}
                 </div>
                 <div>
                   <h4 className="text-sm font-bold text-white">{asset.title}</h4>
-                  <p className="text-[10px] text-white/40 uppercase tracking-widest">v1.0 // LOCKED_ARTIFACT</p>
+                  <p className="text-[10px] text-white/40 uppercase tracking-widest">
+                    v1.0 // LOCKED_ARTIFACT
+                  </p>
                 </div>
               </div>
 
@@ -120,7 +130,7 @@ const ShareModal: React.FC<ShareModalProps> = ({ asset, onClose }) => {
                     <Clock className="w-3 h-3" />
                     Access Expiry
                   </label>
-                  <select 
+                  <select
                     value={expiryDays}
                     onChange={(e) => setExpiryDays(Number(e.target.value))}
                     className="w-full bg-black/40 border border-white/10 rounded-xl px-4 py-2 text-sm text-white focus:border-neon-cyan outline-none transition-colors"
@@ -136,7 +146,7 @@ const ShareModal: React.FC<ShareModalProps> = ({ asset, onClose }) => {
                     <Eye className="w-3 h-3" />
                     View Limit
                   </label>
-                  <select 
+                  <select
                     value={maxViews}
                     onChange={(e) => setMaxViews(Number(e.target.value))}
                     className="w-full bg-black/40 border border-white/10 rounded-xl px-4 py-2 text-sm text-white focus:border-neon-cyan outline-none transition-colors"
@@ -155,15 +165,18 @@ const ShareModal: React.FC<ShareModalProps> = ({ asset, onClose }) => {
                     <ShieldCheck className="w-5 h-5 text-neon-cyan" />
                     <span className="text-sm font-bold text-white">Access Key Required</span>
                   </div>
-                  <div 
+                  <div
                     onClick={() => setRequireAccessKey(!requireAccessKey)}
                     className={`w-12 h-6 rounded-full p-1 cursor-pointer transition-colors ${requireAccessKey ? 'bg-neon-cyan' : 'bg-white/10'}`}
                   >
-                    <div className={`w-4 h-4 rounded-full bg-white transition-transform ${requireAccessKey ? 'translate-x-6' : 'translate-x-0'}`} />
+                    <div
+                      className={`w-4 h-4 rounded-full bg-white transition-transform ${requireAccessKey ? 'translate-x-6' : 'translate-x-0'}`}
+                    />
                   </div>
                 </div>
                 <p className="text-[10px] text-white/40 leading-relaxed italic">
-                  "Enabling an access key ensures that only recipients with the unique token can decrypt and view your professional DNA."
+                  "Enabling an access key ensures that only recipients with the unique token can
+                  decrypt and view your professional DNA."
                 </p>
               </div>
 
@@ -181,7 +194,7 @@ const ShareModal: React.FC<ShareModalProps> = ({ asset, onClose }) => {
               </button>
             </div>
           ) : (
-            <motion.div 
+            <motion.div
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               className="space-y-8 text-center"
@@ -190,7 +203,7 @@ const ShareModal: React.FC<ShareModalProps> = ({ asset, onClose }) => {
                 <CheckCircle2 className="w-10 h-10 text-green-400" />
                 <div className="absolute inset-0 border-2 border-green-400/20 rounded-full animate-ping" />
               </div>
-              
+
               <div className="space-y-2">
                 <h4 className="text-2xl font-bold text-white">Share Link Generated</h4>
                 <p className="text-sm text-white/40 max-w-xs mx-auto">
@@ -215,11 +228,15 @@ const ShareModal: React.FC<ShareModalProps> = ({ asset, onClose }) => {
 
               <div className="pt-4 grid grid-cols-2 gap-4">
                 <div className="p-4 rounded-2xl bg-white/5 border border-white/10 text-center space-y-1">
-                  <p className="text-[10px] text-white/40 uppercase font-bold tracking-widest">Expires In</p>
+                  <p className="text-[10px] text-white/40 uppercase font-bold tracking-widest">
+                    Expires In
+                  </p>
                   <p className="text-sm font-bold text-white">{expiryDays} Days</p>
                 </div>
                 <div className="p-4 rounded-2xl bg-white/5 border border-white/10 text-center space-y-1">
-                  <p className="text-[10px] text-white/40 uppercase font-bold tracking-widest">View Limit</p>
+                  <p className="text-[10px] text-white/40 uppercase font-bold tracking-widest">
+                    View Limit
+                  </p>
                   <p className="text-sm font-bold text-white">{maxViews} Views</p>
                 </div>
               </div>

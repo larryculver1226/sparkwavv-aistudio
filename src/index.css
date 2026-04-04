@@ -1,4 +1,4 @@
-@import "tailwindcss";
+@import 'tailwindcss';
 
 @layer utilities {
   .no-scrollbar::-webkit-scrollbar {
@@ -11,14 +11,14 @@
 }
 
 @theme {
-  --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
-  --font-display: "Space Grotesk", sans-serif;
+  --font-sans: 'Inter', ui-sans-serif, system-ui, sans-serif;
+  --font-display: 'Space Grotesk', sans-serif;
   --color-neon-cyan: #00f3ff;
   --color-neon-magenta: #ff00ff;
   --color-neon-lime: #ccff00;
   --color-dark-bg: #0a0a0c;
   --color-dark-surface: #16161e;
-  
+
   /* Yin Theme Colors */
   --color-yin-bg: #f8f9fa;
   --color-yin-surface: #ffffff;
@@ -35,7 +35,10 @@
     @apply bg-yin-bg text-yin-text;
   }
 
-  h1, h2, h3, h4 {
+  h1,
+  h2,
+  h3,
+  h4 {
     @apply font-display tracking-tight;
   }
 }
@@ -72,9 +75,15 @@
 }
 
 @keyframes shimmer {
-  0% { transform: translateX(-150%); }
-  50% { transform: translateX(150%); }
-  100% { transform: translateX(150%); }
+  0% {
+    transform: translateX(-150%);
+  }
+  50% {
+    transform: translateX(150%);
+  }
+  100% {
+    transform: translateX(150%);
+  }
 }
 
 .animate-shimmer {
@@ -86,7 +95,7 @@
 }
 
 .atmosphere {
-  background: 
+  background:
     radial-gradient(circle at 50% 30%, rgba(58, 21, 16, 0.4) 0%, transparent 60%),
     radial-gradient(circle at 10% 80%, rgba(0, 243, 255, 0.15) 0%, transparent 50%),
     radial-gradient(circle at 90% 10%, rgba(255, 0, 255, 0.1) 0%, transparent 40%);

@@ -1,80 +1,90 @@
 import React from 'react';
 import { motion } from 'motion/react';
-import { 
-  BookOpen, 
-  HelpCircle, 
-  FileText, 
-  ChevronRight, 
+import {
+  BookOpen,
+  HelpCircle,
+  FileText,
+  ChevronRight,
   Search,
   Zap,
   ShieldCheck,
   Target,
   Users,
-  MessageSquare
+  MessageSquare,
 } from 'lucide-react';
 
 export const Documentation: React.FC = () => {
   const faqs = [
     {
-      question: "What is SPARKWavv?",
-      answer: "SPARKWavv is an AI-powered career engine designed to transform your professional history into market dominance through a structured, 12-week journey. It combines advanced AI synthesis with proven strategic coaching methodologies."
+      question: 'What is SPARKWavv?',
+      answer:
+        'SPARKWavv is an AI-powered career engine designed to transform your professional history into market dominance through a structured, 12-week journey. It combines advanced AI synthesis with proven strategic coaching methodologies.',
     },
     {
-      question: "Who is Skylar?",
-      answer: "Skylar is your AI Career Partner, a sophisticated AI coach trained in strategic methodologies (like Lobkowicz and Feynman) to guide you through your career evolution. Skylar helps you extract your 'Career DNA' and validates your progress at every step."
+      question: 'Who is Skylar?',
+      answer:
+        "Skylar is your AI Career Partner, a sophisticated AI coach trained in strategic methodologies (like Lobkowicz and Feynman) to guide you through your career evolution. Skylar helps you extract your 'Career DNA' and validates your progress at every step.",
     },
     {
-      question: "What is the Wavvault?",
-      answer: "The Wavvault is a secure, encrypted data vault where your professional history, accomplishments, and career DNA are stored and synthesized. It serves as the 'source of truth' for your professional identity."
+      question: 'What is the Wavvault?',
+      answer:
+        "The Wavvault is a secure, encrypted data vault where your professional history, accomplishments, and career DNA are stored and synthesized. It serves as the 'source of truth' for your professional identity.",
     },
     {
-      question: "How long does the program take?",
-      answer: "The core SPARKWavv journey is designed as a 12-week intensive process, divided into five key phases: Dive-In, Ignition, Discovery, Branding, and Outreach. Each phase builds upon the last to ensure a comprehensive career transformation."
+      question: 'How long does the program take?',
+      answer:
+        'The core SPARKWavv journey is designed as a 12-week intensive process, divided into five key phases: Dive-In, Ignition, Discovery, Branding, and Outreach. Each phase builds upon the last to ensure a comprehensive career transformation.',
     },
     {
-      question: "Is my data secure?",
-      answer: "Yes. We use industry-standard encryption and the Wavvault architecture to ensure your personal and professional data remains private and under your control. Your data is anonymized when used for collective insights."
-    }
+      question: 'Is my data secure?',
+      answer:
+        'Yes. We use industry-standard encryption and the Wavvault architecture to ensure your personal and professional data remains private and under your control. Your data is anonymized when used for collective insights.',
+    },
   ];
 
   const docOutline = [
     {
-      title: "Getting Started Guide",
-      description: "Account setup, initial 'Dive-In' phase, and connecting with Skylar for the first time.",
-      icon: <Zap className="w-5 h-5 text-neon-cyan" />
+      title: 'Getting Started Guide',
+      description:
+        "Account setup, initial 'Dive-In' phase, and connecting with Skylar for the first time.",
+      icon: <Zap className="w-5 h-5 text-neon-cyan" />,
     },
     {
-      title: "The 5-Phase Methodology",
-      description: "Detailed breakdown of Dive-In, Ignition, Discovery, Branding, and Outreach phases and their 'Validation Gates'.",
-      icon: <Target className="w-5 h-5 text-neon-magenta" />
+      title: 'The 5-Phase Methodology',
+      description:
+        "Detailed breakdown of Dive-In, Ignition, Discovery, Branding, and Outreach phases and their 'Validation Gates'.",
+      icon: <Target className="w-5 h-5 text-neon-magenta" />,
     },
     {
-      title: "Working with Skylar",
-      description: "How to provide high-impact stories for DNA synthesis and switching between coaching methodologies.",
-      icon: <MessageSquare className="w-5 h-5 text-neon-lime" />
+      title: 'Working with Skylar',
+      description:
+        'How to provide high-impact stories for DNA synthesis and switching between coaching methodologies.',
+      icon: <MessageSquare className="w-5 h-5 text-neon-lime" />,
     },
     {
-      title: "The Wavvault & Data Privacy",
-      description: "Understanding how your data is stored, used, and how to export your career DNA.",
-      icon: <ShieldCheck className="w-5 h-5 text-neon-cyan" />
+      title: 'The Wavvault & Data Privacy',
+      description:
+        'Understanding how your data is stored, used, and how to export your career DNA.',
+      icon: <ShieldCheck className="w-5 h-5 text-neon-cyan" />,
     },
     {
-      title: "Market Intelligence Grid (MIG)",
-      description: "How to interpret real-time market data and align your brand with current market demand.",
-      icon: <Search className="w-5 h-5 text-neon-magenta" />
+      title: 'Market Intelligence Grid (MIG)',
+      description:
+        'How to interpret real-time market data and align your brand with current market demand.',
+      icon: <Search className="w-5 h-5 text-neon-magenta" />,
     },
     {
-      title: "Partner Program Guide",
-      description: "For coaches and mentors using the SPARKWavv platform with their clients.",
-      icon: <Users className="w-5 h-5 text-neon-lime" />
-    }
+      title: 'Partner Program Guide',
+      description: 'For coaches and mentors using the SPARKWavv platform with their clients.',
+      icon: <Users className="w-5 h-5 text-neon-lime" />,
+    },
   ];
 
   return (
     <div className="max-w-7xl mx-auto px-6 py-24 space-y-24">
       {/* Header */}
       <header className="text-center space-y-6">
-        <motion.div 
+        <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-neon-cyan/10 border border-neon-cyan/20 text-neon-cyan text-sm font-medium"
@@ -82,7 +92,7 @@ export const Documentation: React.FC = () => {
           <BookOpen className="w-4 h-4" />
           <span>Documentation Center</span>
         </motion.div>
-        <motion.h1 
+        <motion.h1
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.1 }}
@@ -90,13 +100,14 @@ export const Documentation: React.FC = () => {
         >
           Master the <span className="text-neon-cyan italic">Engine</span>
         </motion.h1>
-        <motion.p 
+        <motion.p
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.2 }}
           className="text-xl text-white/60 max-w-2xl mx-auto leading-relaxed"
         >
-          Everything you need to know about navigating your career journey with SPARKWavv and Skylar.
+          Everything you need to know about navigating your career journey with SPARKWavv and
+          Skylar.
         </motion.p>
       </header>
 
@@ -107,7 +118,9 @@ export const Documentation: React.FC = () => {
             <HelpCircle className="w-6 h-6 text-neon-cyan" />
           </div>
           <div>
-            <h2 className="text-3xl font-display font-bold text-white">Frequently Asked Questions</h2>
+            <h2 className="text-3xl font-display font-bold text-white">
+              Frequently Asked Questions
+            </h2>
             <p className="text-white/40">Quick answers to common questions about the platform.</p>
           </div>
         </div>
@@ -125,9 +138,7 @@ export const Documentation: React.FC = () => {
               <h3 className="text-lg font-bold text-white group-hover:text-neon-cyan transition-colors">
                 {faq.question}
               </h3>
-              <p className="text-white/60 leading-relaxed text-sm">
-                {faq.answer}
-              </p>
+              <p className="text-white/60 leading-relaxed text-sm">{faq.answer}</p>
             </motion.div>
           ))}
         </div>

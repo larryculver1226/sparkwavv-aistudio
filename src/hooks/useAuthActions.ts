@@ -25,7 +25,8 @@ export function useAuthActions() {
     setError,
     login: (email: string, pass: string) => handleAction(() => login(email, pass)),
     loginWithPopup: () => handleAction(() => loginWithPopup()),
-    signUp: (email: string, pass: string, name: string) => handleAction(() => signUpWithEmail(email, pass, name)),
-    logout: () => handleAction(() => logout())
+    signUp: (email: string, pass: string, name: string) =>
+      handleAction(() => signUpWithEmail(email, pass, name)),
+    logout: () => handleAction(() => logout()),
   };
 }

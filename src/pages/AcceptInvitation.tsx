@@ -13,7 +13,7 @@ export const AcceptInvitation: React.FC = () => {
   const email = searchParams.get('email');
   const { user, status } = useIdentity();
   const navigate = useNavigate();
-  
+
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
@@ -35,9 +35,9 @@ export const AcceptInvitation: React.FC = () => {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${idToken}`
+          Authorization: `Bearer ${idToken}`,
         },
-        body: JSON.stringify({ invitationId: token })
+        body: JSON.stringify({ invitationId: token }),
       });
 
       if (!response.ok) {
@@ -58,7 +58,7 @@ export const AcceptInvitation: React.FC = () => {
 
   useEffect(() => {
     if (status === 'authenticated' && token && !success && !loading && !error) {
-      // Auto-accept if already logged in? 
+      // Auto-accept if already logged in?
       // Maybe better to let them click a button to confirm.
     }
   }, [status, token]);
@@ -66,7 +66,7 @@ export const AcceptInvitation: React.FC = () => {
   return (
     <div className="min-h-screen bg-[#050505] text-white flex items-center justify-center p-6">
       <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,rgba(0,255,159,0.05),transparent_70%)]" />
-      
+
       <motion.div
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
@@ -88,11 +88,11 @@ export const AcceptInvitation: React.FC = () => {
             <div className="w-20 h-20 bg-neon-cyan/10 rounded-full flex items-center justify-center mx-auto">
               <UserPlus className="w-10 h-10 text-neon-cyan" />
             </div>
-            
+
             <div>
               <h1 className="text-3xl font-display font-bold mb-3">RPP Invitation</h1>
               <p className="text-zinc-400">
-                You've been invited to become a Relational Power Partner. 
+                You've been invited to become a Relational Power Partner.
                 {email && <span className="block mt-2 text-neon-lime font-medium">{email}</span>}
               </p>
             </div>
@@ -130,7 +130,7 @@ export const AcceptInvitation: React.FC = () => {
                 </>
               )}
             </Button>
-            
+
             {!user && (
               <p className="text-[10px] text-zinc-500 uppercase tracking-widest font-bold">
                 Google Account Required

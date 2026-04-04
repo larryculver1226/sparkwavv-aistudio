@@ -1,18 +1,18 @@
-import { GoogleGenAI } from "@google/genai";
-import { getGeminiApiKey } from "../services/aiConfig";
+import { GoogleGenAI } from '@google/genai';
+import { getGeminiApiKey } from '../services/aiConfig';
 
 /**
  * Synthetic Methodology Generator
- * Generates training data (JSONL format) for fine-tuning Skylar 
+ * Generates training data (JSONL format) for fine-tuning Skylar
  * on the Philip Lobkowicz coaching methodology.
  */
 export class MethodologyGenerator {
-  private model = "gemini-3.1-pro-preview";
+  private model = 'gemini-3.1-pro-preview';
 
   private getAI() {
     const apiKey = getGeminiApiKey();
     if (!apiKey) {
-      throw new Error("No valid Gemini API key found.");
+      throw new Error('No valid Gemini API key found.');
     }
     return new GoogleGenAI({ apiKey });
   }
@@ -39,13 +39,13 @@ export class MethodologyGenerator {
       const response = await ai.models.generateContent({
         model: this.model,
         contents: [{ role: 'user', parts: [{ text: prompt }] }],
-        config: { responseMimeType: "application/json" }
+        config: { responseMimeType: 'application/json' },
       });
 
       const data = JSON.parse(response.text);
       return Array.isArray(data) ? data : [];
     } catch (error) {
-      console.error("[GENERATOR ERROR]", error);
+      console.error('[GENERATOR ERROR]', error);
       return [];
     }
   }
@@ -54,22 +54,22 @@ export class MethodologyGenerator {
    * Generates a full training set for a list of scenarios.
    */
   async generateTrainingSet(scenarios: string[]): Promise<string> {
-    let trainingSet = "";
-    
+    let trainingSet = '';
+
     for (const scenario of scenarios) {
       const dialogues = await this.generateDialogue(scenario);
       for (const dialogue of dialogues) {
         // Vertex AI Fine-tuning format (JSONL)
         const entry = {
           contents: [
-            { role: "user", parts: [{ text: dialogue.input }] },
-            { role: "model", parts: [{ text: dialogue.output }] }
-          ]
+            { role: 'user', parts: [{ text: dialogue.input }] },
+            { role: 'model', parts: [{ text: dialogue.output }] },
+          ],
         };
-        trainingSet += JSON.stringify(entry) + "\n";
+        trainingSet += JSON.stringify(entry) + '\n';
       }
     }
-    
+
     return trainingSet;
   }
 }

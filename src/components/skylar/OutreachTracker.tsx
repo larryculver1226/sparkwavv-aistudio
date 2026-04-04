@@ -1,17 +1,42 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { 
-  Send, ExternalLink, Copy, Check, 
-  MessageSquare, Users, Target, Activity,
-  Filter, Search, Plus, Calendar,
-  Linkedin, Mail, Globe, MoreVertical,
-  ArrowUpRight, Clock, ShieldCheck, Zap, Brain
+import {
+  Send,
+  ExternalLink,
+  Copy,
+  Check,
+  MessageSquare,
+  Users,
+  Target,
+  Activity,
+  Filter,
+  Search,
+  Plus,
+  Calendar,
+  Linkedin,
+  Mail,
+  Globe,
+  MoreVertical,
+  ArrowUpRight,
+  Clock,
+  ShieldCheck,
+  Zap,
+  Brain,
 } from 'lucide-react';
 import { skylar } from '../../services/skylarService';
-import { 
-  BarChart, Bar, XAxis, YAxis, CartesianGrid, 
-  Tooltip, ResponsiveContainer, AreaChart, Area,
-  PieChart, Pie, Cell
+import {
+  BarChart,
+  Bar,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  ResponsiveContainer,
+  AreaChart,
+  Area,
+  PieChart,
+  Pie,
+  Cell,
 } from 'recharts';
 
 interface OutreachTrackerProps {
@@ -33,7 +58,7 @@ export const OutreachTracker: React.FC<OutreachTrackerProps> = ({ userId }) => {
     recipient: '',
     platform: 'LinkedIn',
     type: 'sent' as any,
-    notes: ''
+    notes: '',
   });
 
   useEffect(() => {
@@ -49,7 +74,7 @@ export const OutreachTracker: React.FC<OutreachTrackerProps> = ({ userId }) => {
       const s = JSON.parse(localStorage.getItem(`outreach_${userId}`) || '[]');
       setSequences(s.reverse());
     } catch (error) {
-      console.error("Failed to fetch outreach data:", error);
+      console.error('Failed to fetch outreach data:', error);
     } finally {
       setIsLoading(false);
     }
@@ -59,7 +84,7 @@ export const OutreachTracker: React.FC<OutreachTrackerProps> = ({ userId }) => {
     e.preventDefault();
     await skylar.logOutreachAction(userId, {
       ...logForm,
-      templateId: 'manual'
+      templateId: 'manual',
     });
     setShowLogModal(false);
     setLogForm({ recipient: '', platform: 'LinkedIn', type: 'sent', notes: '' });
@@ -77,26 +102,30 @@ export const OutreachTracker: React.FC<OutreachTrackerProps> = ({ userId }) => {
       {/* Header */}
       <div className="flex items-center justify-between mb-12">
         <div>
-          <h2 className="text-4xl font-display font-bold text-white tracking-tight mb-2">Engagement Command</h2>
-          <p className="text-[10px] text-white/40 uppercase tracking-[0.4em] font-bold">Strategic Outreach Tracking & Analytics</p>
+          <h2 className="text-4xl font-display font-bold text-white tracking-tight mb-2">
+            Engagement Command
+          </h2>
+          <p className="text-[10px] text-white/40 uppercase tracking-[0.4em] font-bold">
+            Strategic Outreach Tracking & Analytics
+          </p>
         </div>
 
         <div className="flex items-center gap-4">
           <div className="flex bg-white/5 p-1 rounded-xl border border-white/10">
-            <button 
+            <button
               onClick={() => setActiveTab('pipeline')}
               className={`px-6 py-2 rounded-lg text-[10px] font-bold uppercase tracking-widest transition-all ${activeTab === 'pipeline' ? 'bg-neon-cyan text-black' : 'text-white/40 hover:text-white'}`}
             >
               Pipeline
             </button>
-            <button 
+            <button
               onClick={() => setActiveTab('analytics')}
               className={`px-6 py-2 rounded-lg text-[10px] font-bold uppercase tracking-widest transition-all ${activeTab === 'analytics' ? 'bg-neon-cyan text-black' : 'text-white/40 hover:text-white'}`}
             >
               Analytics
             </button>
           </div>
-          <button 
+          <button
             onClick={() => setShowLogModal(true)}
             className="flex items-center gap-2 px-6 py-3 rounded-xl bg-neon-cyan text-black text-[10px] font-bold uppercase tracking-widest hover:bg-neon-cyan/80 transition-all"
           >
@@ -109,20 +138,49 @@ export const OutreachTracker: React.FC<OutreachTrackerProps> = ({ userId }) => {
       {/* Quick Stats */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-12">
         {[
-          { label: 'Total Sent', value: metrics?.totalSent || 0, icon: Send, color: 'text-neon-cyan' },
-          { label: 'Engagement Rate', value: metrics?.totalSent ? `${((metrics.totalEngaged / metrics.totalSent) * 100).toFixed(1)}%` : '0%', icon: Activity, color: 'text-neon-magenta' },
-          { label: 'Weekly Velocity', value: metrics?.velocity || 0, icon: Zap, color: 'text-neon-lime' },
-          { label: 'Active Sequences', value: metrics?.funnel?.find((f: any) => f.name === 'Nurturing')?.value || 0, icon: Target, color: 'text-amber-400' },
+          {
+            label: 'Total Sent',
+            value: metrics?.totalSent || 0,
+            icon: Send,
+            color: 'text-neon-cyan',
+          },
+          {
+            label: 'Engagement Rate',
+            value: metrics?.totalSent
+              ? `${((metrics.totalEngaged / metrics.totalSent) * 100).toFixed(1)}%`
+              : '0%',
+            icon: Activity,
+            color: 'text-neon-magenta',
+          },
+          {
+            label: 'Weekly Velocity',
+            value: metrics?.velocity || 0,
+            icon: Zap,
+            color: 'text-neon-lime',
+          },
+          {
+            label: 'Active Sequences',
+            value: metrics?.funnel?.find((f: any) => f.name === 'Nurturing')?.value || 0,
+            icon: Target,
+            color: 'text-amber-400',
+          },
         ].map((stat, i) => (
-          <div key={i} className="glass-panel p-6 rounded-3xl border border-white/5 bg-black/40 relative overflow-hidden group">
+          <div
+            key={i}
+            className="glass-panel p-6 rounded-3xl border border-white/5 bg-black/40 relative overflow-hidden group"
+          >
             <div className="absolute top-0 right-0 p-4 opacity-[0.03] group-hover:opacity-10 transition-opacity">
               <stat.icon className={`w-12 h-12 ${stat.color}`} />
             </div>
             <div className="flex items-center gap-3 mb-4">
-              <div className={`w-10 h-10 rounded-xl bg-white/5 flex items-center justify-center ${stat.color}`}>
+              <div
+                className={`w-10 h-10 rounded-xl bg-white/5 flex items-center justify-center ${stat.color}`}
+              >
                 <stat.icon className="w-5 h-5" />
               </div>
-              <span className="text-[10px] font-bold text-white/40 uppercase tracking-widest">{stat.label}</span>
+              <span className="text-[10px] font-bold text-white/40 uppercase tracking-widest">
+                {stat.label}
+              </span>
             </div>
             <div className="text-3xl font-display font-bold text-white">{stat.value}</div>
           </div>
@@ -149,52 +207,78 @@ export const OutreachTracker: React.FC<OutreachTrackerProps> = ({ userId }) => {
             </div>
 
             <div className="space-y-4">
-              {sequences.length > 0 ? sequences.map((action, i) => (
-                <motion.div 
-                  key={i}
-                  initial={{ opacity: 0, x: -20 }}
-                  animate={{ opacity: 1, x: 0 }}
-                  transition={{ delay: i * 0.05 }}
-                  className="glass-panel p-6 rounded-2xl border border-white/5 bg-black/40 hover:bg-white/5 transition-all group flex items-center justify-between"
-                >
-                  <div className="flex items-center gap-6">
-                    <div className={`w-12 h-12 rounded-xl flex items-center justify-center ${
-                      action.type === 'sent' ? 'bg-neon-cyan/10 text-neon-cyan' :
-                      action.type === 'engaged' ? 'bg-neon-lime/10 text-neon-lime' :
-                      'bg-neon-magenta/10 text-neon-magenta'
-                    }`}>
-                      {action.platform === 'LinkedIn' ? <Linkedin className="w-6 h-6" /> : <Mail className="w-6 h-6" />}
+              {sequences.length > 0 ? (
+                sequences.map((action, i) => (
+                  <motion.div
+                    key={i}
+                    initial={{ opacity: 0, x: -20 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    transition={{ delay: i * 0.05 }}
+                    className="glass-panel p-6 rounded-2xl border border-white/5 bg-black/40 hover:bg-white/5 transition-all group flex items-center justify-between"
+                  >
+                    <div className="flex items-center gap-6">
+                      <div
+                        className={`w-12 h-12 rounded-xl flex items-center justify-center ${
+                          action.type === 'sent'
+                            ? 'bg-neon-cyan/10 text-neon-cyan'
+                            : action.type === 'engaged'
+                              ? 'bg-neon-lime/10 text-neon-lime'
+                              : 'bg-neon-magenta/10 text-neon-magenta'
+                        }`}
+                      >
+                        {action.platform === 'LinkedIn' ? (
+                          <Linkedin className="w-6 h-6" />
+                        ) : (
+                          <Mail className="w-6 h-6" />
+                        )}
+                      </div>
+                      <div>
+                        <h4 className="text-sm font-bold text-white mb-1">{action.recipient}</h4>
+                        <p className="text-[10px] text-white/40 font-medium">
+                          {action.platform} • {new Date(action.timestamp).toLocaleDateString()} at{' '}
+                          {new Date(action.timestamp).toLocaleTimeString([], {
+                            hour: '2-digit',
+                            minute: '2-digit',
+                          })}
+                        </p>
+                      </div>
                     </div>
-                    <div>
-                      <h4 className="text-sm font-bold text-white mb-1">{action.recipient}</h4>
-                      <p className="text-[10px] text-white/40 font-medium">
-                        {action.platform} • {new Date(action.timestamp).toLocaleDateString()} at {new Date(action.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                      </p>
-                    </div>
-                  </div>
 
-                  <div className="flex items-center gap-4">
-                    <div className={`px-3 py-1 rounded-full text-[8px] font-bold uppercase tracking-widest border ${
-                      action.type === 'sent' ? 'border-neon-cyan/20 text-neon-cyan bg-neon-cyan/5' :
-                      action.type === 'engaged' ? 'border-neon-lime/20 text-neon-lime bg-neon-lime/5' :
-                      'border-neon-magenta/20 text-neon-magenta bg-neon-magenta/5'
-                    }`}>
-                      {action.type}
+                    <div className="flex items-center gap-4">
+                      <div
+                        className={`px-3 py-1 rounded-full text-[8px] font-bold uppercase tracking-widest border ${
+                          action.type === 'sent'
+                            ? 'border-neon-cyan/20 text-neon-cyan bg-neon-cyan/5'
+                            : action.type === 'engaged'
+                              ? 'border-neon-lime/20 text-neon-lime bg-neon-lime/5'
+                              : 'border-neon-magenta/20 text-neon-magenta bg-neon-magenta/5'
+                        }`}
+                      >
+                        {action.type}
+                      </div>
+                      <button
+                        onClick={() =>
+                          copyToClipboard(`Outreach to ${action.recipient}`, `copy_${i}`)
+                        }
+                        className="p-2 rounded-lg bg-white/5 border border-white/10 text-white/40 hover:text-white transition-all"
+                      >
+                        {copiedId === `copy_${i}` ? (
+                          <Check className="w-4 h-4 text-neon-lime" />
+                        ) : (
+                          <Copy className="w-4 h-4" />
+                        )}
+                      </button>
+                      <button className="p-2 rounded-lg bg-white/5 border border-white/10 text-white/40 hover:text-white transition-all">
+                        <MoreVertical className="w-4 h-4" />
+                      </button>
                     </div>
-                    <button 
-                      onClick={() => copyToClipboard(`Outreach to ${action.recipient}`, `copy_${i}`)}
-                      className="p-2 rounded-lg bg-white/5 border border-white/10 text-white/40 hover:text-white transition-all"
-                    >
-                      {copiedId === `copy_${i}` ? <Check className="w-4 h-4 text-neon-lime" /> : <Copy className="w-4 h-4" />}
-                    </button>
-                    <button className="p-2 rounded-lg bg-white/5 border border-white/10 text-white/40 hover:text-white transition-all">
-                      <MoreVertical className="w-4 h-4" />
-                    </button>
-                  </div>
-                </motion.div>
-              )) : (
+                  </motion.div>
+                ))
+              ) : (
                 <div className="p-20 text-center border-2 border-dashed border-white/5 rounded-[2.5rem]">
-                  <p className="text-white/20 font-bold uppercase tracking-widest text-xs">No activity logged yet</p>
+                  <p className="text-white/20 font-bold uppercase tracking-widest text-xs">
+                    No activity logged yet
+                  </p>
                 </div>
               )}
             </div>
@@ -206,13 +290,14 @@ export const OutreachTracker: React.FC<OutreachTrackerProps> = ({ userId }) => {
               <Brain className="w-4 h-4 text-neon-cyan" />
               Strategic Nudges
             </h3>
-            
+
             <div className="glass-panel p-8 rounded-[2rem] border border-neon-cyan/20 bg-neon-cyan/5 relative overflow-hidden">
               <div className="absolute top-0 right-0 p-4 opacity-5">
                 <Zap className="w-16 h-16 text-neon-cyan" />
               </div>
               <p className="text-sm text-white/80 leading-relaxed mb-6 relative z-10">
-                "The AI Strategist at TechFlow just engaged with your portfolio. Send the 'Phase 2: Technical Deep Dive' follow-up now to maintain momentum."
+                "The AI Strategist at TechFlow just engaged with your portfolio. Send the 'Phase 2:
+                Technical Deep Dive' follow-up now to maintain momentum."
               </p>
               <button className="w-full py-3 rounded-xl bg-neon-cyan text-black text-[10px] font-bold uppercase tracking-widest hover:bg-neon-cyan/80 transition-all flex items-center justify-center gap-2">
                 Execute Follow-up <ArrowUpRight className="w-4 h-4" />
@@ -220,7 +305,9 @@ export const OutreachTracker: React.FC<OutreachTrackerProps> = ({ userId }) => {
             </div>
 
             <div className="glass-panel p-8 rounded-[2rem] border border-white/5 bg-black/40">
-              <h4 className="text-[10px] font-bold text-white/40 uppercase tracking-widest mb-6">Sequence Health</h4>
+              <h4 className="text-[10px] font-bold text-white/40 uppercase tracking-widest mb-6">
+                Sequence Health
+              </h4>
               <div className="space-y-4">
                 {[
                   { label: 'LinkedIn Connection Velocity', value: 85, color: 'bg-neon-cyan' },
@@ -233,7 +320,7 @@ export const OutreachTracker: React.FC<OutreachTrackerProps> = ({ userId }) => {
                       <span className="text-white">{item.value}%</span>
                     </div>
                     <div className="h-1 bg-white/5 rounded-full overflow-hidden">
-                      <motion.div 
+                      <motion.div
                         initial={{ width: 0 }}
                         animate={{ width: `${item.value}%` }}
                         className={`h-full ${item.color}`}
@@ -249,14 +336,26 @@ export const OutreachTracker: React.FC<OutreachTrackerProps> = ({ userId }) => {
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
           {/* Engagement Funnel */}
           <div className="glass-panel p-10 rounded-[2.5rem] border border-white/5 bg-black/40 h-[400px]">
-            <h3 className="text-xs font-bold text-white/40 uppercase tracking-[0.3em] mb-10">Outreach Funnel</h3>
+            <h3 className="text-xs font-bold text-white/40 uppercase tracking-[0.3em] mb-10">
+              Outreach Funnel
+            </h3>
             <ResponsiveContainer width="100%" height="100%">
               <BarChart data={metrics?.funnel || []}>
                 <CartesianGrid strokeDasharray="3 3" stroke="#ffffff10" vertical={false} />
-                <XAxis dataKey="name" stroke="#ffffff40" fontSize={10} tickLine={false} axisLine={false} />
+                <XAxis
+                  dataKey="name"
+                  stroke="#ffffff40"
+                  fontSize={10}
+                  tickLine={false}
+                  axisLine={false}
+                />
                 <YAxis stroke="#ffffff40" fontSize={10} tickLine={false} axisLine={false} />
-                <Tooltip 
-                  contentStyle={{ backgroundColor: '#111', border: '1px solid #ffffff10', borderRadius: '12px' }}
+                <Tooltip
+                  contentStyle={{
+                    backgroundColor: '#111',
+                    border: '1px solid #ffffff10',
+                    borderRadius: '12px',
+                  }}
                   itemStyle={{ color: '#00f3ff' }}
                 />
                 <Bar dataKey="value" fill="#00f3ff" radius={[4, 4, 0, 0]} />
@@ -266,7 +365,9 @@ export const OutreachTracker: React.FC<OutreachTrackerProps> = ({ userId }) => {
 
           {/* Platform Distribution */}
           <div className="glass-panel p-10 rounded-[2.5rem] border border-white/5 bg-black/40 h-[400px]">
-            <h3 className="text-xs font-bold text-white/40 uppercase tracking-[0.3em] mb-10">Platform Distribution</h3>
+            <h3 className="text-xs font-bold text-white/40 uppercase tracking-[0.3em] mb-10">
+              Platform Distribution
+            </h3>
             <ResponsiveContainer width="100%" height="100%">
               <PieChart>
                 <Pie
@@ -286,8 +387,12 @@ export const OutreachTracker: React.FC<OutreachTrackerProps> = ({ userId }) => {
                     <Cell key={`cell-${index}`} fill={color} />
                   ))}
                 </Pie>
-                <Tooltip 
-                  contentStyle={{ backgroundColor: '#111', border: '1px solid #ffffff10', borderRadius: '12px' }}
+                <Tooltip
+                  contentStyle={{
+                    backgroundColor: '#111',
+                    border: '1px solid #ffffff10',
+                    borderRadius: '12px',
+                  }}
                 />
               </PieChart>
             </ResponsiveContainer>
@@ -312,25 +417,31 @@ export const OutreachTracker: React.FC<OutreachTrackerProps> = ({ userId }) => {
               exit={{ opacity: 0, scale: 0.95, y: 20 }}
               className="relative w-full max-w-lg glass-panel p-10 rounded-[2.5rem] border border-white/10 bg-black/90 shadow-2xl"
             >
-              <h3 className="text-2xl font-display font-bold text-white mb-8">Log Outreach Action</h3>
+              <h3 className="text-2xl font-display font-bold text-white mb-8">
+                Log Outreach Action
+              </h3>
               <form onSubmit={handleLogAction} className="space-y-6">
                 <div>
-                  <label className="block text-[10px] font-bold text-white/40 uppercase tracking-widest mb-2">Recipient Name</label>
-                  <input 
+                  <label className="block text-[10px] font-bold text-white/40 uppercase tracking-widest mb-2">
+                    Recipient Name
+                  </label>
+                  <input
                     type="text"
                     required
                     value={logForm.recipient}
-                    onChange={(e) => setLogForm({...logForm, recipient: e.target.value})}
+                    onChange={(e) => setLogForm({ ...logForm, recipient: e.target.value })}
                     className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white focus:border-neon-cyan transition-all"
                     placeholder="e.g. Jane Doe"
                   />
                 </div>
                 <div className="grid grid-cols-2 gap-4">
                   <div>
-                    <label className="block text-[10px] font-bold text-white/40 uppercase tracking-widest mb-2">Platform</label>
-                    <select 
+                    <label className="block text-[10px] font-bold text-white/40 uppercase tracking-widest mb-2">
+                      Platform
+                    </label>
+                    <select
                       value={logForm.platform}
-                      onChange={(e) => setLogForm({...logForm, platform: e.target.value})}
+                      onChange={(e) => setLogForm({ ...logForm, platform: e.target.value })}
                       className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white focus:border-neon-cyan transition-all appearance-none"
                     >
                       <option value="LinkedIn">LinkedIn</option>
@@ -339,10 +450,12 @@ export const OutreachTracker: React.FC<OutreachTrackerProps> = ({ userId }) => {
                     </select>
                   </div>
                   <div>
-                    <label className="block text-[10px] font-bold text-white/40 uppercase tracking-widest mb-2">Action Type</label>
-                    <select 
+                    <label className="block text-[10px] font-bold text-white/40 uppercase tracking-widest mb-2">
+                      Action Type
+                    </label>
+                    <select
                       value={logForm.type}
-                      onChange={(e) => setLogForm({...logForm, type: e.target.value as any})}
+                      onChange={(e) => setLogForm({ ...logForm, type: e.target.value as any })}
                       className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white focus:border-neon-cyan transition-all appearance-none"
                     >
                       <option value="sent">Sent</option>
@@ -352,23 +465,25 @@ export const OutreachTracker: React.FC<OutreachTrackerProps> = ({ userId }) => {
                   </div>
                 </div>
                 <div>
-                  <label className="block text-[10px] font-bold text-white/40 uppercase tracking-widest mb-2">Notes</label>
-                  <textarea 
+                  <label className="block text-[10px] font-bold text-white/40 uppercase tracking-widest mb-2">
+                    Notes
+                  </label>
+                  <textarea
                     value={logForm.notes}
-                    onChange={(e) => setLogForm({...logForm, notes: e.target.value})}
+                    onChange={(e) => setLogForm({ ...logForm, notes: e.target.value })}
                     className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white focus:border-neon-cyan transition-all h-24"
                     placeholder="Add any specific context..."
                   />
                 </div>
                 <div className="flex gap-4 pt-4">
-                  <button 
+                  <button
                     type="button"
                     onClick={() => setShowLogModal(false)}
                     className="flex-1 py-4 rounded-xl bg-white/5 border border-white/10 text-white/60 text-[10px] font-bold uppercase tracking-widest hover:bg-white/10 transition-all"
                   >
                     Cancel
                   </button>
-                  <button 
+                  <button
                     type="submit"
                     className="flex-1 py-4 rounded-xl bg-neon-cyan text-black text-[10px] font-bold uppercase tracking-widest hover:bg-neon-cyan/80 transition-all"
                   >

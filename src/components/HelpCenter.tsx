@@ -1,61 +1,65 @@
 import React from 'react';
 import { motion } from 'motion/react';
-import { 
-  LifeBuoy, 
-  Search, 
-  User, 
-  CreditCard, 
-  Shield, 
-  Zap, 
-  MessageCircle, 
-  Mail, 
+import {
+  LifeBuoy,
+  Search,
+  User,
+  CreditCard,
+  Shield,
+  Zap,
+  MessageCircle,
+  Mail,
   ExternalLink,
   ChevronRight,
-  FileText
+  FileText,
 } from 'lucide-react';
 
 export const HelpCenter: React.FC = () => {
   const categories = [
     {
-      title: "Account & Billing",
-      description: "Manage your subscription, update payment methods, and account settings.",
+      title: 'Account & Billing',
+      description: 'Manage your subscription, update payment methods, and account settings.',
       icon: <CreditCard className="w-6 h-6 text-neon-cyan" />,
-      articles: ["Updating your payment info", "How to cancel your subscription", "Managing your profile"]
+      articles: [
+        'Updating your payment info',
+        'How to cancel your subscription',
+        'Managing your profile',
+      ],
     },
     {
-      title: "Technical Support",
-      description: "Troubleshoot issues with the platform, Skylar AI, and the Wavvault.",
+      title: 'Technical Support',
+      description: 'Troubleshoot issues with the platform, Skylar AI, and the Wavvault.',
       icon: <Zap className="w-6 h-6 text-neon-magenta" />,
-      articles: ["Audio troubleshooting", "Browser compatibility", "Wavvault upload errors"]
+      articles: ['Audio troubleshooting', 'Browser compatibility', 'Wavvault upload errors'],
     },
     {
-      title: "Career Journey",
-      description: "Guidance on navigating the 5 phases and working with Skylar.",
+      title: 'Career Journey',
+      description: 'Guidance on navigating the 5 phases and working with Skylar.',
       icon: <Zap className="w-6 h-6 text-neon-lime" />,
-      articles: ["Understanding the Dive-In phase", "How to use the MIG", "Preparing for Outreach"]
+      articles: ['Understanding the Dive-In phase', 'How to use the MIG', 'Preparing for Outreach'],
     },
     {
-      title: "Privacy & Security",
-      description: "Learn how we protect your data and manage your privacy settings.",
+      title: 'Privacy & Security',
+      description: 'Learn how we protect your data and manage your privacy settings.',
       icon: <Shield className="w-6 h-6 text-neon-cyan" />,
-      articles: ["Wavvault encryption", "Data anonymization", "GDPR compliance"]
-    }
+      articles: ['Wavvault encryption', 'Data anonymization', 'GDPR compliance'],
+    },
   ];
 
   const popularArticles = [
-    "How do I reset my password?",
-    "Connecting your LinkedIn profile",
-    "Understanding your Brand DNA synthesis",
-    "How to share your cinematic report",
-    "What are Validation Gates?",
-    "Switching coaching methodologies"
+    'How do I reset my password?',
+    'Connecting your LinkedIn profile',
+    'Understanding your Brand DNA synthesis',
+    'How to share your cinematic report',
+    'What are Validation Gates?',
+    'Switching coaching methodologies',
   ];
 
   return (
     <div className="max-w-7xl mx-auto px-6 py-24 space-y-24">
       {/* Hero Section */}
       <header className="text-center space-y-8">
-        <motion.div 
+        <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-neon-cyan/10 border border-neon-cyan/20 text-neon-cyan text-sm font-medium"
@@ -63,7 +67,7 @@ export const HelpCenter: React.FC = () => {
           <LifeBuoy className="w-4 h-4" />
           <span>Help Center</span>
         </motion.div>
-        <motion.h1 
+        <motion.h1
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.1 }}
@@ -71,9 +75,9 @@ export const HelpCenter: React.FC = () => {
         >
           How can we <span className="text-neon-cyan italic">Help?</span>
         </motion.h1>
-        
+
         {/* Mock Search Bar */}
-        <motion.div 
+        <motion.div
           initial={{ opacity: 0, scale: 0.95 }}
           animate={{ opacity: 1, scale: 1 }}
           transition={{ delay: 0.2 }}
@@ -81,8 +85,8 @@ export const HelpCenter: React.FC = () => {
         >
           <div className="absolute inset-0 bg-neon-cyan/5 blur-2xl rounded-full -z-10 group-focus-within:bg-neon-cyan/10 transition-all" />
           <Search className="absolute left-6 top-1/2 -translate-y-1/2 w-6 h-6 text-white/20 group-focus-within:text-neon-cyan transition-colors" />
-          <input 
-            type="text" 
+          <input
+            type="text"
             placeholder="Search for articles, guides, or troubleshooting..."
             className="w-full bg-white/5 border border-white/10 rounded-2xl py-6 pl-16 pr-6 text-white focus:outline-none focus:border-neon-cyan/50 transition-all placeholder:text-white/20"
           />
@@ -108,9 +112,7 @@ export const HelpCenter: React.FC = () => {
                 {category.title}
               </h2>
             </div>
-            <p className="text-white/60 leading-relaxed">
-              {category.description}
-            </p>
+            <p className="text-white/60 leading-relaxed">{category.description}</p>
             <ul className="space-y-3 pt-4 border-t border-white/5">
               {category.articles.map((article, i) => (
                 <li key={i}>

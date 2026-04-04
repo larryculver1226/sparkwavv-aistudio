@@ -15,9 +15,9 @@ export const SkylarAvatar: React.FC = () => {
       className="relative"
     >
       <div className="w-32 h-32 md:w-40 md:h-40 rounded-full overflow-hidden border-2 border-neon-cyan/30 shadow-[0_0_30px_rgba(0,243,255,0.1)] group">
-        <img 
-          src={skylarAvatar} 
-          alt="Skylar" 
+        <img
+          src={skylarAvatar}
+          alt="Skylar"
           className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110"
           referrerPolicy="no-referrer"
         />
@@ -40,7 +40,7 @@ export const SkylarScrollingText: React.FC = () => {
     "I've analyzed 10,000 career paths. Yours is unique.",
     "Let's extract your Career DNA and find the work that truly energizes you.",
     "Stop settling for 'good enough'. Aim for 'indispensable'.",
-    "Your next chapter starts with a single spark."
+    'Your next chapter starts with a single spark.',
   ];
 
   useEffect(() => {
@@ -48,9 +48,8 @@ export const SkylarScrollingText: React.FC = () => {
       const i = loopNum % messages.length;
       const fullText = messages[i];
 
-      setText(isDeleting 
-        ? fullText.substring(0, text.length - 1) 
-        : fullText.substring(0, text.length + 1)
+      setText(
+        isDeleting ? fullText.substring(0, text.length - 1) : fullText.substring(0, text.length + 1)
       );
 
       setTypingSpeed(isDeleting ? 30 : 150);
@@ -81,7 +80,7 @@ export const SkylarIntro: React.FC<{ onClose?: () => void }> = ({ onClose }) => 
   return (
     <div className="flex flex-col items-center space-y-8 py-8 relative group">
       {onClose && (
-        <button 
+        <button
           onClick={onClose}
           className="absolute -top-4 -right-4 p-2 rounded-full bg-white/5 text-white/20 hover:text-white hover:bg-white/10 transition-all opacity-0 group-hover:opacity-100"
           title="Dismiss Intro"

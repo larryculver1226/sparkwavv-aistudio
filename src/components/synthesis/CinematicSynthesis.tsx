@@ -1,17 +1,17 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { 
-  Sparkles, 
-  ChevronRight, 
-  ChevronLeft, 
-  RefreshCw, 
-  Check, 
-  Share2, 
+import {
+  Sparkles,
+  ChevronRight,
+  ChevronLeft,
+  RefreshCw,
+  Check,
+  Share2,
   Lock,
   MessageSquare,
   Volume2,
   VolumeX,
-  ArrowRight
+  ArrowRight,
 } from 'lucide-react';
 import { useIdentity } from '../../contexts/IdentityContext';
 import { generateCinematicManifesto, generateBrandImage } from '../../services/geminiService';
@@ -29,9 +29,14 @@ interface CinematicSynthesisProps {
   onComplete: (secretId: string) => void;
 }
 
-export const CinematicSynthesis: React.FC<CinematicSynthesisProps> = ({ dashboardData, onComplete }) => {
+export const CinematicSynthesis: React.FC<CinematicSynthesisProps> = ({
+  dashboardData,
+  onComplete,
+}) => {
   const { user } = useIdentity();
-  const [step, setStep] = useState<'analyzing' | 'revealing' | 'refining' | 'finalizing'>('analyzing');
+  const [step, setStep] = useState<'analyzing' | 'revealing' | 'refining' | 'finalizing'>(
+    'analyzing'
+  );
   const [pillars, setPillars] = useState<Pillar[]>([]);
   const [currentPillarIdx, setCurrentPillarIdx] = useState(0);
   const [isGenerating, setIsGenerating] = useState(false);
@@ -52,21 +57,25 @@ export const CinematicSynthesis: React.FC<CinematicSynthesisProps> = ({ dashboar
     try {
       // 1. Generate Manifesto
       const manifesto = await generateCinematicManifesto(dashboardData as any);
-      if (!manifesto || !manifesto.pillars) throw new Error("Failed to generate manifesto");
+      if (!manifesto || !manifesto.pillars) throw new Error('Failed to generate manifesto');
 
       // 2. Generate initial images for all 3 pillars
-      const pillarsWithImages = await Promise.all(manifesto.pillars.map(async (p: any) => {
-        const imageUrl = await generateBrandImage(p.visualPrompt);
-        return { ...p, imageUrl, refinementCount: 0 };
-      }));
+      const pillarsWithImages = await Promise.all(
+        manifesto.pillars.map(async (p: any) => {
+          const imageUrl = await generateBrandImage(p.visualPrompt);
+          return { ...p, imageUrl, refinementCount: 0 };
+        })
+      );
 
       setPillars(pillarsWithImages);
       setStep('revealing');
-      
+
       // Play Skylar Narration (Mock for now, would be real TTS)
-      playSkylarNarration("Synthesis moment initiated. I've analyzed your Wavvault and distilled your professional DNA into three cinematic pillars.");
+      playSkylarNarration(
+        "Synthesis moment initiated. I've analyzed your Wavvault and distilled your professional DNA into three cinematic pillars."
+      );
     } catch (error) {
-      console.error("Synthesis failed:", error);
+      console.error('Synthesis failed:', error);
     } finally {
       setIsGenerating(false);
     }
@@ -75,12 +84,12 @@ export const CinematicSynthesis: React.FC<CinematicSynthesisProps> = ({ dashboar
   const playSkylarNarration = (text: string) => {
     if (isMuted) return;
     // In a real implementation, this would call a TTS service
-    console.log("Skylar Narration:", text);
+    console.log('Skylar Narration:', text);
   };
 
   const handleRefine = async () => {
     if (refiningPillarIdx === null || !refinementFeedback.trim()) return;
-    
+
     const pillar = pillars[refiningPillarIdx];
     if (pillar.refinementCount >= 3) return;
 
@@ -91,7 +100,7 @@ export const CinematicSynthesis: React.FC<CinematicSynthesisProps> = ({ dashboar
       const updatedPillar = { ...pillar };
       updatedPillar.visualPrompt += ` (Refinement: ${refinementFeedback})`;
       updatedPillar.refinementCount += 1;
-      
+
       const newImageUrl = await generateBrandImage(updatedPillar.visualPrompt);
       updatedPillar.imageUrl = newImageUrl || pillar.imageUrl;
 
@@ -101,7 +110,7 @@ export const CinematicSynthesis: React.FC<CinematicSynthesisProps> = ({ dashboar
       setRefiningPillarIdx(null);
       setRefinementFeedback('');
     } catch (error) {
-      console.error("Refinement failed:", error);
+      console.error('Refinement failed:', error);
     } finally {
       setIsRefining(false);
     }
@@ -114,13 +123,13 @@ export const CinematicSynthesis: React.FC<CinematicSynthesisProps> = ({ dashboar
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${await user?.getIdToken()}`
+          Authorization: `Bearer ${await user?.getIdToken()}`,
         },
         body: JSON.stringify({
           pillars,
           strengths: dashboardData?.strengths?.map((s: any) => s.name) || [],
-          skillsCloud: [] // This would be generated in a real flow
-        })
+          skillsCloud: [], // This would be generated in a real flow
+        }),
       });
 
       const result = await response.json();
@@ -128,7 +137,7 @@ export const CinematicSynthesis: React.FC<CinematicSynthesisProps> = ({ dashboar
         onComplete(result.secretId);
       }
     } catch (error) {
-      console.error("Finalization failed:", error);
+      console.error('Finalization failed:', error);
     }
   };
 
@@ -137,13 +146,13 @@ export const CinematicSynthesis: React.FC<CinematicSynthesisProps> = ({ dashboar
       {/* Background Ambience */}
       <div className="absolute inset-0 opacity-30 pointer-events-none">
         <div className="absolute inset-0 bg-gradient-to-b from-blue-900/20 to-black" />
-        <motion.div 
-          animate={{ 
+        <motion.div
+          animate={{
             scale: [1, 1.2, 1],
-            opacity: [0.3, 0.5, 0.3] 
+            opacity: [0.3, 0.5, 0.3],
           }}
           transition={{ duration: 10, repeat: Infinity }}
-          className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[800px] h-[800px] bg-blue-500/10 rounded-full blur-[120px]" 
+          className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[800px] h-[800px] bg-blue-500/10 rounded-full blur-[120px]"
         />
       </div>
 
@@ -158,15 +167,13 @@ export const CinematicSynthesis: React.FC<CinematicSynthesisProps> = ({ dashboar
           >
             <motion.div
               animate={{ rotate: 360 }}
-              transition={{ duration: 4, repeat: Infinity, ease: "linear" }}
+              transition={{ duration: 4, repeat: Infinity, ease: 'linear' }}
               className="w-24 h-24 border-t-2 border-blue-500 rounded-full mx-auto mb-8"
             />
             <h2 className="text-3xl font-light text-white tracking-widest uppercase mb-4">
               Synthesizing Brand DNA
             </h2>
-            <p className="text-blue-400/60 font-mono text-sm">
-              Analyzing Wavvault artifacts...
-            </p>
+            <p className="text-blue-400/60 font-mono text-sm">Analyzing Wavvault artifacts...</p>
           </motion.div>
         )}
 
@@ -194,7 +201,7 @@ export const CinematicSynthesis: React.FC<CinematicSynthesisProps> = ({ dashboar
                 </AnimatePresence>
                 <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent" />
                 <div className="absolute bottom-8 left-8 right-8">
-                  <motion.p 
+                  <motion.p
                     initial={{ y: 20, opacity: 0 }}
                     animate={{ y: 0, opacity: 1 }}
                     key={`tagline-${currentPillarIdx}`}
@@ -216,7 +223,7 @@ export const CinematicSynthesis: React.FC<CinematicSynthesisProps> = ({ dashboar
                   <blockquote className="text-4xl lg:text-5xl font-serif italic text-white leading-tight">
                     "{pillars[currentPillarIdx]?.quote}"
                   </blockquote>
-                  
+
                   <div className="flex items-center gap-4 pt-8">
                     <button
                       onClick={() => setRefiningPillarIdx(currentPillarIdx)}
@@ -231,7 +238,7 @@ export const CinematicSynthesis: React.FC<CinematicSynthesisProps> = ({ dashboar
 
                     {currentPillarIdx < 2 ? (
                       <button
-                        onClick={() => setCurrentPillarIdx(prev => prev + 1)}
+                        onClick={() => setCurrentPillarIdx((prev) => prev + 1)}
                         className="flex items-center gap-2 px-6 py-3 rounded-full bg-blue-600 text-white hover:bg-blue-500 transition-all"
                       >
                         <span>Next Pillar</span>
@@ -251,8 +258,8 @@ export const CinematicSynthesis: React.FC<CinematicSynthesisProps> = ({ dashboar
 
                 {/* Progress Dots */}
                 <div className="flex gap-2">
-                  {[0, 1, 2].map(i => (
-                    <div 
+                  {[0, 1, 2].map((i) => (
+                    <div
                       key={i}
                       className={`h-1 transition-all duration-500 rounded-full ${i === currentPillarIdx ? 'w-12 bg-blue-500' : 'w-4 bg-white/20'}`}
                     />
@@ -281,7 +288,8 @@ export const CinematicSynthesis: React.FC<CinematicSynthesisProps> = ({ dashboar
               Brand DNA Locked
             </h2>
             <p className="text-white/60 max-w-md mx-auto">
-              Your cinematic narrative is now the foundational DNA for your branding and outreach flows.
+              Your cinematic narrative is now the foundational DNA for your branding and outreach
+              flows.
             </p>
           </motion.div>
         )}
@@ -307,12 +315,16 @@ export const CinematicSynthesis: React.FC<CinematicSynthesisProps> = ({ dashboar
                 </div>
                 <div>
                   <h3 className="text-xl font-medium text-white">Refine with Skylar</h3>
-                  <p className="text-xs text-white/40">Pillar {refiningPillarIdx + 1} • {3 - pillars[refiningPillarIdx].refinementCount} refinements remaining</p>
+                  <p className="text-xs text-white/40">
+                    Pillar {refiningPillarIdx + 1} •{' '}
+                    {3 - pillars[refiningPillarIdx].refinementCount} refinements remaining
+                  </p>
                 </div>
               </div>
 
               <p className="text-white/70 text-sm mb-6 italic">
-                "Skylar, this pillar feels a bit too corporate. Can we make it feel more like a creative catalyst?"
+                "Skylar, this pillar feels a bit too corporate. Can we make it feel more like a
+                creative catalyst?"
               </p>
 
               <textarea
@@ -351,7 +363,7 @@ export const CinematicSynthesis: React.FC<CinematicSynthesisProps> = ({ dashboar
 
       {/* Controls */}
       <div className="absolute bottom-8 right-8 flex items-center gap-4 z-20">
-        <button 
+        <button
           onClick={() => setIsMuted(!isMuted)}
           className="p-3 rounded-full bg-white/5 border border-white/10 text-white hover:bg-white/10 transition-all"
         >

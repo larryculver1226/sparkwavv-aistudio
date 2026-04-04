@@ -1,14 +1,14 @@
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
-import { 
-  onAuthStateChanged, 
-  User, 
-  getIdTokenResult, 
-  signOut as firebaseSignOut, 
+import {
+  onAuthStateChanged,
+  User,
+  getIdTokenResult,
+  signOut as firebaseSignOut,
   signInWithPopup,
   signInWithEmailAndPassword,
   createUserWithEmailAndPassword,
   updateProfile as firebaseUpdateProfile,
-  sendEmailVerification
+  sendEmailVerification,
 } from 'firebase/auth';
 import { auth, setTenantId } from '../lib/firebase';
 import { authService } from '../services/authService';
@@ -16,7 +16,12 @@ import { userService } from '../services/userService';
 import { UserProfile } from '../types/user';
 import { ROLES } from '../constants';
 
-export type IdentityStatus = 'initializing' | 'unauthenticated' | 'authenticated' | 'ready' | 'error';
+export type IdentityStatus =
+  | 'initializing'
+  | 'unauthenticated'
+  | 'authenticated'
+  | 'ready'
+  | 'error';
 
 interface IdentityContextType {
   user: User | null;
@@ -79,7 +84,7 @@ export function IdentityProvider({ children }: { children: React.ReactNode }) {
       setStatus('initializing');
       const effectiveTenant = getEffectiveTenant(providedTenantId);
       setLocalTenantId(effectiveTenant);
-      
+
       await authService.loginWithGoogle(effectiveTenant);
       console.log('🛡️ [Identity] Google Login Success!');
     } catch (err: any) {
@@ -90,55 +95,64 @@ export function IdentityProvider({ children }: { children: React.ReactNode }) {
     }
   }, []);
 
-  const login = useCallback(async (email?: string, pass?: string, providedTenantId?: string) => {
-    try {
-      setStatus('initializing');
-      const effectiveTenant = getEffectiveTenant(providedTenantId);
-      setLocalTenantId(effectiveTenant);
+  const login = useCallback(
+    async (email?: string, pass?: string, providedTenantId?: string) => {
+      try {
+        setStatus('initializing');
+        const effectiveTenant = getEffectiveTenant(providedTenantId);
+        setLocalTenantId(effectiveTenant);
 
-      if (!email || !pass) {
-        console.log('🛡️ [Identity] No credentials provided, falling back to Google Login');
-        return loginWithPopup(providedTenantId);
+        if (!email || !pass) {
+          console.log('🛡️ [Identity] No credentials provided, falling back to Google Login');
+          return loginWithPopup(providedTenantId);
+        }
+
+        await authService.loginWithEmail(email, pass, effectiveTenant);
+        console.log('🛡️ [Identity] Email Login Success!');
+      } catch (err: any) {
+        console.error('❌ [Identity] Login Error:', err);
+        setError(err.message);
+        setStatus('error');
+        throw err;
       }
+    },
+    [loginWithPopup]
+  );
 
-      await authService.loginWithEmail(email, pass, effectiveTenant);
-      console.log('🛡️ [Identity] Email Login Success!');
-    } catch (err: any) {
-      console.error('❌ [Identity] Login Error:', err);
-      setError(err.message);
-      setStatus('error');
-      throw err;
-    }
-  }, [loginWithPopup]);
+  const signUpWithEmail = useCallback(
+    async (email: string, pass: string, name: string, providedTenantId?: string) => {
+      try {
+        setStatus('initializing');
+        const effectiveTenant = getEffectiveTenant(providedTenantId);
+        setLocalTenantId(effectiveTenant);
 
-  const signUpWithEmail = useCallback(async (email: string, pass: string, name: string, providedTenantId?: string) => {
-    try {
-      setStatus('initializing');
-      const effectiveTenant = getEffectiveTenant(providedTenantId);
-      setLocalTenantId(effectiveTenant);
-
-      await authService.signUpWithEmail(email, pass, name, effectiveTenant);
-      console.log('🛡️ [Identity] Email Sign-up Success!');
-    } catch (err: any) {
-      console.error('❌ [Identity] Email Sign-up Error:', err);
-      setError(err.message);
-      setStatus('error');
-      throw err;
-    }
-  }, []);
+        await authService.signUpWithEmail(email, pass, name, effectiveTenant);
+        console.log('🛡️ [Identity] Email Sign-up Success!');
+      } catch (err: any) {
+        console.error('❌ [Identity] Email Sign-up Error:', err);
+        setError(err.message);
+        setStatus('error');
+        throw err;
+      }
+    },
+    []
+  );
 
   const fetchIdentity = useCallback(async (firebaseUser: User, forceRefresh = false) => {
     console.group('🆔 Identity Initialization');
     console.log('👤 [Identity] Fetching for:', firebaseUser.email, { forceRefresh });
     try {
       // 1. Get ID Token Result for Custom Claims (Roles)
-      const { token: idToken, claims } = await authService.getIdentityInfo(firebaseUser, forceRefresh);
+      const { token: idToken, claims } = await authService.getIdentityInfo(
+        firebaseUser,
+        forceRefresh
+      );
       console.log('🎫 [Identity] Token Result Claims:', claims);
-      
+
       const rawRole = claims.role;
       const claimRole = typeof rawRole === 'string' ? rawRole : (rawRole as any)?.role;
       const claimTenant = claims.tenantId as string;
-      
+
       // Safety net for Larry Culver
       let finalRole = claimRole || ROLES.USER;
       const userEmail = firebaseUser.email?.toLowerCase()?.trim();
@@ -146,21 +160,22 @@ export function IdentityProvider({ children }: { children: React.ReactNode }) {
         console.log('🛡️ [Identity] Safety Net: Identified Larry Culver as Super Admin', userEmail);
         finalRole = ROLES.SUPER_ADMIN;
       }
-      
+
       setRole(String(finalRole));
       setLocalTenantId(claimTenant || null);
 
       // 2. Fetch Profile and Wavvault Status
       const [pData, exists] = await Promise.all([
         userService.fetchProfile(idToken),
-        userService.fetchWavvaultStatus(idToken)
+        userService.fetchWavvaultStatus(idToken),
       ]);
 
       if (pData) {
         setProfile(pData);
-        
+
         if (pData.role && pData.role !== finalRole) {
-          const isAdminRole = (r: any) => [ROLES.ADMIN, ROLES.SUPER_ADMIN, ROLES.EDITOR, ROLES.MENTOR].includes(r as any);
+          const isAdminRole = (r: any) =>
+            [ROLES.ADMIN, ROLES.SUPER_ADMIN, ROLES.EDITOR, ROLES.MENTOR].includes(r as any);
           if (!isAdminRole(finalRole) || isAdminRole(pData.role)) {
             setRole(String(pData.role));
           }
@@ -175,7 +190,8 @@ export function IdentityProvider({ children }: { children: React.ReactNode }) {
       console.error('❌ Identity fetch error:', err);
       let msg = err.message;
       if (msg.includes('auth/unauthorized-domain')) {
-        msg = 'Unauthorized Domain: Please add this URL to your Firebase Authorized Domains in the console.';
+        msg =
+          'Unauthorized Domain: Please add this URL to your Firebase Authorized Domains in the console.';
       } else if (msg.includes('auth/popup-blocked')) {
         msg = 'Popup Blocked: Please allow popups for this site to sign in.';
       }
@@ -211,12 +227,15 @@ export function IdentityProvider({ children }: { children: React.ReactNode }) {
     return () => unsubscribe();
   }, [fetchIdentity]);
 
-  const updateProfile = useCallback(async (updates: Partial<UserProfile>) => {
-    if (!user) return;
-    const idToken = await user.getIdToken();
-    const updatedProfile = await userService.updateProfile(idToken, updates);
-    setProfile(updatedProfile);
-  }, [user]);
+  const updateProfile = useCallback(
+    async (updates: Partial<UserProfile>) => {
+      if (!user) return;
+      const idToken = await user.getIdToken();
+      const updatedProfile = await userService.updateProfile(idToken, updates);
+      setProfile(updatedProfile);
+    },
+    [user]
+  );
 
   const reloadUser = useCallback(async () => {
     if (user) {
@@ -238,52 +257,51 @@ export function IdentityProvider({ children }: { children: React.ReactNode }) {
     }
   }, [user, fetchIdentity]);
 
-  const value = React.useMemo(() => ({
-    user,
-    isAuthenticated: !!user,
-    profile,
-    role,
-    tenantId,
-    status,
-    loading: status === 'initializing' || status === 'authenticated',
-    isAdmin: role === ROLES.ADMIN || role === ROLES.SUPER_ADMIN,
-    isOperator: role === ROLES.OPERATOR,
-    isSuperAdmin: role === ROLES.SUPER_ADMIN,
-    emailVerified: user?.emailVerified || false,
-    onboardingComplete: profile?.onboardingComplete === true,
-    hasWavvault,
-    error,
-    logout,
-    loginWithPopup,
-    login,
-    signUpWithEmail,
-    refreshIdentity,
-    refreshProfile,
-    reloadUser,
-    updateProfile
-  }), [
-    user, 
-    profile, 
-    role, 
-    tenantId,
-    status, 
-    hasWavvault, 
-    error, 
-    logout, 
-    loginWithPopup, 
-    login,
-    signUpWithEmail,
-    refreshIdentity, 
-    refreshProfile, 
-    reloadUser, 
-    updateProfile
-  ]);
-
-  return (
-    <IdentityContext.Provider value={value}>
-      {children}
-    </IdentityContext.Provider>
+  const value = React.useMemo(
+    () => ({
+      user,
+      isAuthenticated: !!user,
+      profile,
+      role,
+      tenantId,
+      status,
+      loading: status === 'initializing' || status === 'authenticated',
+      isAdmin: role === ROLES.ADMIN || role === ROLES.SUPER_ADMIN,
+      isOperator: role === ROLES.OPERATOR,
+      isSuperAdmin: role === ROLES.SUPER_ADMIN,
+      emailVerified: user?.emailVerified || false,
+      onboardingComplete: profile?.onboardingComplete === true,
+      hasWavvault,
+      error,
+      logout,
+      loginWithPopup,
+      login,
+      signUpWithEmail,
+      refreshIdentity,
+      refreshProfile,
+      reloadUser,
+      updateProfile,
+    }),
+    [
+      user,
+      profile,
+      role,
+      tenantId,
+      status,
+      hasWavvault,
+      error,
+      logout,
+      loginWithPopup,
+      login,
+      signUpWithEmail,
+      refreshIdentity,
+      refreshProfile,
+      reloadUser,
+      updateProfile,
+    ]
   );
+
+  return <IdentityContext.Provider value={value}>{children}</IdentityContext.Provider>;
 }
 
 export function useIdentity() {

@@ -23,9 +23,15 @@ export const ExplorerFooter: React.FC<ExplorerFooterProps> = ({ userId }) => {
           </div>
         </div>
         <div className="flex items-center gap-12 text-[10px] font-black text-white/30 uppercase tracking-[0.25em]">
-          <a href="#" className="hover:text-neon-cyan transition-colors">Privacy Protocol</a>
-          <a href="#" className="hover:text-neon-cyan transition-colors">Data Portability</a>
-          <a href="#" className="hover:text-neon-cyan transition-colors">Ledger Verification</a>
+          <a href="#" className="hover:text-neon-cyan transition-colors">
+            Privacy Protocol
+          </a>
+          <a href="#" className="hover:text-neon-cyan transition-colors">
+            Data Portability
+          </a>
+          <a href="#" className="hover:text-neon-cyan transition-colors">
+            Ledger Verification
+          </a>
         </div>
       </div>
     </footer>

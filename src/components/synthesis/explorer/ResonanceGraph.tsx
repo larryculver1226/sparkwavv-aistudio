@@ -9,22 +9,26 @@ interface ResonanceGraphProps {
 
 const ResonanceConstellation: React.FC<ResonanceGraphProps> = ({ artifacts, activeId }) => {
   // Generate random float offsets for each node
-  const nodeOffsets = useMemo(() => artifacts.map(() => ({
-    x: (Math.random() - 0.5) * 40,
-    y: (Math.random() - 0.5) * 40,
-    duration: 3 + Math.random() * 4
-  })), [artifacts]);
+  const nodeOffsets = useMemo(
+    () =>
+      artifacts.map(() => ({
+        x: (Math.random() - 0.5) * 40,
+        y: (Math.random() - 0.5) * 40,
+        duration: 3 + Math.random() * 4,
+      })),
+    [artifacts]
+  );
 
   // Calculate active node position for panning
   const activeNodePos = useMemo(() => {
     if (!activeId) return { x: 400, y: 300 };
-    const idx = artifacts.findIndex(a => a.id === activeId);
+    const idx = artifacts.findIndex((a) => a.id === activeId);
     if (idx === -1) return { x: 400, y: 300 };
     const angle = (idx / artifacts.length) * Math.PI * 2;
     const r = 220;
     return {
       x: 400 + Math.cos(angle) * r,
-      y: 300 + Math.sin(angle) * r
+      y: 300 + Math.sin(angle) * r,
     };
   }, [activeId, artifacts]);
 
@@ -33,18 +37,21 @@ const ResonanceConstellation: React.FC<ResonanceGraphProps> = ({ artifacts, acti
       {/* Background Nebula */}
       <div className="absolute inset-0 opacity-30">
         <div className="absolute top-1/4 left-1/4 w-[500px] h-[500px] bg-neon-cyan/10 rounded-full blur-[150px] animate-pulse" />
-        <div className="absolute bottom-1/4 right-1/4 w-[500px] h-[500px] bg-neon-magenta/10 rounded-full blur-[150px] animate-pulse" style={{ animationDelay: '2s' }} />
+        <div
+          className="absolute bottom-1/4 right-1/4 w-[500px] h-[500px] bg-neon-magenta/10 rounded-full blur-[150px] animate-pulse"
+          style={{ animationDelay: '2s' }}
+        />
       </div>
 
-      <motion.svg 
-        className="w-full h-full relative z-10" 
+      <motion.svg
+        className="w-full h-full relative z-10"
         viewBox="0 0 800 600"
         animate={{
-          viewBox: activeId 
-            ? `${activeNodePos.x - 200} ${activeNodePos.y - 150} 400 300` 
-            : `0 0 800 600`
+          viewBox: activeId
+            ? `${activeNodePos.x - 200} ${activeNodePos.y - 150} 400 300`
+            : `0 0 800 600`,
         }}
-        transition={{ duration: 1.5, ease: "easeInOut" }}
+        transition={{ duration: 1.5, ease: 'easeInOut' }}
       >
         <defs>
           <radialGradient id="nodeGradient" cx="50%" cy="50%" r="50%">
@@ -74,7 +81,10 @@ const ResonanceConstellation: React.FC<ResonanceGraphProps> = ({ artifacts, acti
           return (
             <motion.line
               key={`line-${i}`}
-              x1={x1} y1={y1} x2={x2} y2={y2}
+              x1={x1}
+              y1={y1}
+              x2={x2}
+              y2={y2}
               stroke="rgba(0, 243, 255, 0.15)"
               strokeWidth="1"
               initial={{ pathLength: 0, opacity: 0 }}
@@ -97,29 +107,43 @@ const ResonanceConstellation: React.FC<ResonanceGraphProps> = ({ artifacts, acti
             <motion.g
               key={a.id}
               initial={{ scale: 0, opacity: 0 }}
-              animate={{ 
-                scale: isActive ? 1.6 : 1, 
+              animate={{
+                scale: isActive ? 1.6 : 1,
                 opacity: 1,
                 x: isActive ? 0 : offset.x,
-                y: isActive ? 0 : offset.y
+                y: isActive ? 0 : offset.y,
               }}
-              transition={{ 
+              transition={{
                 scale: { type: 'spring', stiffness: 100 },
-                x: { duration: offset.duration, repeat: Infinity, repeatType: "reverse", ease: "easeInOut" },
-                y: { duration: offset.duration * 1.2, repeat: Infinity, repeatType: "reverse", ease: "easeInOut" }
+                x: {
+                  duration: offset.duration,
+                  repeat: Infinity,
+                  repeatType: 'reverse',
+                  ease: 'easeInOut',
+                },
+                y: {
+                  duration: offset.duration * 1.2,
+                  repeat: Infinity,
+                  repeatType: 'reverse',
+                  ease: 'easeInOut',
+                },
               }}
             >
               <circle
-                cx={baseX} cy={baseY} r={isActive ? 14 : 10}
-                fill={isActive ? "#00f3ff" : "rgba(255,255,255,0.05)"}
-                stroke={isActive ? "#00f3ff" : "rgba(255,255,255,0.2)"}
+                cx={baseX}
+                cy={baseY}
+                r={isActive ? 14 : 10}
+                fill={isActive ? '#00f3ff' : 'rgba(255,255,255,0.05)'}
+                stroke={isActive ? '#00f3ff' : 'rgba(255,255,255,0.2)'}
                 strokeWidth="2"
-                filter={isActive ? "url(#glow)" : ""}
+                filter={isActive ? 'url(#glow)' : ''}
                 className="cursor-pointer"
               />
               {isActive && (
                 <motion.circle
-                  cx={baseX} cy={baseY} r={25}
+                  cx={baseX}
+                  cy={baseY}
+                  r={25}
                   fill="none"
                   stroke="#00f3ff"
                   strokeWidth="1"
@@ -138,24 +162,35 @@ const ResonanceConstellation: React.FC<ResonanceGraphProps> = ({ artifacts, acti
           animate={{ scale: 1 }}
           transition={{ delay: 1.5, duration: 2, type: 'spring' }}
         >
-          <circle cx="400" cy="300" r="45" fill="url(#nodeGradient)" className="text-neon-cyan" filter="url(#glow)" />
+          <circle
+            cx="400"
+            cy="300"
+            r="45"
+            fill="url(#nodeGradient)"
+            className="text-neon-cyan"
+            filter="url(#glow)"
+          />
           <motion.circle
-            cx="400" cy="300" r="60"
+            cx="400"
+            cy="300"
+            r="60"
             fill="none"
             stroke="#00f3ff"
             strokeWidth="0.5"
             strokeDasharray="15 10"
             animate={{ rotate: 360 }}
-            transition={{ duration: 30, repeat: Infinity, ease: "linear" }}
+            transition={{ duration: 30, repeat: Infinity, ease: 'linear' }}
           />
           <motion.circle
-            cx="400" cy="300" r="75"
+            cx="400"
+            cy="300"
+            r="75"
             fill="none"
             stroke="#00f3ff"
             strokeWidth="0.2"
             strokeDasharray="5 15"
             animate={{ rotate: -360 }}
-            transition={{ duration: 45, repeat: Infinity, ease: "linear" }}
+            transition={{ duration: 45, repeat: Infinity, ease: 'linear' }}
           />
         </motion.g>
       </motion.svg>
@@ -172,16 +207,19 @@ export const ResonanceGraph: React.FC<ResonanceGraphProps> = ({ artifacts, activ
       className="relative h-[700px] rounded-[3rem] border border-white/5 bg-black/40 backdrop-blur-3xl overflow-hidden"
     >
       <ResonanceConstellation artifacts={artifacts} activeId={activeId} />
-      
+
       {/* Overlay UI for Graph */}
       <div className="absolute top-12 left-12 max-w-xs space-y-6 pointer-events-none">
         <div className="space-y-2">
-          <h3 className="text-3xl font-display font-bold italic text-white">Resonance <span className="text-neon-cyan">Graph</span></h3>
+          <h3 className="text-3xl font-display font-bold italic text-white">
+            Resonance <span className="text-neon-cyan">Graph</span>
+          </h3>
           <p className="text-sm text-white/30 leading-relaxed">
-            Visualizing the semantic architecture of your professional DNA. Every node is a signal; every link is a potential.
+            Visualizing the semantic architecture of your professional DNA. Every node is a signal;
+            every link is a potential.
           </p>
         </div>
-        
+
         <div className="flex flex-col gap-3">
           <div className="flex items-center gap-3 text-[10px] font-black uppercase tracking-widest text-neon-cyan">
             <div className="w-2 h-2 rounded-full bg-neon-cyan animate-pulse" />
@@ -198,11 +236,15 @@ export const ResonanceGraph: React.FC<ResonanceGraphProps> = ({ artifacts, activ
       <div className="absolute bottom-12 right-12 flex gap-8 p-6 rounded-2xl bg-black/60 border border-white/5 backdrop-blur-xl">
         <div className="flex items-center gap-3">
           <div className="w-3 h-3 rounded-full bg-neon-cyan shadow-[0_0_10px_rgba(0,243,255,0.5)]" />
-          <span className="text-[10px] font-black uppercase tracking-widest text-white/60">Core Spark</span>
+          <span className="text-[10px] font-black uppercase tracking-widest text-white/60">
+            Core Spark
+          </span>
         </div>
         <div className="flex items-center gap-3">
           <div className="w-3 h-3 rounded-full bg-white/20" />
-          <span className="text-[10px] font-black uppercase tracking-widest text-white/60">Artifact Node</span>
+          <span className="text-[10px] font-black uppercase tracking-widest text-white/60">
+            Artifact Node
+          </span>
         </div>
       </div>
     </motion.div>

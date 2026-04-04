@@ -11,9 +11,9 @@ vi.mock('../contexts/IdentityContext', () => ({
     user: null,
     profile: null,
     loading: false,
-    status: 'unauthenticated'
+    status: 'unauthenticated',
   })),
-  IdentityProvider: ({ children }: { children: React.ReactNode }) => <div>{children}</div>
+  IdentityProvider: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
 }));
 
 // Mock useNavigate
@@ -55,9 +55,9 @@ describe('NavBar', () => {
 
     const dashboardBtn = screen.getByRole('button', { name: /Dashboard/i });
     expect(dashboardBtn).toBeInTheDocument();
-    
+
     fireEvent.click(dashboardBtn);
-    expect(mockOnNavigate).toHaveBeenCalledWith('login');
+    expect(mockNavigate).toHaveBeenCalledWith('/login');
   });
 
   it('shows user dashboard and settings when authenticated', async () => {
@@ -66,7 +66,7 @@ describe('NavBar', () => {
       user: { uid: '123' },
       profile: { uid: '123' },
       loading: false,
-      status: 'authenticated'
+      status: 'authenticated',
     });
 
     render(

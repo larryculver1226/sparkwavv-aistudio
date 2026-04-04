@@ -12,7 +12,7 @@ export const InactivityTimeout: React.FC = () => {
   const [showWarning, setShowWarning] = useState(false);
   const [timeLeft, setTimeLeft] = useState(LOGOUT_TIME / 1000);
   const navigate = useNavigate();
-  
+
   const warningTimerRef = useRef<NodeJS.Timeout | null>(null);
   const logoutTimerRef = useRef<NodeJS.Timeout | null>(null);
   const countdownIntervalRef = useRef<NodeJS.Timeout | null>(null);
@@ -36,7 +36,7 @@ export const InactivityTimeout: React.FC = () => {
     // Set warning timer
     warningTimerRef.current = setTimeout(() => {
       setShowWarning(true);
-      
+
       // Start logout countdown
       let seconds = LOGOUT_TIME / 1000;
       countdownIntervalRef.current = setInterval(() => {
@@ -55,18 +55,18 @@ export const InactivityTimeout: React.FC = () => {
 
   useEffect(() => {
     const events = ['mousedown', 'mousemove', 'keypress', 'scroll', 'touchstart'];
-    
+
     const handleActivity = () => {
       if (!showWarning) {
         resetTimers();
       }
     };
 
-    events.forEach(event => window.addEventListener(event, handleActivity));
+    events.forEach((event) => window.addEventListener(event, handleActivity));
     resetTimers();
 
     return () => {
-      events.forEach(event => window.removeEventListener(event, handleActivity));
+      events.forEach((event) => window.removeEventListener(event, handleActivity));
       if (warningTimerRef.current) clearTimeout(warningTimerRef.current);
       if (logoutTimerRef.current) clearTimeout(logoutTimerRef.current);
       if (countdownIntervalRef.current) clearInterval(countdownIntervalRef.current);
@@ -91,21 +91,23 @@ export const InactivityTimeout: React.FC = () => {
           >
             {/* Background Glow */}
             <div className="absolute -top-24 -right-24 w-48 h-48 bg-neon-magenta/10 rounded-full blur-3xl" />
-            
+
             <div className="relative z-10 flex flex-col items-center text-center">
               <div className="w-20 h-20 rounded-2xl bg-neon-magenta/10 border border-neon-magenta/20 flex items-center justify-center mb-6">
                 <Clock className="w-10 h-10 text-neon-magenta animate-pulse" />
               </div>
-              
-              <h2 className="text-3xl font-display font-bold text-white mb-2">Inactivity Warning</h2>
+
+              <h2 className="text-3xl font-display font-bold text-white mb-2">
+                Inactivity Warning
+              </h2>
               <p className="text-white/60 mb-8">
                 You've been inactive for a while. For your security, you will be logged out in:
               </p>
-              
+
               <div className="text-6xl font-mono font-bold text-neon-magenta mb-10 tracking-tighter">
                 {formatTime(timeLeft)}
               </div>
-              
+
               <div className="flex flex-col w-full gap-4">
                 <button
                   onClick={resetTimers}

@@ -12,7 +12,7 @@ export const IntroSequence: React.FC<IntroSequenceProps> = ({ stage }) => {
 
   return (
     <AnimatePresence>
-      <motion.div 
+      <motion.div
         initial={{ opacity: 1 }}
         exit={{ opacity: 0 }}
         className="fixed inset-0 z-[100] bg-black flex flex-col items-center justify-center p-8 text-center overflow-hidden"
@@ -22,19 +22,19 @@ export const IntroSequence: React.FC<IntroSequenceProps> = ({ stage }) => {
           {[...Array(20)].map((_, i) => (
             <motion.div
               key={i}
-              initial={{ 
-                x: Math.random() * (typeof window !== 'undefined' ? window.innerWidth : 1000), 
+              initial={{
+                x: Math.random() * (typeof window !== 'undefined' ? window.innerWidth : 1000),
                 y: Math.random() * (typeof window !== 'undefined' ? window.innerHeight : 1000),
-                opacity: 0 
+                opacity: 0,
               }}
-              animate={{ 
+              animate={{
                 y: [null, Math.random() * -200],
-                opacity: [0, 0.3, 0]
+                opacity: [0, 0.3, 0],
               }}
-              transition={{ 
-                duration: 5 + Math.random() * 5, 
+              transition={{
+                duration: 5 + Math.random() * 5,
                 repeat: Infinity,
-                delay: Math.random() * 5
+                delay: Math.random() * 5,
               }}
               className="absolute w-1 h-1 bg-neon-cyan rounded-full blur-[1px]"
             />
@@ -91,10 +91,10 @@ export const IntroSequence: React.FC<IntroSequenceProps> = ({ stage }) => {
                 exit={{ scale: 2, opacity: 0 }}
                 className="absolute inset-0 flex items-center justify-center"
               >
-                <motion.div 
+                <motion.div
                   animate={{ scale: [1, 1.2, 1], opacity: [0.3, 0.6, 0.3] }}
                   transition={{ duration: 2, repeat: Infinity }}
-                  className="w-48 h-48 bg-neon-cyan rounded-full blur-[80px]" 
+                  className="w-48 h-48 bg-neon-cyan rounded-full blur-[80px]"
                 />
                 <Sparkles className="w-32 h-32 text-white drop-shadow-[0_0_30px_rgba(0,243,255,1)]" />
                 <div className="absolute -bottom-16 font-mono text-[10px] text-white tracking-[0.4em] uppercase font-black">
@@ -105,7 +105,7 @@ export const IntroSequence: React.FC<IntroSequenceProps> = ({ stage }) => {
           </AnimatePresence>
         </div>
 
-        <motion.div 
+        <motion.div
           className="max-w-xl space-y-8 relative z-10"
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
@@ -113,9 +113,9 @@ export const IntroSequence: React.FC<IntroSequenceProps> = ({ stage }) => {
         >
           <div className="space-y-2">
             <h2 className="text-4xl font-display font-bold italic text-white tracking-tighter">
-              {stage === 'sequencing' && "Accessing the Treasury"}
-              {stage === 'mapping' && "Synthesizing Inferences"}
-              {stage === 'spark' && "Your Professional Essence"}
+              {stage === 'sequencing' && 'Accessing the Treasury'}
+              {stage === 'mapping' && 'Synthesizing Inferences'}
+              {stage === 'spark' && 'Your Professional Essence'}
             </h2>
             <div className="h-px w-24 bg-neon-cyan mx-auto opacity-50" />
           </div>
@@ -126,9 +126,12 @@ export const IntroSequence: React.FC<IntroSequenceProps> = ({ stage }) => {
               Skylar Transmission
             </div>
             <p className="text-lg text-white/70 leading-relaxed font-serif italic">
-              {stage === 'sequencing' && "I'm decrypting your professional history into a sovereign, immutable ledger. Every achievement is a signal."}
-              {stage === 'mapping' && "I'm identifying the latent connections between your past achievements and your future potential. The pattern is emerging."}
-              {stage === 'spark' && "The core of your professional identity has been distilled. This is the 'Spark' that will ignite your next chapter. Welcome home."}
+              {stage === 'sequencing' &&
+                "I'm decrypting your professional history into a sovereign, immutable ledger. Every achievement is a signal."}
+              {stage === 'mapping' &&
+                "I'm identifying the latent connections between your past achievements and your future potential. The pattern is emerging."}
+              {stage === 'spark' &&
+                "The core of your professional identity has been distilled. This is the 'Spark' that will ignite your next chapter. Welcome home."}
             </p>
           </div>
         </motion.div>

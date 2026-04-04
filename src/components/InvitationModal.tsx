@@ -29,13 +29,13 @@ export const InvitationModal: React.FC<InvitationModalProps> = ({ isOpen, onClos
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${idToken}`
+          Authorization: `Bearer ${idToken}`,
         },
         body: JSON.stringify({
           recipientEmail: email,
           recipientName: name,
-          relationship
-        })
+          relationship,
+        }),
       });
 
       if (!response.ok) {
@@ -68,7 +68,7 @@ export const InvitationModal: React.FC<InvitationModalProps> = ({ isOpen, onClos
             onClick={onClose}
             className="absolute inset-0 bg-black/80 backdrop-blur-sm"
           />
-          
+
           <motion.div
             initial={{ opacity: 0, scale: 0.9, y: 20 }}
             animate={{ opacity: 1, scale: 1, y: 0 }}
@@ -80,7 +80,10 @@ export const InvitationModal: React.FC<InvitationModalProps> = ({ isOpen, onClos
                 <div className="p-3 bg-emerald-500/10 rounded-2xl">
                   <UserPlus className="w-6 h-6 text-emerald-400" />
                 </div>
-                <button onClick={onClose} className="p-2 hover:bg-zinc-800 rounded-full transition-colors">
+                <button
+                  onClick={onClose}
+                  className="p-2 hover:bg-zinc-800 rounded-full transition-colors"
+                >
                   <X className="w-5 h-5 text-zinc-500" />
                 </button>
               </div>

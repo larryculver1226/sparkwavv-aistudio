@@ -27,18 +27,18 @@ class AudioService {
 
     this.ambientOsc = this.context.createOscillator();
     const filter = this.context.createBiquadFilter();
-    
+
     this.ambientOsc.type = 'sine';
     this.ambientOsc.frequency.setValueAtTime(40, this.context.currentTime); // 40Hz hum
-    
+
     filter.type = 'lowpass';
     filter.frequency.setValueAtTime(100, this.context.currentTime);
-    
+
     this.ambientOsc.connect(filter);
     filter.connect(this.masterGain);
-    
+
     this.ambientOsc.start();
-    
+
     // Subtle frequency modulation for "living" feel
     const lfo = this.context.createOscillator();
     const lfoGain = this.context.createGain();
@@ -72,18 +72,18 @@ class AudioService {
       const now = this.context.currentTime;
       const osc = this.context.createOscillator();
       const gain = this.context.createGain();
-      
+
       osc.type = 'sine';
       osc.frequency.setValueAtTime(50, now);
       osc.frequency.exponentialRampToValueAtTime(30, now + 0.2);
-      
+
       gain.gain.setValueAtTime(0, now);
       gain.gain.linearRampToValueAtTime(0.2, now + 0.05);
       gain.gain.exponentialRampToValueAtTime(0.001, now + 0.5);
-      
+
       osc.connect(gain);
       gain.connect(this.masterGain);
-      
+
       osc.start(now);
       osc.stop(now + 0.5);
     };
@@ -113,7 +113,7 @@ class AudioService {
     osc.type = 'sine';
     osc.frequency.setValueAtTime(880, now); // A5
     osc.frequency.exponentialRampToValueAtTime(1760, now + 0.1); // Quick slide up
-    
+
     gain.gain.setValueAtTime(0, now);
     gain.gain.linearRampToValueAtTime(0.2, now + 0.05);
     gain.gain.exponentialRampToValueAtTime(0.001, now + 2);
@@ -137,13 +137,13 @@ class AudioService {
     const bufferSize = this.context.sampleRate * 1; // 1 second
     const buffer = this.context.createBuffer(1, bufferSize, this.context.sampleRate);
     const data = buffer.getChannelData(0);
-    
+
     for (let i = 0; i < bufferSize; i++) {
       data[i] = Math.random() * 2 - 1;
     }
 
     noise.buffer = buffer;
-    
+
     const filter = this.context.createBiquadFilter();
     filter.type = 'bandpass';
     filter.frequency.setValueAtTime(100, now);

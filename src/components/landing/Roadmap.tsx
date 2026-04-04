@@ -7,27 +7,29 @@ const steps = [
     id: 'ignition',
     number: '01',
     title: 'Ignition: Onboarding',
-    description: 'Begin your journey with a streamlined onboarding process and secure your spot via our premium paywall.',
+    description:
+      'Begin your journey with a streamlined onboarding process and secure your spot via our premium paywall.',
     proTip: 'Secure your spot in the next cohort to begin your transformation.',
     coreActivity: 'Account Setup & Goal Alignment',
     icon: <Zap className="w-8 h-8" />,
     color: 'text-amber-400',
     bgColor: 'bg-amber-500/10',
     borderColor: 'border-amber-500/20',
-    accent: 'from-amber-500/20 to-transparent'
+    accent: 'from-amber-500/20 to-transparent',
   },
   {
     id: 'discovery',
     number: '02',
     title: 'Discovery: Launchpad',
     description: 'Intensive internal assessments to identify core strengths and extinguishers.',
-    proTip: "The '13-20' Rule: Your most instructive insights surface after the first 12 accomplishments.",
+    proTip:
+      "The '13-20' Rule: Your most instructive insights surface after the first 12 accomplishments.",
     coreActivity: '20 Accomplishments Exercise',
     icon: <Search className="w-8 h-8" />,
     color: 'text-orange-500',
     bgColor: 'bg-orange-500/10',
     borderColor: 'border-orange-500/20',
-    accent: 'from-orange-500/20 to-transparent'
+    accent: 'from-orange-500/20 to-transparent',
   },
   {
     id: 'branding',
@@ -40,7 +42,7 @@ const steps = [
     color: 'text-orange-400',
     bgColor: 'bg-gradient-to-br from-orange-500/10 to-emerald-500/10',
     borderColor: 'border-orange-500/20',
-    accent: 'from-orange-500/20 via-emerald-500/10 to-transparent'
+    accent: 'from-orange-500/20 via-emerald-500/10 to-transparent',
   },
   {
     id: 'outreach',
@@ -53,8 +55,8 @@ const steps = [
     color: 'text-emerald-400',
     bgColor: 'bg-emerald-500/10',
     borderColor: 'border-emerald-500/20',
-    accent: 'from-emerald-500/20 to-transparent'
-  }
+    accent: 'from-emerald-500/20 to-transparent',
+  },
 ];
 
 export const Roadmap: React.FC = () => {
@@ -88,13 +90,15 @@ export const Roadmap: React.FC = () => {
               STEP {step.number}
             </div>
 
-            <div className={`flex-grow glass-panel p-8 rounded-3xl border ${step.borderColor} bg-white/[0.02] flex flex-col space-y-6 transition-all duration-500 group-hover:bg-white/[0.04] group-hover:-translate-y-2`}>
+            <div
+              className={`flex-grow glass-panel p-8 rounded-3xl border ${step.borderColor} bg-white/[0.02] flex flex-col space-y-6 transition-all duration-500 group-hover:bg-white/[0.04] group-hover:-translate-y-2`}
+            >
               {/* Icon Container */}
-              <div className={`w-16 h-16 rounded-2xl ${step.bgColor} ${step.color} flex items-center justify-center relative overflow-hidden shadow-2xl group-hover:scale-110 transition-transform duration-500`}>
+              <div
+                className={`w-16 h-16 rounded-2xl ${step.bgColor} ${step.color} flex items-center justify-center relative overflow-hidden shadow-2xl group-hover:scale-110 transition-transform duration-500`}
+              >
                 <div className={`absolute inset-0 bg-gradient-to-br ${step.accent} opacity-50`} />
-                <div className="relative z-10">
-                  {step.icon}
-                </div>
+                <div className="relative z-10">{step.icon}</div>
               </div>
 
               {/* Content */}
@@ -102,24 +106,28 @@ export const Roadmap: React.FC = () => {
                 <h3 className="text-2xl font-display font-bold group-hover:text-white transition-colors">
                   {step.title}
                 </h3>
-                <p className="text-white/50 text-sm leading-relaxed">
-                  {step.description}
-                </p>
+                <p className="text-white/50 text-sm leading-relaxed">{step.description}</p>
               </div>
 
               {/* Pro-Tip Block */}
               <div className="pt-6 border-t border-white/5 space-y-3">
                 <div className="flex items-start gap-3 p-3 rounded-xl bg-white/5 border border-white/5 group-hover:border-white/10 transition-colors">
-                  <Star className={`w-4 h-4 mt-0.5 shrink-0 ${step.color} fill-current opacity-50`} />
+                  <Star
+                    className={`w-4 h-4 mt-0.5 shrink-0 ${step.color} fill-current opacity-50`}
+                  />
                   <p className="text-[11px] text-white/40 leading-snug italic">
-                    <span className="font-bold text-white/60 not-italic uppercase tracking-tighter mr-1">Pro-Tip:</span>
+                    <span className="font-bold text-white/60 not-italic uppercase tracking-tighter mr-1">
+                      Pro-Tip:
+                    </span>
                     {step.proTip}
                   </p>
                 </div>
-                
+
                 {/* Core Activity Label */}
                 <div className="flex items-center gap-2 px-1">
-                  <div className={`w-1.5 h-1.5 rounded-full ${step.color.replace('text-', 'bg-')} animate-pulse`} />
+                  <div
+                    className={`w-1.5 h-1.5 rounded-full ${step.color.replace('text-', 'bg-')} animate-pulse`}
+                  />
                   <span className="text-[10px] uppercase tracking-widest font-bold text-white/30">
                     Core Activity: <span className="text-white/60">{step.coreActivity}</span>
                   </span>
@@ -145,7 +153,7 @@ export const Roadmap: React.FC = () => {
       </div>
 
       {/* Bottom Summary Label */}
-      <motion.div 
+      <motion.div
         initial={{ opacity: 0 }}
         whileInView={{ opacity: 1 }}
         transition={{ delay: 0.8 }}

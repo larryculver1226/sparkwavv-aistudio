@@ -15,18 +15,20 @@ const MOCK_STRENGTHS: Strength[] = [
   {
     id: '1',
     title: 'Strategic Systems Design',
-    description: 'Ability to architect complex digital ecosystems with a focus on scalability and user resonance.',
+    description:
+      'Ability to architect complex digital ecosystems with a focus on scalability and user resonance.',
     level: 95,
     category: 'Design',
-    tags: ['Architecture', 'Scalability', 'Ecosystems']
+    tags: ['Architecture', 'Scalability', 'Ecosystems'],
   },
   {
     id: '2',
     title: 'Neural UX Research',
-    description: 'Deep understanding of cognitive patterns and behavioral psychology applied to interface design.',
+    description:
+      'Deep understanding of cognitive patterns and behavioral psychology applied to interface design.',
     level: 92,
     category: 'Research',
-    tags: ['Psychology', 'Cognitive Patterns', 'Behavioral']
+    tags: ['Psychology', 'Cognitive Patterns', 'Behavioral'],
   },
   {
     id: '3',
@@ -34,8 +36,8 @@ const MOCK_STRENGTHS: Strength[] = [
     description: 'High-velocity iteration from concept to high-fidelity interactive models.',
     level: 88,
     category: 'Execution',
-    tags: ['Velocity', 'High-Fidelity', 'Iteration']
-  }
+    tags: ['Velocity', 'High-Fidelity', 'Iteration'],
+  },
 ];
 
 interface StrengthsViewProps {
@@ -47,7 +49,7 @@ export const StrengthsView: React.FC<StrengthsViewProps> = ({ onBack }) => {
     <div className="space-y-8">
       <header className="space-y-4">
         <div className="flex items-center gap-4">
-          <button 
+          <button
             onClick={onBack}
             className="p-2 rounded-xl bg-white/5 border border-white/10 text-white/40 hover:text-white transition-colors"
           >
@@ -55,11 +57,14 @@ export const StrengthsView: React.FC<StrengthsViewProps> = ({ onBack }) => {
           </button>
           <div className="flex items-center gap-2 text-neon-cyan">
             <Award className="w-5 h-5" />
-            <h2 className="text-2xl font-display font-bold uppercase tracking-tight">Professional Strengths</h2>
+            <h2 className="text-2xl font-display font-bold uppercase tracking-tight">
+              Professional Strengths
+            </h2>
           </div>
         </div>
         <p className="text-white/40 text-sm max-w-2xl pl-14">
-          Your unique professional DNA, distilled from your experiences, artifacts, and neural synthesis.
+          Your unique professional DNA, distilled from your experiences, artifacts, and neural
+          synthesis.
         </p>
       </header>
 
@@ -77,17 +82,26 @@ export const StrengthsView: React.FC<StrengthsViewProps> = ({ onBack }) => {
                 <Brain className="w-6 h-6 text-neon-cyan" />
               </div>
               <div className="text-right">
-                <div className="text-[10px] font-bold text-neon-cyan uppercase tracking-widest mb-1">{strength.category}</div>
-                <div className="text-xl font-display font-bold text-white italic">{strength.level}%</div>
+                <div className="text-[10px] font-bold text-neon-cyan uppercase tracking-widest mb-1">
+                  {strength.category}
+                </div>
+                <div className="text-xl font-display font-bold text-white italic">
+                  {strength.level}%
+                </div>
               </div>
             </div>
 
-            <h3 className="text-lg font-bold text-white mb-3 group-hover:text-neon-cyan transition-colors">{strength.title}</h3>
+            <h3 className="text-lg font-bold text-white mb-3 group-hover:text-neon-cyan transition-colors">
+              {strength.title}
+            </h3>
             <p className="text-sm text-white/60 mb-6 leading-relaxed">{strength.description}</p>
 
             <div className="flex flex-wrap gap-2">
               {strength.tags.map((tag, j) => (
-                <span key={j} className="px-3 py-1 rounded-lg bg-white/5 border border-white/5 text-[10px] font-bold text-white/40 uppercase tracking-wider">
+                <span
+                  key={j}
+                  className="px-3 py-1 rounded-lg bg-white/5 border border-white/5 text-[10px] font-bold text-white/40 uppercase tracking-wider"
+                >
                   {tag}
                 </span>
               ))}
@@ -103,8 +117,16 @@ export const StrengthsView: React.FC<StrengthsViewProps> = ({ onBack }) => {
             Verified Competencies
           </h3>
           <div className="space-y-4">
-            {['Product Strategy', 'User Experience', 'Visual Communication', 'Technical Architecture'].map((skill, i) => (
-              <div key={i} className="flex items-center justify-between p-4 rounded-xl bg-white/5 border border-white/5">
+            {[
+              'Product Strategy',
+              'User Experience',
+              'Visual Communication',
+              'Technical Architecture',
+            ].map((skill, i) => (
+              <div
+                key={i}
+                className="flex items-center justify-between p-4 rounded-xl bg-white/5 border border-white/5"
+              >
                 <span className="text-sm font-bold text-white/80">{skill}</span>
                 <div className="flex items-center gap-2">
                   <div className="w-24 h-1.5 bg-white/10 rounded-full overflow-hidden">
@@ -130,7 +152,9 @@ export const StrengthsView: React.FC<StrengthsViewProps> = ({ onBack }) => {
               <div className="absolute inset-0 flex items-center justify-center">
                 <div className="text-center">
                   <div className="text-3xl font-display font-bold text-neon-cyan italic">+12%</div>
-                  <div className="text-[8px] font-bold text-white/40 uppercase tracking-widest">Velocity</div>
+                  <div className="text-[8px] font-bold text-white/40 uppercase tracking-widest">
+                    Velocity
+                  </div>
                 </div>
               </div>
               {/* Simple radar chart decoration */}

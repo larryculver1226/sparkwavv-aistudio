@@ -1,13 +1,13 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { 
-  History, 
-  ChevronRight, 
-  ChevronLeft, 
-  Clock, 
-  Tag, 
-  AlertCircle, 
-  CheckCircle2, 
+import {
+  History,
+  ChevronRight,
+  ChevronLeft,
+  Clock,
+  Tag,
+  AlertCircle,
+  CheckCircle2,
   Zap,
   Target,
   Compass,
@@ -15,7 +15,7 @@ import {
   Settings2,
   Brain,
   Database,
-  X
+  X,
 } from 'lucide-react';
 import * as d3 from 'd3';
 import { UserInsight } from '../types/dashboard';
@@ -27,9 +27,9 @@ interface EvolutionVisualizerProps {
 
 type ViewMode = 'history' | 'neural';
 
-export const EvolutionVisualizer: React.FC<EvolutionVisualizerProps> = ({ 
-  insights, 
-  onInsightClick 
+export const EvolutionVisualizer: React.FC<EvolutionVisualizerProps> = ({
+  insights,
+  onInsightClick,
 }) => {
   const [view, setView] = useState<ViewMode>('neural');
   const [selectedNode, setSelectedNode] = useState<UserInsight | null>(null);
@@ -44,111 +44,126 @@ export const EvolutionVisualizer: React.FC<EvolutionVisualizerProps> = ({
     const height = 500;
 
     // Clear previous
-    d3.select(svgRef.current).selectAll("*").remove();
+    d3.select(svgRef.current).selectAll('*').remove();
 
-    const svg = d3.select(svgRef.current)
-      .attr("viewBox", [0, 0, width, height])
-      .attr("style", "max-width: 100%; height: auto;");
+    const svg = d3
+      .select(svgRef.current)
+      .attr('viewBox', [0, 0, width, height])
+      .attr('style', 'max-width: 100%; height: auto;');
 
     // Add a central "Spark Core" glow
-    svg.append("defs")
-      .append("radialGradient")
-      .attr("id", "spark-glow")
-      .selectAll("stop")
+    svg
+      .append('defs')
+      .append('radialGradient')
+      .attr('id', 'spark-glow')
+      .selectAll('stop')
       .data([
-        { offset: "0%", color: "#00f3ff", opacity: 0.3 },
-        { offset: "100%", color: "#00f3ff", opacity: 0 }
+        { offset: '0%', color: '#00f3ff', opacity: 0.3 },
+        { offset: '100%', color: '#00f3ff', opacity: 0 },
       ])
-      .enter().append("stop")
-      .attr("offset", d => d.offset)
-      .attr("stop-color", d => d.color)
-      .attr("stop-opacity", d => d.opacity);
+      .enter()
+      .append('stop')
+      .attr('offset', (d) => d.offset)
+      .attr('stop-color', (d) => d.color)
+      .attr('stop-opacity', (d) => d.opacity);
 
-    svg.append("circle")
-      .attr("cx", width / 2)
-      .attr("cy", height / 2)
-      .attr("r", 150)
-      .attr("fill", "url(#spark-glow)")
-      .attr("class", "animate-pulse");
+    svg
+      .append('circle')
+      .attr('cx', width / 2)
+      .attr('cy', height / 2)
+      .attr('r', 150)
+      .attr('fill', 'url(#spark-glow)')
+      .attr('class', 'animate-pulse');
 
-    const nodes = insights.map(d => ({ ...d, id: d.id || Math.random().toString() }));
+    const nodes = insights.map((d) => ({ ...d, id: d.id || Math.random().toString() }));
     const links: any[] = [];
-    
+
     // Create links based on tags or shared context
     nodes.forEach((node, i) => {
-      nodes.slice(i + 1).forEach(other => {
-        const commonTags = node.tags?.filter(t => other.tags?.includes(t));
+      nodes.slice(i + 1).forEach((other) => {
+        const commonTags = node.tags?.filter((t) => other.tags?.includes(t));
         if (commonTags && commonTags.length > 0) {
           links.push({ source: node.id, target: other.id, value: commonTags.length });
         }
       });
     });
 
-    const simulation = d3.forceSimulation(nodes as any)
-      .force("link", d3.forceLink(links).id((d: any) => d.id).distance(100))
-      .force("charge", d3.forceManyBody().strength(-200))
-      .force("center", d3.forceCenter(width / 2, height / 2))
-      .force("collision", d3.forceCollide().radius(50));
+    const simulation = d3
+      .forceSimulation(nodes as any)
+      .force(
+        'link',
+        d3
+          .forceLink(links)
+          .id((d: any) => d.id)
+          .distance(100)
+      )
+      .force('charge', d3.forceManyBody().strength(-200))
+      .force('center', d3.forceCenter(width / 2, height / 2))
+      .force('collision', d3.forceCollide().radius(50));
 
-    const link = svg.append("g")
-      .attr("stroke", "#00f3ff")
-      .attr("stroke-opacity", 0.2)
-      .selectAll("line")
+    const link = svg
+      .append('g')
+      .attr('stroke', '#00f3ff')
+      .attr('stroke-opacity', 0.2)
+      .selectAll('line')
       .data(links)
-      .join("line")
-      .attr("stroke-width", d => Math.sqrt(d.value) * 2);
+      .join('line')
+      .attr('stroke-width', (d) => Math.sqrt(d.value) * 2);
 
-    const node = svg.append("g")
-      .selectAll("g")
+    const node = svg
+      .append('g')
+      .selectAll('g')
       .data(nodes)
-      .join("g")
-      .attr("class", "cursor-pointer")
-      .on("mouseenter", (event, d) => setHoveredNode(d))
-      .on("mouseleave", () => setHoveredNode(null))
-      .on("click", (event, d) => {
+      .join('g')
+      .attr('class', 'cursor-pointer')
+      .on('mouseenter', (event, d) => setHoveredNode(d))
+      .on('mouseleave', () => setHoveredNode(null))
+      .on('click', (event, d) => {
         setSelectedNode(d);
         setShowLogicChain(true);
       });
 
     // Node Background
-    node.append("circle")
-      .attr("r", 25)
-      .attr("fill", d => d.status === 'confirmed' ? '#00f3ff20' : '#ffffff05')
-      .attr("stroke", d => d.status === 'confirmed' ? '#00f3ff' : '#ffffff20')
-      .attr("stroke-width", 1.5);
+    node
+      .append('circle')
+      .attr('r', 25)
+      .attr('fill', (d) => (d.status === 'confirmed' ? '#00f3ff20' : '#ffffff05'))
+      .attr('stroke', (d) => (d.status === 'confirmed' ? '#00f3ff' : '#ffffff20'))
+      .attr('stroke-width', 1.5);
 
     // Node Icon/Text Placeholder
-    node.append("text")
-      .attr("text-anchor", "middle")
-      .attr("dy", ".35em")
-      .attr("fill", "#fff")
-      .attr("font-size", "8px")
-      .attr("font-family", "monospace")
-      .text(d => d.type.split('_')[0].toUpperCase());
+    node
+      .append('text')
+      .attr('text-anchor', 'middle')
+      .attr('dy', '.35em')
+      .attr('fill', '#fff')
+      .attr('font-size', '8px')
+      .attr('font-family', 'monospace')
+      .text((d) => d.type.split('_')[0].toUpperCase());
 
     // Filaments (Animated lines flowing to center for Ignition phase)
-    const filaments = svg.append("g")
-      .attr("class", "filaments")
-      .selectAll("path")
-      .data(nodes.filter(n => n.status === 'confirmed'))
-      .join("path")
-      .attr("fill", "none")
-      .attr("stroke", "#00f3ff")
-      .attr("stroke-width", 0.5)
-      .attr("stroke-dasharray", "4,4")
-      .attr("opacity", 0.3);
+    const filaments = svg
+      .append('g')
+      .attr('class', 'filaments')
+      .selectAll('path')
+      .data(nodes.filter((n) => n.status === 'confirmed'))
+      .join('path')
+      .attr('fill', 'none')
+      .attr('stroke', '#00f3ff')
+      .attr('stroke-width', 0.5)
+      .attr('stroke-dasharray', '4,4')
+      .attr('opacity', 0.3);
 
-    simulation.on("tick", () => {
+    simulation.on('tick', () => {
       link
-        .attr("x1", (d: any) => d.source.x)
-        .attr("y1", (d: any) => d.source.y)
-        .attr("x2", (d: any) => d.target.x)
-        .attr("y2", (d: any) => d.target.y);
+        .attr('x1', (d: any) => d.source.x)
+        .attr('y1', (d: any) => d.source.y)
+        .attr('x2', (d: any) => d.target.x)
+        .attr('y2', (d: any) => d.target.y);
 
-      node
-        .attr("transform", (d: any) => `translate(${d.x},${d.y})`);
+      node.attr('transform', (d: any) => `translate(${d.x},${d.y})`);
 
-      filaments.attr("d", (d: any) => {
+      filaments.attr('d', (d: any) => {
         const dx = width / 2 - d.x;
         const dy = height / 2 - d.y;
         const dr = Math.sqrt(dx * dx + dy * dy);
@@ -156,7 +171,9 @@ export const EvolutionVisualizer: React.FC<EvolutionVisualizerProps> = ({
       });
     });
 
-    return () => { simulation.stop(); };
+    return () => {
+      simulation.stop();
+    };
   }, [view, insights]);
 
   return (
@@ -173,16 +190,18 @@ export const EvolutionVisualizer: React.FC<EvolutionVisualizerProps> = ({
             <Zap className="w-6 h-6 text-neon-cyan" />
             Synthesis Core
           </h2>
-          <p className="text-[10px] text-white/40 uppercase tracking-[0.2em] font-bold mt-1">Real-time Evolution DNA</p>
+          <p className="text-[10px] text-white/40 uppercase tracking-[0.2em] font-bold mt-1">
+            Real-time Evolution DNA
+          </p>
         </div>
         <div className="flex bg-white/5 p-1 rounded-xl border border-white/10">
-          <button 
+          <button
             onClick={() => setView('history')}
             className={`px-4 py-2 rounded-lg text-[10px] font-bold uppercase tracking-widest transition-all ${view === 'history' ? 'bg-neon-cyan text-black shadow-[0_0_15px_rgba(0,243,255,0.4)]' : 'text-white/40 hover:text-white'}`}
           >
             History
           </button>
-          <button 
+          <button
             onClick={() => setView('neural')}
             className={`px-4 py-2 rounded-lg text-[10px] font-bold uppercase tracking-widest transition-all ${view === 'neural' ? 'bg-neon-cyan text-black shadow-[0_0_15px_rgba(0,243,255,0.4)]' : 'text-white/40 hover:text-white'}`}
           >
@@ -204,15 +223,24 @@ export const EvolutionVisualizer: React.FC<EvolutionVisualizerProps> = ({
               >
                 <div className="flex items-center justify-between mb-3">
                   <div className="flex items-center gap-3">
-                    <div className={`w-2 h-2 rounded-full ${insight.status === 'confirmed' ? 'bg-neon-cyan shadow-[0_0_8px_rgba(0,243,255,0.8)]' : 'bg-white/20'}`} />
-                    <span className="text-[10px] font-bold uppercase tracking-widest text-white/40">{insight.type.replace('_', ' ')}</span>
+                    <div
+                      className={`w-2 h-2 rounded-full ${insight.status === 'confirmed' ? 'bg-neon-cyan shadow-[0_0_8px_rgba(0,243,255,0.8)]' : 'bg-white/20'}`}
+                    />
+                    <span className="text-[10px] font-bold uppercase tracking-widest text-white/40">
+                      {insight.type.replace('_', ' ')}
+                    </span>
                   </div>
-                  <span className="text-[10px] font-mono text-white/20">{new Date().toLocaleDateString()}</span>
+                  <span className="text-[10px] font-mono text-white/20">
+                    {new Date().toLocaleDateString()}
+                  </span>
                 </div>
                 <p className="text-sm text-white/80 leading-relaxed mb-4">{insight.content}</p>
                 <div className="flex flex-wrap gap-2">
-                  {insight.tags?.map(tag => (
-                    <span key={tag} className="px-2 py-1 rounded-md bg-white/5 border border-white/10 text-[9px] text-white/40 uppercase tracking-tighter">
+                  {insight.tags?.map((tag) => (
+                    <span
+                      key={tag}
+                      className="px-2 py-1 rounded-md bg-white/5 border border-white/10 text-[9px] text-white/40 uppercase tracking-tighter"
+                    >
                       #{tag}
                     </span>
                   ))}
@@ -223,7 +251,7 @@ export const EvolutionVisualizer: React.FC<EvolutionVisualizerProps> = ({
         ) : (
           <div className="w-full h-full relative">
             <svg ref={svgRef} className="w-full h-full" />
-            
+
             {/* Ancestry Trace Overlay */}
             <AnimatePresence>
               {hoveredNode && (
@@ -233,7 +261,9 @@ export const EvolutionVisualizer: React.FC<EvolutionVisualizerProps> = ({
                   exit={{ opacity: 0, y: 10 }}
                   className="absolute bottom-8 left-8 p-6 glass-panel rounded-2xl border border-neon-cyan/20 bg-black/60 max-w-xs pointer-events-none"
                 >
-                  <p className="text-[10px] text-neon-cyan uppercase tracking-widest font-bold mb-2">Ancestry Trace</p>
+                  <p className="text-[10px] text-neon-cyan uppercase tracking-widest font-bold mb-2">
+                    Ancestry Trace
+                  </p>
                   <p className="text-sm text-white/80 leading-relaxed">{hoveredNode.content}</p>
                   <div className="mt-4 flex items-center gap-2 text-[10px] text-white/40 font-mono">
                     <Database className="w-3 h-3" />
@@ -250,7 +280,7 @@ export const EvolutionVisualizer: React.FC<EvolutionVisualizerProps> = ({
       <AnimatePresence>
         {showLogicChain && selectedNode && (
           <div className="fixed inset-0 z-[150] flex items-center justify-center p-8">
-            <motion.div 
+            <motion.div
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
@@ -267,16 +297,23 @@ export const EvolutionVisualizer: React.FC<EvolutionVisualizerProps> = ({
                 <div className="flex items-center justify-between mb-8">
                   <div className="flex items-center gap-3 text-neon-cyan">
                     <Brain className="w-6 h-6" />
-                    <h3 className="text-2xl font-display font-bold tracking-tight uppercase">Trace to Source</h3>
+                    <h3 className="text-2xl font-display font-bold tracking-tight uppercase">
+                      Trace to Source
+                    </h3>
                   </div>
-                  <button onClick={() => setShowLogicChain(false)} className="p-2 rounded-full bg-white/5 text-white/40 hover:text-white transition-colors">
+                  <button
+                    onClick={() => setShowLogicChain(false)}
+                    className="p-2 rounded-full bg-white/5 text-white/40 hover:text-white transition-colors"
+                  >
                     <X className="w-6 h-6" />
                   </button>
                 </div>
 
                 <div className="space-y-8">
                   <div className="p-6 rounded-2xl bg-neon-cyan/5 border border-neon-cyan/20">
-                    <p className="text-[10px] text-neon-cyan uppercase tracking-widest font-bold mb-3">Synthesized Marker</p>
+                    <p className="text-[10px] text-neon-cyan uppercase tracking-widest font-bold mb-3">
+                      Synthesized Marker
+                    </p>
                     <p className="text-lg text-white font-medium">{selectedNode.content}</p>
                   </div>
 
@@ -289,15 +326,20 @@ export const EvolutionVisualizer: React.FC<EvolutionVisualizerProps> = ({
                   </div>
 
                   <div className="p-6 rounded-2xl bg-neon-magenta/5 border border-neon-magenta/20">
-                    <p className="text-[10px] text-neon-magenta uppercase tracking-widest font-bold mb-3">Raw Signal Ancestry</p>
+                    <p className="text-[10px] text-neon-magenta uppercase tracking-widest font-bold mb-3">
+                      Raw Signal Ancestry
+                    </p>
                     <p className="text-sm text-white/60 leading-relaxed italic">
-                      "{selectedNode.evidence || 'This insight was synthesized from multiple overlapping signals in your Wavvault, specifically correlating your stated goals with historical achievements.'}"
+                      "
+                      {selectedNode.evidence ||
+                        'This insight was synthesized from multiple overlapping signals in your Wavvault, specifically correlating your stated goals with historical achievements.'}
+                      "
                     </p>
                   </div>
                 </div>
 
                 <div className="mt-12 flex justify-end">
-                  <button 
+                  <button
                     onClick={() => setShowLogicChain(false)}
                     className="px-8 py-3 rounded-xl bg-white text-black font-bold text-sm hover:bg-neon-cyan transition-all"
                   >
