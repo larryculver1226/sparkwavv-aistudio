@@ -33,7 +33,7 @@ export const useWavvaultExplorer = (
         const matchesSearch =
           a.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
           a.type.toLowerCase().includes(searchQuery.toLowerCase());
-        const matchesPhase = !selectedPhase || a.phase === selectedPhase;
+        const matchesPhase = !selectedPhase || a.journeyPhase === selectedPhase;
         return matchesSearch && matchesPhase;
       }),
     [artifacts, searchQuery, selectedPhase]

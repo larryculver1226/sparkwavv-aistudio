@@ -48,6 +48,7 @@ import { v4 as uuidv4 } from 'uuid';
 import { InvitationModal } from '../components/InvitationModal';
 import { PartnerSelectionModal } from '../components/PartnerSelectionModal';
 import { EveningSpark } from '../components/EveningSpark';
+import { logUserActivity } from '../services/activityService';
 import { NeuralSynthesisEngine } from '../components/dashboard/NeuralSynthesisEngine';
 import { HighFidelitySynthesisLab } from '../components/skylar/HighFidelitySynthesisLab';
 import { OutreachForge } from '../components/skylar/OutreachForge';
@@ -551,6 +552,16 @@ export const UserDashboard: React.FC<{ userId: string; isAdmin?: boolean }> = ({
         setData({ ...data, discoveryProgress: nextStage as any });
         // The profile in AuthContext might need a refresh or we can just rely on the dashboard data for now
         // Since we unified the stage usage to timelineStage which uses data.discoveryProgress, it will update the UI
+        
+        // Log activity
+        await logUserActivity(
+          userId,
+          'default', // Default tenantId
+          'phase_unlocked',
+          `Unlocked Phase: ${nextStage}`,
+          `You have successfully advanced to the ${nextStage} phase of your journey.`,
+          nextStage as any
+        );
       }
     } catch (err) {
       console.error('Error completing phase:', err);
@@ -1017,7 +1028,7 @@ export const UserDashboard: React.FC<{ userId: string; isAdmin?: boolean }> = ({
                       <div className="absolute top-0 right-0 p-10 opacity-[0.02]">
                         <Rocket className="w-48 h-48 text-neon-cyan" />
                       </div>
-                      <JourneyTimeline stage={timelineStage} />
+                      <JourneyTimeline stage={timelineStage} phaseProgress={data?.phaseProgress} />
                     </div>
 
                     <div className="glass-panel p-6 lg:p-10 rounded-[2.5rem] border border-white/5 bg-black/40 flex flex-col items-center justify-center relative overflow-hidden">

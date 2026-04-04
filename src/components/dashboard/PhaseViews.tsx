@@ -3,6 +3,7 @@ import { NeuralSynthesisEngine } from './NeuralSynthesisEngine';
 import { SectorIntelligence } from './SectorIntelligence';
 import { WavvaultHighlights } from './WavvaultHighlights';
 import { ActionCenter } from './ActionCenter';
+import { ActivityFeed } from './ActivityFeed';
 import { DashboardData } from '../../types/dashboard';
 import { Camera, ChevronRight, Briefcase, Target, Award, FileText, Brain, Eye, EyeOff, History } from 'lucide-react';
 
@@ -23,8 +24,9 @@ export const DiveInView: React.FC<PhaseViewProps> = ({ userId, currentStage, onA
   <div className="space-y-8">
     <ActionCenter currentStage={currentStage} onActionClick={onActionClick} />
     <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-      <div className="lg:col-span-2">
+      <div className="lg:col-span-2 space-y-8">
         <NeuralSynthesisEngine userId={userId} currentStage={currentStage} />
+        <ActivityFeed userId={userId} limitCount={5} />
       </div>
       <div className="flex flex-col gap-6">
         <div className="glass-panel p-8 rounded-[2rem] border border-white/5 bg-black/40 flex flex-col justify-between h-full">
@@ -79,7 +81,10 @@ export const IgnitionView: React.FC<PhaseViewProps> = ({ userId, currentStage, o
   <div className="space-y-8">
     <ActionCenter currentStage={currentStage} onActionClick={onActionClick} />
     <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-      <NeuralSynthesisEngine userId={userId} currentStage={currentStage} />
+      <div className="space-y-8">
+        <NeuralSynthesisEngine userId={userId} currentStage={currentStage} />
+        <ActivityFeed userId={userId} limitCount={5} />
+      </div>
       
       <div className="glass-panel p-10 rounded-[2.5rem] border border-white/5 bg-black/40">
         <h3 className="text-xs font-bold text-white/40 uppercase tracking-[0.3em] mb-10 flex items-center gap-2">
@@ -124,7 +129,10 @@ export const DiscoveryView: React.FC<PhaseViewProps> = ({ userId, currentStage, 
     <ActionCenter currentStage={currentStage} onActionClick={onActionClick} />
     
     <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-      <NeuralSynthesisEngine userId={userId} currentStage={currentStage} />
+      <div className="space-y-8">
+        <NeuralSynthesisEngine userId={userId} currentStage={currentStage} />
+        <ActivityFeed userId={userId} limitCount={5} />
+      </div>
       {profile?.specializedSector && profile.specializedSector !== 'General' && (
         <SectorIntelligence sector={profile.specializedSector} userId={userId} />
       )}
@@ -202,7 +210,10 @@ export const BrandingView: React.FC<PhaseViewProps> = ({ userId, currentStage, o
         stage="Branding"
         isLocked={false}
       />
-      <NeuralSynthesisEngine userId={userId} currentStage={currentStage} />
+      <div className="space-y-8">
+        <NeuralSynthesisEngine userId={userId} currentStage={currentStage} />
+        <ActivityFeed userId={userId} limitCount={5} />
+      </div>
     </div>
   </div>
 );
@@ -247,7 +258,10 @@ export const OutreachView: React.FC<PhaseViewProps> = ({ userId, currentStage, o
           ))}
         </div>
       </div>
-      <NeuralSynthesisEngine userId={userId} currentStage={currentStage} />
+      <div className="space-y-8">
+        <NeuralSynthesisEngine userId={userId} currentStage={currentStage} />
+        <ActivityFeed userId={userId} limitCount={5} />
+      </div>
     </div>
   </div>
 );

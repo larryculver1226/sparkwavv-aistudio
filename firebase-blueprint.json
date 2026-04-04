@@ -87,7 +87,17 @@
         "tenantId": { "type": "string" },
         "careerHappiness": { "type": "integer" },
         "discoveryProgress": { "type": "string" },
-        "validationGateMode": { "type": "string" }
+        "validationGateMode": { "type": "string" },
+        "phaseProgress": {
+          "type": "object",
+          "properties": {
+            "diveIn": { "type": "integer" },
+            "ignition": { "type": "integer" },
+            "discovery": { "type": "integer" },
+            "branding": { "type": "integer" },
+            "outreach": { "type": "integer" }
+          }
+        }
       },
       "required": ["userId", "tenantId"]
     },
@@ -333,7 +343,8 @@
         "timestamp": { "type": "string", "format": "date-time" },
         "evidence": { "type": "string" },
         "conflictWith": { "type": "string" },
-        "tags": { "type": "array", "items": { "type": "string" } }
+        "tags": { "type": "array", "items": { "type": "string" } },
+        "journeyPhase": { "type": "string", "enum": ["Dive-In", "Ignition", "Discovery", "Branding", "Outreach"] }
       },
       "required": ["id", "userId", "type", "content", "status", "timestamp"]
     },
@@ -347,7 +358,8 @@
         "type": { "type": "string", "enum": ["portrait", "outreach_sequence"] },
         "content": { "type": "string", "description": "The generated text or image URL/base64" },
         "metadata": { "type": "object", "description": "Generation parameters (model, style, tone, target)" },
-        "createdAt": { "type": "string", "format": "date-time" }
+        "createdAt": { "type": "string", "format": "date-time" },
+        "journeyPhase": { "type": "string", "enum": ["Dive-In", "Ignition", "Discovery", "Branding", "Outreach"] }
       },
       "required": ["id", "userId", "type", "content", "createdAt"]
     },
@@ -379,9 +391,27 @@
         "content": { "type": "object" },
         "timestamp": { "type": "string", "format": "date-time" },
         "sourceGateId": { "type": "string" },
-        "metadata": { "type": "object" }
+        "metadata": { "type": "object" },
+        "journeyPhase": { "type": "string", "enum": ["Dive-In", "Ignition", "Discovery", "Branding", "Outreach"] }
       },
       "required": ["id", "userId", "type", "title", "timestamp"]
+    },
+    "UserActivity": {
+      "title": "UserActivity",
+      "description": "A materialized view of important user events for the activity feed",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "userId": { "type": "string" },
+        "tenantId": { "type": "string" },
+        "type": { "type": "string", "enum": ["artifact_created", "insight_discovered", "phase_unlocked", "asset_generated"] },
+        "title": { "type": "string" },
+        "description": { "type": "string" },
+        "timestamp": { "type": "string", "format": "date-time" },
+        "relatedEntityId": { "type": "string" },
+        "journeyPhase": { "type": "string", "enum": ["Dive-In", "Ignition", "Discovery", "Branding", "Outreach"] }
+      },
+      "required": ["id", "userId", "tenantId", "type", "title", "timestamp"]
     }
   },
   "firestore": {
@@ -464,6 +494,10 @@
     "/wavvault_artifacts/{artifactId}": {
       "schema": "DistilledArtifact",
       "description": "Distilled career artifacts"
+    },
+    "/user_activities/{activityId}": {
+      "schema": "UserActivity",
+      "description": "User activity feed events"
     }
   }
 }

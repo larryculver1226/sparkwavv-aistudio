@@ -63,6 +63,13 @@ export interface DashboardData {
   mentorNoteTimestamp?: string;
   validationPending?: boolean;
   _persistenceStatus?: 'active' | 'fallback';
+  phaseProgress?: {
+    diveIn: number;
+    ignition: number;
+    discovery: number;
+    branding: number;
+    outreach: number;
+  };
 }
 
 export interface UserProfile {
@@ -90,6 +97,19 @@ export interface UserInsight {
   evidence?: string;
   conflictWith?: string; // ID of the insight it replaces
   tags?: string[]; // For thematic mapping
+  journeyPhase?: 'Dive-In' | 'Ignition' | 'Discovery' | 'Branding' | 'Outreach';
+}
+
+export interface UserActivity {
+  id: string;
+  userId: string;
+  tenantId: string;
+  type: 'artifact_created' | 'insight_discovered' | 'phase_unlocked' | 'asset_generated';
+  title: string;
+  description?: string;
+  timestamp: string;
+  relatedEntityId?: string;
+  journeyPhase?: 'Dive-In' | 'Ignition' | 'Discovery' | 'Branding' | 'Outreach';
 }
 
 export interface MarketSignal {

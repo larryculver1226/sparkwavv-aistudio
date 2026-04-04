@@ -28,6 +28,7 @@ import { useIdentity } from '../../contexts/IdentityContext';
 import { LiveResume } from './LiveResume';
 import { InteractivePortfolio } from './InteractivePortfolio';
 import { OutreachForge } from './OutreachForge';
+import { logUserActivity } from '../../services/activityService';
 
 interface UserAsset {
   id: string;
@@ -35,6 +36,7 @@ interface UserAsset {
   content: string;
   metadata: any;
   createdAt: string;
+  journeyPhase?: 'Dive-In' | 'Ignition' | 'Discovery' | 'Branding' | 'Outreach';
 }
 
 export const HighFidelitySynthesisLab: React.FC = () => {
@@ -121,7 +123,18 @@ export const HighFidelitySynthesisLab: React.FC = () => {
         type: 'portrait',
         content: portrait,
         metadata: { style: selectedStyle, modelId, usedReference: !!referencePhoto },
+        journeyPhase: 'Branding',
       });
+      
+      await logUserActivity(
+        user.uid,
+        'default',
+        'asset_generated',
+        'Generated Brand Portrait',
+        `Created a new portrait in the ${selectedStyle} style.`,
+        'Branding'
+      );
+      
       fetchAssets();
     } catch (error) {
       console.error('Portrait generation failed:', error);
@@ -146,7 +159,18 @@ export const HighFidelitySynthesisLab: React.FC = () => {
         type: 'outreach_sequence',
         content: JSON.stringify(sequence),
         metadata: { targetCompany, targetRole, tone },
+        journeyPhase: 'Outreach',
       });
+      
+      await logUserActivity(
+        user.uid,
+        'default',
+        'asset_generated',
+        'Generated Outreach Sequence',
+        `Created a targeted sequence for ${targetRole} at ${targetCompany}.`,
+        'Outreach'
+      );
+      
       fetchAssets();
     } catch (error) {
       console.error('Sequence generation failed:', error);
@@ -166,7 +190,16 @@ export const HighFidelitySynthesisLab: React.FC = () => {
           type: 'live_resume',
           content: JSON.stringify(resume),
           metadata: { style: 'Editorial / Magazine' },
+          journeyPhase: 'Branding',
         });
+        await logUserActivity(
+          user.uid,
+          'default',
+          'asset_generated',
+          'Generated Live Resume',
+          'Created a dynamic, ATS-optimized resume.',
+          'Branding'
+        );
       } else {
         const portfolio = await skylar.generateInteractivePortfolio(user.uid);
         setGeneratedPortfolio(portfolio);
@@ -174,7 +207,16 @@ export const HighFidelitySynthesisLab: React.FC = () => {
           type: 'interactive_portfolio',
           content: JSON.stringify(portfolio),
           metadata: { style: 'Editorial / Magazine' },
+          journeyPhase: 'Branding',
         });
+        await logUserActivity(
+          user.uid,
+          'default',
+          'asset_generated',
+          'Generated Interactive Portfolio',
+          'Created a high-fidelity interactive portfolio.',
+          'Branding'
+        );
       }
       fetchAssets();
     } catch (error) {

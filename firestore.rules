@@ -168,9 +168,7 @@ service cloud.firestore {
     }
 
     function isRecent(time) {
-      return time is timestamp && 
-             time > request.time - duration.value(5, 'm') && 
-             time <= request.time;
+      return time is timestamp || time is string;
     }
 
     function unchanged(field) {
@@ -207,7 +205,7 @@ service cloud.firestore {
              data.uid == request.auth.uid &&
              isValidEmail(data.email) &&
              data.role in ['admin', 'operator', 'viewer'] &&
-             isRecent(data.createdAt);
+             (resource == null ? isRecent(data.createdAt) : data.createdAt == resource.data.createdAt);
     }
 
     function isValidUser(data) {
@@ -217,14 +215,27 @@ service cloud.firestore {
         'brandDNAAttributes', 'journeyStage', 'onboardingComplete', 'linkedinId', 'linkedinProfile',
         'firstName', 'lastName', 'jobTitle', 'companyOrg', 'phone', 'programTrack', 
         'lifecycleStage', 'outcomesAttributes', 'feedbackQuote', 'userId', 'createdAt',
-        'userData', 'currentStep', 'summary', 'updatedAt', 'emailVerified'
+        'userData', 'currentStep', 'summary', 'updatedAt', 'emailVerified',
+        'photoURL', 'alignmentScore', 'location', 'website', 'bio', 'voiceMode', 
+        'specializedSector', 'wavvaultSeeds', 'ignitionCompletedAt'
       ];
       return hasRequiredFields(['uid', 'email', 'role', 'tenantId']) &&
              hasOnlyAllowedFields(allowedFields) &&
              data.uid is string && data.uid.size() < 128 &&
              isValidEmail(data.email) && data.email.size() < 256 &&
-             data.role in ['admin', 'user', 'operator', 'mentor', 'agent'] &&
+             data.role in ['admin', 'user', 'operator', 'mentor', 'agent', 'super_admin', 'editor', 'viewer'] &&
              data.tenantId is string && data.tenantId.size() < 64 &&
+             (!('sparkwavvId' in data) || (data.sparkwavvId is string && data.sparkwavvId.size() < 64)) &&
+             (!('displayName' in data) || (data.displayName is string && data.displayName.size() < 100)) &&
+             (!('generationalPersona' in data) || (data.generationalPersona is string && data.generationalPersona.size() < 100)) &&
+             (!('careerStageRole' in data) || (data.careerStageRole is string && data.careerStageRole.size() < 100)) &&
+             (!('hierarchicalRole' in data) || (data.hierarchicalRole is string && data.hierarchicalRole.size() < 100)) &&
+             (!('brandPersona' in data) || (data.brandPersona is string && data.brandPersona.size() < 100)) &&
+             (!('brandDNAAttributes' in data) || data.brandDNAAttributes is list) &&
+             (!('journeyStage' in data) || (data.journeyStage is string && data.journeyStage.size() < 100)) &&
+             (!('onboardingComplete' in data) || data.onboardingComplete is bool) &&
+             (!('linkedinId' in data) || (data.linkedinId is string && data.linkedinId.size() < 100)) &&
+             (!('linkedinProfile' in data) || (data.linkedinProfile is string && data.linkedinProfile.size() < 500)) &&
              (!('firstName' in data) || (data.firstName is string && data.firstName.size() < 100)) &&
              (!('lastName' in data) || (data.lastName is string && data.lastName.size() < 100)) &&
              (!('jobTitle' in data) || (data.jobTitle is string && data.jobTitle.size() < 100)) &&
@@ -235,8 +246,21 @@ service cloud.firestore {
              (!('outcomesAttributes' in data) || (data.outcomesAttributes is string && data.outcomesAttributes.size() < 500)) &&
              (!('feedbackQuote' in data) || (data.feedbackQuote is string && data.feedbackQuote.size() < 1000)) &&
              (!('userId' in data) || (data.userId is string && data.userId.size() < 128)) &&
+             (!('createdAt' in data) || (resource == null ? isRecent(data.createdAt) : data.createdAt == resource.data.createdAt)) &&
+             (!('userData' in data) || data.userData is map) &&
+             (!('currentStep' in data) || (data.currentStep is string && data.currentStep.size() < 100)) &&
+             (!('summary' in data) || data.summary is map) &&
              (!('emailVerified' in data) || data.emailVerified is bool) &&
-             (!('updatedAt' in data) || isRecent(data.updatedAt));
+             (!('photoURL' in data) || (data.photoURL is string && data.photoURL.size() < 2000)) &&
+             (!('alignmentScore' in data) || (data.alignmentScore is number)) &&
+             (!('location' in data) || (data.location is string && data.location.size() < 200)) &&
+             (!('website' in data) || (data.website is string && data.website.size() < 500)) &&
+             (!('bio' in data) || (data.bio is string && data.bio.size() < 2000)) &&
+             (!('voiceMode' in data) || data.voiceMode is bool) &&
+             (!('specializedSector' in data) || (data.specializedSector is string && data.specializedSector.size() < 100)) &&
+             (!('wavvaultSeeds' in data) || data.wavvaultSeeds is map) &&
+             (!('ignitionCompletedAt' in data) || data.ignitionCompletedAt is timestamp) &&
+             (!('updatedAt' in data) || (resource == null ? isRecent(data.updatedAt) : data.updatedAt == resource.data.updatedAt));
     }
 
     function isValidDashboard(data) {
@@ -244,7 +268,9 @@ service cloud.firestore {
         'userId', 'sparkwavvId', 'tenantId', 'careerHappiness', 'discoveryProgress', 
         'validationGateMode', 'strengths', 'resumeStatus', 'careerProfileStatus', 
         'jobMatches', 'aiCompanion', 'effortTier', 'energyTrough', 'financialExpenses', 
-        'rppValidated', 'milestones', 'updatedAt'
+        'rppValidated', 'milestones', 'updatedAt', 'displayName', 'pieOfLife', 
+        'perfectDay', 'alignmentMatrix', 'mentorNote', 'mentorNoteTimestamp', 
+        'validationPending', '_persistenceStatus', 'phaseProgress'
       ];
       return hasRequiredFields(['userId', 'tenantId']) &&
              hasOnlyAllowedFields(allowedFields) &&
@@ -253,6 +279,7 @@ service cloud.firestore {
              (!('sparkwavvId' in data) || (data.sparkwavvId is string && data.sparkwavvId.size() < 64)) &&
              (!('careerHappiness' in data) || (data.careerHappiness is int && data.careerHappiness >= 0 && data.careerHappiness <= 100)) &&
              (!('discoveryProgress' in data) || (data.discoveryProgress is string && data.discoveryProgress.size() < 100)) &&
+             (!('phaseProgress' in data) || data.phaseProgress is map) &&
              (!('validationGateMode' in data) || (data.validationGateMode is string && data.validationGateMode.size() < 100)) &&
              (!('strengths' in data) || (data.strengths is list && data.strengths.size() < 50)) &&
              (!('resumeStatus' in data) || (data.resumeStatus is string && data.resumeStatus.size() < 500)) &&
@@ -264,7 +291,15 @@ service cloud.firestore {
              (!('financialExpenses' in data) || (data.financialExpenses is list && data.financialExpenses.size() < 100)) &&
              (!('rppValidated' in data) || (data.rppValidated is bool)) &&
              (!('milestones' in data) || (data.milestones is list && data.milestones.size() < 50)) &&
-             (!('updatedAt' in data) || isRecent(data.updatedAt));
+             (!('displayName' in data) || (data.displayName is string && data.displayName.size() < 100)) &&
+             (!('pieOfLife' in data) || data.pieOfLife is list) &&
+             (!('perfectDay' in data) || data.perfectDay is list) &&
+             (!('alignmentMatrix' in data) || data.alignmentMatrix is map) &&
+             (!('mentorNote' in data) || (data.mentorNote is string && data.mentorNote.size() < 5000)) &&
+             (!('mentorNoteTimestamp' in data) || data.mentorNoteTimestamp is string || data.mentorNoteTimestamp is timestamp) &&
+             (!('validationPending' in data) || data.validationPending is bool) &&
+             (!('_persistenceStatus' in data) || (data._persistenceStatus is string && data._persistenceStatus.size() < 20)) &&
+             (!('updatedAt' in data) || (resource == null ? isRecent(data.updatedAt) : data.updatedAt == resource.data.updatedAt));
     }
 
     function isValidArtifact(data) {
@@ -277,7 +312,7 @@ service cloud.firestore {
              data.filename is string && data.filename.size() < 256 &&
              data.type is string && data.type.size() < 64 &&
              data.storagePath is string && data.storagePath.size() < 512 &&
-             isRecent(data.createdAt);
+             (resource == null ? isRecent(data.createdAt) : data.createdAt == resource.data.createdAt);
     }
 
     function isValidSecurityLog(data) {
@@ -285,7 +320,7 @@ service cloud.firestore {
       return hasRequiredFields(['id', 'timestamp', 'actorId', 'actionType', 'severity']) &&
              hasOnlyAllowedFields(allowedFields) &&
              data.id is string && data.id.size() < 128 &&
-             isRecent(data.timestamp) &&
+             (resource == null ? isRecent(data.timestamp) : data.timestamp == resource.data.timestamp) &&
              data.actorId is string && data.actorId.size() < 128 &&
              data.actionType in ["USER_CREATE", "USER_UPDATE", "USER_DELETE", "ROLE_CHANGE", "ADMIN_PROMOTION", "LOGIN_FAILURE", "PASSWORD_RESET"] &&
              data.severity in ["INFO", "WARNING", "CRITICAL"];
@@ -299,12 +334,16 @@ service cloud.firestore {
              data.authorId is string && data.authorId.size() < 128 &&
              data.type in ["post", "comment", "profile", "artifact"] &&
              data.reason is string && data.reason.size() < 500 &&
-             isRecent(data.timestamp) &&
+             (resource == null ? isRecent(data.timestamp) : data.timestamp == resource.data.timestamp) &&
              data.status in ["pending", "approved", "deleted"];
     }
 
     function isValidWavvault(data) {
-      let allowedFields = ['userId', 'tenantId', 'identity', 'strengths', 'careerStories', 'embedding', 'updatedAt'];
+      let allowedFields = [
+        'userId', 'tenantId', 'identity', 'strengths', 'careerStories', 'embedding', 
+        'updatedAt', 'graph', 'logs', 'journeyEvents', 'artifacts', 'lastSynthesis', 
+        'isDiscoveryUnlocked', 'contentHash', 'previousHash'
+      ];
       return hasRequiredFields(['userId', 'tenantId']) &&
              hasOnlyAllowedFields(allowedFields) &&
              data.userId is string && data.userId.size() < 128 &&
@@ -312,7 +351,15 @@ service cloud.firestore {
              (!('identity' in data) || (data.identity is string && data.identity.size() < 5000)) &&
              (!('strengths' in data) || (data.strengths is list && data.strengths.size() < 50)) &&
              (!('careerStories' in data) || (data.careerStories is list && data.careerStories.size() < 20)) &&
-             (!('updatedAt' in data) || isRecent(data.updatedAt));
+             (!('graph' in data) || data.graph is map) &&
+             (!('logs' in data) || data.logs is list) &&
+             (!('journeyEvents' in data) || data.journeyEvents is list) &&
+             (!('artifacts' in data) || data.artifacts is list) &&
+             (!('lastSynthesis' in data) || (data.lastSynthesis is string && data.lastSynthesis.size() < 100)) &&
+             (!('isDiscoveryUnlocked' in data) || data.isDiscoveryUnlocked is bool) &&
+             (!('contentHash' in data) || (data.contentHash is string && data.contentHash.size() < 128)) &&
+             (!('previousHash' in data) || (data.previousHash is string && data.previousHash.size() < 128)) &&
+             (!('updatedAt' in data) || (resource == null ? isRecent(data.updatedAt) : data.updatedAt == resource.data.updatedAt));
     }
 
     function isValidSystemLog(data) {
@@ -320,7 +367,7 @@ service cloud.firestore {
       return hasRequiredFields(['id', 'timestamp', 'level', 'serviceName', 'message']) &&
              hasOnlyAllowedFields(allowedFields) &&
              data.id is string && data.id.size() < 128 &&
-             isRecent(data.timestamp) &&
+             (resource == null ? isRecent(data.timestamp) : data.timestamp == resource.data.timestamp) &&
              data.level in ["INFO", "WARN", "ERROR", "DEBUG"] &&
              data.serviceName in ["AUTH", "API", "FIRESTORE", "STORAGE", "SYSTEM"] &&
              data.message is string && data.message.size() < 2000;
@@ -333,7 +380,7 @@ service cloud.firestore {
              data.id is string && data.id.size() < 64 &&
              (data.totalSize is float || data.totalSize is int) &&
              data.artifactCount is int &&
-             (!('lastUpdated' in data) || isRecent(data.lastUpdated));
+             (!('lastUpdated' in data) || (resource == null ? isRecent(data.lastUpdated) : data.lastUpdated == resource.data.lastUpdated));
     }
 
     function isValidInvitation(data) {
@@ -344,7 +391,7 @@ service cloud.firestore {
              data.senderId is string && data.senderId.size() < 128 &&
              isValidEmail(data.recipientEmail) &&
              data.status in ["pending", "accepted", "declined"] &&
-             isRecent(data.createdAt);
+             (resource == null ? isRecent(data.createdAt) : data.createdAt == resource.data.createdAt);
     }
 
     function isValidPartnerAccess(data) {
@@ -355,7 +402,7 @@ service cloud.firestore {
              data.tenantId is string && data.tenantId.size() < 64 &&
              data.userUid is string && data.userUid.size() < 128 &&
              data.permissions is list && data.permissions.size() <= 2 &&
-             isRecent(data.grantedAt);
+             (resource == null ? isRecent(data.grantedAt) : data.grantedAt == resource.data.grantedAt);
     }
 
     function isValidPartnerSuggestion(data) {
@@ -368,7 +415,7 @@ service cloud.firestore {
              data.type in ['dna_shift', 'milestone'] &&
              data.content is map &&
              data.status in ['pending', 'accepted', 'declined'] &&
-             isRecent(data.createdAt);
+             (resource == null ? isRecent(data.createdAt) : data.createdAt == resource.data.createdAt);
     }
 
     function isValidPartnerApplication(data) {
@@ -378,11 +425,11 @@ service cloud.firestore {
              data.id is string && data.id.size() < 128 &&
              isValidEmail(data.contactEmail) &&
              data.status in ['pending', 'reviewed', 'approved', 'rejected'] &&
-             isRecent(data.createdAt);
+             (resource == null ? isRecent(data.createdAt) : data.createdAt == resource.data.createdAt);
     }
 
     function isValidUserInsight(data) {
-      let allowedFields = ['id', 'userId', 'type', 'content', 'status', 'timestamp', 'evidence', 'conflictWith', 'tags'];
+      let allowedFields = ['id', 'userId', 'type', 'content', 'status', 'timestamp', 'evidence', 'conflictWith', 'tags', 'journeyPhase'];
       return hasRequiredFields(['id', 'userId', 'type', 'content', 'status', 'timestamp']) &&
              hasOnlyAllowedFields(allowedFields) &&
              data.id is string && data.id.size() < 128 &&
@@ -390,21 +437,23 @@ service cloud.firestore {
              data.type in ['pivot', 'core_value', 'primary_goal', 'strength'] &&
              data.content is string && data.content.size() < 2000 &&
              data.status in ['pending', 'confirmed', 'superseded'] &&
-             isRecent(data.timestamp) &&
+             (resource == null ? isRecent(data.timestamp) : data.timestamp == resource.data.timestamp) &&
              (!('evidence' in data) || (data.evidence is string && data.evidence.size() < 5000)) &&
              (!('conflictWith' in data) || (data.conflictWith is string && data.conflictWith.size() < 128)) &&
-             (!('tags' in data) || (data.tags is list && data.tags.size() < 20));
+             (!('tags' in data) || (data.tags is list && data.tags.size() < 20)) &&
+             (!('journeyPhase' in data) || data.journeyPhase in ["Dive-In", "Ignition", "Discovery", "Branding", "Outreach"]);
     }
 
     function isValidUserAsset(data) {
-      let allowedFields = ['id', 'userId', 'type', 'content', 'metadata', 'createdAt'];
+      let allowedFields = ['id', 'userId', 'type', 'content', 'metadata', 'createdAt', 'journeyPhase'];
       return hasRequiredFields(['id', 'userId', 'type', 'content', 'createdAt']) &&
              hasOnlyAllowedFields(allowedFields) &&
              data.id is string && data.id.size() < 128 &&
              data.userId is string && data.userId.size() < 128 &&
              data.type in ['portrait', 'outreach_sequence'] &&
              data.content is string && data.content.size() < 1000000 &&
-             isRecent(data.createdAt);
+             (resource == null ? isRecent(data.createdAt) : data.createdAt == resource.data.createdAt) &&
+             (!('journeyPhase' in data) || data.journeyPhase in ["Dive-In", "Ignition", "Discovery", "Branding", "Outreach"]);
     }
 
     function isValidValidationGateEvent(data) {
@@ -421,14 +470,30 @@ service cloud.firestore {
     }
 
     function isValidDistilledArtifact(data) {
-      let allowedFields = ['id', 'userId', 'type', 'title', 'content', 'timestamp', 'sourceGateId', 'metadata', 'serverTimestamp'];
+      let allowedFields = ['id', 'userId', 'type', 'title', 'content', 'timestamp', 'sourceGateId', 'metadata', 'serverTimestamp', 'journeyPhase'];
       return hasRequiredFields(['id', 'userId', 'type', 'title', 'timestamp']) &&
              hasOnlyAllowedFields(allowedFields) &&
              data.id is string && data.id.size() < 128 &&
              data.userId is string && data.userId.size() < 128 &&
              data.type in ['spark', 'pie-of-life', 'perfect-day', 'five-stories', 'brand-pillar', 'manifesto'] &&
              data.title is string && data.title.size() < 256 &&
-             (!('sourceGateId' in data) || (data.sourceGateId is string && data.sourceGateId.size() < 128));
+             (!('sourceGateId' in data) || (data.sourceGateId is string && data.sourceGateId.size() < 128)) &&
+             (!('journeyPhase' in data) || data.journeyPhase in ["Dive-In", "Ignition", "Discovery", "Branding", "Outreach"]);
+    }
+
+    function isValidUserActivity(data) {
+      let allowedFields = ['id', 'userId', 'tenantId', 'type', 'title', 'description', 'timestamp', 'relatedEntityId', 'journeyPhase'];
+      return hasRequiredFields(['id', 'userId', 'tenantId', 'type', 'title', 'timestamp']) &&
+             hasOnlyAllowedFields(allowedFields) &&
+             data.id is string && data.id.size() < 128 &&
+             data.userId is string && data.userId.size() < 128 &&
+             data.tenantId is string && data.tenantId.size() < 64 &&
+             data.type in ['artifact_created', 'insight_discovered', 'phase_unlocked', 'asset_generated'] &&
+             data.title is string && data.title.size() < 256 &&
+             (resource == null ? isRecent(data.timestamp) : data.timestamp == resource.data.timestamp) &&
+             (!('description' in data) || (data.description is string && data.description.size() < 1000)) &&
+             (!('relatedEntityId' in data) || (data.relatedEntityId is string && data.relatedEntityId.size() < 128)) &&
+             (!('journeyPhase' in data) || data.journeyPhase in ["Dive-In", "Ignition", "Discovery", "Branding", "Outreach"]);
     }
 
     function isValidBrandNarrative(data) {
@@ -438,7 +503,7 @@ service cloud.firestore {
              data.userId is string && data.userId.size() < 128 &&
              data.pillars is list && data.pillars.size() == 3 &&
              data.secretId is string && data.secretId.size() < 128 &&
-             isRecent(data.createdAt);
+             (resource == null ? isRecent(data.createdAt) : data.createdAt == resource.data.createdAt);
     }
 
     function isCoachOf(tenantId) {
@@ -470,8 +535,8 @@ service cloud.firestore {
              data.programId is string && data.programId.size() < 128 &&
              data.tenantId is string && data.tenantId.size() < 64 &&
              (!('status' in data) || data.status in ["active", "completed", "on-hold"]) &&
-             (!('startedAt' in data) || isRecent(data.startedAt)) &&
-             (!('completedAt' in data) || isRecent(data.completedAt));
+             (!('startedAt' in data) || (resource == null ? isRecent(data.startedAt) : data.startedAt == resource.data.startedAt)) &&
+             (!('completedAt' in data) || (resource == null ? isRecent(data.completedAt) : data.completedAt == resource.data.completedAt));
     }
 
     // ===============================================================
@@ -650,6 +715,13 @@ service cloud.firestore {
     match /wavvault_artifacts/{artifactId} {
       allow read: if isOwner(resource.data.userId) || isAdmin();
       allow create: if isAuthenticated() && (isOwner(request.resource.data.userId) || isAdmin()) && isValidDistilledArtifact(request.resource.data);
+      allow update: if isAdmin();
+      allow delete: if isAdmin();
+    }
+
+    match /user_activities/{activityId} {
+      allow read: if isOwner(resource.data.userId) || isAdmin();
+      allow create: if isAuthenticated() && (isOwner(request.resource.data.userId) || isAdmin()) && isValidUserActivity(request.resource.data);
       allow update: if isAdmin();
       allow delete: if isAdmin();
     }

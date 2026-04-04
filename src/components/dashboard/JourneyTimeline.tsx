@@ -2,13 +2,13 @@ import React from 'react';
 import { motion } from 'motion/react';
 import { Sparkles, Zap, Search as SearchIcon, Compass, Handshake, Lock, CheckCircle2 } from 'lucide-react';
 
-export const JourneyTimeline: React.FC<{ stage: string }> = ({ stage }) => {
+export const JourneyTimeline: React.FC<{ stage: string; phaseProgress?: Record<string, number> }> = ({ stage, phaseProgress }) => {
   const stages = [
-    { id: 'Dive-In', label: 'Dive-In', icon: Sparkles, desc: 'WEEKS 1-2' },
-    { id: 'Ignition', label: 'Ignition', icon: Zap, desc: 'WEEKS 3-4' },
-    { id: 'Discovery', label: 'Discovery', icon: SearchIcon, desc: 'WEEKS 5-6' },
-    { id: 'Branding', label: 'Branding', icon: Compass, desc: 'WEEKS 7-9' },
-    { id: 'Outreach', label: 'Outreach', icon: Handshake, desc: 'WEEKS 10-12' },
+    { id: 'Dive-In', label: 'Dive-In', icon: Sparkles, desc: 'WEEKS 1-2', key: 'diveIn' },
+    { id: 'Ignition', label: 'Ignition', icon: Zap, desc: 'WEEKS 3-4', key: 'ignition' },
+    { id: 'Discovery', label: 'Discovery', icon: SearchIcon, desc: 'WEEKS 5-6', key: 'discovery' },
+    { id: 'Branding', label: 'Branding', icon: Compass, desc: 'WEEKS 7-9', key: 'branding' },
+    { id: 'Outreach', label: 'Outreach', icon: Handshake, desc: 'WEEKS 10-12', key: 'outreach' },
   ];
 
   const currentIndex = stages.findIndex((s) => s.id === stage);
@@ -22,6 +22,7 @@ export const JourneyTimeline: React.FC<{ stage: string }> = ({ stage }) => {
           const isCurrent = i === currentIndex;
           const isCompleted = i < currentIndex;
           const isNext = i === currentIndex + 1;
+          const phasePercent = phaseProgress?.[s.key] || 0;
 
           return (
             <div
@@ -94,11 +95,12 @@ export const JourneyTimeline: React.FC<{ stage: string }> = ({ stage }) => {
             const isCurrent = i === currentIndex;
             const isCompleted = i < currentIndex;
             const isLocked = i > currentIndex;
+            const phasePercent = phaseProgress?.[s.key] || 0;
 
             return (
-              <div key={s.id} className="flex flex-col items-center w-32">
+              <div key={s.id} className="flex flex-col items-center w-32 relative">
                 <div
-                  className={`w-16 h-16 rounded-2xl border-2 flex items-center justify-center transition-all duration-700 relative ${
+                  className={`w-16 h-16 rounded-2xl border-2 flex items-center justify-center transition-all duration-700 relative z-10 ${
                     isCurrent
                       ? 'bg-black border-neon-cyan text-neon-cyan shadow-[0_0_40px_rgba(0,243,255,0.5)] scale-125 ring-8 ring-neon-cyan/5'
                       : isCompleted
@@ -119,6 +121,17 @@ export const JourneyTimeline: React.FC<{ stage: string }> = ({ stage }) => {
                     </>
                   )}
                 </div>
+                
+                {/* Phase Progress Indicator */}
+                {(isCurrent || (isCompleted && phasePercent < 100)) && (
+                  <div className="absolute -bottom-6 left-1/2 -translate-x-1/2 w-20 h-1 bg-white/10 rounded-full overflow-hidden">
+                    <motion.div 
+                      initial={{ width: 0 }}
+                      animate={{ width: `${phasePercent}%` }}
+                      className="h-full bg-neon-cyan"
+                    />
+                  </div>
+                )}
               </div>
             );
           })}

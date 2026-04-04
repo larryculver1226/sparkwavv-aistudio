@@ -16,6 +16,7 @@ import {
 } from 'firebase/firestore';
 import { db } from '../lib/firebase';
 import { ValidationGateEvent, DistilledArtifact } from '../types/wavvault';
+import { logUserActivity } from './activityService';
 
 export const subscribeToEvents = (
   userId: string,
@@ -97,6 +98,18 @@ export async function writeArtifact(data: any) {
     userId,
     timestamp: serverTimestamp(),
   });
+
+  // Log activity
+  await logUserActivity(
+    userId,
+    artifact.tenantId || 'default',
+    'artifact_created',
+    `Created Artifact: ${artifact.title || 'Untitled'}`,
+    `A new artifact was distilled in the ${artifact.journeyPhase || 'unknown'} phase.`,
+    artifact.journeyPhase as any,
+    artifactId
+  );
+
   return { success: true, artifactId };
 }
 
