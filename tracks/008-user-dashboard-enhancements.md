@@ -1,4 +1,4 @@
-# Track: User Dashboard Completion & Enhancements
+# Track 008: User Dashboard Completion & Enhancements
 
 ## Objective
 Identify and implement a minimal, initial set of feature enhancements for the User Dashboard UX to ensure consistency with the Sparkwavv Journey, reflect user progress, highlight required actions, and enhance Wavvault to support the journey.

@@ -18,6 +18,7 @@ import { Button } from '../components/Button';
 import { ProfilePhotoUpload } from '../components/profile/ProfilePhotoUpload';
 import { doc, updateDoc } from 'firebase/firestore';
 import { db } from '../lib/firebase';
+import { logUserActivity } from '../services/activityService';
 
 export const ProfilePage: React.FC = () => {
   const { user, profile, status, updateProfile } = useIdentity();
@@ -64,6 +65,18 @@ export const ProfilePage: React.FC = () => {
     try {
       setIsSaving(true);
       await updateProfile(formData);
+      
+      await logUserActivity(
+        user.uid,
+        profile?.tenantId || 'default',
+        'profile_updated',
+        'Updated Profile',
+        'You updated your profile information.',
+        profile?.journeyStage as any || 'Dive-In',
+        user.uid,
+        ['profile']
+      );
+      
       setShowSuccess(true);
       setTimeout(() => setShowSuccess(false), 3000);
     } catch (error) {
@@ -84,6 +97,18 @@ export const ProfilePage: React.FC = () => {
       reader.onloadend = async () => {
         const base64data = reader.result as string;
         await updateProfile({ photoURL: base64data });
+        
+        await logUserActivity(
+          user.uid,
+          profile?.tenantId || 'default',
+          'profile_updated',
+          'Updated Profile Photo',
+          'You uploaded a new profile photo.',
+          profile?.journeyStage as any || 'Dive-In',
+          user.uid,
+          ['profile', 'photo']
+        );
+        
         setShowSuccess(true);
         setTimeout(() => setShowSuccess(false), 3000);
       };

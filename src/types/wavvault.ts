@@ -43,10 +43,54 @@ export interface DistilledArtifact {
   type: 'spark' | 'pie-of-life' | 'perfect-day' | 'five-stories' | 'brand-pillar' | 'manifesto';
   title: string;
   journeyPhase?: 'Dive-In' | 'Ignition' | 'Discovery' | 'Branding' | 'Outreach';
+  status?: 'draft' | 'review' | 'approved';
   content: any;
   timestamp: string;
   sourceGateId?: string;
   metadata?: Record<string, any>;
+}
+
+export type EffortTier = '3.5 Hours/Week' | '7 Hours/Week';
+
+export interface EnergyManagement {
+  rebootActivities: {
+    relax: string[];
+    refresh: string[];
+    review: string[];
+    reflect: string[];
+  };
+  energyTroughs: string[];
+}
+
+export interface RPP {
+  name: string;
+  meetingType: string;
+  location?: string;
+  validationTimestamp?: string;
+}
+
+export interface TwentyOneQuestions {
+  organizationType?: string;
+  industrySector?: string;
+  roleLevel?: string;
+  budgetControl?: string;
+  reportingStructureUp?: string;
+  reportingStructureDown?: string;
+  bossTitleLocation?: string;
+  workplaceEnvironment?: string;
+  commuteTime?: string;
+  commuteMode?: string;
+  attire?: string;
+  lunchHabit?: string;
+  [key: string]: any;
+}
+
+export interface StoryEntity {
+  id: string;
+  accomplishmentId: string;
+  styleAJournalist: string;
+  styleBFeeling: string;
+  isHeroicDeed: boolean;
 }
 
 export interface WavvaultData {
@@ -62,6 +106,19 @@ export interface WavvaultData {
   isDiscoveryUnlocked: boolean;
   contentHash?: string;
   previousHash?: string;
+  
+  // Draft V9 Schema Additions
+  effortTier?: EffortTier;
+  energyManagement?: EnergyManagement;
+  rppPartners?: RPP[];
+  twentyOneQuestions?: TwentyOneQuestions;
+  perfectDay?: string;
+  prioritizationRankings?: Record<string, number>;
+  pieOfLife?: { current: any; target: any };
+  extinguishers?: string[];
+  accomplishmentLedger?: any[]; // Top 20
+  fiveStories?: StoryEntity[];
+  attributeAssignments?: Record<string, string>;
 }
 
 export type AssetType = 'narrative' | 'resume' | 'portfolio';

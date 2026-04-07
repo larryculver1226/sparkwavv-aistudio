@@ -104,12 +104,13 @@ export interface UserActivity {
   id: string;
   userId: string;
   tenantId: string;
-  type: 'artifact_created' | 'insight_discovered' | 'phase_unlocked' | 'asset_generated';
+  type: 'artifact_created' | 'insight_discovered' | 'phase_unlocked' | 'asset_generated' | 'milestone_completed' | 'profile_updated' | 'mentor_note_received';
   title: string;
   description?: string;
   timestamp: string;
   relatedEntityId?: string;
   journeyPhase?: 'Dive-In' | 'Ignition' | 'Discovery' | 'Branding' | 'Outreach';
+  tags?: string[];
 }
 
 export interface MarketSignal {

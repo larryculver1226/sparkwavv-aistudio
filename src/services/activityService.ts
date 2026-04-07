@@ -9,7 +9,8 @@ export async function logUserActivity(
   title: string,
   description: string,
   journeyPhase: UserActivity['journeyPhase'],
-  relatedEntityId?: string
+  relatedEntityId?: string,
+  tags?: string[]
 ) {
   try {
     const docRef = doc(collection(db, 'user_activities'));
@@ -22,6 +23,7 @@ export async function logUserActivity(
       timestamp: serverTimestamp() as any, // Will be replaced by Firestore
       journeyPhase,
       relatedEntityId,
+      tags,
     };
 
     await setDoc(docRef, activity);

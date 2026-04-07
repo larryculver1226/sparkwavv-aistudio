@@ -8,9 +8,10 @@ import { motion, AnimatePresence } from 'motion/react';
 interface ActivityFeedProps {
   userId: string;
   limitCount?: number;
+  onActivityClick?: (activity: UserActivity) => void;
 }
 
-export const ActivityFeed: React.FC<ActivityFeedProps> = ({ userId, limitCount = 10 }) => {
+export const ActivityFeed: React.FC<ActivityFeedProps> = ({ userId, limitCount = 10, onActivityClick }) => {
   const [activities, setActivities] = useState<UserActivity[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -46,6 +47,9 @@ export const ActivityFeed: React.FC<ActivityFeedProps> = ({ userId, limitCount =
       case 'insight_discovered': return <Sparkles className="w-4 h-4 text-yellow-400" />;
       case 'phase_unlocked': return <Target className="w-4 h-4 text-green-400" />;
       case 'asset_generated': return <Award className="w-4 h-4 text-purple-400" />;
+      case 'milestone_completed': return <Target className="w-4 h-4 text-neon-cyan" />;
+      case 'profile_updated': return <Activity className="w-4 h-4 text-blue-400" />;
+      case 'mentor_note_received': return <FileText className="w-4 h-4 text-amber-400" />;
       default: return <Activity className="w-4 h-4 text-white/40" />;
     }
   };
@@ -114,7 +118,10 @@ export const ActivityFeed: React.FC<ActivityFeedProps> = ({ userId, limitCount =
                   {getActivityIcon(activity.type)}
                 </div>
                 
-                <div className="w-[calc(100%-3rem)] md:w-[calc(50%-2rem)] p-4 rounded-xl border border-white/5 bg-white/5 hover:bg-white/10 transition-colors">
+                <div 
+                  className={`w-[calc(100%-3rem)] md:w-[calc(50%-2rem)] p-4 rounded-xl border border-white/5 bg-white/5 transition-colors ${onActivityClick ? 'cursor-pointer hover:bg-white/10 hover:border-neon-cyan/30' : 'hover:bg-white/10'}`}
+                  onClick={() => onActivityClick && onActivityClick(activity)}
+                >
                   <div className="flex items-center justify-between mb-1">
                     <span className="text-xs font-bold text-white/80">{activity.title}</span>
                     <span className="text-[10px] text-white/40 flex items-center gap-1">

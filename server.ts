@@ -596,6 +596,8 @@ const envStatus: any = {
   FIRESTORE_STATUS: 'OK',
 };
 
+import { skylar } from './src/services/skylarService';
+
 async function startServer() {
   console.log('Starting server initialization...');
   const app = express();
@@ -1935,6 +1937,7 @@ async function startServer() {
                 creationTime: data.createdAt || new Date().toISOString(),
                 source: 'firestore',
                 tenantId: typeof data.tenantId === 'string' ? data.tenantId : (data.tenantId?.tenantId || 'sparkwavv'),
+                sparkwavvId: data.sparkwavvId || null,
               };
             });
             console.log(`[ADMIN] Found ${firestoreUsers.length} users in Firestore collection 'users'`);
@@ -1962,6 +1965,11 @@ async function startServer() {
               
               // If the existing role is SUPER_ADMIN (bootstrapped), don't let Firestore overwrite it
               if (key === 'role' && existing.role === ROLES.SUPER_ADMIN) return;
+              
+              // Prevent Firestore UID fallback from overwriting a valid Auth displayName
+              if (key === 'displayName' && u[key] === u.uid && existing.displayName && existing.displayName !== existing.uid) {
+                return;
+              }
               
               if (u[key] !== undefined && u[key] !== null && u[key] !== '') {
                 merged[key] = u[key];
@@ -2059,11 +2067,30 @@ async function startServer() {
         if (userDoc.exists) {
           const userData = userDoc.data();
           console.log(`[AUTH] Profile found for ${decodedToken.email}. Role: ${userData.role}`);
+          
+          // Self-healing: if user exists but has no sparkwavvId, generate one
+          if (!userData.sparkwavvId && (userData.role === ROLES.USER || !userData.role)) {
+            console.log(`[AUTH] Self-healing: Generating missing sparkwavvId for ${decodedToken.uid}`);
+            const sparkwavvId = await generateSparkwavvId(db);
+            await db.collection('users').doc(decodedToken.uid).update({ sparkwavvId });
+            userData.sparkwavvId = sparkwavvId;
+            
+            // Also ensure dashboard exists and is linked
+            const dashboardDoc = await db.collection('dashboards').doc(decodedToken.uid).get();
+            if (!dashboardDoc.exists) {
+              await createDefaultDashboard(db, decodedToken.uid, userData.journeyStage || 'Dive-In', sparkwavvId);
+            } else {
+              await db.collection('dashboards').doc(decodedToken.uid).update({ sparkwavvId });
+            }
+          }
+          
           res.json({ ...userData, uid: decodedToken.uid });
         } else {
           console.warn(`[AUTH] Profile NOT found for UID: ${decodedToken.uid} (${decodedToken.email}). Creating default profile.`);
+          const sparkwavvId = await generateSparkwavvId(db);
           const newProfile = {
             uid: decodedToken.uid,
+            sparkwavvId,
             email: decodedToken.email || '',
             role: ROLES.USER,
             tenantId: 'sparkwavv',
@@ -2072,6 +2099,7 @@ async function startServer() {
             updatedAt: admin.firestore.FieldValue.serverTimestamp()
           };
           await db.collection('users').doc(decodedToken.uid).set(newProfile);
+          await createDefaultDashboard(db, decodedToken.uid, 'Dive-In', sparkwavvId);
           res.json(newProfile);
         }
       } catch (error: any) {
@@ -2466,6 +2494,53 @@ async function startServer() {
     });
 
     // Skylar AI Agentic Routes
+    app.post("/api/agent/chat", requireRole([ROLES.USER, ROLES.ADMIN, ROLES.OPERATOR, ROLES.MENTOR, ROLES.AGENT]), async (req, res) => {
+      try {
+        const { message, history, wavvaultContext } = req.body;
+        const authenticatedUser = (req as any).user;
+        const userId = authenticatedUser.uid;
+
+        const result = await skylar.orchestrateAgent(message, history, wavvaultContext, userId);
+        
+        // If the agent executed tools, we update the user's wavvault in Firestore
+        if (result.toolCallsExecuted && result.toolCallsExecuted.length > 0) {
+          for (const call of result.toolCallsExecuted) {
+            if (call.name === 'save_dive_in_commitments') {
+              const { effortTier, rppPartners, energyTroughs, rebootActivities } = call.args;
+              await db?.collection('users').doc(userId).update({
+                'diveInCommitments.effortTier': effortTier,
+                'diveInCommitments.rppPartners': rppPartners,
+                'diveInCommitments.energyTroughs': energyTroughs,
+                'diveInCommitments.rebootActivities': rebootActivities,
+                'diveInCommitments.completedAt': new Date().toISOString()
+              });
+            } else if (call.name === 'save_ignition_exercises') {
+              const { pieOfLife, perfectDay } = call.args;
+              await db?.collection('users').doc(userId).update({
+                'ignitionExercises.pieOfLife': pieOfLife,
+                'ignitionExercises.perfectDay': perfectDay,
+                'ignitionExercises.completedAt': new Date().toISOString()
+              });
+            } else if (call.name === 'save_career_dna_hypothesis') {
+              const { hypothesis } = call.args;
+              await db?.collection('users').doc(userId).update({
+                'careerDnaHypothesis': hypothesis
+              });
+            } else if (call.name === 'update_journey_stage') {
+              await db?.collection('users').doc(userId).update({
+                journeyStage: call.args.newStage
+              });
+            }
+          }
+        }
+
+        res.json({ success: true, text: result.text, toolCalls: result.toolCallsExecuted });
+      } catch (error: any) {
+        console.error("Error in /api/agent/chat:", error);
+        res.status(500).json({ error: error.message });
+      }
+    });
+
     app.post("/api/skylar/search-wavvault", requireRole([ROLES.USER, ROLES.ADMIN, ROLES.OPERATOR, ROLES.MENTOR, ROLES.AGENT]), async (req, res) => {
       const { query } = req.body;
       const authenticatedUser = (req as any).user;

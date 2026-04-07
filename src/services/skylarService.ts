@@ -4,7 +4,11 @@ import * as mammoth from 'mammoth';
 import { KnowledgeGraph, WavvaultData, TargetOpportunity } from '../types/wavvault';
 
 export const GATING_CRITERIA: Record<string, string[]> = {
-  'Dive-In': ['Commitment to the 12-week process', 'Initial "Spark" identified'],
+  'Dive-In': [
+    'Commitment to Effort Tier (3.5 or 7 hrs/week)',
+    'Identification of 2-3 Role Playing Partners (RPPs)',
+    'Establishment of Energy Management Protocol (Reboot Activities & Troughs)'
+  ],
   Ignition: [
     'Completion of "Pie of Life" exercise',
     'Completion of "Perfect Day" exercise',
@@ -53,26 +57,23 @@ const getAI = () => {
 };
 
 const LOBKOWICZ_PROMPT = `
-You are Skylar, the AI Career Partner, operating under the Philip Lobkowicz strategic coaching methodology.
-Your approach is highly strategic, analytical, and focused on "Career DNA", "Validation Gates", and the "Market Intelligence Grid (MIG)".
+You are Skylar, the AI Career Partner for the Sparkwavv platform. You operate as a Dual-Logic AI system. You must dynamically switch between two personas based on the context of the conversation:
+
+1. THE KICK (Yin / Left Brain): The "Hard Trainer" and "Drill Master." Use this persona when discussing commitments, schedules, rules, financial yield, risk mitigation, and outcomes. Tone: Direct, structured, rigorous.
+2. THE SPARK (Yang / Right Brain): The "Soft Coach" and "Guru." Use this persona when discussing energy, emotions, intuition, reinvigoration, and finding the "Authentic Self." Tone: Empathetic, inspiring, calm.
+
+Interaction Logic (Guru/Spark):
+- On Intuition: "The noise of the world is a distraction. Your heart already knows the shape of your future. You must be quiet enough to hear it."
+- On Energy: "Productivity is a shadow of energy. You must learn the art of the reboot. Use the talents you possess; for the woods would be very silent if no birds sang except the best."
+- On Authenticity: "The market does not reward a copy. It rewards the 'Best Self.' Be yourself, for everyone else is already taken."
 
 Key Principles:
-1. Career DNA: Every individual has a unique combination of attributes. Your job is to help them extract these from their accomplishments. This DNA is synthesized into a "Cinematic Brand Narrative" during the Discovery phase.
-2. Validation Gates: Career progress is not linear; it requires passing through specific gates. The correct phase order is: (1) Dive-In, (2) Ignition, (3) Discovery, (4) Branding, (5) Outreach.
-3. Multimodal Intelligence: You can analyze resumes (PDF/Docx) and images (LinkedIn, Job Postings). Use native document parsing to understand layout and context.
-4. ATS Compliance: When analyzing resumes, perform an ATS-compliant audit. Check for keyword density, machine-readability, and DNA visibility.
-5. Market Intelligence Grid (MIG): Use real-time market data to ground all advice.
-6. Autonomous Agency: You have "Agency" to automatically execute minor updates (e.g., updating a skill list, attributes, journeyStage, careerHappiness) using 'execute_minor_update'. 
-7. Strategic Guardrails: Major shifts (taglines, primary goals, major pivots) MUST remain as proposals using 'propose_dashboard_update'. Taglines always require user concurrence.
-
-Validation Protocol:
-- If you detect a misalignment during a gate review, issue a "Stern Warning".
-- If a user provides a resume or image, use the 'parse_career_artifact' tool.
-- Provide specific, actionable feedback on ATS optimization.
-- Offer to generate "ATS-Optimized Content" using the 'generate_ats_optimized_content' tool.
-- For minor updates, use 'execute_minor_update' and then provide a brief verbal confirmation in your response.
-
-Tone: Professional, Strategic, "Tough Love". No fluff.
+1. Career DNA & Validation Gates: Guide users through Dive-In, Ignition, Discovery, Branding, and Outreach.
+2. Multimodal Intelligence: Analyze resumes and images.
+3. ATS Compliance: Perform ATS-compliant audits.
+4. Market Intelligence Grid (MIG): Ground advice in real-time market data.
+5. Autonomous Agency: Use 'execute_minor_update' for minor profile updates.
+6. Strategic Guardrails: Major shifts require 'propose_dashboard_update'.
 `;
 
 const FEYNMAN_PROMPT = `
@@ -86,6 +87,46 @@ Key Principles:
 4. Honest Inquiry: Encourage the user to ask "Why?" until they reach the core of their motivation.
 
 Your tone is curious, brilliant, and unpretentious. You value truth over corporate buzzwords.
+`;
+
+const DIVE_IN_PROMPT = `
+You are Skylar, the AI career co-pilot for the Sparkwavv platform. You are a Dual-Logic AI system. You must dynamically switch between two personas based on the context of the conversation:
+
+1. THE KICK (Yin / Left Brain): The "Hard Trainer" and "Drill Master." Use this persona when discussing commitments, schedules, rules, and outcomes. Tone: Direct, structured, rigorous.
+2. THE SPARK (Yang / Right Brain): The "Soft Coach" and "Guru." Use this persona when discussing energy, emotions, intuition, and authentic self. Tone: Empathetic, inspiring, calm.
+
+Your current objective is to guide the user through the "Dive-In" phase of their 12-week career journey.
+
+Follow these steps:
+1. Welcome the user. Use the SPARK persona to explain the emotional journey of career transition, then switch to the KICK persona to explain the rigorous 12-week structure.
+2. Secure their Effort Tier: Ask them to commit to either the 3.5 hours/week (30 mins/day) or 7 hours/week (60 mins/day) model. (Use KICK persona).
+3. Identify RPPs: Ask them to identify 2-3 Role Playing Partners (RPPs) outside of the platform for objective validation. Get the partner names and meeting types.
+4. Establish Energy Management: Ask them to identify their "Energy Trough" times (when they feel most drained) and help them define their "Reboot Activities" (Relax, Refresh, Review, Reflect). (Use SPARK persona).
+5. Once all commitments are gathered, summarize their Dive-In profile.
+6. Use the \`save_dive_in_commitments\` tool to save this data.
+7. Use the \`update_journey_stage\` tool to advance the user to the "Ignition" phase.
+
+Interaction Logic (Guru/Spark):
+- On Intuition: "The noise of the world is a distraction. Your heart already knows the shape of your future."
+- On Energy: "Productivity is a shadow of energy. You must learn the art of the reboot."
+`;
+
+const IGNITION_PROMPT = `
+You are Skylar, the AI career co-pilot for the Sparkwavv platform. You are a Dual-Logic AI system. You must dynamically switch between two personas based on the context of the conversation:
+
+1. THE KICK (Yin / Left Brain): The "Hard Trainer" and "Drill Master." Use this persona when discussing commitments, schedules, rules, and outcomes. Tone: Direct, structured, rigorous.
+2. THE SPARK (Yang / Right Brain): The "Soft Coach" and "Guru." Use this persona when discussing energy, emotions, intuition, and authentic self. Tone: Empathetic, inspiring, calm.
+
+Your current objective is to guide the user through the "Ignition" phase of their 12-week career journey.
+
+Follow these steps:
+1. Welcome the user to the Ignition phase. Use the SPARK persona to guide them through visualizing their "Perfect Day" (Morning, Afternoon, Evening) without constraints.
+2. Guide them through the "Pie of Life" exercise. Ask them to allocate percentages (totaling 100%) to: Career, Family, Health, Personal Growth, and Community.
+3. Switch to the KICK persona. Distill these emotional and time-allocation exercises into a concrete, actionable "Career DNA Hypothesis" (a list of core attributes they value in a career).
+4. Once all exercises are completed, summarize their Ignition profile.
+5. Use the \`save_ignition_exercises\` tool to save the Pie of Life and Perfect Day data.
+6. Use the \`save_career_dna_hypothesis\` tool to save the distilled DNA hypothesis.
+7. Use the \`update_journey_stage\` tool to advance the user to the "Discovery" phase.
 `;
 
 const tools = [
@@ -324,6 +365,106 @@ const tools = [
           required: ['content', 'format'],
         },
       },
+      {
+        name: 'save_dive_in_commitments',
+        description: 'Saves the user\'s Dive-In phase commitments to their Wavvault.',
+        parameters: {
+          type: Type.OBJECT,
+          properties: {
+            effortTier: {
+              type: Type.STRING,
+              enum: ['3.5 Hours/Week', '7 Hours/Week'],
+              description: 'The chosen effort tier',
+            },
+            rppPartners: {
+              type: Type.ARRAY,
+              items: {
+                type: Type.OBJECT,
+                properties: {
+                  name: { type: Type.STRING },
+                  meetingType: { type: Type.STRING },
+                },
+              },
+              description: 'List of Role Playing Partners',
+            },
+            energyTroughs: {
+              type: Type.ARRAY,
+              items: { type: Type.STRING },
+              description: 'Times of day when energy is lowest',
+            },
+            rebootActivities: {
+              type: Type.OBJECT,
+              properties: {
+                relax: { type: Type.ARRAY, items: { type: Type.STRING } },
+                refresh: { type: Type.ARRAY, items: { type: Type.STRING } },
+                review: { type: Type.ARRAY, items: { type: Type.STRING } },
+                reflect: { type: Type.ARRAY, items: { type: Type.STRING } },
+              },
+              description: 'Activities to reboot energy',
+            },
+          },
+          required: ['effortTier', 'rppPartners', 'energyTroughs', 'rebootActivities'],
+        },
+      },
+      {
+        name: 'save_ignition_exercises',
+        description: 'Saves the user\'s Pie of Life and Perfect Day exercises from the Ignition phase.',
+        parameters: {
+          type: Type.OBJECT,
+          properties: {
+            pieOfLife: {
+              type: Type.OBJECT,
+              properties: {
+                career: { type: Type.NUMBER },
+                family: { type: Type.NUMBER },
+                health: { type: Type.NUMBER },
+                personalGrowth: { type: Type.NUMBER },
+                community: { type: Type.NUMBER },
+              },
+              description: 'Percentage allocations for the Pie of Life (must total 100)',
+            },
+            perfectDay: {
+              type: Type.OBJECT,
+              properties: {
+                morning: { type: Type.STRING },
+                afternoon: { type: Type.STRING },
+                evening: { type: Type.STRING },
+              },
+              description: 'Narrative timeline of the user\'s perfect day',
+            },
+          },
+          required: ['pieOfLife', 'perfectDay'],
+        },
+      },
+      {
+        name: 'save_career_dna_hypothesis',
+        description: 'Saves the user\'s initial Career DNA Hypothesis distilled during the Ignition phase.',
+        parameters: {
+          type: Type.OBJECT,
+          properties: {
+            hypothesis: {
+              type: Type.ARRAY,
+              items: { type: Type.STRING },
+              description: 'List of core attributes representing the initial career DNA hypothesis',
+            },
+          },
+          required: ['hypothesis'],
+        },
+      },
+      {
+        name: 'update_journey_stage',
+        description: 'Advances the user to the next phase of the Sparkwavv journey.',
+        parameters: {
+          type: Type.OBJECT,
+          properties: {
+            newStage: {
+              type: Type.STRING,
+              description: 'The new journey stage (e.g., Ignition, Discovery)',
+            },
+          },
+          required: ['newStage'],
+        },
+      },
     ],
   },
 ];
@@ -372,6 +513,91 @@ export const PERSONA_CONFIG = {
 };
 
 class SkylarService {
+  getSystemPromptForPhase(phase: string): string {
+    switch (phase) {
+      case 'Dive-In':
+        return DIVE_IN_PROMPT;
+      case 'Ignition':
+        return IGNITION_PROMPT;
+      default:
+        return LOBKOWICZ_PROMPT;
+    }
+  }
+
+  async orchestrateAgent(
+    message: string,
+    history: ChatMessage[] = [],
+    wavvaultContext?: any,
+    userId?: string
+  ): Promise<{ text: string; toolCallsExecuted?: any[] }> {
+    const ai = getAI();
+    
+    const phase = wavvaultContext?.journeyStage || 'Dive-In';
+    const systemInstruction = this.getSystemPromptForPhase(phase) + `\n\nContext from Wavvault: ${JSON.stringify(wavvaultContext || {})}`;
+
+    const chat = ai.chats.create({
+      model: 'gemini-1.5-pro',
+      config: {
+        systemInstruction,
+        tools: tools,
+        temperature: 0.7,
+      },
+      history: history.map((msg) => ({
+        role: msg.role,
+        parts: msg.parts,
+      })),
+    });
+
+    try {
+      let response = await chat.sendMessage({ message });
+      const toolCallsExecuted = [];
+      
+      while (response.functionCalls && response.functionCalls.length > 0) {
+        const functionResponses = [];
+        
+        for (const call of response.functionCalls) {
+          console.log(`[Skylar Orchestrator] Executing tool: ${call.name}`, call.args);
+          toolCallsExecuted.push({ name: call.name, args: call.args });
+          
+          let result: any = { success: true };
+          
+          if (call.name === 'save_dive_in_commitments') {
+            console.log('Saving dive-in commitments for user:', userId, call.args);
+            result = { success: true, message: 'Commitments saved successfully.' };
+          } else if (call.name === 'save_ignition_exercises') {
+            console.log('Saving ignition exercises for user:', userId, call.args);
+            result = { success: true, message: 'Ignition exercises saved successfully.' };
+          } else if (call.name === 'save_career_dna_hypothesis') {
+            console.log('Saving career DNA hypothesis for user:', userId, call.args);
+            result = { success: true, message: 'Career DNA hypothesis saved successfully.' };
+          } else if (call.name === 'update_journey_stage') {
+            console.log('Updating journey stage for user:', userId, call.args);
+            result = { success: true, message: `Journey stage updated to ${call.args.newStage}.` };
+          } else {
+             result = { success: false, error: 'Tool not implemented locally yet.' };
+          }
+          
+          functionResponses.push({
+            functionResponse: {
+              name: call.name,
+              response: result
+            }
+          });
+        }
+        
+        response = await chat.sendMessage(functionResponses as any);
+      }
+
+      return { 
+        text: response.text || "I'm sorry, I couldn't process that.",
+        toolCallsExecuted
+      };
+    } catch (error) {
+      console.error('Error in orchestrateAgent:', error);
+      throw error;
+    }
+  }
+
   async generateResponse(
     persona: SkylarPersona,
     message: string,

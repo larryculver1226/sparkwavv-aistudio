@@ -470,7 +470,7 @@ service cloud.firestore {
     }
 
     function isValidDistilledArtifact(data) {
-      let allowedFields = ['id', 'userId', 'type', 'title', 'content', 'timestamp', 'sourceGateId', 'metadata', 'serverTimestamp', 'journeyPhase'];
+      let allowedFields = ['id', 'userId', 'type', 'title', 'content', 'timestamp', 'sourceGateId', 'metadata', 'serverTimestamp', 'journeyPhase', 'status'];
       return hasRequiredFields(['id', 'userId', 'type', 'title', 'timestamp']) &&
              hasOnlyAllowedFields(allowedFields) &&
              data.id is string && data.id.size() < 128 &&
@@ -478,22 +478,24 @@ service cloud.firestore {
              data.type in ['spark', 'pie-of-life', 'perfect-day', 'five-stories', 'brand-pillar', 'manifesto'] &&
              data.title is string && data.title.size() < 256 &&
              (!('sourceGateId' in data) || (data.sourceGateId is string && data.sourceGateId.size() < 128)) &&
-             (!('journeyPhase' in data) || data.journeyPhase in ["Dive-In", "Ignition", "Discovery", "Branding", "Outreach"]);
+             (!('journeyPhase' in data) || data.journeyPhase in ["Dive-In", "Ignition", "Discovery", "Branding", "Outreach"]) &&
+             (!('status' in data) || data.status in ["draft", "review", "approved"]);
     }
 
     function isValidUserActivity(data) {
-      let allowedFields = ['id', 'userId', 'tenantId', 'type', 'title', 'description', 'timestamp', 'relatedEntityId', 'journeyPhase'];
+      let allowedFields = ['id', 'userId', 'tenantId', 'type', 'title', 'description', 'timestamp', 'relatedEntityId', 'journeyPhase', 'tags'];
       return hasRequiredFields(['id', 'userId', 'tenantId', 'type', 'title', 'timestamp']) &&
              hasOnlyAllowedFields(allowedFields) &&
              data.id is string && data.id.size() < 128 &&
              data.userId is string && data.userId.size() < 128 &&
              data.tenantId is string && data.tenantId.size() < 64 &&
-             data.type in ['artifact_created', 'insight_discovered', 'phase_unlocked', 'asset_generated'] &&
+             data.type in ['artifact_created', 'insight_discovered', 'phase_unlocked', 'asset_generated', 'milestone_completed', 'profile_updated', 'mentor_note_received'] &&
              data.title is string && data.title.size() < 256 &&
              (resource == null ? isRecent(data.timestamp) : data.timestamp == resource.data.timestamp) &&
              (!('description' in data) || (data.description is string && data.description.size() < 1000)) &&
              (!('relatedEntityId' in data) || (data.relatedEntityId is string && data.relatedEntityId.size() < 128)) &&
-             (!('journeyPhase' in data) || data.journeyPhase in ["Dive-In", "Ignition", "Discovery", "Branding", "Outreach"]);
+             (!('journeyPhase' in data) || data.journeyPhase in ["Dive-In", "Ignition", "Discovery", "Branding", "Outreach"]) &&
+             (!('tags' in data) || (data.tags is list && data.tags.size() < 20));
     }
 
     function isValidBrandNarrative(data) {

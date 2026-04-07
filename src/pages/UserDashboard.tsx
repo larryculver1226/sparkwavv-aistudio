@@ -49,15 +49,19 @@ import { InvitationModal } from '../components/InvitationModal';
 import { PartnerSelectionModal } from '../components/PartnerSelectionModal';
 import { EveningSpark } from '../components/EveningSpark';
 import { logUserActivity } from '../services/activityService';
+import { calculateAndUpdateProgress } from '../services/progressService';
 import { NeuralSynthesisEngine } from '../components/dashboard/NeuralSynthesisEngine';
 import { HighFidelitySynthesisLab } from '../components/skylar/HighFidelitySynthesisLab';
 import { OutreachForge } from '../components/skylar/OutreachForge';
 import { JobMatchesView } from '../components/dashboard/JobMatchesView';
+import { HistoryView } from '../components/dashboard/HistoryView';
 import { StrengthsView } from '../components/dashboard/StrengthsView';
 import { PhaseDetails } from '../components/kickspark/PhaseDetails';
 import { MilestoneRoadmap } from '../components/kickspark/MilestoneRoadmap';
 import { EvolutionVisualizer } from '../components/EvolutionVisualizer';
-import { UserInsight } from '../types/dashboard';
+import { UserInsight, UserActivity } from '../types/dashboard';
+import { ArtifactModal } from '../components/dashboard/ArtifactModal';
+import { DistilledArtifact } from '../types/wavvault';
 import { X, Eye, EyeOff, Brain as BrainIcon } from 'lucide-react';
 import { SentimentMotivationModal } from '../components/dashboard/SentimentMotivationModal';
 import { GateReviewModal } from '../components/dashboard/GateReviewModal';
@@ -108,6 +112,18 @@ export const UserDashboard: React.FC<{ userId: string; isAdmin?: boolean }> = ({
   const [suggestions, setSuggestions] = useState<any[]>([]);
   const [activePartners, setActivePartners] = useState<any[]>([]);
   const [activePhaseView, setActivePhaseView] = useState<'ignition' | 'discovery'>('ignition');
+  const [selectedArtifact, setSelectedArtifact] = useState<DistilledArtifact | null>(null);
+  const [isArtifactModalOpen, setIsArtifactModalOpen] = useState(false);
+
+  const handleActivityClick = (activity: UserActivity) => {
+    if (activity.type === 'artifact_created' && activity.relatedEntityId) {
+      const artifact = artifacts.find(a => a.id === activity.relatedEntityId);
+      if (artifact) {
+        setSelectedArtifact(artifact);
+        setIsArtifactModalOpen(true);
+      }
+    }
+  };
 
   const currentStage =
     data?.discoveryProgress || (isAdmin ? 'Dive-In' : profile?.journeyStage) || 'Dive-In';
@@ -126,6 +142,19 @@ export const UserDashboard: React.FC<{ userId: string; isAdmin?: boolean }> = ({
       audioService.stopMomentumPulse();
     };
   }, [timelineStage]);
+
+  useEffect(() => {
+    if (!data || !user || !artifacts) return;
+    
+    const updateProgress = async () => {
+      const newProgress = await calculateAndUpdateProgress(userId, data, artifacts);
+      if (newProgress && JSON.stringify(newProgress) !== JSON.stringify(data.phaseProgress)) {
+        setData(prev => prev ? { ...prev, phaseProgress: newProgress } : prev);
+      }
+    };
+    
+    updateProgress();
+  }, [artifacts.length, user]); // Only re-run when artifact count changes to avoid infinite loops if data changes
 
   useEffect(() => {
     const fetchPartnerData = async () => {
@@ -267,13 +296,14 @@ export const UserDashboard: React.FC<{ userId: string; isAdmin?: boolean }> = ({
   const [searchParams, setSearchParams] = useSearchParams();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [activeView, setActiveView] = useState<
-    'dashboard' | 'synthesis' | 'matches' | 'outreach' | 'strengths'
+    'dashboard' | 'synthesis' | 'matches' | 'outreach' | 'strengths' | 'history'
   >(() => {
     const view = searchParams.get('view');
     if (view === 'matches') return 'matches';
     if (view === 'synthesis') return 'synthesis';
     if (view === 'outreach') return 'outreach';
     if (view === 'strengths') return 'strengths';
+    if (view === 'history') return 'history';
     return 'dashboard';
   });
 
@@ -283,11 +313,12 @@ export const UserDashboard: React.FC<{ userId: string; isAdmin?: boolean }> = ({
     else if (view === 'synthesis') setActiveView('synthesis');
     else if (view === 'outreach') setActiveView('outreach');
     else if (view === 'strengths') setActiveView('strengths');
+    else if (view === 'history') setActiveView('history');
     else setActiveView('dashboard');
   }, [searchParams]);
 
   const handleViewChange = (
-    view: 'dashboard' | 'synthesis' | 'matches' | 'outreach' | 'strengths'
+    view: 'dashboard' | 'synthesis' | 'matches' | 'outreach' | 'strengths' | 'history'
   ) => {
     setActiveView(view);
     setSearchParams({ view });
@@ -526,6 +557,25 @@ export const UserDashboard: React.FC<{ userId: string; isAdmin?: boolean }> = ({
           completed: milestone?.completed ?? false,
         }),
       });
+
+      if (milestone?.completed) {
+        await logUserActivity(
+          userId,
+          'default',
+          'milestone_completed',
+          `Completed Milestone: ${milestone.label}`,
+          `You have successfully completed the milestone: ${milestone.label}.`,
+          data.discoveryProgress as any,
+          milestoneId,
+          ['milestone']
+        );
+      }
+
+      // Update progress
+      const newProgress = await calculateAndUpdateProgress(userId, { ...data, milestones: updatedMilestones }, artifacts);
+      if (newProgress) {
+        setData(prev => prev ? { ...prev, phaseProgress: newProgress } : prev);
+      }
     } catch (err) {
       console.error('Error toggling milestone:', err);
     }
@@ -689,6 +739,12 @@ export const UserDashboard: React.FC<{ userId: string; isAdmin?: boolean }> = ({
                     active: activeView === 'outreach',
                     onClick: () => handleViewChange('outreach'),
                   },
+                  {
+                    icon: History,
+                    label: 'History',
+                    active: activeView === 'history',
+                    onClick: () => handleViewChange('history'),
+                  },
                   { icon: Database, label: 'Vault', path: '/vault' },
                   { icon: UserIcon, label: 'Profile', path: '/profile' },
                   { icon: Users, label: 'Community', path: '/community' },
@@ -752,6 +808,12 @@ export const UserDashboard: React.FC<{ userId: string; isAdmin?: boolean }> = ({
               label: 'Outreach Forge',
               active: activeView === 'outreach',
               onClick: () => handleViewChange('outreach'),
+            },
+            {
+              icon: History,
+              label: 'History',
+              active: activeView === 'history',
+              onClick: () => handleViewChange('history'),
             },
             { icon: Database, label: 'Vault', path: '/vault' },
             { icon: UserIcon, label: 'Profile', path: '/profile' },
@@ -934,6 +996,8 @@ export const UserDashboard: React.FC<{ userId: string; isAdmin?: boolean }> = ({
                 <JobMatchesView onBack={() => handleViewChange('dashboard')} />
               ) : activeView === 'strengths' ? (
                 <StrengthsView onBack={() => handleViewChange('dashboard')} />
+              ) : activeView === 'history' ? (
+                <HistoryView userId={userId} />
               ) : (
                 <>
                   <div className="mb-12">
@@ -999,9 +1063,19 @@ export const UserDashboard: React.FC<{ userId: string; isAdmin?: boolean }> = ({
                               </div>
                               <div className="flex gap-3">
                                 <button
-                                  onClick={() =>
-                                    handleSuggestionResponse(suggestion.id, 'accepted')
-                                  }
+                                  onClick={async () => {
+                                    await handleSuggestionResponse(suggestion.id, 'accepted');
+                                    await logUserActivity(
+                                      userId,
+                                      'default',
+                                      'mentor_note_received',
+                                      `Accepted Partner Suggestion`,
+                                      `You accepted a ${suggestion.type === 'dna_shift' ? 'DNA Shift' : 'New Milestone'} from ${suggestion.partnerName}.`,
+                                      data?.discoveryProgress as any,
+                                      suggestion.id,
+                                      ['partner', 'suggestion']
+                                    );
+                                  }}
                                   className="flex-1 py-2 bg-amber-400 text-black text-xs font-bold rounded-xl hover:bg-amber-300 transition-all"
                                 >
                                   Accept
@@ -1064,6 +1138,7 @@ export const UserDashboard: React.FC<{ userId: string; isAdmin?: boolean }> = ({
                         transparencyMode={transparencyMode}
                         toggleTransparency={toggleTransparency}
                         setShowEvolution={setShowEvolution}
+                        onActivityClick={handleActivityClick}
                       />
                     )}
                     {timelineStage === 'Ignition' && (
@@ -1077,6 +1152,7 @@ export const UserDashboard: React.FC<{ userId: string; isAdmin?: boolean }> = ({
                           if (actionId === 'validation') setIsGateModalOpen(true);
                         }}
                         onNavigate={handleViewChange}
+                        onActivityClick={handleActivityClick}
                       />
                     )}
                     {timelineStage === 'Discovery' && (
@@ -1090,6 +1166,7 @@ export const UserDashboard: React.FC<{ userId: string; isAdmin?: boolean }> = ({
                           if (actionId === 'validation') setIsGateModalOpen(true);
                         }}
                         onNavigate={handleViewChange}
+                        onActivityClick={handleActivityClick}
                       />
                     )}
                     {timelineStage === 'Branding' && (
@@ -1103,6 +1180,7 @@ export const UserDashboard: React.FC<{ userId: string; isAdmin?: boolean }> = ({
                           if (actionId === 'validation') setIsGateModalOpen(true);
                         }}
                         onNavigate={handleViewChange}
+                        onActivityClick={handleActivityClick}
                       />
                     )}
                     {timelineStage === 'Outreach' && (
@@ -1116,6 +1194,7 @@ export const UserDashboard: React.FC<{ userId: string; isAdmin?: boolean }> = ({
                           if (actionId === 'validation') setIsGateModalOpen(true);
                         }}
                         onNavigate={handleViewChange}
+                        onActivityClick={handleActivityClick}
                       />
                     )}
                   </div>
@@ -1329,6 +1408,12 @@ export const UserDashboard: React.FC<{ userId: string; isAdmin?: boolean }> = ({
           </div>
         </div>
       )}
+
+      <ArtifactModal
+        isOpen={isArtifactModalOpen}
+        onClose={() => setIsArtifactModalOpen(false)}
+        artifact={selectedArtifact}
+      />
     </div>
   );
 };

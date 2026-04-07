@@ -274,30 +274,64 @@ export const SkylarSidebar: React.FC<SkylarSidebarProps> = ({ onLogin }) => {
         parts: msg.parts,
       }));
 
-      const result = await skylar.chatWithVertex(
-        uid === 'anonymous' ? '' : uid,
-        currentInput,
-        vertexHistory,
-        methodology,
-        token,
-        currentFile || undefined
-      );
+      let responseText = '';
+      let executedActions = [];
 
-      const { response, executedActions } = result;
+      if (user) {
+        // Use the new in-app orchestrator
+        const res = await fetch('/api/agent/chat', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${token}`
+          },
+          body: JSON.stringify({
+            message: currentInput,
+            history: vertexHistory,
+            wavvaultContext: profile
+          })
+        });
 
-      const responseText =
-        response.candidates?.[0]?.content?.parts
-          ?.filter((part) => part.text)
-          ?.map((part) => part.text)
-          ?.join('') || '';
-      const calls = response.functionCalls;
+        if (!res.ok) throw new Error('Failed to communicate with Skylar');
+        
+        const data = await res.json();
+        responseText = data.text;
+        
+        if (data.toolCalls && data.toolCalls.length > 0) {
+          executedActions = data.toolCalls.map((call: any) => ({
+            action: call.name,
+            data: call.args
+          }));
+        }
+      } else {
+        // Fallback for unauthenticated users
+        const result = await skylar.chatWithVertex(
+          uid === 'anonymous' ? '' : uid,
+          currentInput,
+          vertexHistory,
+          methodology,
+          token,
+          currentFile || undefined
+        );
+        responseText = result.response.candidates?.[0]?.content?.parts?.filter((part) => part.text)?.map((part) => part.text)?.join('') || '';
+        executedActions = result.executedActions || [];
+      }
 
       if (executedActions && executedActions.length > 0) {
         executedActions.forEach((action: any) => {
           // Show toast for auto-executed actions
           console.log(`[SKYLAR] Auto-executed: ${action.action}`, action.data);
 
-          const toastMessage = `✨ Skylar auto-updated: ${action.data.field} to "${action.data.value}"`;
+          let toastMessage = `✨ Skylar auto-updated: ${action.data.field} to "${action.data.value}"`;
+          if (action.action === 'save_dive_in_commitments') {
+            toastMessage = `✨ Skylar saved your Dive-In commitments (${action.data.effortTier})`;
+          } else if (action.action === 'save_ignition_exercises') {
+            toastMessage = `✨ Skylar saved your Pie of Life and Perfect Day timeline`;
+          } else if (action.action === 'save_career_dna_hypothesis') {
+            toastMessage = `✨ Skylar saved your Career DNA Hypothesis`;
+          } else if (action.action === 'update_journey_stage') {
+            toastMessage = `✨ Skylar advanced your journey to ${action.data.newStage}`;
+          }
 
           // 1. Add to toasts
           const newToast = {
@@ -322,36 +356,23 @@ export const SkylarSidebar: React.FC<SkylarSidebarProps> = ({ onLogin }) => {
 
           // 4. Verbal confirmation if voice is enabled
           if (isVoiceEnabled) {
-            handleSpeak(`I've updated your ${action.data.field} to ${action.data.value}.`);
+            let speakText = `I've updated your ${action.data.field} to ${action.data.value}.`;
+            if (action.action === 'save_dive_in_commitments') {
+              speakText = `I've saved your Dive-In commitments.`;
+            } else if (action.action === 'save_ignition_exercises') {
+              speakText = `I've saved your Pie of Life and Perfect Day timeline.`;
+            } else if (action.action === 'save_career_dna_hypothesis') {
+              speakText = `I've saved your Career DNA Hypothesis.`;
+            } else if (action.action === 'update_journey_stage') {
+              speakText = `I've advanced your journey to ${action.data.newStage}.`;
+            }
+            handleSpeak(speakText);
           }
         });
       }
 
-      if (calls && calls.length > 0) {
-        for (const call of calls) {
-          const { name, args } = call;
-
-          if (name === 'generate_ats_optimized_content') {
-            setAtsProposal({
-              content: (args as any).content,
-              format: (args as any).format,
-            });
-          } else if (name.startsWith('propose_') || name === 'flag_dna_conflict') {
-            const proposal: SkylarProposal = {
-              type: name === 'flag_dna_conflict' ? 'CONFLICT' : 'PROPOSAL',
-              action: name as any,
-              data: args,
-              reasoning:
-                (args as any).reasoning ||
-                (args as any).conflictReason ||
-                'Skylar suggests this based on your conversation.',
-            };
-
-            const messageIndex = messages.length + 1;
-            setProposals((prev) => ({ ...prev, [messageIndex]: proposal }));
-          }
-        }
-      }
+      // Note: In the new architecture, proposals are handled differently. 
+      // For now, we skip the 'calls' logic since the orchestrator handles execution.
 
       const modelMessage: ChatMessage = {
         role: 'model',

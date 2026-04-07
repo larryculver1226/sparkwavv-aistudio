@@ -32,4 +32,19 @@ export interface UserProfile {
   voiceMode?: boolean;
   specializedSector?: 'Healthcare' | 'Legal' | 'Cybersecurity' | 'Finance' | 'General';
   updatedAt?: any;
+  ignitionExercises?: {
+    pieOfLife: {
+      career: number;
+      family: number;
+      health: number;
+      personalGrowth: number;
+      community: number;
+    };
+    perfectDay: {
+      morning: string;
+      afternoon: string;
+      evening: string;
+    };
+  };
+  careerDnaHypothesis?: string[];
 }

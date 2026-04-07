@@ -392,7 +392,8 @@
         "timestamp": { "type": "string", "format": "date-time" },
         "sourceGateId": { "type": "string" },
         "metadata": { "type": "object" },
-        "journeyPhase": { "type": "string", "enum": ["Dive-In", "Ignition", "Discovery", "Branding", "Outreach"] }
+        "journeyPhase": { "type": "string", "enum": ["Dive-In", "Ignition", "Discovery", "Branding", "Outreach"] },
+        "status": { "type": "string", "enum": ["draft", "review", "approved"] }
       },
       "required": ["id", "userId", "type", "title", "timestamp"]
     },
@@ -404,12 +405,13 @@
         "id": { "type": "string" },
         "userId": { "type": "string" },
         "tenantId": { "type": "string" },
-        "type": { "type": "string", "enum": ["artifact_created", "insight_discovered", "phase_unlocked", "asset_generated"] },
+        "type": { "type": "string", "enum": ["artifact_created", "insight_discovered", "phase_unlocked", "asset_generated", "milestone_completed", "profile_updated", "mentor_note_received"] },
         "title": { "type": "string" },
         "description": { "type": "string" },
         "timestamp": { "type": "string", "format": "date-time" },
         "relatedEntityId": { "type": "string" },
-        "journeyPhase": { "type": "string", "enum": ["Dive-In", "Ignition", "Discovery", "Branding", "Outreach"] }
+        "journeyPhase": { "type": "string", "enum": ["Dive-In", "Ignition", "Discovery", "Branding", "Outreach"] },
+        "tags": { "type": "array", "items": { "type": "string" } }
       },
       "required": ["id", "userId", "tenantId", "type", "title", "timestamp"]
     }

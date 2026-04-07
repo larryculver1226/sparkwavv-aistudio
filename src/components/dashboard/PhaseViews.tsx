@@ -18,15 +18,16 @@ interface PhaseViewProps {
   transparencyMode?: 'full' | 'under-the-hood';
   toggleTransparency?: () => void;
   setShowEvolution?: (show: boolean) => void;
+  onActivityClick?: (activity: any) => void;
 }
 
-export const DiveInView: React.FC<PhaseViewProps> = ({ userId, currentStage, onActionClick, transparencyMode, toggleTransparency, setShowEvolution }) => (
+export const DiveInView: React.FC<PhaseViewProps> = ({ userId, currentStage, onActionClick, transparencyMode, toggleTransparency, setShowEvolution, onActivityClick }) => (
   <div className="space-y-8">
     <ActionCenter currentStage={currentStage} onActionClick={onActionClick} />
     <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
       <div className="lg:col-span-2 space-y-8">
         <NeuralSynthesisEngine userId={userId} currentStage={currentStage} />
-        <ActivityFeed userId={userId} limitCount={5} />
+        <ActivityFeed userId={userId} limitCount={5} onActivityClick={onActivityClick} />
       </div>
       <div className="flex flex-col gap-6">
         <div className="glass-panel p-8 rounded-[2rem] border border-white/5 bg-black/40 flex flex-col justify-between h-full">
@@ -77,13 +78,13 @@ export const DiveInView: React.FC<PhaseViewProps> = ({ userId, currentStage, onA
   </div>
 );
 
-export const IgnitionView: React.FC<PhaseViewProps> = ({ userId, currentStage, onActionClick, onNavigate, profile }) => (
+export const IgnitionView: React.FC<PhaseViewProps> = ({ userId, currentStage, onActionClick, onNavigate, profile, onActivityClick }) => (
   <div className="space-y-8">
     <ActionCenter currentStage={currentStage} onActionClick={onActionClick} />
     <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
       <div className="space-y-8">
         <NeuralSynthesisEngine userId={userId} currentStage={currentStage} />
-        <ActivityFeed userId={userId} limitCount={5} />
+        <ActivityFeed userId={userId} limitCount={5} onActivityClick={onActivityClick} />
       </div>
       
       <div className="glass-panel p-10 rounded-[2.5rem] border border-white/5 bg-black/40">
@@ -124,14 +125,14 @@ export const IgnitionView: React.FC<PhaseViewProps> = ({ userId, currentStage, o
   </div>
 );
 
-export const DiscoveryView: React.FC<PhaseViewProps> = ({ userId, currentStage, onActionClick, profile, data, onNavigate }) => (
+export const DiscoveryView: React.FC<PhaseViewProps> = ({ userId, currentStage, onActionClick, profile, data, onNavigate, onActivityClick }) => (
   <div className="space-y-8">
     <ActionCenter currentStage={currentStage} onActionClick={onActionClick} />
     
     <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
       <div className="space-y-8">
         <NeuralSynthesisEngine userId={userId} currentStage={currentStage} />
-        <ActivityFeed userId={userId} limitCount={5} />
+        <ActivityFeed userId={userId} limitCount={5} onActivityClick={onActivityClick} />
       </div>
       {profile?.specializedSector && profile.specializedSector !== 'General' && (
         <SectorIntelligence sector={profile.specializedSector} userId={userId} />
@@ -175,7 +176,7 @@ export const DiscoveryView: React.FC<PhaseViewProps> = ({ userId, currentStage, 
   </div>
 );
 
-export const BrandingView: React.FC<PhaseViewProps> = ({ userId, currentStage, onActionClick, artifacts, onNavigate }) => (
+export const BrandingView: React.FC<PhaseViewProps> = ({ userId, currentStage, onActionClick, artifacts, onNavigate, onActivityClick }) => (
   <div className="space-y-8">
     <ActionCenter currentStage={currentStage} onActionClick={onActionClick} />
     
@@ -212,13 +213,13 @@ export const BrandingView: React.FC<PhaseViewProps> = ({ userId, currentStage, o
       />
       <div className="space-y-8">
         <NeuralSynthesisEngine userId={userId} currentStage={currentStage} />
-        <ActivityFeed userId={userId} limitCount={5} />
+        <ActivityFeed userId={userId} limitCount={5} onActivityClick={onActivityClick} />
       </div>
     </div>
   </div>
 );
 
-export const OutreachView: React.FC<PhaseViewProps> = ({ userId, currentStage, onActionClick, data, onNavigate }) => (
+export const OutreachView: React.FC<PhaseViewProps> = ({ userId, currentStage, onActionClick, data, onNavigate, onActivityClick }) => (
   <div className="space-y-8">
     <ActionCenter currentStage={currentStage} onActionClick={onActionClick} />
     
@@ -260,7 +261,7 @@ export const OutreachView: React.FC<PhaseViewProps> = ({ userId, currentStage, o
       </div>
       <div className="space-y-8">
         <NeuralSynthesisEngine userId={userId} currentStage={currentStage} />
-        <ActivityFeed userId={userId} limitCount={5} />
+        <ActivityFeed userId={userId} limitCount={5} onActivityClick={onActivityClick} />
       </div>
     </div>
   </div>

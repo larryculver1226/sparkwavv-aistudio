@@ -201,6 +201,9 @@ const IdentityManagementPanel = () => {
                 User
               </th>
               <th className="px-6 py-4 text-[10px] font-bold text-white/40 uppercase tracking-widest">
+                Dashboard ID
+              </th>
+              <th className="px-6 py-4 text-[10px] font-bold text-white/40 uppercase tracking-widest">
                 Tenant
               </th>
               <th className="px-6 py-4 text-[10px] font-bold text-white/40 uppercase tracking-widest">
@@ -228,6 +231,7 @@ const IdentityManagementPanel = () => {
                     </div>
                   </div>
                 </td>
+                <td className="px-6 py-4 text-xs font-mono text-white/60">{u.sparkwavvId || 'N/A'}</td>
                 <td className="px-6 py-4 text-xs text-white/60">{u.tenantId || 'sparkwavv'}</td>
                 <td className="px-6 py-4 text-xs text-white/40 uppercase tracking-widest">
                   {u.role}
