@@ -1,0 +1,27 @@
+---
+description: Gemini Live API Development Guidelines
+globs: *.ts, *.tsx, *.js, *.jsx
+---
+# Gemini Live API Development Guidelines
+
+Use the `@google/genai` SDK for connecting to the Gemini Live API via WebSockets.
+
+## Connection
+```typescript
+import { GoogleGenAI } from '@google/genai';
+
+const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
+const session = await ai.models.connect({
+  model: 'gemini-2.0-flash-exp',
+  config: {
+    responseModalities: ['AUDIO']
+  }
+});
+
+session.on('message', (message) => {
+  // Handle incoming audio/text
+});
+
+// Send audio/text
+await session.send({ text: 'Hello!' });
+```

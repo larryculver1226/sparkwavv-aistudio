@@ -727,5 +727,10 @@ service cloud.firestore {
       allow update: if isAdmin();
       allow delete: if isAdmin();
     }
+
+    match /agent_configs/{stageId} {
+      allow read: if isAuthenticated();
+      allow write: if isAdmin();
+    }
   }
 }

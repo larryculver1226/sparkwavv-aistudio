@@ -13,6 +13,7 @@ You MUST follow the "Plan, Setup, Build" methodology for all tasks.
 ## 3. History & Tracking
 - **Tracks**: Every Plan/Setup/Build task is a "track". Create a sequentially numbered markdown file in the `/tracks` folder (e.g., `/tracks/004-feature-name.md`) following the template in `/tracks/002-home-page-redesign.md`.
 - **Changelog**: Maintain a complete history of all coding changes in `CHANGELOG.md` in the root directory. Update this file at the end of every track.
+- **MCP Context**: Be aware that `/tracks`, `CHANGELOG.md`, and `TECH_SPECS.md` are indexed and served via a local MCP server (`scripts/mcp-server/index.ts`). Ensure these files are kept clean, well-formatted, and up-to-date so that local AI coding assistants (like Cursor or Cline) can accurately query the project history.
 
 ## 4. Testing & QA
 - **Unit/Component Testing**: Use `vitest` and `@testing-library/react`. Always write tests for new utility functions or components.

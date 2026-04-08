@@ -1,6 +1,7 @@
 import { initializeApp, getApps, getApp } from 'firebase/app';
 import { getAuth, GoogleAuthProvider, OAuthProvider } from 'firebase/auth';
 import { getFirestore, initializeFirestore } from 'firebase/firestore';
+import { getStorage } from 'firebase/storage';
 import firebaseConfig from '../../firebase-applet-config.json';
 
 // Sparkwavv Project (Project 1) - End Users
@@ -104,6 +105,8 @@ try {
 }
 export const adminDb = adminDbInstance;
 export const adminAuth = auth; // Same auth instance for single project
+
+export const storage = getStorage(sparkwavvApp);
 
 export const googleProvider = new GoogleAuthProvider();
 

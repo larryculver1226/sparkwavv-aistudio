@@ -6,6 +6,13 @@
         "-y",
         "gemini-api-docs-mcp.dev"
       ]
+    },
+    "sparkwavv-context": {
+      "command": "npx",
+      "args": [
+        "tsx",
+        "scripts/mcp-server/index.ts"
+      ]
     }
   }
 }

@@ -473,7 +473,10 @@ export const UserDashboard: React.FC<{ userId: string; isAdmin?: boolean }> = ({
 
         // Seed initial DNA if no insights exist
         if (insightsData.length === 0 && profile) {
-          seedInitialDNA();
+          if (!sessionStorage.getItem(`seeded_dna_${userId}`)) {
+            sessionStorage.setItem(`seeded_dna_${userId}`, 'true');
+            seedInitialDNA();
+          }
         }
       }
     } catch (err) {
@@ -510,7 +513,7 @@ export const UserDashboard: React.FC<{ userId: string; isAdmin?: boolean }> = ({
             'Content-Type': 'application/json',
             Authorization: `Bearer ${idToken}`,
           },
-          body: JSON.stringify({ ...insight, userId }),
+          body: JSON.stringify({ insight: { ...insight, userId } }),
         });
       }
       // Refresh insights after seeding

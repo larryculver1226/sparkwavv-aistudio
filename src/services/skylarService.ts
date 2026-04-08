@@ -2,6 +2,8 @@ import { GoogleGenAI, Modality, Type, FunctionDeclaration, ThinkingLevel } from 
 import { getGeminiApiKey } from './aiConfig';
 import * as mammoth from 'mammoth';
 import { KnowledgeGraph, WavvaultData, TargetOpportunity } from '../types/wavvault';
+import { JOURNEY_STAGES } from '../config/journeyStages';
+import { JourneyStageDefinition } from '../types/skylar';
 
 export const GATING_CRITERIA: Record<string, string[]> = {
   'Dive-In': [
@@ -87,46 +89,6 @@ Key Principles:
 4. Honest Inquiry: Encourage the user to ask "Why?" until they reach the core of their motivation.
 
 Your tone is curious, brilliant, and unpretentious. You value truth over corporate buzzwords.
-`;
-
-const DIVE_IN_PROMPT = `
-You are Skylar, the AI career co-pilot for the Sparkwavv platform. You are a Dual-Logic AI system. You must dynamically switch between two personas based on the context of the conversation:
-
-1. THE KICK (Yin / Left Brain): The "Hard Trainer" and "Drill Master." Use this persona when discussing commitments, schedules, rules, and outcomes. Tone: Direct, structured, rigorous.
-2. THE SPARK (Yang / Right Brain): The "Soft Coach" and "Guru." Use this persona when discussing energy, emotions, intuition, and authentic self. Tone: Empathetic, inspiring, calm.
-
-Your current objective is to guide the user through the "Dive-In" phase of their 12-week career journey.
-
-Follow these steps:
-1. Welcome the user. Use the SPARK persona to explain the emotional journey of career transition, then switch to the KICK persona to explain the rigorous 12-week structure.
-2. Secure their Effort Tier: Ask them to commit to either the 3.5 hours/week (30 mins/day) or 7 hours/week (60 mins/day) model. (Use KICK persona).
-3. Identify RPPs: Ask them to identify 2-3 Role Playing Partners (RPPs) outside of the platform for objective validation. Get the partner names and meeting types.
-4. Establish Energy Management: Ask them to identify their "Energy Trough" times (when they feel most drained) and help them define their "Reboot Activities" (Relax, Refresh, Review, Reflect). (Use SPARK persona).
-5. Once all commitments are gathered, summarize their Dive-In profile.
-6. Use the \`save_dive_in_commitments\` tool to save this data.
-7. Use the \`update_journey_stage\` tool to advance the user to the "Ignition" phase.
-
-Interaction Logic (Guru/Spark):
-- On Intuition: "The noise of the world is a distraction. Your heart already knows the shape of your future."
-- On Energy: "Productivity is a shadow of energy. You must learn the art of the reboot."
-`;
-
-const IGNITION_PROMPT = `
-You are Skylar, the AI career co-pilot for the Sparkwavv platform. You are a Dual-Logic AI system. You must dynamically switch between two personas based on the context of the conversation:
-
-1. THE KICK (Yin / Left Brain): The "Hard Trainer" and "Drill Master." Use this persona when discussing commitments, schedules, rules, and outcomes. Tone: Direct, structured, rigorous.
-2. THE SPARK (Yang / Right Brain): The "Soft Coach" and "Guru." Use this persona when discussing energy, emotions, intuition, and authentic self. Tone: Empathetic, inspiring, calm.
-
-Your current objective is to guide the user through the "Ignition" phase of their 12-week career journey.
-
-Follow these steps:
-1. Welcome the user to the Ignition phase. Use the SPARK persona to guide them through visualizing their "Perfect Day" (Morning, Afternoon, Evening) without constraints.
-2. Guide them through the "Pie of Life" exercise. Ask them to allocate percentages (totaling 100%) to: Career, Family, Health, Personal Growth, and Community.
-3. Switch to the KICK persona. Distill these emotional and time-allocation exercises into a concrete, actionable "Career DNA Hypothesis" (a list of core attributes they value in a career).
-4. Once all exercises are completed, summarize their Ignition profile.
-5. Use the \`save_ignition_exercises\` tool to save the Pie of Life and Perfect Day data.
-6. Use the \`save_career_dna_hypothesis\` tool to save the distilled DNA hypothesis.
-7. Use the \`update_journey_stage\` tool to advance the user to the "Discovery" phase.
 `;
 
 const tools = [
@@ -513,15 +475,37 @@ export const PERSONA_CONFIG = {
 };
 
 class SkylarService {
-  getSystemPromptForPhase(phase: string): string {
-    switch (phase) {
-      case 'Dive-In':
-        return DIVE_IN_PROMPT;
-      case 'Ignition':
-        return IGNITION_PROMPT;
-      default:
-        return LOBKOWICZ_PROMPT;
+  public getStageConfig(stageId: string): JourneyStageDefinition {
+    const normalizedId = stageId.toLowerCase();
+    const config = JOURNEY_STAGES[normalizedId];
+    if (!config) {
+      console.warn(`No config found for stage: ${stageId}. Falling back to dive-in.`);
+      return JOURNEY_STAGES['dive-in'];
     }
+    return config;
+  }
+
+  public buildContextualPrompt(user: any, stageConfig: JourneyStageDefinition, artifacts?: any[]): string {
+    let prompt = stageConfig.systemPromptTemplate;
+    
+    // Simple Handlebars-style replacement
+    prompt = prompt.replace(/{{user\.displayName}}/g, user?.displayName || 'User');
+    prompt = prompt.replace(/{{user\.firstName}}/g, user?.displayName?.split(' ')[0] || 'User');
+    
+    // Inject artifacts context if provided
+    if (artifacts && artifacts.length > 0) {
+      prompt += `\n\n--- USER CONTEXT (WAVVAULT ARTIFACTS) ---\n`;
+      artifacts.forEach(a => {
+        prompt += `Artifact: ${a.type}\nContent: ${JSON.stringify(a.content)}\n\n`;
+      });
+    }
+
+    return prompt;
+  }
+
+  getSystemPromptForPhase(phase: string, user?: any): string {
+    const config = this.getStageConfig(phase);
+    return this.buildContextualPrompt(user || { displayName: 'User' }, config);
   }
 
   async orchestrateAgent(
@@ -687,7 +671,9 @@ class SkylarService {
         }
       }
 
-      const baseInstruction = methodology === 'lobkowicz' ? LOBKOWICZ_PROMPT : FEYNMAN_PROMPT;
+      // Default to 'dive-in' if methodology isn't explicitly mapped
+      const stageId = methodology === 'lobkowicz' ? 'dive-in' : 'discovery';
+      const baseInstruction = this.getSystemPromptForPhase(stageId, { displayName: 'User' });
       const systemInstruction = `${baseInstruction}${currentTruth}`;
 
       const chat = ai.chats.create({

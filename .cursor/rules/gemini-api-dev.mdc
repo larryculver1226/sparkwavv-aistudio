@@ -1,0 +1,39 @@
+---
+description: Gemini API Development Guidelines
+globs: *.ts, *.tsx, *.js, *.jsx
+---
+# Gemini API Development Guidelines
+
+Always use the official `@google/genai` SDK for Gemini API integrations.
+
+## Initialization
+```typescript
+import { GoogleGenAI } from '@google/genai';
+const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
+```
+
+## Text Generation
+```typescript
+const response = await ai.models.generateContent({
+  model: 'gemini-2.5-flash',
+  contents: 'Tell me a joke.',
+});
+console.log(response.text);
+```
+
+## Structured Output (JSON)
+```typescript
+import { Type } from '@google/genai';
+
+const response = await ai.models.generateContent({
+  model: 'gemini-2.5-flash',
+  contents: 'List 3 colors.',
+  config: {
+    responseMimeType: 'application/json',
+    responseSchema: {
+      type: Type.ARRAY,
+      items: { type: Type.STRING }
+    }
+  }
+});
+```

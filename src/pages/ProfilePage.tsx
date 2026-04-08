@@ -20,6 +20,8 @@ import { doc, updateDoc } from 'firebase/firestore';
 import { db } from '../lib/firebase';
 import { logUserActivity } from '../services/activityService';
 
+import { storageService } from '../services/storageService';
+
 export const ProfilePage: React.FC = () => {
   const { user, profile, status, updateProfile } = useIdentity();
   const navigate = useNavigate();
@@ -90,28 +92,25 @@ export const ProfilePage: React.FC = () => {
     if (!user) return;
 
     try {
-      // In a real app, you'd upload this blob to Firebase Storage
-      // For this demo, we'll convert to base64 and store in Firestore (not ideal for real apps but works for demo)
-      const reader = new FileReader();
-      reader.readAsDataURL(blob);
-      reader.onloadend = async () => {
-        const base64data = reader.result as string;
-        await updateProfile({ photoURL: base64data });
-        
-        await logUserActivity(
-          user.uid,
-          profile?.tenantId || 'default',
-          'profile_updated',
-          'Updated Profile Photo',
-          'You uploaded a new profile photo.',
-          profile?.journeyStage as any || 'Dive-In',
-          user.uid,
-          ['profile', 'photo']
-        );
-        
-        setShowSuccess(true);
-        setTimeout(() => setShowSuccess(false), 3000);
-      };
+      // Upload to Firebase Storage
+      const downloadURL = await storageService.uploadProfileImage(blob);
+      
+      // Update local context
+      await updateProfile({ photoURL: downloadURL });
+      
+      await logUserActivity(
+        user.uid,
+        profile?.tenantId || 'default',
+        'profile_updated',
+        'Updated Profile Photo',
+        'You uploaded a new profile photo.',
+        profile?.journeyStage as any || 'Dive-In',
+        user.uid,
+        ['profile', 'photo']
+      );
+      
+      setShowSuccess(true);
+      setTimeout(() => setShowSuccess(false), 3000);
     } catch (error) {
       console.error('Error updating photo:', error);
     }

@@ -4,6 +4,13 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 ### Added
+- **Track 024**: Migrate Skylar Agent Definitions to Firestore & Build Agent Ops UI (Created `agent_configs` collection, `agentOpsService`, and `AgentOpsPanel` in Admin Dashboard for dynamic prompt management).
+- **Track 023**: Integration of SkylarInteractionPanel into the User Dashboard for Dive-In Phase (Replaced the static Dive-In view with the dynamic Skylar Agent interface).
+- **Track 022**: Skylar Agent Definitions for Sparkwavv Journey Steps (Architected generic `JourneyStageDefinition` schema, refactored `skylarService.ts` to use dynamic prompts, and built the unified `SkylarInteractionPanel`).
+- **Track 021**: Implement User Profile Image Upload (Added Firebase Storage integration, `storageService`, and updated `ProfilePage` to upload profile images).
+- **Track 020**: Set up your coding assistant with Gemini MCP and Skills (Added Gemini Docs MCP, API Development Skills, and a local Project Context MCP Server).
+- **Track 019**: Model Garden Models Setup (Replaced hardcoded Gemini fallbacks with environment variables for Vertex AI fine-tuned endpoints).
+- **Track 018**: Fix Login Hang (Resolved infinite loop during login and removed email verification banner).
 - **Track 017**: Skylar Ignition Subagent (Added structured data models for Pie of Life and Perfect Day, updated Skylar prompt and tools for the Ignition phase).
 - **Track 016**: In-App Agent Orchestration (Code-First Custom Agent Orchestrator using Gemini Function Calling).
 - **Track 015**: GCS Upload 404 Error (Mocked GCS upload if the bucket does not exist for prototype purposes).

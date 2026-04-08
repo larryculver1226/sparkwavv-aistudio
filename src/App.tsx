@@ -202,37 +202,6 @@ const ProtectedRoute = ({
   return <>{children}</>;
 };
 
-const VerificationBanner = ({
-  user,
-  onResend,
-  onRefresh,
-}: {
-  user: any;
-  onResend: () => void;
-  onRefresh: () => void;
-}) => {
-  if (!user || user.emailVerified) return null;
-  return (
-    <div className="bg-neon-cyan/10 border-b border-neon-cyan/20 py-2 px-4 flex items-center justify-center gap-4 text-xs md:text-sm relative z-[60]">
-      <ShieldAlert className="w-4 h-4 text-neon-cyan" />
-      <span className="text-white/80">Your email is not verified. Please check your inbox.</span>
-      <div className="flex items-center gap-3">
-        <button onClick={onResend} className="text-neon-cyan font-bold hover:underline">
-          Resend Verification
-        </button>
-        <span className="text-white/20">|</span>
-        <button
-          onClick={onRefresh}
-          className="flex items-center gap-1 text-white/60 hover:text-white transition-colors"
-        >
-          <RefreshCw className="w-3 h-3" />
-          Check Status
-        </button>
-      </div>
-    </div>
-  );
-};
-
 const ProgressBar = ({ current, total }: { current: number; total: number }) => (
   <div className="fixed top-0 left-0 w-full h-1 bg-white/5 z-50">
     <motion.div
@@ -1014,29 +983,6 @@ export function SPARKWavvApp({
               }
             } else {
               setStep(s as Step);
-            }
-          }}
-        />
-        <VerificationBanner
-          user={user}
-          onResend={() => {
-            // Identity Platform handles verification resending via their dashboard or universal login
-            setShowToast({
-              message: 'Please check your inbox for the verification email from Identity Platform.',
-              type: 'success',
-            });
-          }}
-          onRefresh={async () => {
-            if (user) {
-              await refreshProfile();
-              if (emailVerified) {
-                setShowToast({ message: 'Email verified! Welcome aboard.', type: 'success' });
-              } else {
-                setShowToast({
-                  message: 'Email still not verified. Please check your inbox.',
-                  type: 'error',
-                });
-              }
             }
           }}
         />

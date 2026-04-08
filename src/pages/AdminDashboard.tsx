@@ -56,6 +56,7 @@ import { FirebaseSetup } from './FirebaseSetup';
 import { IdentityReconciliation } from './IdentityReconciliation';
 import { VertexDashboard } from '../components/admin/VertexDashboard';
 import { ValidationGateReview } from '../components/admin/ValidationGateReview';
+import { AgentOpsPanel } from '../components/admin/AgentOpsPanel';
 import {
   JOURNEY_STAGES,
   TENANTS,
@@ -1062,6 +1063,12 @@ export const AdminDashboard: React.FC<{ onLogout: () => void }> = ({ onLogout })
                       roles: [ROLES.SUPER_ADMIN, ROLES.ADMIN],
                     },
                     {
+                      id: 'agent-ops',
+                      label: 'Agent Ops',
+                      icon: Brain,
+                      roles: [ROLES.SUPER_ADMIN, ROLES.ADMIN],
+                    },
+                    {
                       id: 'validation',
                       label: 'Validation Gates',
                       icon: ShieldCheck,
@@ -1188,6 +1195,12 @@ export const AdminDashboard: React.FC<{ onLogout: () => void }> = ({ onLogout })
                 roles: [ROLES.SUPER_ADMIN, ROLES.ADMIN],
               },
               {
+                id: 'agent-ops',
+                label: 'Agent Ops',
+                icon: Brain,
+                roles: [ROLES.SUPER_ADMIN, ROLES.ADMIN],
+              },
+              {
                 id: 'validation',
                 label: 'Validation Gates',
                 icon: ShieldCheck,
@@ -1269,6 +1282,7 @@ export const AdminDashboard: React.FC<{ onLogout: () => void }> = ({ onLogout })
               {activeTab === 'logs' && 'System Logs'}
               {activeTab === 'vertex' && 'Vertex AI Enterprise Intelligence'}
               {activeTab === 'validation' && 'Validation Gate Review'}
+              {activeTab === 'agent-ops' && 'Agent Operations'}
               {activeTab === 'diagnostics' && 'Connectivity Diagnostics'}
               {activeTab === 'firebase-setup' && 'Firebase Configuration'}
             </h2>
@@ -1280,6 +1294,7 @@ export const AdminDashboard: React.FC<{ onLogout: () => void }> = ({ onLogout })
               {activeTab === 'reconciliation' && 'Reconcile and sync identities across platforms'}
               {activeTab === 'vertex' && 'Managed RAG, Fine-Tuning, and Model Garden (Track B)'}
               {activeTab === 'validation' && 'Human-in-the-Loop (HITL) Lifecycle Gatekeeping'}
+              {activeTab === 'agent-ops' && 'Manage Skylar prompts, modalities, and UI configurations'}
               {activeTab === 'diagnostics' && 'Evaluate SPARKWavv & Firebase integration status'}
               {activeTab === 'firebase-setup' &&
                 'Step-by-step guide to connect your Firebase project'}
@@ -1400,6 +1415,10 @@ export const AdminDashboard: React.FC<{ onLogout: () => void }> = ({ onLogout })
           ) : activeTab === 'firebase-setup' ? (
             <div className="col-span-4">
               <FirebaseSetup />
+            </div>
+          ) : activeTab === 'agent-ops' ? (
+            <div className="col-span-4">
+              <AgentOpsPanel />
             </div>
           ) : (
             <div className="col-span-4 glass-panel p-12 text-center border-white/5 bg-white/[0.02] rounded-3xl">

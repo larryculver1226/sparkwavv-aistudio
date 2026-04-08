@@ -99,8 +99,13 @@ export class VertexService {
    */
   async getFinanceInsight(prompt: string, context?: string): Promise<string | null> {
     const ai = getVertexAI();
+    const endpointId = process.env.VERTEX_AI_FINANCE_ENDPOINT_ID;
+    const modelPath = endpointId 
+      ? `projects/${PROJECT_ID}/locations/${LOCATION}/endpoints/${endpointId}`
+      : 'gemini-3.1-pro-preview';
+
     const generativeModel = ai.getGenerativeModel({
-      model: 'gemini-3.1-pro-preview',
+      model: modelPath,
     });
 
     const enhancedPrompt = `
@@ -132,8 +137,13 @@ export class VertexService {
    */
   async getTechInsight(prompt: string, context?: string): Promise<string | null> {
     const ai = getVertexAI();
+    const endpointId = process.env.VERTEX_AI_TECH_ENDPOINT_ID;
+    const modelPath = endpointId 
+      ? `projects/${PROJECT_ID}/locations/${LOCATION}/endpoints/${endpointId}`
+      : 'gemini-3.1-pro-preview';
+
     const generativeModel = ai.getGenerativeModel({
-      model: 'gemini-3.1-pro-preview',
+      model: modelPath,
     });
 
     const enhancedPrompt = `
@@ -183,11 +193,14 @@ export class VertexService {
    * (In a real scenario, this would call a specific Vertex AI endpoint)
    */
   async getLobkowiczCoaching(prompt: string, context?: string): Promise<string | null> {
-    // Placeholder for fine-tuned model endpoint
-    // In production, this would use vertexAI.getGenerativeModel({ model: 'projects/.../endpoints/...' })
     const ai = getVertexAI();
+    const endpointId = process.env.VERTEX_AI_LOBKOWICZ_ENDPOINT_ID;
+    const modelPath = endpointId 
+      ? `projects/${PROJECT_ID}/locations/${LOCATION}/endpoints/${endpointId}`
+      : 'gemini-3.1-pro-preview';
+
     const generativeModel = ai.getGenerativeModel({
-      model: 'gemini-3.1-pro-preview', // Fallback to standard pro if fine-tuned not yet deployed
+      model: modelPath,
     });
 
     const systemInstruction = `

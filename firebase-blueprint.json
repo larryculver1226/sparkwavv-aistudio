@@ -77,6 +77,28 @@
       },
       "required": ["uid", "email", "tenantId"]
     },
+    "AgentConfig": {
+      "title": "AgentConfig",
+      "description": "Configuration for a Skylar journey stage",
+      "type": "object",
+      "properties": {
+        "stageId": { "type": "string" },
+        "title": { "type": "string" },
+        "description": { "type": "string" },
+        "systemPromptTemplate": { "type": "string" },
+        "requiredArtifacts": { "type": "array", "items": { "type": "string" } },
+        "allowedModalities": { "type": "array", "items": { "type": "string" } },
+        "uiConfig": {
+          "type": "object",
+          "properties": {
+            "theme": { "type": "string" },
+            "layout": { "type": "string" },
+            "primaryColor": { "type": "string" }
+          }
+        }
+      },
+      "required": ["stageId", "title", "description", "systemPromptTemplate", "requiredArtifacts", "allowedModalities", "uiConfig"]
+    },
     "Dashboard": {
       "title": "Dashboard",
       "description": "User's career dashboard data",
@@ -424,6 +446,10 @@
     "/users/{uid}": {
       "schema": "User",
       "description": "User profiles"
+    },
+    "/agent_configs/{stageId}": {
+      "schema": { "$ref": "#/entities/AgentConfig" },
+      "description": "Configuration for Skylar agent stages"
     },
     "/dashboards/{userId}": {
       "schema": "Dashboard",

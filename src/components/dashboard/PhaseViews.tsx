@@ -6,6 +6,8 @@ import { ActionCenter } from './ActionCenter';
 import { ActivityFeed } from './ActivityFeed';
 import { DashboardData } from '../../types/dashboard';
 import { Camera, ChevronRight, Briefcase, Target, Award, FileText, Brain, Eye, EyeOff, History } from 'lucide-react';
+import { SkylarInteractionPanel } from '../skylar/SkylarInteractionPanel';
+import { useIdentity } from '../../contexts/IdentityContext';
 
 interface PhaseViewProps {
   userId: string;
@@ -21,62 +23,73 @@ interface PhaseViewProps {
   onActivityClick?: (activity: any) => void;
 }
 
-export const DiveInView: React.FC<PhaseViewProps> = ({ userId, currentStage, onActionClick, transparencyMode, toggleTransparency, setShowEvolution, onActivityClick }) => (
-  <div className="space-y-8">
-    <ActionCenter currentStage={currentStage} onActionClick={onActionClick} />
-    <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-      <div className="lg:col-span-2 space-y-8">
-        <NeuralSynthesisEngine userId={userId} currentStage={currentStage} />
-        <ActivityFeed userId={userId} limitCount={5} onActivityClick={onActivityClick} />
-      </div>
-      <div className="flex flex-col gap-6">
-        <div className="glass-panel p-8 rounded-[2rem] border border-white/5 bg-black/40 flex flex-col justify-between h-full">
-          <div>
-            <div className="flex items-center justify-between mb-6">
-              <div className="flex items-center gap-2 text-neon-cyan">
-                <Brain className="w-5 h-5" />
-                <h3 className="font-display font-bold text-sm tracking-tight uppercase">
-                  Skylar Learning
-                </h3>
+export const DiveInView: React.FC<PhaseViewProps> = ({ userId, currentStage, onActionClick, transparencyMode, toggleTransparency, setShowEvolution, onActivityClick }) => {
+  const { user } = useIdentity();
+  
+  return (
+    <div className="space-y-8">
+      <ActionCenter currentStage={currentStage} onActionClick={onActionClick} />
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+        <div className="lg:col-span-2 space-y-8">
+          <div className="h-[600px]">
+            <SkylarInteractionPanel 
+              stageId="dive-in" 
+              user={user} 
+              onArtifactCreated={(artifact) => console.log('Artifact created:', artifact)}
+              onActionTriggered={(action, payload) => console.log('Action triggered:', action, payload)}
+            />
+          </div>
+          <ActivityFeed userId={userId} limitCount={5} onActivityClick={onActivityClick} />
+        </div>
+        <div className="flex flex-col gap-6">
+          <div className="glass-panel p-8 rounded-[2rem] border border-white/5 bg-black/40 flex flex-col justify-between h-full">
+            <div>
+              <div className="flex items-center justify-between mb-6">
+                <div className="flex items-center gap-2 text-neon-cyan">
+                  <Brain className="w-5 h-5" />
+                  <h3 className="font-display font-bold text-sm tracking-tight uppercase">
+                    Skylar Learning
+                  </h3>
+                </div>
+                <button
+                  onClick={toggleTransparency}
+                  className={`p-2 rounded-lg border transition-all ${
+                    transparencyMode === 'full'
+                      ? 'bg-neon-cyan/20 border-neon-cyan/40 text-neon-cyan'
+                      : 'bg-white/5 border-white/10 text-white/40'
+                  }`}
+                  title={
+                    transparencyMode === 'full' ? 'Full Transparency' : 'Under the Hood'
+                  }
+                >
+                  {transparencyMode === 'full' ? (
+                    <Eye className="w-4 h-4" />
+                  ) : (
+                    <EyeOff className="w-4 h-4" />
+                  )}
+                </button>
               </div>
-              <button
-                onClick={toggleTransparency}
-                className={`p-2 rounded-lg border transition-all ${
-                  transparencyMode === 'full'
-                    ? 'bg-neon-cyan/20 border-neon-cyan/40 text-neon-cyan'
-                    : 'bg-white/5 border-white/10 text-white/40'
-                }`}
-                title={
-                  transparencyMode === 'full' ? 'Full Transparency' : 'Under the Hood'
-                }
-              >
-                {transparencyMode === 'full' ? (
-                  <Eye className="w-4 h-4" />
-                ) : (
-                  <EyeOff className="w-4 h-4" />
-                )}
-              </button>
+
+              <p className="text-xs text-white/60 leading-relaxed mb-6">
+                {transparencyMode === 'full'
+                  ? 'Skylar is operating in Full Transparency mode. You can see her evolving understanding of your professional DNA in real-time.'
+                  : "Skylar is learning from your interactions 'under the hood' to provide increasingly precise guidance."}
+              </p>
             </div>
 
-            <p className="text-xs text-white/60 leading-relaxed mb-6">
-              {transparencyMode === 'full'
-                ? 'Skylar is operating in Full Transparency mode. You can see her evolving understanding of your professional DNA in real-time.'
-                : "Skylar is learning from your interactions 'under the hood' to provide increasingly precise guidance."}
-            </p>
+            <button
+              onClick={() => setShowEvolution?.(true)}
+              className="w-full py-4 rounded-2xl bg-neon-cyan/10 border border-neon-cyan/20 text-neon-cyan text-[10px] font-bold uppercase tracking-[0.2em] hover:bg-neon-cyan/20 transition-all flex items-center justify-center gap-2 mb-4"
+            >
+              <History className="w-4 h-4" />
+              View Evolution DNA
+            </button>
           </div>
-
-          <button
-            onClick={() => setShowEvolution?.(true)}
-            className="w-full py-4 rounded-2xl bg-neon-cyan/10 border border-neon-cyan/20 text-neon-cyan text-[10px] font-bold uppercase tracking-[0.2em] hover:bg-neon-cyan/20 transition-all flex items-center justify-center gap-2 mb-4"
-          >
-            <History className="w-4 h-4" />
-            View Evolution DNA
-          </button>
         </div>
       </div>
     </div>
-  </div>
-);
+  );
+};
 
 export const IgnitionView: React.FC<PhaseViewProps> = ({ userId, currentStage, onActionClick, onNavigate, profile, onActivityClick }) => (
   <div className="space-y-8">
