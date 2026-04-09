@@ -75,7 +75,6 @@ import { GaugeChart } from '../components/dashboard/Gauges';
 import { JourneyTimeline } from '../components/dashboard/JourneyTimeline';
 import { MentorNote } from '../components/dashboard/MentorNote';
 import {
-  DiveInView,
   IgnitionView,
   DiscoveryView,
   BrandingView,
@@ -126,7 +125,7 @@ export const UserDashboard: React.FC<{ userId: string; isAdmin?: boolean }> = ({
   };
 
   const currentStage =
-    data?.discoveryProgress || (isAdmin ? 'Dive-In' : profile?.journeyStage) || 'Dive-In';
+    data?.discoveryProgress || (isAdmin ? 'Ignition' : profile?.journeyStage) || 'Ignition';
   const timelineStage = getTimelineStage(currentStage);
 
   useEffect(() => {
@@ -1127,23 +1126,6 @@ export const UserDashboard: React.FC<{ userId: string; isAdmin?: boolean }> = ({
 
                   {/* Phase Specific View */}
                   <div className="mb-12">
-                    {timelineStage === 'Dive-In' && (
-                      <DiveInView
-                        userId={userId}
-                        currentStage={timelineStage}
-                        data={data}
-                        artifacts={artifacts}
-                        profile={profile}
-                        onActionClick={(actionId) => {
-                          if (actionId === 'validation') setIsGateModalOpen(true);
-                        }}
-                        onNavigate={handleViewChange}
-                        transparencyMode={transparencyMode}
-                        toggleTransparency={toggleTransparency}
-                        setShowEvolution={setShowEvolution}
-                        onActivityClick={handleActivityClick}
-                      />
-                    )}
                     {timelineStage === 'Ignition' && (
                       <IgnitionView
                         userId={userId}

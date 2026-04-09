@@ -12,6 +12,7 @@ interface SkylarInteractionPanelProps {
   artifacts?: SkylarArtifact[];
   onArtifactCreated?: (artifact: SkylarArtifact) => void;
   onActionTriggered?: (action: string, payload: any) => void;
+  initialContext?: string;
 }
 
 interface Message {
@@ -27,7 +28,8 @@ export const SkylarInteractionPanel: React.FC<SkylarInteractionPanelProps> = ({
   user,
   artifacts = [],
   onArtifactCreated,
-  onActionTriggered
+  onActionTriggered,
+  initialContext
 }) => {
   const [stageConfig, setStageConfig] = useState<JourneyStageDefinition | null>(null);
   const [messages, setMessages] = useState<Message[]>([]);
@@ -85,25 +87,32 @@ export const SkylarInteractionPanel: React.FC<SkylarInteractionPanelProps> = ({
       // using skylar.chatWithVertex or similar, passing the stageConfig.
       // For now, we simulate a response.
       
-      const response = await skylar.chatWithVertex(
-        user.uid,
-        input,
+      const result = await skylar.chatWithVertex(
+        user?.uid || 'anonymous',
+        initialContext ? `${initialContext}\n\nUser Message: ${input}` : input,
         [], // history
-        'lobkowicz', // default methodology
+        stageConfig,
         undefined // token
       );
+
+      const responseText = result.response.candidates?.[0]?.content?.parts?.filter((part: any) => part.text)?.map((part: any) => part.text)?.join('') || '';
 
       const newSkylarMsg: Message = {
         id: (Date.now() + 1).toString(),
         role: 'skylar',
-        content: response.text,
+        content: responseText,
         timestamp: new Date()
       };
 
       setMessages(prev => [...prev, newSkylarMsg]);
       
-      // If the response contains an action (e.g., JSON block), we would parse it here
-      // and call onActionTriggered or onArtifactCreated.
+      if (result.executedActions && result.executedActions.length > 0) {
+        result.executedActions.forEach((action: any) => {
+          if (onActionTriggered) {
+            onActionTriggered(action.action, action.data);
+          }
+        });
+      }
 
     } catch (error) {
       console.error('Error communicating with Skylar:', error);

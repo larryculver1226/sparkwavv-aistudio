@@ -309,7 +309,7 @@ export const SkylarSidebar: React.FC<SkylarSidebarProps> = ({ onLogin }) => {
           uid === 'anonymous' ? '' : uid,
           currentInput,
           vertexHistory,
-          methodology,
+          undefined, // stageConfig not available here, will fallback to dive-in
           token,
           currentFile || undefined
         );

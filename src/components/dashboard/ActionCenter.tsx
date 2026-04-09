@@ -10,16 +10,6 @@ interface ActionCenterProps {
 export const ActionCenter: React.FC<ActionCenterProps> = ({ currentStage, onActionClick }) => {
   // Define phase-specific actions and gaps
   const phaseData: Record<string, { title: string; actions: any[]; gaps: any[] }> = {
-    'Dive-In': {
-      title: 'Dive-In Actions',
-      actions: [
-        { id: 'baseline', label: 'Complete Baseline Assessment', status: 'pending' },
-        { id: 'skylar_intro', label: 'Initial Skylar Conversation', status: 'completed' },
-      ],
-      gaps: [
-        { id: 'gap1', label: 'Missing core values definition. Chat with Skylar to explore.' },
-      ],
-    },
     'Ignition': {
       title: 'Ignition Actions',
       actions: [
@@ -62,7 +52,7 @@ export const ActionCenter: React.FC<ActionCenterProps> = ({ currentStage, onActi
     },
   };
 
-  const data = phaseData[currentStage] || phaseData['Dive-In'];
+  const data = phaseData[currentStage] || phaseData['Ignition'];
 
   return (
     <div className="glass-panel p-8 rounded-[2rem] border border-neon-cyan/20 bg-black/60 relative overflow-hidden">

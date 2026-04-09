@@ -1,86 +1,150 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { motion } from 'motion/react';
-import { Sparkles, ArrowRight, LogIn } from 'lucide-react';
+import { Sparkles, Upload, FileText, Loader2 } from 'lucide-react';
 import { useIdentity } from '../contexts/IdentityContext';
+import { SkylarInteractionPanel } from '../components/skylar/SkylarInteractionPanel';
+import { parseResume } from '../services/geminiService';
 
 export default function DiveInPage() {
   const { loginWithPopup } = useIdentity();
+  const [resumeData, setResumeData] = useState<any>(null);
+  const [isParsing, setIsParsing] = useState(false);
+
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setIsParsing(true);
+    try {
+      let base64 = '';
+      const reader = new FileReader();
+      
+      const fileReadPromise = new Promise<void>((resolve, reject) => {
+        reader.onload = () => {
+          base64 = (reader.result as string).split(',')[1];
+          resolve();
+        };
+        reader.onerror = reject;
+      });
+
+      reader.readAsDataURL(file);
+      await fileReadPromise;
+
+      const result = await parseResume(base64, file.type);
+      if (result) {
+        setResumeData(result);
+      }
+    } catch (error) {
+      console.error('Error parsing resume:', error);
+    } finally {
+      setIsParsing(false);
+    }
+  };
+
+  const handleSkylarAction = (action: string, payload: any) => {
+    if (action === 'create_sparkwavv_account') {
+      // In a real app, we would pass payload and resumeData to the signup flow
+      console.log('Triggering account creation with:', { payload, resumeData });
+      loginWithPopup();
+    }
+  };
 
   return (
-    <div className="min-h-screen bg-[#050505] text-white flex flex-col items-center justify-center p-6 relative overflow-hidden">
+    <div className="min-h-screen bg-[#050505] text-white flex flex-col p-6 relative overflow-hidden">
       {/* Background Atmosphere */}
       <div className="absolute inset-0 overflow-hidden pointer-events-none">
         <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-blue-500/10 blur-[120px] rounded-full animate-pulse" />
         <div className="absolute bottom-1/4 right-1/4 w-96 h-96 bg-purple-500/10 blur-[120px] rounded-full animate-pulse delay-1000" />
       </div>
 
-      <motion.div
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        className="max-w-2xl w-full text-center space-y-12 relative z-10"
-      >
-        <div className="space-y-4">
-          <div className="flex justify-center">
-            <div className="w-20 h-20 bg-white/5 border border-white/10 rounded-3xl flex items-center justify-center backdrop-blur-xl">
-              <Sparkles className="w-10 h-10 text-blue-400" />
+      <div className="max-w-6xl w-full mx-auto grid grid-cols-1 lg:grid-cols-3 gap-8 relative z-10 h-[calc(100vh-3rem)]">
+        
+        {/* Left Column: Context & Upload */}
+        <div className="lg:col-span-1 flex flex-col gap-6">
+          <motion.div
+            initial={{ opacity: 0, x: -20 }}
+            animate={{ opacity: 1, x: 0 }}
+            className="space-y-4"
+          >
+            <div className="w-16 h-16 bg-white/5 border border-white/10 rounded-2xl flex items-center justify-center backdrop-blur-xl">
+              <Sparkles className="w-8 h-8 text-blue-400" />
             </div>
-          </div>
-          <h1 className="text-5xl md:text-7xl font-display font-bold tracking-tight">
-            Dive <span className="text-blue-400 italic">In</span>
-          </h1>
-          <p className="text-white/40 uppercase tracking-[0.3em] text-sm font-medium">
-            The Journey Begins Here
-          </p>
-        </div>
-
-        <div className="bg-white/5 border border-white/10 rounded-[2rem] p-8 md:p-12 backdrop-blur-2xl space-y-8">
-          <div className="space-y-4">
-            <h2 className="text-2xl font-bold">Ready to ignite your brand?</h2>
-            <p className="text-white/60 leading-relaxed max-w-md mx-auto">
-              You are currently in the <span className="text-white font-bold">Dive-In</span> phase.
-              Authenticate your identity to unlock your personal dashboard and start your
-              acceleration.
+            <h1 className="text-4xl font-display font-bold tracking-tight">
+              Dive <span className="text-blue-400 italic">In</span>
+            </h1>
+            <p className="text-white/60 text-sm leading-relaxed">
+              Welcome to Sparkwavv. Before we create your dashboard, Skylar needs to understand your baseline. 
+              Upload your resume to give her context, then chat with her to finalize your Dive-In commitments.
             </p>
-          </div>
+          </motion.div>
 
-          <div className="pt-4">
-            <button
-              onClick={() => loginWithPopup()}
-              className="group relative px-8 py-5 bg-white text-black rounded-2xl font-bold text-lg hover:scale-[1.02] transition-all flex items-center gap-3 mx-auto overflow-hidden"
-            >
-              <div className="absolute inset-0 bg-blue-400 transform translate-y-full group-hover:translate-y-0 transition-transform duration-300" />
-              <span className="relative z-10 flex items-center gap-3 group-hover:text-white transition-colors">
-                <LogIn className="w-5 h-5" />
-                Authenticate Identity
-                <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
-              </span>
-            </button>
-          </div>
-
-          <div className="pt-8 border-t border-white/10 flex flex-wrap justify-center gap-8 opacity-40 grayscale">
-            <div className="flex items-center gap-2 text-xs uppercase tracking-widest">
-              <div className="w-1.5 h-1.5 bg-white rounded-full" />
-              Ignition
-            </div>
-            <div className="flex items-center gap-2 text-xs uppercase tracking-widest">
-              <div className="w-1.5 h-1.5 bg-white rounded-full" />
-              Discovery
-            </div>
-            <div className="flex items-center gap-2 text-xs uppercase tracking-widest">
-              <div className="w-1.5 h-1.5 bg-white rounded-full" />
-              Branding
-            </div>
-            <div className="flex items-center gap-2 text-xs uppercase tracking-widest">
-              <div className="w-1.5 h-1.5 bg-white rounded-full" />
-              Outreach
-            </div>
-          </div>
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.1 }}
+            className="bg-white/5 border border-white/10 rounded-3xl p-6 backdrop-blur-xl flex-1"
+          >
+            <h3 className="text-sm font-bold uppercase tracking-widest text-white/40 mb-4">Context Upload</h3>
+            
+            {!resumeData ? (
+              <div className="border-2 border-dashed border-white/20 rounded-2xl p-8 text-center hover:bg-white/5 transition-colors relative group">
+                <input
+                  type="file"
+                  accept=".pdf,.doc,.docx,.txt"
+                  onChange={handleFileUpload}
+                  className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10"
+                  disabled={isParsing}
+                />
+                <div className="flex flex-col items-center gap-3">
+                  {isParsing ? (
+                    <Loader2 className="w-8 h-8 text-blue-400 animate-spin" />
+                  ) : (
+                    <Upload className="w-8 h-8 text-white/40 group-hover:text-blue-400 transition-colors" />
+                  )}
+                  <div className="space-y-1">
+                    <p className="text-sm font-medium">
+                      {isParsing ? 'Analyzing Document...' : 'Upload Resume'}
+                    </p>
+                    <p className="text-xs text-white/40">PDF, DOCX, or TXT</p>
+                  </div>
+                </div>
+              </div>
+            ) : (
+              <div className="bg-blue-500/10 border border-blue-500/20 rounded-2xl p-4 flex items-start gap-4">
+                <div className="p-2 bg-blue-500/20 rounded-lg">
+                  <FileText className="w-5 h-5 text-blue-400" />
+                </div>
+                <div>
+                  <p className="text-sm font-bold text-white">{resumeData.name || 'Resume Parsed'}</p>
+                  <p className="text-xs text-white/60 mt-1 line-clamp-2">{resumeData.bio || resumeData.role}</p>
+                  <div className="mt-3 flex items-center gap-2">
+                    <span className="text-xs text-blue-400 font-medium bg-blue-400/10 px-2 py-1 rounded-md">
+                      Context Loaded
+                    </span>
+                  </div>
+                </div>
+              </div>
+            )}
+          </motion.div>
         </div>
 
-        <p className="text-white/20 text-xs uppercase tracking-widest">
-          Powered by SPARKWavv Acceleration Engine
-        </p>
-      </motion.div>
+        {/* Right Column: Skylar Chat */}
+        <motion.div
+          initial={{ opacity: 0, x: 20 }}
+          animate={{ opacity: 1, x: 0 }}
+          transition={{ delay: 0.2 }}
+          className="lg:col-span-2 h-full"
+        >
+          <SkylarInteractionPanel 
+            stageId="dive-in" 
+            user={null} 
+            onActionTriggered={handleSkylarAction}
+            // Pass resume data as initial context if available
+            initialContext={resumeData ? `User Context: ${JSON.stringify(resumeData)}` : undefined}
+          />
+        </motion.div>
+
+      </div>
     </div>
   );
 }

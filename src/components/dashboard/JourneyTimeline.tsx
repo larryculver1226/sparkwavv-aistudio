@@ -4,11 +4,10 @@ import { Sparkles, Zap, Search as SearchIcon, Compass, Handshake, Lock, CheckCir
 
 export const JourneyTimeline: React.FC<{ stage: string; phaseProgress?: Record<string, number> }> = ({ stage, phaseProgress }) => {
   const stages = [
-    { id: 'Dive-In', label: 'Dive-In', icon: Sparkles, desc: 'WEEKS 1-2', key: 'diveIn' },
-    { id: 'Ignition', label: 'Ignition', icon: Zap, desc: 'WEEKS 3-4', key: 'ignition' },
-    { id: 'Discovery', label: 'Discovery', icon: SearchIcon, desc: 'WEEKS 5-6', key: 'discovery' },
-    { id: 'Branding', label: 'Branding', icon: Compass, desc: 'WEEKS 7-9', key: 'branding' },
-    { id: 'Outreach', label: 'Outreach', icon: Handshake, desc: 'WEEKS 10-12', key: 'outreach' },
+    { id: 'Ignition', label: 'Ignition', icon: Zap, desc: 'WEEKS 1-2', key: 'ignition' },
+    { id: 'Discovery', label: 'Discovery', icon: SearchIcon, desc: 'WEEKS 3-4', key: 'discovery' },
+    { id: 'Branding', label: 'Branding', icon: Compass, desc: 'WEEKS 5-7', key: 'branding' },
+    { id: 'Outreach', label: 'Outreach', icon: Handshake, desc: 'WEEKS 8-10', key: 'outreach' },
   ];
 
   const currentIndex = stages.findIndex((s) => s.id === stage);

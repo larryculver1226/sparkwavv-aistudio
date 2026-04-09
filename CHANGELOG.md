@@ -4,6 +4,7 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 ### Added
+- **Track 026**: Redesign Dive-In as Pre-Registration Onboarding (Moved Dive-In to a public route `/dive-in`, added resume upload, updated Skylar to trigger account creation, and removed Dive-In from the authenticated dashboard).
 - **Track 024**: Migrate Skylar Agent Definitions to Firestore & Build Agent Ops UI (Created `agent_configs` collection, `agentOpsService`, and `AgentOpsPanel` in Admin Dashboard for dynamic prompt management).
 - **Track 023**: Integration of SkylarInteractionPanel into the User Dashboard for Dive-In Phase (Replaced the static Dive-In view with the dynamic Skylar Agent interface).
 - **Track 022**: Skylar Agent Definitions for Sparkwavv Journey Steps (Architected generic `JourneyStageDefinition` schema, refactored `skylarService.ts` to use dynamic prompts, and built the unified `SkylarInteractionPanel`).

@@ -95,6 +95,30 @@ const tools = [
   {
     functionDeclarations: [
       {
+        name: 'create_sparkwavv_account',
+        description:
+          'Trigger the account creation flow for a prospective user. Call this ONLY when the user has provided their Effort Tier, RPPs, and Energy Protocol during the Dive-In phase.',
+        parameters: {
+          type: Type.OBJECT,
+          properties: {
+            effortTier: {
+              type: Type.STRING,
+              description: 'The selected effort tier (e.g., 3.5 hrs/week or 7 hrs/week)',
+            },
+            rpps: {
+              type: Type.ARRAY,
+              items: { type: Type.STRING },
+              description: 'List of Role Playing Partners',
+            },
+            energyProtocol: {
+              type: Type.STRING,
+              description: 'The defined energy management protocol',
+            },
+          },
+          required: ['effortTier', 'rpps', 'energyProtocol'],
+        },
+      },
+      {
         name: 'search_wavvault',
         description:
           'Search the collective, anonymized Wavvault for similar career paths, strengths, and stories from other users to provide comparative insights.',
@@ -656,7 +680,7 @@ class SkylarService {
     userId: string,
     message: string,
     history: any[] = [],
-    methodology: 'lobkowicz' | 'feynman' = 'lobkowicz',
+    stageConfig?: JourneyStageDefinition,
     token?: string,
     fileData?: { data: string; mimeType: string }
   ): Promise<any> {
@@ -664,16 +688,17 @@ class SkylarService {
       const ai = getAI();
 
       let currentTruth = '';
-      if (userId) {
+      if (userId && userId !== 'anonymous') {
         const insights = await this.fetchConfirmedInsights(userId);
         if (insights.length > 0) {
           currentTruth = `\n\nConfirmed Professional DNA (Current Truth):\n${insights.map((i) => `- [${i.type.toUpperCase()}] ${i.content}`).join('\n')}`;
         }
       }
 
-      // Default to 'dive-in' if methodology isn't explicitly mapped
-      const stageId = methodology === 'lobkowicz' ? 'dive-in' : 'discovery';
-      const baseInstruction = this.getSystemPromptForPhase(stageId, { displayName: 'User' });
+      const baseInstruction = stageConfig 
+        ? this.buildContextualPrompt({ displayName: 'User' }, stageConfig)
+        : this.getSystemPromptForPhase('dive-in', { displayName: 'User' });
+        
       const systemInstruction = `${baseInstruction}${currentTruth}`;
 
       const chat = ai.chats.create({
@@ -714,7 +739,17 @@ class SkylarService {
           const { name, args, id } = call;
           const typedArgs = args as any;
 
-          if (name === 'search_wavvault') {
+          if (name === 'create_sparkwavv_account') {
+            console.log(`[SKYLAR] Executing tool: create_sparkwavv_account`);
+            executedActions.push({ action: 'create_sparkwavv_account', data: typedArgs });
+            toolResponses.push({
+              functionResponse: {
+                name: 'create_sparkwavv_account',
+                response: { status: 'success', message: 'Account creation flow triggered.' },
+                id,
+              },
+            });
+          } else if (name === 'search_wavvault') {
             console.log(`[SKYLAR] Executing tool: search_wavvault with query: ${typedArgs.query}`);
             const searchResults = await this.performAnonymizedSearch(
               typedArgs.query as string,
