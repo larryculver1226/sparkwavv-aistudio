@@ -432,7 +432,7 @@ export const UserDashboard: React.FC<{ userId: string; isAdmin?: boolean }> = ({
       if (!user) return;
 
       const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 8000); // 8s timeout
+      const timeoutId = setTimeout(() => controller.abort(), 15000); // 15s timeout
 
       try {
         setLoading(true);

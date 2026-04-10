@@ -93,7 +93,7 @@ async function getDashboard(db_unused: any, userId: string, sparkwavvId?: string
 
   try {
     // 1. Try primary lookup by userId (uid)
-    const doc = (await withTimeout(db.collection('dashboards').doc(userId).get(), 5000)) as any;
+    const doc = (await withTimeout(db.collection('dashboards').doc(userId).get(), 15000)) as any;
     if (doc.exists) {
       const data = doc.data();
       // Self-healing: ensure sparkwavvId is synced if we have it
@@ -146,13 +146,13 @@ async function saveDashboard(db_unused: any, userId: string, data: any) {
   
   try {
     // 1. Save to dashboards collection
-    await withTimeout(db.collection('dashboards').doc(userId).set(data, { merge: true }), 5000);
+    await withTimeout(db.collection('dashboards').doc(userId).set(data, { merge: true }), 15000);
     
     // 2. If discoveryProgress is provided, sync it to journeyStage in users collection
     if (data.discoveryProgress) {
       await withTimeout(db.collection('users').doc(userId).set({
         journeyStage: data.discoveryProgress
-      }, { merge: true }), 5000);
+      }, { merge: true }), 15000);
     }
     
     return true;
@@ -562,7 +562,7 @@ function getAdminDb() {
 /**
  * Helper to wrap Firestore calls with a timeout to prevent hanging the API
  */
-async function withTimeout<T>(promise: Promise<T>, timeoutMs: number = 5000): Promise<T> {
+async function withTimeout<T>(promise: Promise<T>, timeoutMs: number = 15000): Promise<T> {
   let timeoutId: NodeJS.Timeout;
   const timeoutPromise = new Promise<never>((_, reject) => {
     timeoutId = setTimeout(() => {
@@ -605,7 +605,7 @@ async function startServer() {
 
   console.log('Configuring session middleware...');
   app.set("trust proxy", 1); // Trust first proxy (Nginx)
-  app.use(express.json());
+  app.use(express.json({ limit: '50mb' }));
   app.use(
     session({
       secret: process.env.SESSION_SECRET,
@@ -638,7 +638,7 @@ async function startServer() {
       try {
         const db = getAdminDb();
         if (db) {
-          const userDoc = await withTimeout(db.collection('admins').doc(uid).get(), 3000) as any;
+          const userDoc = await withTimeout(db.collection('admins').doc(uid).get(), 15000) as any;
           if (userDoc.exists) {
             const data = userDoc.data();
             const rawRole = data?.role || ROLES.USER;
@@ -659,7 +659,7 @@ async function startServer() {
       try {
         const db = getFirestoreDb();
         if (db) {
-          const userDoc = await withTimeout(db.collection('users').doc(uid).get(), 3000) as any;
+          const userDoc = await withTimeout(db.collection('users').doc(uid).get(), 15000) as any;
           if (userDoc.exists) {
             const data = userDoc.data();
             const rawRole = data?.role || ROLES.USER;
@@ -2035,7 +2035,7 @@ async function startServer() {
         if (!db) {
           throw new Error("Firestore not initialized");
         }
-        const decodedToken = await withTimeout(sparkwavvAdmin.auth().verifyIdToken(idToken), 5000);
+        const decodedToken = await withTimeout(sparkwavvAdmin.auth().verifyIdToken(idToken), 15000);
         console.log(`[AUTH] Fetching profile for UID: ${decodedToken.uid} (${decodedToken.email})`);
         
         // Larry Bootstrap
@@ -2063,7 +2063,7 @@ async function startServer() {
           return res.json(larryProfile);
         }
 
-        const userDoc = (await withTimeout(db.collection('users').doc(decodedToken.uid).get(), 5000)) as any;
+        const userDoc = (await withTimeout(db.collection('users').doc(decodedToken.uid).get(), 15000)) as any;
         if (userDoc.exists) {
           const userData = userDoc.data();
           console.log(`[AUTH] Profile found for ${decodedToken.email}. Role: ${userData.role}`);
@@ -2140,8 +2140,8 @@ async function startServer() {
       const idToken = req.headers.authorization?.split('Bearer ')[1];
       if (!idToken) return res.status(401).json({ error: "Unauthorized" });
       try {
-        const decodedToken = await withTimeout(sparkwavvAdmin.auth().verifyIdToken(idToken), 5000);
-        const wavvaultDoc = (await withTimeout(db.collection('wavvault').doc(decodedToken.uid).get(), 5000)) as any;
+        const decodedToken = await withTimeout(sparkwavvAdmin.auth().verifyIdToken(idToken), 15000);
+        const wavvaultDoc = (await withTimeout(db.collection('wavvault').doc(decodedToken.uid).get(), 15000)) as any;
         res.json({ exists: wavvaultDoc.exists });
       } catch (error) {
         console.error("Error fetching wavvault status:", error);
@@ -3183,7 +3183,7 @@ async function startServer() {
     if (!idToken) return res.status(401).json({ error: "Unauthorized" });
 
     try {
-      const decodedToken = await withTimeout(sparkwavvAdmin.auth().verifyIdToken(idToken), 5000);
+      const decodedToken = await withTimeout(sparkwavvAdmin.auth().verifyIdToken(idToken), 15000);
       let userId = decodedToken.uid;
       
       if (!isFirebaseAdminConfigured) {
@@ -3200,7 +3200,7 @@ async function startServer() {
       let userRole: string = ROLES.USER;
 
       try {
-        const userDoc = (await withTimeout(db.collection('users').doc(userId).get(), 3000)) as any;
+        const userDoc = (await withTimeout(db.collection('users').doc(userId).get(), 15000)) as any;
         if (userDoc.exists) {
           const userData = userDoc.data();
           authoritativeStage = userData?.journeyStage || 'Ignition';
@@ -3336,7 +3336,7 @@ async function startServer() {
     if (!idToken) return res.status(401).json({ error: "Unauthorized" });
 
     try {
-      const decodedToken = await withTimeout(sparkwavvAdmin.auth().verifyIdToken(idToken), 5000);
+      const decodedToken = await withTimeout(sparkwavvAdmin.auth().verifyIdToken(idToken), 15000);
       const userId = decodedToken.uid;
       const { insight } = req.body;
 
@@ -3374,7 +3374,7 @@ async function startServer() {
     if (!idToken) return res.status(401).json({ error: "Unauthorized" });
 
     try {
-      const decodedToken = await withTimeout(sparkwavvAdmin.auth().verifyIdToken(idToken), 5000);
+      const decodedToken = await withTimeout(sparkwavvAdmin.auth().verifyIdToken(idToken), 15000);
       const userId = decodedToken.uid;
       
       const db = getFirestoreDb();
@@ -3406,7 +3406,7 @@ async function startServer() {
     if (!idToken) return res.status(401).json({ error: "Unauthorized" });
 
     try {
-      const decodedToken = await withTimeout(sparkwavvAdmin.auth().verifyIdToken(idToken), 5000);
+      const decodedToken = await withTimeout(sparkwavvAdmin.auth().verifyIdToken(idToken), 15000);
       const userId = decodedToken.uid;
       const { asset } = req.body;
 
@@ -4095,14 +4095,14 @@ async function runConnectivityChecks() {
   if (isFirebaseAdminConfigured && sparkwavvAdmin) {
     console.log('Firebase Admin configured. Verifying connectivity...');
     try {
-      const listUsersResult = await withTimeout(sparkwavvAdmin.auth().listUsers(), 5000);
+      const listUsersResult = await withTimeout(sparkwavvAdmin.auth().listUsers(), 15000);
       envStatus.USER_COUNT = listUsersResult.users.length;
       console.log(`[AUTH] Firebase Auth connected. Found ${envStatus.USER_COUNT} users.`);
       
       const db = getFirestoreDb();
       let fsUsers: any[] = [];
       if (db) {
-        const snapshot = await withTimeout(db.collection('users').get(), 5000) as any;
+        const snapshot = await withTimeout(db.collection('users').get(), 15000) as any;
         fsUsers = snapshot.docs.map((d: any) => ({ uid: d.id, ...d.data() }));
         console.log(`[FIRESTORE] Connectivity check successful. Found ${snapshot.size} users in 'users' collection.`);
         
@@ -4111,7 +4111,7 @@ async function runConnectivityChecks() {
           console.log("[DEBUG] Found target user in Firestore:", JSON.stringify(targetUser, null, 2));
           
           // Check for dashboard
-          const dashboardSnapshot = await withTimeout(db.collection('dashboards').where('userId', '==', targetUser.uid).get(), 5000) as any;
+          const dashboardSnapshot = await withTimeout(db.collection('dashboards').where('userId', '==', targetUser.uid).get(), 15000) as any;
           if (!dashboardSnapshot.empty) {
             console.log(`[DEBUG] Found ${dashboardSnapshot.size} dashboards for user ${targetUser.uid}`);
             dashboardSnapshot.docs.forEach((d: any) => console.log(` - Dashboard ID: ${d.id}`));
@@ -4138,7 +4138,7 @@ async function runConnectivityChecks() {
       };
       
       if (db) {
-        const dashSnapshot = await withTimeout(db.collection('dashboards').get(), 5000) as any;
+        const dashSnapshot = await withTimeout(db.collection('dashboards').get(), 15000) as any;
         debugData.dashboards = dashSnapshot.docs.map((d: any) => ({ id: d.id, ...d.data() }));
       }
       
