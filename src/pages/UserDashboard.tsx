@@ -101,7 +101,7 @@ export const UserDashboard: React.FC<{ userId: string; isAdmin?: boolean }> = ({
   const { user, profile, status, error: authError } = useIdentity();
   const isConfirmed = status === 'authenticated';
   const navigate = useNavigate();
-  const { artifacts } = useWavvaultData();
+  const { artifacts, wavvaultData, refreshWavvaultData } = useWavvaultData();
   const [data, setData] = useState<DashboardData | null>(null);
   const [insights, setInsights] = useState<UserInsight[]>([]);
   const [showEvolution, setShowEvolution] = useState(false);
@@ -113,6 +113,35 @@ export const UserDashboard: React.FC<{ userId: string; isAdmin?: boolean }> = ({
   const [activePhaseView, setActivePhaseView] = useState<'ignition' | 'discovery'>('ignition');
   const [selectedArtifact, setSelectedArtifact] = useState<DistilledArtifact | null>(null);
   const [isArtifactModalOpen, setIsArtifactModalOpen] = useState(false);
+  const [isStrengthsModalOpen, setIsStrengthsModalOpen] = useState(false);
+  const [isIdentityModalOpen, setIsIdentityModalOpen] = useState(false);
+  const [strengthsInput, setStrengthsInput] = useState('');
+  const [identityInput, setIdentityInput] = useState('');
+
+  const handleSaveStrengths = async () => {
+    if (!user || !strengthsInput.trim()) return;
+    const newStrengths = strengthsInput.split(',').map(s => s.trim()).filter(Boolean);
+    try {
+      const currentData = wavvaultData || { userId: user.uid, graph: { nodes: [], links: [] }, logs: [], journeyEvents: [], artifacts: [], lastSynthesis: new Date().toISOString(), isDiscoveryUnlocked: false };
+      await skylar.saveWavvaultData({ ...currentData, strengths: newStrengths }, true);
+      setIsStrengthsModalOpen(false);
+      refreshWavvaultData();
+    } catch (e) {
+      console.error('Failed to save strengths', e);
+    }
+  };
+
+  const handleSaveIdentity = async () => {
+    if (!user || !identityInput.trim()) return;
+    try {
+      const currentData = wavvaultData || { userId: user.uid, graph: { nodes: [], links: [] }, logs: [], journeyEvents: [], artifacts: [], lastSynthesis: new Date().toISOString(), isDiscoveryUnlocked: false };
+      await skylar.saveWavvaultData({ ...currentData, identity: identityInput.trim() }, true);
+      setIsIdentityModalOpen(false);
+      refreshWavvaultData();
+    } catch (e) {
+      console.error('Failed to save identity', e);
+    }
+  };
 
   const handleActivityClick = (activity: UserActivity) => {
     if (activity.type === 'artifact_created' && activity.relatedEntityId) {
@@ -146,14 +175,14 @@ export const UserDashboard: React.FC<{ userId: string; isAdmin?: boolean }> = ({
     if (!data || !user || !artifacts) return;
     
     const updateProgress = async () => {
-      const newProgress = await calculateAndUpdateProgress(userId, data, artifacts);
+      const newProgress = await calculateAndUpdateProgress(userId, data, artifacts, wavvaultData);
       if (newProgress && JSON.stringify(newProgress) !== JSON.stringify(data.phaseProgress)) {
         setData(prev => prev ? { ...prev, phaseProgress: newProgress } : prev);
       }
     };
     
     updateProgress();
-  }, [artifacts.length, user]); // Only re-run when artifact count changes to avoid infinite loops if data changes
+  }, [artifacts.length, wavvaultData, user]); // Only re-run when artifact count or wavvaultData changes
 
   useEffect(() => {
     const fetchPartnerData = async () => {
@@ -294,6 +323,7 @@ export const UserDashboard: React.FC<{ userId: string; isAdmin?: boolean }> = ({
 
   const [searchParams, setSearchParams] = useSearchParams();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const [isProfileDropdownOpen, setIsProfileDropdownOpen] = useState(false);
   const [activeView, setActiveView] = useState<
     'dashboard' | 'synthesis' | 'matches' | 'outreach' | 'strengths' | 'history'
   >(() => {
@@ -329,13 +359,6 @@ export const UserDashboard: React.FC<{ userId: string; isAdmin?: boolean }> = ({
   const [isGateModalOpen, setIsGateModalOpen] = useState(false);
   const [gateData, setGateData] = useState<any>(null);
   const [isReviewing, setIsReviewing] = useState(false);
-
-  const theme = profile?.brandPersona === 'Right Brain' ? 'yang' : 'yin';
-
-  useEffect(() => {
-    document.body.setAttribute('data-theme', theme);
-    return () => document.body.removeAttribute('data-theme');
-  }, [theme]);
 
   const handleOpenEQ = async () => {
     if (!user) return;
@@ -574,7 +597,7 @@ export const UserDashboard: React.FC<{ userId: string; isAdmin?: boolean }> = ({
       }
 
       // Update progress
-      const newProgress = await calculateAndUpdateProgress(userId, { ...data, milestones: updatedMilestones }, artifacts);
+      const newProgress = await calculateAndUpdateProgress(userId, { ...data, milestones: updatedMilestones }, artifacts, wavvaultData);
       if (newProgress) {
         setData(prev => prev ? { ...prev, phaseProgress: newProgress } : prev);
       }
@@ -917,7 +940,7 @@ export const UserDashboard: React.FC<{ userId: string; isAdmin?: boolean }> = ({
 
             <div className="h-8 w-px bg-white/10" />
 
-            <div className="flex items-center gap-4">
+            <div className="hidden md:flex items-center gap-4">
               <button
                 onClick={() => handleViewChange('dashboard')}
                 className={`px-4 py-2 rounded-xl text-[10px] font-bold uppercase tracking-widest transition-all ${activeView === 'dashboard' ? 'bg-neon-cyan text-black' : 'text-white/40 hover:text-white'}`}
@@ -945,8 +968,8 @@ export const UserDashboard: React.FC<{ userId: string; isAdmin?: boolean }> = ({
             </div>
           </div>
 
-          <div className="flex items-center gap-6">
-            <div className="flex items-center gap-3 px-4 py-2 rounded-2xl bg-white/5 border border-white/10">
+          <div className="flex items-center gap-4 md:gap-6">
+            <div className="hidden md:flex items-center gap-3 px-4 py-2 rounded-2xl bg-white/5 border border-white/10">
               <div className="w-2 h-2 rounded-full bg-neon-lime animate-pulse shadow-[0_0_10px_rgba(57,255,20,0.5)]" />
               <span className="text-[10px] font-bold uppercase tracking-widest text-white/60">
                 Skylar Active
@@ -958,29 +981,95 @@ export const UserDashboard: React.FC<{ userId: string; isAdmin?: boolean }> = ({
               <div className="absolute top-2 right-2 w-2 h-2 bg-neon-magenta rounded-full border-2 border-black" />
             </button>
 
-            <div className="flex items-center gap-3 pl-6 border-l border-white/10">
-              <div className="text-right">
-                <p className="text-xs font-bold text-white">
-                  {profile?.displayName || user?.displayName || 'User'}
-                </p>
-                <p className="text-[10px] text-white/40 uppercase tracking-tighter font-bold">
-                  {typeof profile?.role === 'string'
-                    ? profile?.role
-                    : (profile?.role as any)?.role || 'Member'}
-                </p>
-              </div>
-              <div className="w-10 h-10 rounded-xl bg-neon-cyan/20 border border-neon-cyan/40 flex items-center justify-center overflow-hidden">
-                {profile?.photoURL || user?.photoURL ? (
-                  <img
-                    src={profile?.photoURL || user?.photoURL || ''}
-                    alt=""
-                    className="w-full h-full object-cover"
-                    referrerPolicy="no-referrer"
-                  />
-                ) : (
-                  <UserIcon className="w-5 h-5 text-neon-cyan" />
+            <div className="relative">
+              <button 
+                onClick={() => setIsProfileDropdownOpen(!isProfileDropdownOpen)}
+                className="flex items-center gap-3 pl-4 md:pl-6 border-l border-white/10 hover:opacity-80 transition-opacity"
+              >
+                <div className="text-right hidden sm:block">
+                  <p className="text-xs font-bold text-white">
+                    {profile?.displayName || user?.displayName || 'User'}
+                  </p>
+                  <p className="text-[10px] text-white/40 uppercase tracking-tighter font-bold">
+                    {typeof profile?.role === 'string'
+                      ? profile?.role
+                      : (profile?.role as any)?.role || 'Member'}
+                  </p>
+                </div>
+                <div className="w-10 h-10 rounded-xl bg-neon-cyan/20 border border-neon-cyan/40 flex items-center justify-center overflow-hidden">
+                  {profile?.photoURL || user?.photoURL ? (
+                    <img
+                      src={profile?.photoURL || user?.photoURL || ''}
+                      alt=""
+                      className="w-full h-full object-cover"
+                      referrerPolicy="no-referrer"
+                    />
+                  ) : (
+                    <UserIcon className="w-5 h-5 text-neon-cyan" />
+                  )}
+                </div>
+              </button>
+
+              <AnimatePresence>
+                {isProfileDropdownOpen && (
+                  <>
+                    <div 
+                      className="fixed inset-0 z-40" 
+                      onClick={() => setIsProfileDropdownOpen(false)} 
+                    />
+                    <motion.div
+                      initial={{ opacity: 0, y: 10, scale: 0.95 }}
+                      animate={{ opacity: 1, y: 0, scale: 1 }}
+                      exit={{ opacity: 0, y: 10, scale: 0.95 }}
+                      className="absolute right-0 mt-4 w-56 bg-dark-surface border border-white/10 rounded-2xl shadow-2xl z-50 overflow-hidden"
+                    >
+                      <div className="p-4 border-b border-white/10 sm:hidden">
+                        <p className="text-sm font-bold text-white truncate">
+                          {profile?.displayName || user?.displayName || 'User'}
+                        </p>
+                        <p className="text-xs text-white/40 uppercase tracking-wider mt-1">
+                          {typeof profile?.role === 'string'
+                            ? profile?.role
+                            : (profile?.role as any)?.role || 'Member'}
+                        </p>
+                      </div>
+                      <div className="p-2">
+                        <button
+                          onClick={() => {
+                            setIsProfileDropdownOpen(false);
+                            navigate('/profile');
+                          }}
+                          className="w-full flex items-center gap-3 px-4 py-3 rounded-xl hover:bg-white/5 transition-colors text-left"
+                        >
+                          <UserIcon className="w-4 h-4 text-neon-cyan" />
+                          <span className="text-sm font-medium text-white/80">Profile</span>
+                        </button>
+                        <button
+                          onClick={() => {
+                            setIsProfileDropdownOpen(false);
+                            navigate('/settings');
+                          }}
+                          className="w-full flex items-center gap-3 px-4 py-3 rounded-xl hover:bg-white/5 transition-colors text-left"
+                        >
+                          <Settings className="w-4 h-4 text-neon-cyan" />
+                          <span className="text-sm font-medium text-white/80">Settings</span>
+                        </button>
+                        <div className="h-px bg-white/10 my-2" />
+                        <button
+                          onClick={() => {
+                            setIsProfileDropdownOpen(false);
+                            handleLogout();
+                          }}
+                          className="w-full flex items-center gap-3 px-4 py-3 rounded-xl hover:bg-neon-magenta/10 transition-colors text-left group"
+                        >
+                          <LogOut className="w-4 h-4 text-neon-magenta group-hover:scale-110 transition-transform" />
+                          <span className="text-sm font-medium text-neon-magenta">Sign Out</span>
+                        </button>
+                      </div>
+                    </motion.div>
+                  </>
                 )}
-              </div>
+              </AnimatePresence>
             </div>
           </div>
         </header>
@@ -1133,8 +1222,11 @@ export const UserDashboard: React.FC<{ userId: string; isAdmin?: boolean }> = ({
                         data={data}
                         artifacts={artifacts}
                         profile={profile}
+                        wavvaultData={wavvaultData}
                         onActionClick={(actionId) => {
                           if (actionId === 'validation') setIsGateModalOpen(true);
+                          else if (actionId === 'strengths') setIsStrengthsModalOpen(true);
+                          else if (actionId === 'identity') setIsIdentityModalOpen(true);
                         }}
                         onNavigate={handleViewChange}
                         onActivityClick={handleActivityClick}
@@ -1147,6 +1239,7 @@ export const UserDashboard: React.FC<{ userId: string; isAdmin?: boolean }> = ({
                         data={data}
                         artifacts={artifacts}
                         profile={profile}
+                        wavvaultData={wavvaultData}
                         onActionClick={(actionId) => {
                           if (actionId === 'validation') setIsGateModalOpen(true);
                         }}
@@ -1161,6 +1254,7 @@ export const UserDashboard: React.FC<{ userId: string; isAdmin?: boolean }> = ({
                         data={data}
                         artifacts={artifacts}
                         profile={profile}
+                        wavvaultData={wavvaultData}
                         onActionClick={(actionId) => {
                           if (actionId === 'validation') setIsGateModalOpen(true);
                         }}
@@ -1175,6 +1269,7 @@ export const UserDashboard: React.FC<{ userId: string; isAdmin?: boolean }> = ({
                         data={data}
                         artifacts={artifacts}
                         profile={profile}
+                        wavvaultData={wavvaultData}
                         onActionClick={(actionId) => {
                           if (actionId === 'validation') setIsGateModalOpen(true);
                         }}
@@ -1199,11 +1294,11 @@ export const UserDashboard: React.FC<{ userId: string; isAdmin?: boolean }> = ({
                           initial={{ opacity: 0, scale: 0.9, y: 40 }}
                           animate={{ opacity: 1, scale: 1, y: 0 }}
                           exit={{ opacity: 0, scale: 0.9, y: 40 }}
-                          className="relative w-full max-w-4xl h-[80vh] bg-white rounded-[2.5rem] overflow-hidden shadow-2xl"
+                          className="relative w-full max-w-4xl h-[80vh] bg-black border border-white/10 rounded-[2.5rem] overflow-hidden shadow-2xl"
                         >
                           <button
                             onClick={() => setShowEvolution(false)}
-                            className="absolute top-6 right-6 p-2 rounded-full bg-slate-100 text-slate-400 hover:text-slate-600 transition-colors z-20"
+                            className="absolute top-6 right-6 p-2 rounded-full bg-white/5 text-white/40 hover:text-white hover:bg-white/10 transition-colors z-20"
                           >
                             <X className="w-6 h-6" />
                           </button>
@@ -1399,6 +1494,100 @@ export const UserDashboard: React.FC<{ userId: string; isAdmin?: boolean }> = ({
         onClose={() => setIsArtifactModalOpen(false)}
         artifact={selectedArtifact}
       />
+
+      {/* Strengths Modal */}
+      <AnimatePresence>
+        {isStrengthsModalOpen && (
+          <div className="fixed inset-0 z-[200] flex items-center justify-center p-4">
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="absolute inset-0 bg-black/80 backdrop-blur-sm"
+              onClick={() => setIsStrengthsModalOpen(false)}
+            />
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95, y: 20 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: 20 }}
+              className="relative w-full max-w-lg bg-black border border-white/10 rounded-3xl p-8 shadow-2xl"
+            >
+              <h2 className="text-2xl font-display font-bold text-white mb-2">Complete Strengths Assessment</h2>
+              <p className="text-sm text-white/60 mb-6">Enter your top Gallup strengths (comma-separated) to align your professional DNA.</p>
+              
+              <input
+                type="text"
+                value={strengthsInput}
+                onChange={(e) => setStrengthsInput(e.target.value)}
+                placeholder="e.g., Strategic, Analytical, Creative, Collaborative"
+                className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white placeholder:text-white/20 focus:outline-none focus:border-neon-cyan/50 transition-colors mb-6"
+              />
+              
+              <div className="flex gap-4 justify-end">
+                <button
+                  onClick={() => setIsStrengthsModalOpen(false)}
+                  className="px-6 py-2 rounded-xl border border-white/10 text-white/60 hover:text-white hover:bg-white/5 transition-all text-sm font-bold"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleSaveStrengths}
+                  className="px-6 py-2 rounded-xl bg-neon-cyan text-black hover:bg-neon-cyan/80 transition-all text-sm font-bold"
+                >
+                  Save to Wavvault
+                </button>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* Identity Clarity Modal */}
+      <AnimatePresence>
+        {isIdentityModalOpen && (
+          <div className="fixed inset-0 z-[200] flex items-center justify-center p-4">
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="absolute inset-0 bg-black/80 backdrop-blur-sm"
+              onClick={() => setIsIdentityModalOpen(false)}
+            />
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95, y: 20 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: 20 }}
+              className="relative w-full max-w-lg bg-black border border-white/10 rounded-3xl p-8 shadow-2xl"
+            >
+              <h2 className="text-2xl font-display font-bold text-white mb-2">Finalize Identity Clarity</h2>
+              <p className="text-sm text-white/60 mb-6">Define your core professional identity or mission statement.</p>
+              
+              <textarea
+                value={identityInput}
+                onChange={(e) => setIdentityInput(e.target.value)}
+                placeholder="I am a strategic leader focused on..."
+                rows={4}
+                className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white placeholder:text-white/20 focus:outline-none focus:border-neon-cyan/50 transition-colors mb-6 resize-none"
+              />
+              
+              <div className="flex gap-4 justify-end">
+                <button
+                  onClick={() => setIsIdentityModalOpen(false)}
+                  className="px-6 py-2 rounded-xl border border-white/10 text-white/60 hover:text-white hover:bg-white/5 transition-all text-sm font-bold"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleSaveIdentity}
+                  className="px-6 py-2 rounded-xl bg-neon-cyan text-black hover:bg-neon-cyan/80 transition-all text-sm font-bold"
+                >
+                  Save to Wavvault
+                </button>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
     </div>
   );
 };

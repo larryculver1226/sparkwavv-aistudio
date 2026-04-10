@@ -4,6 +4,7 @@ import * as mammoth from 'mammoth';
 import { KnowledgeGraph, WavvaultData, TargetOpportunity } from '../types/wavvault';
 import { JOURNEY_STAGES } from '../config/journeyStages';
 import { JourneyStageDefinition } from '../types/skylar';
+import { auth } from '../lib/firebase';
 
 export const GATING_CRITERIA: Record<string, string[]> = {
   'Dive-In': [
@@ -544,7 +545,7 @@ class SkylarService {
     const systemInstruction = this.getSystemPromptForPhase(phase) + `\n\nContext from Wavvault: ${JSON.stringify(wavvaultContext || {})}`;
 
     const chat = ai.chats.create({
-      model: 'gemini-1.5-pro',
+      model: 'gemini-3.1-pro-preview',
       config: {
         systemInstruction,
         tools: tools,
@@ -675,7 +676,7 @@ class SkylarService {
     return base64Audio ? `data:audio/mp3;base64,${base64Audio}` : '';
   }
 
-  // Vertex AI Agentic Chat - Migrated to Gemini Frontend
+  // Vertex AI Agentic Chat - Migrated to LangGraph
   async chatWithVertex(
     userId: string,
     message: string,
@@ -685,176 +686,48 @@ class SkylarService {
     fileData?: { data: string; mimeType: string }
   ): Promise<any> {
     try {
-      const ai = getAI();
+      // Dynamically import to avoid circular dependency issues at load time
+      const { skylarGraph } = await import('./skylarGraph');
+      const { HumanMessage, AIMessage } = await import('@langchain/core/messages');
 
-      let currentTruth = '';
-      if (userId && userId !== 'anonymous') {
-        const insights = await this.fetchConfirmedInsights(userId);
-        if (insights.length > 0) {
-          currentTruth = `\n\nConfirmed Professional DNA (Current Truth):\n${insights.map((i) => `- [${i.type.toUpperCase()}] ${i.content}`).join('\n')}`;
-        }
-      }
-
-      const baseInstruction = stageConfig 
-        ? this.buildContextualPrompt({ displayName: 'User' }, stageConfig)
-        : this.getSystemPromptForPhase('dive-in', { displayName: 'User' });
-        
-      const systemInstruction = `${baseInstruction}${currentTruth}`;
-
-      const chat = ai.chats.create({
-        model: 'gemini-3.1-pro-preview',
-        config: {
-          systemInstruction,
-          tools: tools as any,
-          maxOutputTokens: 16384,
-          thinkingConfig: {
-            thinkingLevel: ThinkingLevel.LOW,
-          },
-        },
-        history: history.map((h) => ({
-          role: h.role,
-          parts: h.parts,
-        })),
+      // Convert history to LangChain format
+      const lcHistory = history.map((h) => {
+        if (h.role === 'user') return new HumanMessage(h.parts[0].text);
+        return new AIMessage(h.parts[0].text);
       });
 
-      const messageParts: any[] = [{ text: message }];
+      let content: any = message;
       if (fileData) {
-        messageParts.push({
-          inlineData: {
-            data: fileData.data,
-            mimeType: fileData.mimeType,
-          },
-        });
-      }
-
-      const executedActions: any[] = [];
-      let response = await chat.sendMessage({ message: messageParts });
-      let calls = response.functionCalls;
-
-      // Agentic Loop: Handle tool calls (except proposals which go to the user)
-      while (calls && calls.length > 0) {
-        const toolResponses: any[] = [];
-
-        for (const call of calls) {
-          const { name, args, id } = call;
-          const typedArgs = args as any;
-
-          if (name === 'create_sparkwavv_account') {
-            console.log(`[SKYLAR] Executing tool: create_sparkwavv_account`);
-            executedActions.push({ action: 'create_sparkwavv_account', data: typedArgs });
-            toolResponses.push({
-              functionResponse: {
-                name: 'create_sparkwavv_account',
-                response: { status: 'success', message: 'Account creation flow triggered.' },
-                id,
-              },
-            });
-          } else if (name === 'search_wavvault') {
-            console.log(`[SKYLAR] Executing tool: search_wavvault with query: ${typedArgs.query}`);
-            const searchResults = await this.performAnonymizedSearch(
-              typedArgs.query as string,
-              token
-            );
-            toolResponses.push({
-              functionResponse: {
-                name: 'search_wavvault',
-                response: { content: searchResults },
-                id,
-              },
-            });
-          } else if (name === 'execute_minor_update') {
-            console.log(
-              `[SKYLAR] Executing tool: execute_minor_update for field: ${typedArgs.field}`
-            );
-            const result = await this.executeAction(userId, 'update_dashboard', typedArgs, token);
-            executedActions.push({ action: 'execute_minor_update', data: typedArgs, result });
-            toolResponses.push({
-              functionResponse: {
-                name: 'execute_minor_update',
-                response: result,
-                id,
-              },
-            });
-          } else if (name === 'get_market_intelligence') {
-            console.log(
-              `[SKYLAR] Executing tool: get_market_intelligence for industry: ${typedArgs.industry}`
-            );
-            const marketData = await this.performMarketIntelligenceSearch(
-              typedArgs.industry as string,
-              typedArgs.role as string,
-              token
-            );
-            toolResponses.push({
-              functionResponse: {
-                name: 'get_market_intelligence',
-                response: marketData,
-                id,
-              },
-            });
-          } else if (name === 'perform_gate_review') {
-            console.log(
-              `[SKYLAR] Executing tool: perform_gate_review for ${typedArgs.targetPhase}`
-            );
-            if (userId) {
-              const reviewResult = await this.performGateReview(
-                userId,
-                typedArgs.currentPhase,
-                typedArgs.targetPhase,
-                history
-              );
-              toolResponses.push({
-                functionResponse: {
-                  name: 'perform_gate_review',
-                  response: reviewResult,
-                  id,
-                },
-              });
-            } else {
-              const criteria = GATING_CRITERIA[typedArgs.targetPhase] || [];
-              toolResponses.push({
-                functionResponse: {
-                  name: 'perform_gate_review',
-                  response: {
-                    status: 'warning',
-                    message: 'User context not found. Performing general criteria review.',
-                    criteria: criteria.map((c) => ({ label: c, met: false })),
-                  },
-                  id,
-                },
-              });
-            }
-          } else if (name === 'parse_career_artifact') {
-            console.log(`[SKYLAR] Executing tool: parse_career_artifact`);
-            toolResponses.push({
-              functionResponse: {
-                name: 'parse_career_artifact',
-                response: {
-                  status: 'analyzed',
-                  message: 'Artifact analyzed for DNA and ATS compliance.',
-                },
-                id,
-              },
-            });
-          } else if (name === 'generate_ats_optimized_content') {
-            console.log(`[SKYLAR] Executing tool: generate_ats_optimized_content`);
-            // This will be returned to the frontend to show download buttons
-            return { response, executedActions };
-          } else if (name.startsWith('propose_') || name === 'flag_dna_conflict') {
-            // Proposals are NOT executed automatically.
-            // We return them to the frontend to trigger the UI Widget.
-            return { response, executedActions };
+        content = [
+          { type: 'text', text: message },
+          {
+            type: 'image_url',
+            image_url: { url: `data:${fileData.mimeType};base64,${fileData.data}` }
           }
-        }
-
-        if (toolResponses.length > 0) {
-          response = await chat.sendMessage({ message: toolResponses });
-          calls = response.functionCalls;
-        } else {
-          break;
-        }
+        ];
       }
 
-      return { response, executedActions };
+      const inputMessage = new HumanMessage({ content });
+
+      const initialState = {
+        messages: [...lcHistory, inputMessage],
+        stageConfig,
+        userId,
+        executedActions: [],
+        token
+      };
+
+      const finalState = await skylarGraph.invoke(initialState) as any;
+      
+      const lastMessage = finalState.messages[finalState.messages.length - 1];
+      
+      return { 
+        response: {
+          text: lastMessage.content,
+          candidates: [{ content: { parts: [{ text: lastMessage.content }] } }] // Mocking original response structure for UI compatibility
+        }, 
+        executedActions: finalState.executedActions 
+      };
     } catch (error) {
       console.error('Skylar Chat Error:', error);
       throw error;
@@ -1051,6 +924,26 @@ class SkylarService {
       });
     } catch (error) {
       console.error('Error saving Wavvault data:', error);
+    }
+  }
+
+  async saveWavvaultArtifact(artifact: any): Promise<void> {
+    try {
+      const idToken = await auth.currentUser?.getIdToken();
+      if (!idToken) {
+        console.warn('No auth token available for saveWavvaultArtifact');
+        return;
+      }
+      await fetch('/api/wavvault/artifact', {
+        method: 'POST',
+        headers: { 
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${idToken}`
+        },
+        body: JSON.stringify(artifact),
+      });
+    } catch (error) {
+      console.error('Error saving Wavvault artifact:', error);
     }
   }
 
@@ -1301,8 +1194,9 @@ class SkylarService {
 
   async saveUserAsset(userId: string, asset: any, token?: string) {
     try {
+      const idToken = token || await auth.currentUser?.getIdToken();
       const headers: Record<string, string> = { 'Content-Type': 'application/json' };
-      if (token) headers['Authorization'] = `Bearer ${token}`;
+      if (idToken) headers['Authorization'] = `Bearer ${idToken}`;
 
       const response = await fetch('/api/user-assets', {
         method: 'POST',
@@ -1317,8 +1211,9 @@ class SkylarService {
 
   async getUserAssets(userId: string, type?: string, token?: string) {
     try {
+      const idToken = token || await auth.currentUser?.getIdToken();
       const headers: Record<string, string> = {};
-      if (token) headers['Authorization'] = `Bearer ${token}`;
+      if (idToken) headers['Authorization'] = `Bearer ${idToken}`;
 
       const url = `/api/user-assets?userId=${userId}${type ? `&type=${type}` : ''}`;
       const response = await fetch(url, { headers });

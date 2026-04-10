@@ -8,6 +8,7 @@ import { DashboardData } from '../../types/dashboard';
 import { Camera, ChevronRight, Briefcase, Target, Award, FileText, Brain, Eye, EyeOff, History } from 'lucide-react';
 import { SkylarInteractionPanel } from '../skylar/SkylarInteractionPanel';
 import { useIdentity } from '../../contexts/IdentityContext';
+import { WavvaultData } from '../../types/wavvault';
 
 interface PhaseViewProps {
   userId: string;
@@ -21,11 +22,12 @@ interface PhaseViewProps {
   toggleTransparency?: () => void;
   setShowEvolution?: (show: boolean) => void;
   onActivityClick?: (activity: any) => void;
+  wavvaultData?: WavvaultData | null;
 }
 
-export const IgnitionView: React.FC<PhaseViewProps> = ({ userId, currentStage, onActionClick, onNavigate, profile, onActivityClick }) => (
+export const IgnitionView: React.FC<PhaseViewProps> = ({ userId, currentStage, onActionClick, onNavigate, profile, onActivityClick, wavvaultData }) => (
   <div className="space-y-8">
-    <ActionCenter currentStage={currentStage} onActionClick={onActionClick} />
+    <ActionCenter currentStage={currentStage} onActionClick={onActionClick} wavvaultData={wavvaultData} />
     <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
       <div className="space-y-8">
         <NeuralSynthesisEngine userId={userId} currentStage={currentStage} />
@@ -70,9 +72,9 @@ export const IgnitionView: React.FC<PhaseViewProps> = ({ userId, currentStage, o
   </div>
 );
 
-export const DiscoveryView: React.FC<PhaseViewProps> = ({ userId, currentStage, onActionClick, profile, data, onNavigate, onActivityClick }) => (
+export const DiscoveryView: React.FC<PhaseViewProps> = ({ userId, currentStage, onActionClick, profile, data, onNavigate, onActivityClick, wavvaultData }) => (
   <div className="space-y-8">
-    <ActionCenter currentStage={currentStage} onActionClick={onActionClick} />
+    <ActionCenter currentStage={currentStage} onActionClick={onActionClick} wavvaultData={wavvaultData} />
     
     <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
       <div className="space-y-8">
@@ -121,9 +123,9 @@ export const DiscoveryView: React.FC<PhaseViewProps> = ({ userId, currentStage, 
   </div>
 );
 
-export const BrandingView: React.FC<PhaseViewProps> = ({ userId, currentStage, onActionClick, artifacts, onNavigate, onActivityClick }) => (
+export const BrandingView: React.FC<PhaseViewProps> = ({ userId, currentStage, onActionClick, artifacts, onNavigate, onActivityClick, wavvaultData }) => (
   <div className="space-y-8">
-    <ActionCenter currentStage={currentStage} onActionClick={onActionClick} />
+    <ActionCenter currentStage={currentStage} onActionClick={onActionClick} wavvaultData={wavvaultData} />
     
     <button
       onClick={() => onNavigate('synthesis')}
@@ -164,9 +166,9 @@ export const BrandingView: React.FC<PhaseViewProps> = ({ userId, currentStage, o
   </div>
 );
 
-export const OutreachView: React.FC<PhaseViewProps> = ({ userId, currentStage, onActionClick, data, onNavigate, onActivityClick }) => (
+export const OutreachView: React.FC<PhaseViewProps> = ({ userId, currentStage, onActionClick, data, onNavigate, onActivityClick, wavvaultData }) => (
   <div className="space-y-8">
-    <ActionCenter currentStage={currentStage} onActionClick={onActionClick} />
+    <ActionCenter currentStage={currentStage} onActionClick={onActionClick} wavvaultData={wavvaultData} />
     
     <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
       <div className="glass-panel p-10 rounded-[2.5rem] border border-white/5 bg-black/40">

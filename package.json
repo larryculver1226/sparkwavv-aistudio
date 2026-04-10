@@ -16,13 +16,18 @@
     "generate": "gemini --prompt",
     "test": "vitest run",
     "test:watch": "vitest",
-    "test:e2e": "playwright test"
+    "test:e2e": "playwright install chromium && playwright test",
+    "test:e2e:smoke": "playwright install chromium && playwright test --grep @smoke"
   },
   "dependencies": {
     "@google-cloud/discoveryengine": "^2.6.0",
     "@google-cloud/storage": "^7.19.0",
     "@google-cloud/vertexai": "^1.10.0",
     "@google/genai": "^1.29.0",
+    "@langchain/core": "^1.1.39",
+    "@langchain/google-genai": "^2.1.26",
+    "@langchain/google-vertexai": "^2.1.26",
+    "@langchain/langgraph": "^1.2.8",
     "@modelcontextprotocol/sdk": "^1.29.0",
     "@radix-ui/react-tooltip": "^1.2.8",
     "@sendgrid/mail": "^8.1.6",

@@ -1,14 +1,26 @@
 import { useState, useEffect } from 'react';
-import { ValidationGateEvent, DistilledArtifact } from '../types/wavvault';
+import { ValidationGateEvent, DistilledArtifact, WavvaultData } from '../types/wavvault';
 import { wavvaultService } from '../services/wavvaultService';
 import { useIdentity } from '../contexts/IdentityContext';
+import { skylar } from '../services/skylarService';
 
 export const useWavvaultData = () => {
   const { user, status } = useIdentity();
   const [events, setEvents] = useState<ValidationGateEvent[]>([]);
   const [artifacts, setArtifacts] = useState<DistilledArtifact[]>([]);
+  const [wavvaultData, setWavvaultData] = useState<WavvaultData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+
+  const fetchFullData = async () => {
+    if (!user) return;
+    try {
+      const data = await skylar.getWavvaultData(user.uid);
+      setWavvaultData(data);
+    } catch (err) {
+      console.error('Failed to fetch full WavvaultData', err);
+    }
+  };
 
   useEffect(() => {
     if (status !== 'ready' || !user) {
@@ -20,6 +32,8 @@ export const useWavvaultData = () => {
 
     setLoading(true);
     setError(null);
+
+    fetchFullData();
 
     const unsubscribeEvents = wavvaultService.subscribeToEvents(
       user.uid,
@@ -52,8 +66,10 @@ export const useWavvaultData = () => {
   return {
     events,
     artifacts,
+    wavvaultData,
     loading,
     error,
     userId: user?.uid || '',
+    refreshWavvaultData: fetchFullData,
   };
 };

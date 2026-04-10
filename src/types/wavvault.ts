@@ -40,7 +40,7 @@ export interface ValidationGateEvent {
 
 export interface DistilledArtifact {
   id: string;
-  type: 'spark' | 'pie-of-life' | 'perfect-day' | 'five-stories' | 'brand-pillar' | 'manifesto';
+  type: 'spark' | 'pie-of-life' | 'perfect-day' | 'five-stories' | 'brand-pillar' | 'manifesto' | 'live_resume' | 'interactive_portfolio' | 'outreach_sequence' | 'portrait' | 'likeness';
   title: string;
   journeyPhase?: 'Dive-In' | 'Ignition' | 'Discovery' | 'Branding' | 'Outreach';
   status?: 'draft' | 'review' | 'approved';

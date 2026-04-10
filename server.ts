@@ -2243,6 +2243,34 @@ async function startServer() {
       }
     });
 
+    app.post("/api/wavvault/opportunities", requireRole([ROLES.USER, ROLES.ADMIN, ROLES.OPERATOR, ROLES.MENTOR, ROLES.AGENT]), async (req, res) => {
+      const { userId, opportunity } = req.body;
+      const authenticatedUser = (req as any).user;
+
+      if (userId !== authenticatedUser.uid && authenticatedUser.role !== ROLES.ADMIN) {
+        return res.status(403).json({ error: "Forbidden: You can only save opportunities for yourself." });
+      }
+
+      try {
+        const db = getFirestoreDb();
+        if (!db) return res.status(503).json({ error: "Firestore not initialized" });
+
+        const docRef = db.collection('wavvault_opportunities').doc(opportunity.id || undefined);
+        
+        await docRef.set({
+          ...opportunity,
+          id: docRef.id,
+          userId,
+          tenantId: authenticatedUser.tenantId,
+          updatedAt: admin.firestore.FieldValue.serverTimestamp()
+        }, { merge: true });
+
+        res.json({ success: true, id: docRef.id });
+      } catch (error: any) {
+        res.status(500).json({ error: error.message });
+      }
+    });
+
     app.get("/api/wavvault/search", requireRole([ROLES.USER, ROLES.ADMIN, ROLES.OPERATOR, ROLES.MENTOR, ROLES.AGENT]), async (req, res) => {
       const { q, limitCount } = req.query;
       const authenticatedUser = (req as any).user;
@@ -2489,6 +2517,94 @@ async function startServer() {
         });
       } catch (error: any) {
         console.error("Error fetching public share:", error);
+        res.status(500).json({ error: error.message });
+      }
+    });
+    
+    // Admin System Tests Execution
+    app.post("/api/admin/tests/run", requireRole([ROLES.SUPER_ADMIN], 'admin'), async (req, res) => {
+      try {
+        const { type } = req.body; // 'smoke' or 'full'
+        const { exec } = await import('child_process');
+        
+        const command = type === 'smoke' ? 'npm run test:e2e:smoke' : 'npm run test:e2e';
+        
+        // Spawn the process
+        exec(command, (error, stdout, stderr) => {
+          if (error) {
+            console.error(`Test execution error: ${error.message}`);
+          }
+          console.log(`Test stdout: ${stdout}`);
+          console.error(`Test stderr: ${stderr}`);
+        });
+        
+        res.json({ success: true, message: `Test suite '${type}' started in the background.` });
+      } catch (error: any) {
+        console.error("Error starting tests:", error);
+        res.status(500).json({ error: error.message });
+      }
+    });
+
+    // Admin System Tests Results
+    app.get("/api/admin/tests/results", requireRole([ROLES.SUPER_ADMIN], 'admin'), async (req, res) => {
+      try {
+        const reportPath = path.join(process.cwd(), 'test-results', 'report.json');
+        if (fs.existsSync(reportPath)) {
+          const reportData = fs.readFileSync(reportPath, 'utf8');
+          res.json(JSON.parse(reportData));
+        } else {
+          res.json({ error: "No test results found. Run a test suite first." });
+        }
+      } catch (error: any) {
+        console.error("Error fetching test results:", error);
+        res.status(500).json({ error: error.message });
+      }
+    });
+
+    // User Feedback Submission
+    app.post("/api/feedback", requireRole([ROLES.USER, ROLES.ADMIN, ROLES.OPERATOR, ROLES.MENTOR, ROLES.AGENT]), async (req, res) => {
+      try {
+        const { issueType, description, stepsToReproduce, url, browserInfo } = req.body;
+        const authenticatedUser = (req as any).user;
+        const db = getFirestoreDb();
+        if (!db) throw new Error("Firestore not initialized");
+
+        const feedbackDoc = {
+          userId: authenticatedUser.uid,
+          userEmail: authenticatedUser.email,
+          issueType,
+          description,
+          stepsToReproduce,
+          url,
+          browserInfo,
+          status: 'Open',
+          createdAt: admin.firestore.FieldValue.serverTimestamp()
+        };
+
+        const docRef = await db.collection('feedback_issues').add(feedbackDoc);
+        
+        // Optional: Jira integration could be triggered here via a webhook or direct API call
+        // if (process.env.JIRA_API_KEY) { ... }
+
+        res.json({ success: true, id: docRef.id });
+      } catch (error: any) {
+        console.error("Error submitting feedback:", error);
+        res.status(500).json({ error: error.message });
+      }
+    });
+
+    // Admin Feedback Retrieval
+    app.get("/api/admin/feedback", requireRole([ROLES.SUPER_ADMIN, ROLES.ADMIN, ROLES.OPERATOR], 'admin'), async (req, res) => {
+      try {
+        const db = getFirestoreDb();
+        if (!db) throw new Error("Firestore not initialized");
+
+        const snapshot = await db.collection('feedback_issues').orderBy('createdAt', 'desc').get();
+        const feedback = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+        
+        res.json({ feedback });
+      } catch (error: any) {
+        console.error("Error fetching feedback:", error);
         res.status(500).json({ error: error.message });
       }
     });

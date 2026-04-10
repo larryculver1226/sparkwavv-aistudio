@@ -341,6 +341,30 @@ export const OutreachForge: React.FC<OutreachForgeProps> = ({ userId }) => {
                   <div className="flex-1 glass-panel p-10 rounded-[2.5rem] border border-white/5 bg-black/40 overflow-y-auto max-h-[800px] relative">
                     {generatedSequence ? (
                       <div className="space-y-16">
+                        <div className="flex justify-end">
+                          <button
+                            onClick={async () => {
+                              if (!userId) return;
+                              try {
+                                const newArtifact = {
+                                  userId,
+                                  type: 'outreach_sequence',
+                                  title: `Outreach Sequence: ${targetCompany}`,
+                                  content: JSON.stringify(generatedSequence),
+                                  journeyPhase: 'Outreach',
+                                  status: 'approved',
+                                };
+                                await skylar.saveWavvaultArtifact(newArtifact);
+                                alert('Sequence saved to Wavvault!');
+                              } catch (e) {
+                                console.error('Failed to save sequence to Wavvault', e);
+                              }
+                            }}
+                            className="px-6 py-3 bg-neon-cyan text-black font-bold uppercase tracking-widest text-[10px] hover:bg-neon-cyan/80 transition-all rounded-xl"
+                          >
+                            Save to Wavvault
+                          </button>
+                        </div>
                         {generatedSequence.steps.map((step: any, idx: number) => (
                           <div key={idx} className="space-y-6 relative">
                             <div className="flex items-center gap-4">

@@ -4,6 +4,12 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 ### Added
+- **Track 033**: Home Page and User Dashboard Changes (Updated NavBar to show Dashboard Login/Vault/User Profile conditionally, added Dive-In section to Home Page, and updated Dive-In auth flow).
+- **Track 031**: Regression Tests & Admin Feedback (Added Playwright JSON reporting, `smoke` test suite, `System Tests` and `User Feedback` panels in the Admin Dashboard, and a global `FeedbackModal` in the NavBar).
+- **Track 030**: Fix Skylar Chat Error (Updated the deprecated `gemini-1.5-pro` model to `gemini-3.1-pro-preview` in `skylarService.ts` to resolve the "Failed to communicate with Skylar" error).
+- **Track 029**: Theme Consistency for all tabs and user dashboard items (Replaced hardcoded light theme colors in `HighFidelitySynthesisLab`, `InteractivePortfolio`, `LiveResume`, and `SkylarInteractionPanel` with dark theme utility classes).
+- **Track 028**: Fix User Dashboard UI Scheme/Colors (Removed 'yin' theme overrides and hardcoded light backgrounds to ensure consistency with the Home Page dark theme).
+- **Track 027**: Migrate Skylar Logic to LangGraph (Refactored `skylarService.ts` to use `@langchain/langgraph` and `@langchain/google-genai` for stateful, graph-based agent orchestration).
 - **Track 026**: Redesign Dive-In as Pre-Registration Onboarding (Moved Dive-In to a public route `/dive-in`, added resume upload, updated Skylar to trigger account creation, and removed Dive-In from the authenticated dashboard).
 - **Track 024**: Migrate Skylar Agent Definitions to Firestore & Build Agent Ops UI (Created `agent_configs` collection, `agentOpsService`, and `AgentOpsPanel` in Admin Dashboard for dynamic prompt management).
 - **Track 023**: Integration of SkylarInteractionPanel into the User Dashboard for Dive-In Phase (Replaced the static Dive-In view with the dynamic Skylar Agent interface).

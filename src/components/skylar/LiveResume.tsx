@@ -15,9 +15,9 @@ interface LiveResumeProps {
 
 export const LiveResume: React.FC<LiveResumeProps> = ({ data, onDownload }) => {
   return (
-    <div className="min-h-screen bg-[#E4E3E0] text-[#141414] font-sans selection:bg-[#141414] selection:text-[#E4E3E0]">
+    <div className="min-h-screen bg-black text-white font-sans selection:bg-white/10 selection:text-white">
       {/* Editorial Header */}
-      <header className="p-12 border-b-2 border-[#141414] flex justify-between items-end">
+      <header className="p-12 border-b border-white/10 flex justify-between items-end">
         <div className="max-w-4xl">
           <motion.div
             initial={{ opacity: 0, y: 20 }}
@@ -27,7 +27,7 @@ export const LiveResume: React.FC<LiveResumeProps> = ({ data, onDownload }) => {
             <span className="text-xs font-mono uppercase tracking-[0.3em] font-bold opacity-40">
               Professional DNA Synthesis
             </span>
-            <div className="h-[1px] flex-1 bg-[#141414] opacity-10" />
+            <div className="h-[1px] flex-1 bg-white/10 opacity-10" />
             <span className="text-xs font-mono uppercase tracking-[0.3em] font-bold opacity-40">
               v1.0.0
             </span>
@@ -53,7 +53,7 @@ export const LiveResume: React.FC<LiveResumeProps> = ({ data, onDownload }) => {
             </p>
             <div className="flex flex-col justify-end items-start gap-6">
               <div className="flex items-center gap-4">
-                <div className="w-16 h-16 rounded-full border-2 border-[#141414] flex items-center justify-center">
+                <div className="w-16 h-16 rounded-full border border-white/10 flex items-center justify-center">
                   <span className="text-2xl font-mono font-bold">{data.resonanceScore}%</span>
                 </div>
                 <div>
@@ -66,12 +66,12 @@ export const LiveResume: React.FC<LiveResumeProps> = ({ data, onDownload }) => {
               <div className="flex gap-4">
                 <button
                   onClick={onDownload}
-                  className="px-6 py-3 bg-[#141414] text-[#E4E3E0] text-[10px] font-bold uppercase tracking-widest hover:bg-black transition-colors flex items-center gap-2"
+                  className="px-6 py-3 bg-white/10 text-white text-[10px] font-bold uppercase tracking-widest hover:bg-black transition-colors flex items-center gap-2"
                 >
                   <Download className="w-4 h-4" />
                   Export PDF
                 </button>
-                <button className="px-6 py-3 border border-[#141414] text-[10px] font-bold uppercase tracking-widest hover:bg-[#141414] hover:text-[#E4E3E0] transition-colors flex items-center gap-2">
+                <button className="px-6 py-3 border border-white/10 text-[10px] font-bold uppercase tracking-widest hover:bg-white/10 hover:text-white transition-colors flex items-center gap-2">
                   <Share2 className="w-4 h-4" />
                   Share Live
                 </button>
@@ -82,11 +82,11 @@ export const LiveResume: React.FC<LiveResumeProps> = ({ data, onDownload }) => {
       </header>
 
       {/* DNA Pillars Section */}
-      <section className="grid grid-cols-1 lg:grid-cols-3 border-b-2 border-[#141414]">
+      <section className="grid grid-cols-1 lg:grid-cols-3 border-b border-white/10">
         {data.dnaPillars.map((pillar, idx) => (
           <div
             key={idx}
-            className={`p-12 ${idx < 2 ? 'border-r-2 border-[#141414]' : ''} group hover:bg-[#141414] hover:text-[#E4E3E0] transition-all duration-500`}
+            className={`p-12 ${idx < 2 ? 'border-r border-white/10' : ''} group hover:bg-white/10 hover:text-white transition-all duration-500`}
           >
             <div className="flex justify-between items-start mb-12">
               <span className="text-4xl font-serif italic opacity-20 group-hover:opacity-40">
@@ -111,11 +111,11 @@ export const LiveResume: React.FC<LiveResumeProps> = ({ data, onDownload }) => {
       </section>
 
       {/* Trajectory Section */}
-      <section className="p-12 bg-white">
+      <section className="p-12 bg-white/5">
         <div className="max-w-6xl mx-auto">
           <div className="flex items-center gap-4 mb-16">
             <h2 className="text-6xl font-serif italic tracking-tight">Trajectory</h2>
-            <div className="h-[2px] flex-1 bg-[#141414]" />
+            <div className="h-[2px] flex-1 bg-white/10" />
           </div>
 
           <div className="space-y-24">
@@ -125,7 +125,7 @@ export const LiveResume: React.FC<LiveResumeProps> = ({ data, onDownload }) => {
                   <span className="text-xs font-mono uppercase tracking-[0.3em] font-bold opacity-40 mb-2 block">
                     {t.phase}
                   </span>
-                  <div className="h-1 w-12 bg-[#141414]" />
+                  <div className="h-1 w-12 bg-white/10" />
                 </div>
                 <div className="md:col-span-3">
                   <h4 className="text-4xl font-serif italic mb-4">{t.milestone}</h4>
@@ -138,9 +138,9 @@ export const LiveResume: React.FC<LiveResumeProps> = ({ data, onDownload }) => {
       </section>
 
       {/* Skylar Feedback Footer */}
-      <footer className="p-12 bg-[#141414] text-[#E4E3E0]">
+      <footer className="p-12 bg-white/10 text-white">
         <div className="max-w-4xl mx-auto text-center">
-          <div className="w-16 h-16 rounded-full bg-white/10 border border-white/20 flex items-center justify-center mx-auto mb-8">
+          <div className="w-16 h-16 rounded-full bg-white/5/10 border border-white/20 flex items-center justify-center mx-auto mb-8">
             <Sparkles className="w-8 h-8 text-white" />
           </div>
           <h4 className="text-xs font-mono uppercase tracking-[0.4em] font-bold mb-6 opacity-40">

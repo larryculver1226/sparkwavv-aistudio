@@ -91,8 +91,21 @@ export const HighFidelitySynthesisLab: React.FC = () => {
     const file = e.target.files?.[0];
     if (file) {
       const reader = new FileReader();
-      reader.onloadend = () => {
-        setReferencePhoto(reader.result as string);
+      reader.onloadend = async () => {
+        const base64 = reader.result as string;
+        setReferencePhoto(base64);
+        
+        if (user?.uid) {
+          await skylar.saveWavvaultArtifact({
+            id: crypto.randomUUID(),
+            userId: user.uid,
+            type: 'likeness',
+            title: 'Likeness Preservation',
+            content: base64,
+            journeyPhase: 'Branding',
+            timestamp: new Date().toISOString()
+          });
+        }
       };
       reader.readAsDataURL(file);
     }
@@ -119,11 +132,24 @@ export const HighFidelitySynthesisLab: React.FC = () => {
       );
       setGeneratedPortrait(portrait);
 
+      // Save as UserAsset for backward compatibility
       await skylar.saveUserAsset(user.uid, {
         type: 'portrait',
         content: portrait,
         metadata: { style: selectedStyle, modelId, usedReference: !!referencePhoto },
         journeyPhase: 'Branding',
+      });
+
+      // Save as DistilledArtifact in Wavvault
+      await skylar.saveWavvaultArtifact({
+        id: crypto.randomUUID(),
+        userId: user.uid,
+        type: 'portrait',
+        title: `Brand Portrait - ${selectedStyle}`,
+        content: portrait,
+        metadata: { style: selectedStyle, modelId, usedReference: !!referencePhoto },
+        journeyPhase: 'Branding',
+        timestamp: new Date().toISOString()
       });
       
       await logUserActivity(
@@ -237,9 +263,9 @@ export const HighFidelitySynthesisLab: React.FC = () => {
   };
 
   return (
-    <div className="flex flex-col h-full bg-[#E4E3E0] text-[#141414] font-sans selection:bg-[#141414] selection:text-[#E4E3E0]">
+    <div className="flex flex-col h-full bg-transparent text-white font-sans selection:bg-white/10 selection:text-white">
       {/* Header */}
-      <div className="p-8 border-b-2 border-[#141414]">
+      <div className="p-8 border-b border-white/10">
         <div className="flex items-center justify-between">
           <div>
             <h1 className="text-5xl font-serif italic tracking-tighter">Synthesis Lab</h1>
@@ -257,7 +283,7 @@ export const HighFidelitySynthesisLab: React.FC = () => {
               <button
                 key={tab.id}
                 onClick={() => setActiveTab(tab.id as any)}
-                className={`px-6 py-3 text-[10px] uppercase tracking-widest font-bold border-2 border-[#141414] transition-all flex items-center gap-3 ${activeTab === tab.id ? 'bg-[#141414] text-[#E4E3E0]' : 'hover:bg-[#141414] hover:text-[#E4E3E0]'}`}
+                className={`px-6 py-3 text-[10px] uppercase tracking-widest font-bold border border-white/10 transition-all flex items-center gap-3 ${activeTab === tab.id ? 'bg-white/10 text-white' : 'hover:bg-white/10 hover:text-white'}`}
               >
                 <tab.icon className="w-4 h-4" />
                 {tab.label}
@@ -286,8 +312,8 @@ export const HighFidelitySynthesisLab: React.FC = () => {
                       Likeness Preservation
                     </h2>
                   </div>
-                  <div className="border-2 border-[#141414] p-8 bg-white space-y-6">
-                    <div className="flex items-start gap-4 p-4 bg-[#141414] text-[#E4E3E0]">
+                  <div className="border border-white/10 p-8 bg-white/5 space-y-6">
+                    <div className="flex items-start gap-4 p-4 bg-white/10 text-white">
                       <Shield className="w-5 h-5 mt-0.5" />
                       <div>
                         <p className="text-[10px] font-bold uppercase tracking-widest">
@@ -301,7 +327,7 @@ export const HighFidelitySynthesisLab: React.FC = () => {
 
                     <div className="flex items-center gap-8">
                       <div
-                        className="w-40 h-40 border-2 border-dashed border-[#141414] flex items-center justify-center cursor-pointer overflow-hidden bg-[#F5F5F0] group"
+                        className="w-40 h-40 border border-dashed border-white/10 flex items-center justify-center cursor-pointer overflow-hidden bg-white/5 group"
                         onClick={() => fileInputRef.current?.click()}
                       >
                         {referencePhoto ? (
@@ -354,7 +380,7 @@ export const HighFidelitySynthesisLab: React.FC = () => {
                       <button
                         key={style}
                         onClick={() => setSelectedStyle(style)}
-                        className={`p-6 text-left border-2 border-[#141414] transition-all ${selectedStyle === style ? 'bg-[#141414] text-[#E4E3E0]' : 'bg-white hover:bg-white/80'}`}
+                        className={`p-6 text-left border border-white/10 transition-all ${selectedStyle === style ? 'bg-white/10 text-white' : 'bg-white/5 hover:bg-white/10'}`}
                       >
                         <span className="text-[10px] uppercase tracking-widest font-bold">
                           {style}
@@ -367,7 +393,7 @@ export const HighFidelitySynthesisLab: React.FC = () => {
                 <button
                   onClick={generatePortrait}
                   disabled={loading}
-                  className="w-full py-8 bg-[#141414] text-[#E4E3E0] flex items-center justify-center gap-6 hover:bg-black transition-all disabled:opacity-50 group"
+                  className="w-full py-8 bg-white/10 text-white flex items-center justify-center gap-6 hover:bg-black transition-all disabled:opacity-50 group"
                 >
                   {loading ? (
                     <RefreshCw className="w-8 h-8 animate-spin" />
@@ -386,9 +412,9 @@ export const HighFidelitySynthesisLab: React.FC = () => {
               <div className="flex flex-col">
                 <div className="flex items-center gap-4 mb-6">
                   <h2 className="text-3xl font-serif italic tracking-tight">Synthesis Preview</h2>
-                  <div className="h-[1px] flex-1 bg-[#141414] opacity-10" />
+                  <div className="h-[1px] flex-1 bg-white/10 opacity-10" />
                 </div>
-                <div className="flex-1 border-2 border-[#141414] bg-white relative flex items-center justify-center overflow-hidden min-h-[500px] shadow-2xl">
+                <div className="flex-1 border border-white/10 bg-white/5 relative flex items-center justify-center overflow-hidden min-h-[500px] shadow-2xl">
                   {generatedPortrait ? (
                     <>
                       <img
@@ -397,10 +423,32 @@ export const HighFidelitySynthesisLab: React.FC = () => {
                         className="w-full h-full object-cover"
                       />
                       <div className="absolute bottom-8 right-8 flex gap-4">
+                        <button
+                          onClick={async () => {
+                            if (!user) return;
+                            try {
+                              const newArtifact = {
+                                userId: user.uid,
+                                type: 'brand-pillar',
+                                title: 'Cinematic Brand Portrait',
+                                content: generatedPortrait,
+                                journeyPhase: 'Branding',
+                                status: 'approved',
+                              };
+                              await skylar.saveWavvaultArtifact(newArtifact);
+                              alert('Portrait saved to Wavvault!');
+                            } catch (e) {
+                              console.error('Failed to save to Wavvault', e);
+                            }
+                          }}
+                          className="px-6 py-4 bg-neon-cyan text-black font-bold uppercase tracking-widest text-xs hover:bg-neon-cyan/80 transition-all"
+                        >
+                          Save to Wavvault
+                        </button>
                         <a
                           href={generatedPortrait}
                           download="sparkwavv-portrait.png"
-                          className="p-4 bg-white border-2 border-[#141414] hover:bg-[#141414] hover:text-[#E4E3E0] transition-all"
+                          className="p-4 bg-white/5 border border-white/10 hover:bg-white/10 hover:text-white transition-all"
                         >
                           <Download className="w-6 h-6" />
                         </a>
@@ -439,7 +487,7 @@ export const HighFidelitySynthesisLab: React.FC = () => {
                     <button
                       onClick={() => generateBrandingAsset('live_resume')}
                       disabled={loading}
-                      className="p-8 border-2 border-[#141414] bg-white hover:bg-[#141414] hover:text-[#E4E3E0] transition-all group text-left"
+                      className="p-8 border border-white/10 bg-white/5 hover:bg-white/10 hover:text-white transition-all group text-left"
                     >
                       <div className="flex justify-between items-start mb-8">
                         <FileText className="w-8 h-8" />
@@ -454,7 +502,7 @@ export const HighFidelitySynthesisLab: React.FC = () => {
                     <button
                       onClick={() => generateBrandingAsset('interactive_portfolio')}
                       disabled={loading}
-                      className="p-8 border-2 border-[#141414] bg-white hover:bg-[#141414] hover:text-[#E4E3E0] transition-all group text-left"
+                      className="p-8 border border-white/10 bg-white/5 hover:bg-white/10 hover:text-white transition-all group text-left"
                     >
                       <div className="flex justify-between items-start mb-8">
                         <Globe className="w-8 h-8" />
@@ -472,7 +520,7 @@ export const HighFidelitySynthesisLab: React.FC = () => {
                   <motion.div
                     initial={{ opacity: 0, scale: 0.95 }}
                     animate={{ opacity: 1, scale: 1 }}
-                    className="p-8 border-2 border-[#141414] bg-[#141414] text-[#E4E3E0]"
+                    className="p-8 border border-white/10 bg-white/10 text-white"
                   >
                     <div className="flex items-center justify-between mb-6">
                       <div className="flex items-center gap-3">
@@ -506,24 +554,46 @@ export const HighFidelitySynthesisLab: React.FC = () => {
               <div className="space-y-8">
                 <div className="flex items-center gap-4 mb-6">
                   <h2 className="text-3xl font-serif italic tracking-tight">Branding Preview</h2>
-                  <div className="h-[1px] flex-1 bg-[#141414] opacity-10" />
+                  <div className="h-[1px] flex-1 bg-white/10 opacity-10" />
                 </div>
 
                 <div className="grid grid-cols-1 gap-8">
                   {generatedResume && (
-                    <div className="border-2 border-[#141414] bg-white p-8 group">
+                    <div className="border border-white/10 bg-white/5 p-8 group">
                       <div className="flex justify-between items-center mb-8">
                         <span className="text-[10px] uppercase tracking-widest font-bold opacity-40">
                           Live Resume Ready
                         </span>
                         <div className="flex gap-2">
                           <button
+                            onClick={async () => {
+                              if (!user) return;
+                              try {
+                                const newArtifact = {
+                                  userId: user.uid,
+                                  type: 'live_resume',
+                                  title: 'Live Resume',
+                                  content: generatedResume,
+                                  journeyPhase: 'Branding',
+                                  status: 'approved',
+                                };
+                                await skylar.saveWavvaultArtifact(newArtifact);
+                                alert('Resume saved to Wavvault!');
+                              } catch (e) {
+                                console.error('Failed to save to Wavvault', e);
+                              }
+                            }}
+                            className="px-4 py-2 bg-neon-cyan text-black font-bold uppercase tracking-widest text-[10px] hover:bg-neon-cyan/80 transition-all"
+                          >
+                            Save to Wavvault
+                          </button>
+                          <button
                             onClick={() => setShowLiveResume(true)}
-                            className="p-3 border border-[#141414] hover:bg-[#141414] hover:text-[#E4E3E0] transition-all"
+                            className="p-3 border border-white/10 hover:bg-white/10 hover:text-white transition-all"
                           >
                             <Globe className="w-4 h-4" />
                           </button>
-                          <button className="p-3 border border-[#141414] hover:bg-[#141414] hover:text-[#E4E3E0] transition-all">
+                          <button className="p-3 border border-white/10 hover:bg-white/10 hover:text-white transition-all">
                             <Download className="w-4 h-4" />
                           </button>
                         </div>
@@ -538,17 +608,41 @@ export const HighFidelitySynthesisLab: React.FC = () => {
                   )}
 
                   {generatedPortfolio && (
-                    <div className="border-2 border-[#141414] bg-white p-8 group">
+                    <div className="border border-white/10 bg-white/5 p-8 group">
                       <div className="flex justify-between items-center mb-8">
                         <span className="text-[10px] uppercase tracking-widest font-bold opacity-40">
                           Portfolio Ready
                         </span>
-                        <button
-                          onClick={() => setShowPortfolio(true)}
-                          className="p-3 border border-[#141414] hover:bg-[#141414] hover:text-[#E4E3E0] transition-all"
-                        >
-                          <Globe className="w-4 h-4" />
-                        </button>
+                        <div className="flex gap-2">
+                          <button
+                            onClick={async () => {
+                              if (!user) return;
+                              try {
+                                const newArtifact = {
+                                  userId: user.uid,
+                                  type: 'interactive_portfolio',
+                                  title: 'Interactive Portfolio',
+                                  content: generatedPortfolio,
+                                  journeyPhase: 'Branding',
+                                  status: 'approved',
+                                };
+                                await skylar.saveWavvaultArtifact(newArtifact);
+                                alert('Portfolio saved to Wavvault!');
+                              } catch (e) {
+                                console.error('Failed to save to Wavvault', e);
+                              }
+                            }}
+                            className="px-4 py-2 bg-neon-cyan text-black font-bold uppercase tracking-widest text-[10px] hover:bg-neon-cyan/80 transition-all"
+                          >
+                            Save to Wavvault
+                          </button>
+                          <button
+                            onClick={() => setShowPortfolio(true)}
+                            className="p-3 border border-white/10 hover:bg-white/10 hover:text-white transition-all"
+                          >
+                            <Globe className="w-4 h-4" />
+                          </button>
+                        </div>
                       </div>
                       <h3 className="text-4xl font-serif italic mb-4">The Cinematic Narrative</h3>
                       <p className="text-sm font-serif italic opacity-60 line-clamp-3">
@@ -558,7 +652,7 @@ export const HighFidelitySynthesisLab: React.FC = () => {
                   )}
 
                   {!generatedResume && !generatedPortfolio && (
-                    <div className="h-[400px] border-2 border-dashed border-[#141414] flex items-center justify-center opacity-10">
+                    <div className="h-[400px] border border-dashed border-white/10 flex items-center justify-center opacity-10">
                       <div className="text-center">
                         <Sparkles className="w-24 h-24 mx-auto mb-6" />
                         <p className="text-xs uppercase tracking-[0.4em] font-bold">
@@ -586,9 +680,9 @@ export const HighFidelitySynthesisLab: React.FC = () => {
                 assets.map((asset) => (
                   <div
                     key={asset.id}
-                    className="border-2 border-[#141414] bg-white group overflow-hidden shadow-lg hover:shadow-2xl transition-all"
+                    className="border border-white/10 bg-white/5 group overflow-hidden shadow-lg hover:shadow-2xl transition-all"
                   >
-                    <div className="aspect-square bg-[#F5F5F0] relative overflow-hidden">
+                    <div className="aspect-square bg-white/5 relative overflow-hidden">
                       {asset.type === 'portrait' ? (
                         <img
                           src={asset.content}
@@ -611,7 +705,7 @@ export const HighFidelitySynthesisLab: React.FC = () => {
                           </div>
                         </div>
                       )}
-                      <div className="absolute inset-0 bg-[#141414]/90 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-6">
+                      <div className="absolute inset-0 bg-black/90 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-6">
                         <button
                           onClick={() => {
                             if (asset.type === 'portrait') {
@@ -628,7 +722,7 @@ export const HighFidelitySynthesisLab: React.FC = () => {
                               setShowPortfolio(true);
                             }
                           }}
-                          className="p-4 bg-white text-[#141414] hover:bg-neon-cyan transition-all"
+                          className="p-4 bg-white/5 text-white hover:bg-neon-cyan transition-all"
                         >
                           <RefreshCw className="w-6 h-6" />
                         </button>
@@ -639,13 +733,13 @@ export const HighFidelitySynthesisLab: React.FC = () => {
                               : `data:text/plain;base64,${btoa(asset.content)}`
                           }
                           download={`sparkwavv-${asset.type}-${asset.id}.${asset.type === 'portrait' ? 'png' : 'txt'}`}
-                          className="p-4 bg-white text-[#141414] hover:bg-neon-cyan transition-all"
+                          className="p-4 bg-white/5 text-white hover:bg-neon-cyan transition-all"
                         >
                           <Download className="w-6 h-6" />
                         </a>
                       </div>
                     </div>
-                    <div className="p-6 border-t-2 border-[#141414]">
+                    <div className="p-6 border-t-2 border-white/10">
                       <div className="flex items-center justify-between">
                         <span className="text-[10px] uppercase tracking-widest font-bold">
                           {asset.type.replace('_', ' ')}
@@ -680,7 +774,7 @@ export const HighFidelitySynthesisLab: React.FC = () => {
             <LiveResume data={generatedResume} onDownload={() => window.print()} />
             <button
               onClick={() => setShowLiveResume(false)}
-              className="fixed top-12 right-12 p-4 bg-[#141414] text-[#E4E3E0] rounded-full z-[60] hover:scale-110 transition-transform"
+              className="fixed top-12 right-12 p-4 bg-white/10 text-white rounded-full z-[60] hover:scale-110 transition-transform"
             >
               <X className="w-6 h-6" />
             </button>

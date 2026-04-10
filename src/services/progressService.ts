@@ -1,12 +1,13 @@
 import { doc, updateDoc } from 'firebase/firestore';
 import { db } from '../lib/firebase';
 import { DashboardData, Milestone } from '../types/dashboard';
-import { DistilledArtifact } from '../types/wavvault';
+import { DistilledArtifact, WavvaultData } from '../types/wavvault';
 
 export async function calculateAndUpdateProgress(
   userId: string,
   dashboardData: DashboardData,
-  artifacts: DistilledArtifact[]
+  artifacts: DistilledArtifact[],
+  wavvaultData?: WavvaultData | null
 ) {
   try {
     const milestones = dashboardData.milestones || [];
@@ -16,8 +17,8 @@ export async function calculateAndUpdateProgress(
       'Dive-In': { artifacts: ['spark'] },
       'Ignition': { artifacts: ['pie-of-life', 'perfect-day'] },
       'Discovery': { artifacts: ['five-stories'] },
-      'Branding': { artifacts: ['brand-pillar'] },
-      'Outreach': { artifacts: ['manifesto'] }
+      'Branding': { artifacts: ['brand-pillar', 'live_resume', 'interactive_portfolio'] },
+      'Outreach': { artifacts: ['manifesto', 'outreach_sequence'] }
     };
 
     const newPhaseProgress = {
@@ -37,11 +38,19 @@ export async function calculateAndUpdateProgress(
       // We'll calculate progress based on the artifacts for that phase.
       
       const phaseArtifactTypes = phases[phaseName as keyof typeof phases].artifacts;
-      const completedArtifacts = artifacts.filter(a => 
+      let completedArtifacts = artifacts.filter(a => 
         a.journeyPhase === phaseName || phaseArtifactTypes.includes(a.type)
       ).length;
       
-      const requiredArtifactsCount = phaseArtifactTypes.length;
+      let requiredArtifactsCount = phaseArtifactTypes.length;
+
+      // Add custom logic for Ignition phase based on wavvaultData
+      if (phaseName === 'Ignition' && wavvaultData) {
+        requiredArtifactsCount += 2; // Strengths + Identity
+        if (wavvaultData.strengths && wavvaultData.strengths.length > 0) completedArtifacts++;
+        if (wavvaultData.identity) completedArtifacts++;
+      }
+      
       const artifactProgress = requiredArtifactsCount > 0 
         ? Math.min(100, (completedArtifacts / requiredArtifactsCount) * 100) 
         : 0;

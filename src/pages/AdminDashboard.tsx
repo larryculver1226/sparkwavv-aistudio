@@ -1093,6 +1093,18 @@ export const AdminDashboard: React.FC<{ onLogout: () => void }> = ({ onLogout })
                       roles: [ROLES.SUPER_ADMIN, ROLES.ADMIN],
                     },
                     {
+                      id: 'system-tests',
+                      label: 'System Tests',
+                      icon: ShieldCheck,
+                      roles: [ROLES.SUPER_ADMIN],
+                    },
+                    {
+                      id: 'user-feedback',
+                      label: 'User Feedback',
+                      icon: Activity,
+                      roles: [ROLES.SUPER_ADMIN, ROLES.ADMIN, ROLES.OPERATOR],
+                    },
+                    {
                       id: 'firebase-setup',
                       label: 'Firebase Setup',
                       icon: Database,
@@ -1225,6 +1237,18 @@ export const AdminDashboard: React.FC<{ onLogout: () => void }> = ({ onLogout })
                 roles: [ROLES.SUPER_ADMIN, ROLES.ADMIN],
               },
               {
+                id: 'system-tests',
+                label: 'System Tests',
+                icon: ShieldCheck,
+                roles: [ROLES.SUPER_ADMIN],
+              },
+              {
+                id: 'user-feedback',
+                label: 'User Feedback',
+                icon: Activity,
+                roles: [ROLES.SUPER_ADMIN, ROLES.ADMIN, ROLES.OPERATOR],
+              },
+              {
                 id: 'firebase-setup',
                 label: 'Firebase Setup',
                 icon: Database,
@@ -1284,6 +1308,8 @@ export const AdminDashboard: React.FC<{ onLogout: () => void }> = ({ onLogout })
               {activeTab === 'validation' && 'Validation Gate Review'}
               {activeTab === 'agent-ops' && 'Agent Operations'}
               {activeTab === 'diagnostics' && 'Connectivity Diagnostics'}
+              {activeTab === 'system-tests' && 'System Tests & Regression'}
+              {activeTab === 'user-feedback' && 'User Feedback & Issues'}
               {activeTab === 'firebase-setup' && 'Firebase Configuration'}
             </h2>
             <p className="text-white/40">
@@ -1411,6 +1437,14 @@ export const AdminDashboard: React.FC<{ onLogout: () => void }> = ({ onLogout })
           ) : activeTab === 'diagnostics' ? (
             <div className="col-span-4">
               <AuthDiagnostics />
+            </div>
+          ) : activeTab === 'system-tests' ? (
+            <div className="col-span-4">
+              <SystemTestsPanel />
+            </div>
+          ) : activeTab === 'user-feedback' ? (
+            <div className="col-span-4">
+              <UserFeedbackPanel />
             </div>
           ) : activeTab === 'firebase-setup' ? (
             <div className="col-span-4">
@@ -3173,6 +3207,159 @@ export const AdminDashboard: React.FC<{ onLogout: () => void }> = ({ onLogout })
           </div>
         )}
       </AnimatePresence>
+    </div>
+  );
+};
+
+const SystemTestsPanel: React.FC = () => {
+  const [loading, setLoading] = useState(false);
+  const [results, setResults] = useState<any>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  const runTests = async (type: 'smoke' | 'full') => {
+    setLoading(true);
+    setError(null);
+    try {
+      const idToken = await auth.currentUser?.getIdToken();
+      const res = await fetch('/api/admin/tests/run', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${idToken}`,
+        },
+        body: JSON.stringify({ type }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Failed to start tests');
+      alert(data.message);
+    } catch (err: any) {
+      setError(err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const fetchResults = async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const idToken = await auth.currentUser?.getIdToken();
+      const res = await fetch('/api/admin/tests/results', {
+        headers: { Authorization: `Bearer ${idToken}` },
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Failed to fetch results');
+      setResults(data);
+    } catch (err: any) {
+      setError(err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <div className="space-y-8">
+      <div className="glass-panel p-8 rounded-3xl border-white/5 bg-white/[0.02]">
+        <h3 className="text-xl font-display font-bold mb-4">Test Execution</h3>
+        <div className="flex gap-4">
+          <button
+            onClick={() => runTests('smoke')}
+            disabled={loading}
+            className="px-6 py-3 rounded-xl bg-neon-cyan/20 text-neon-cyan font-bold hover:bg-neon-cyan/30 transition-all disabled:opacity-50"
+          >
+            Run Smoke Tests
+          </button>
+          <button
+            onClick={() => runTests('full')}
+            disabled={loading}
+            className="px-6 py-3 rounded-xl bg-neon-magenta/20 text-neon-magenta font-bold hover:bg-neon-magenta/30 transition-all disabled:opacity-50"
+          >
+            Run Full Regression
+          </button>
+          <button
+            onClick={fetchResults}
+            disabled={loading}
+            className="px-6 py-3 rounded-xl bg-white/10 text-white font-bold hover:bg-white/20 transition-all disabled:opacity-50 ml-auto"
+          >
+            Refresh Results
+          </button>
+        </div>
+        {error && <p className="text-red-500 mt-4">{error}</p>}
+      </div>
+
+      {results && (
+        <div className="glass-panel p-8 rounded-3xl border-white/5 bg-white/[0.02]">
+          <h3 className="text-xl font-display font-bold mb-4">Latest Results</h3>
+          <pre className="bg-black/50 p-4 rounded-xl overflow-x-auto text-xs text-white/80">
+            {JSON.stringify(results, null, 2)}
+          </pre>
+        </div>
+      )}
+    </div>
+  );
+};
+
+const UserFeedbackPanel: React.FC = () => {
+  const [feedback, setFeedback] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const fetchFeedback = async () => {
+      try {
+        const idToken = await auth.currentUser?.getIdToken();
+        const res = await fetch('/api/admin/feedback', {
+          headers: { Authorization: `Bearer ${idToken}` },
+        });
+        if (res.ok) {
+          const data = await res.json();
+          setFeedback(data.feedback || []);
+        }
+      } catch (error) {
+        console.error('Failed to fetch feedback:', error);
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchFeedback();
+  }, []);
+
+  return (
+    <div className="glass-panel rounded-3xl border-white/5 bg-white/[0.02] overflow-hidden">
+      <div className="p-8 border-b border-white/5 flex items-center justify-between">
+        <h3 className="text-xl font-display font-bold">User Feedback & Issues</h3>
+      </div>
+      <div className="overflow-x-auto">
+        <table className="w-full text-left">
+          <thead>
+            <tr className="bg-white/5">
+              <th className="px-6 py-4 text-[10px] font-bold text-white/40 uppercase tracking-widest">Date</th>
+              <th className="px-6 py-4 text-[10px] font-bold text-white/40 uppercase tracking-widest">User</th>
+              <th className="px-6 py-4 text-[10px] font-bold text-white/40 uppercase tracking-widest">Type</th>
+              <th className="px-6 py-4 text-[10px] font-bold text-white/40 uppercase tracking-widest">Description</th>
+              <th className="px-6 py-4 text-[10px] font-bold text-white/40 uppercase tracking-widest">Status</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-white/5">
+            {loading ? (
+              <tr><td colSpan={5} className="px-6 py-4 text-center text-white/40">Loading...</td></tr>
+            ) : feedback.length === 0 ? (
+              <tr><td colSpan={5} className="px-6 py-4 text-center text-white/40">No feedback found.</td></tr>
+            ) : (
+              feedback.map((item) => (
+                <tr key={item.id} className="hover:bg-white/[0.02] transition-colors">
+                  <td className="px-6 py-4 text-xs text-white/60">
+                    {item.createdAt?._seconds ? new Date(item.createdAt._seconds * 1000).toLocaleString() : 'N/A'}
+                  </td>
+                  <td className="px-6 py-4 text-xs text-white/80">{item.userEmail}</td>
+                  <td className="px-6 py-4 text-xs font-bold text-neon-cyan">{item.issueType}</td>
+                  <td className="px-6 py-4 text-xs text-white/80 max-w-md truncate">{item.description}</td>
+                  <td className="px-6 py-4 text-xs font-bold text-neon-lime">{item.status}</td>
+                </tr>
+              ))
+            )}
+          </tbody>
+        </table>
+      </div>
     </div>
   );
 };

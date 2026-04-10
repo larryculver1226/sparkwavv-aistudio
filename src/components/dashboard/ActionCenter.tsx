@@ -1,24 +1,33 @@
 import React from 'react';
 import { motion } from 'motion/react';
 import { Target, AlertCircle, CheckCircle2, ChevronRight } from 'lucide-react';
+import { WavvaultData } from '../../types/wavvault';
 
 interface ActionCenterProps {
   currentStage: string;
   onActionClick: (actionId: string) => void;
+  wavvaultData?: WavvaultData | null;
 }
 
-export const ActionCenter: React.FC<ActionCenterProps> = ({ currentStage, onActionClick }) => {
+export const ActionCenter: React.FC<ActionCenterProps> = ({ currentStage, onActionClick, wavvaultData }) => {
+  // Check completion status based on WavvaultData
+  const hasStrengths = wavvaultData?.strengths && wavvaultData.strengths.length > 0;
+  const hasIdentity = !!wavvaultData?.identity;
+  const hasResume = wavvaultData?.artifacts?.some(a => a.type === 'live_resume' || a.type === 'brand-pillar');
+  const hasPortfolio = wavvaultData?.artifacts?.some(a => a.type === 'interactive_portfolio' || a.type === 'spark');
+  const hasOutreach = wavvaultData?.artifacts?.some(a => a.type === 'manifesto' || a.type === 'outreach_sequence');
+
   // Define phase-specific actions and gaps
   const phaseData: Record<string, { title: string; actions: any[]; gaps: any[] }> = {
     'Ignition': {
       title: 'Ignition Actions',
       actions: [
-        { id: 'strengths', label: 'Complete Strengths Assessment', status: 'pending' },
-        { id: 'identity', label: 'Finalize Identity Clarity', status: 'pending' },
+        { id: 'strengths', label: 'Complete Strengths Assessment', status: hasStrengths ? 'completed' : 'pending' },
+        { id: 'identity', label: 'Finalize Identity Clarity', status: hasIdentity ? 'completed' : 'pending' },
       ],
       gaps: [
-        { id: 'gap2', label: 'Strengths Alignment is low. Review your Gallup results.' },
-      ],
+        !hasStrengths ? { id: 'gap2', label: 'Strengths Alignment is low. Review your Gallup results.' } : null,
+      ].filter(Boolean),
     },
     'Discovery': {
       title: 'Discovery Actions',
@@ -33,22 +42,22 @@ export const ActionCenter: React.FC<ActionCenterProps> = ({ currentStage, onActi
     'Branding': {
       title: 'Branding Actions',
       actions: [
-        { id: 'resume', label: 'Synthesize Resume in Lab', status: 'pending' },
-        { id: 'portfolio', label: 'Update Wavvault Artifacts', status: 'pending' },
+        { id: 'resume', label: 'Synthesize Resume in Lab', status: hasResume ? 'completed' : 'pending' },
+        { id: 'portfolio', label: 'Update Wavvault Artifacts', status: hasPortfolio ? 'completed' : 'pending' },
       ],
       gaps: [
-        { id: 'gap4', label: 'Narrative strength is weak. Generate a new Synthesis Narrative.' },
-      ],
+        !hasResume ? { id: 'gap4', label: 'Narrative strength is weak. Generate a new Synthesis Narrative.' } : null,
+      ].filter(Boolean),
     },
     'Outreach': {
       title: 'Outreach Actions',
       actions: [
-        { id: 'forge', label: 'Create Outreach Sequence', status: 'pending' },
+        { id: 'forge', label: 'Create Outreach Sequence', status: hasOutreach ? 'completed' : 'pending' },
         { id: 'network', label: 'Engage 3 Target Connections', status: 'pending' },
       ],
       gaps: [
-        { id: 'gap5', label: 'No active applications tracked. Use the Outreach Forge.' },
-      ],
+        !hasOutreach ? { id: 'gap5', label: 'No active applications tracked. Use the Outreach Forge.' } : null,
+      ].filter(Boolean),
     },
   };
 

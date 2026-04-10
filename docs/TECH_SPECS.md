@@ -11,7 +11,15 @@
 - Firebase for backend services (Auth, Firestore) if configured.
 - **Local MCP Server**: A Model Context Protocol server (`scripts/mcp-server`) running via stdio to expose project history (Tracks, Changelog, Tech Specs) to local AI coding assistants (e.g., Cursor, Cline).
 
-## Skylar Agent Architecture (Track 022)
+## Skylar Agent Architecture (Track 022 & 027)
+### Orchestration (LangGraph)
+- **Framework**: `@langchain/langgraph`, `@langchain/core`, `@langchain/google-vertexai`.
+- **Graph State**: Tracks `messages` (conversation history), `stageConfig` (current journey stage definition), and `executedActions` (tools called during the run).
+- **Nodes**:
+  - `agent`: Invokes the `ChatVertexAI` model with the current state and bound tools.
+  - `tools`: Executes the tools requested by the model (using LangChain's `ToolNode`).
+- **Edges**: Conditional routing between `agent` and `tools`, ending when a final response is generated.
+
 ### Data Models
 - **`JourneyStageDefinition`**: JSON/Firestore schema controlling Skylar's behavior per stage.
   - `stageId` (string): e.g., 'dive-in', 'ignition', 'discovery'.
@@ -66,18 +74,18 @@
   - `VERTEX_AI_TECH_ENDPOINT_ID`: Endpoint ID for the Tech Sector Intelligence model.
 - **Fallback Mechanism**: If an endpoint ID is not configured (e.g., in local development), the service safely falls back to the standard `gemini-3.1-pro-preview` model.
 
-## Track 009: User Dashboard Improvements
-- **Dynamic Progress Calculation**:
-  - Implement `calculatePhaseProgress(dashboardData, artifacts)` in a new `progressService.ts`.
-  - Trigger progress recalculation when:
-    - A milestone is toggled (`UserDashboard.tsx`).
-    - An artifact is created (`wavvaultService.ts`).
-  - Update `Dashboard.phaseProgress` in Firestore.
-- **Interactive Activity Feed**:
-  - Add `onClick` handler to `ActivityFeed` items.
-  - Fetch artifact details via `relatedEntityId` when an `artifact_created` event is clicked.
-  - Display artifact details in a modal (`ArtifactModal.tsx`).
-- **Dedicated History View**:
-  - Add `/history` route or a "History" tab in `UserDashboard.tsx`.
-  - Create `HistoryView.tsx` component.
-  - Implement filtering by `journeyPhase`, `type`, and `tags`.
+## Track 031: Regression Tests & Admin Feedback
+### Test Architecture
+- **Framework**: Playwright for E2E, Vitest for Unit/Component.
+- **Suites**: Full Regression (`npm run test:e2e`) and Smoke (`npm run test:e2e:smoke`).
+- **Mocking**: Playwright `page.route` used to mock Firebase Auth and Gemini API for deterministic testing.
+
+### Admin Dashboard Integration
+- **Execution Endpoint**: `POST /api/admin/tests/run` (Restricted to `SUPER_ADMIN`). Spawns child process for Playwright.
+- **Results Endpoint**: `GET /api/admin/tests/results`. Fetches JSON reports from `test-results/report.json`.
+- **UI**: "System Tests" tab in Admin Portal.
+
+### User Feedback Mechanism
+- **Data Store**: Firestore `feedback_issues` collection.
+- **Schema**: Maps to Jira (Summary, Description, IssueType, Reporter).
+- **UI**: Global "Feedback" widget in NavBar, and "User Feedback" tab in Admin Portal.

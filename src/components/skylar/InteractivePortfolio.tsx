@@ -43,21 +43,21 @@ export const InteractivePortfolio: React.FC<InteractivePortfolioProps> = ({ data
   };
 
   return (
-    <div className="fixed inset-0 z-50 bg-[#E4E3E0] text-[#141414] font-sans overflow-hidden">
+    <div className="fixed inset-0 z-50 bg-black text-white font-sans overflow-hidden">
       {/* Navigation Header */}
       <nav className="absolute top-0 left-0 right-0 p-12 flex justify-between items-center z-10">
         <div className="flex items-center gap-6">
           <span className="text-xs font-mono uppercase tracking-[0.4em] font-bold opacity-40">
             Interactive Portfolio
           </span>
-          <div className="h-[1px] w-12 bg-[#141414] opacity-20" />
+          <div className="h-[1px] w-12 bg-white/10 opacity-20" />
           <span className="text-xs font-mono uppercase tracking-[0.4em] font-bold opacity-40">
             {activePageIndex + 1} / {data.pages.length}
           </span>
         </div>
         <button
           onClick={onClose}
-          className="px-6 py-3 border border-[#141414] text-[10px] font-bold uppercase tracking-widest hover:bg-[#141414] hover:text-[#E4E3E0] transition-all"
+          className="px-6 py-3 border border-white/10 text-[10px] font-bold uppercase tracking-widest hover:bg-white/10 hover:text-white transition-all"
         >
           Exit Studio
         </button>
@@ -75,7 +75,7 @@ export const InteractivePortfolio: React.FC<InteractivePortfolioProps> = ({ data
             className="max-w-6xl w-full grid grid-cols-1 lg:grid-cols-2 gap-24 items-center"
           >
             {/* Visual Side */}
-            <div className="relative aspect-[3/4] bg-white border-2 border-[#141414] overflow-hidden shadow-2xl">
+            <div className="relative aspect-[3/4] bg-white/5 border border-white/10 overflow-hidden shadow-2xl">
               <div className="absolute inset-0 p-12 flex flex-col justify-between">
                 <div className="flex justify-between items-start">
                   <span className="text-xs font-mono uppercase tracking-widest font-bold opacity-40">
@@ -98,7 +98,7 @@ export const InteractivePortfolio: React.FC<InteractivePortfolioProps> = ({ data
                 </div>
               </div>
               {/* Decorative Elements */}
-              <div className="absolute bottom-0 right-0 w-32 h-32 border-t-2 border-l-2 border-[#141414] opacity-10" />
+              <div className="absolute bottom-0 right-0 w-32 h-32 border-t border-l border-white/10 opacity-10" />
             </div>
 
             {/* Content Side */}
@@ -118,7 +118,7 @@ export const InteractivePortfolio: React.FC<InteractivePortfolioProps> = ({ data
                     {activePage.signals.map((signal, idx) => (
                       <div
                         key={idx}
-                        className="p-6 border border-[#141414] bg-white/50 hover:bg-white transition-all group"
+                        className="p-6 border border-white/10 bg-white/5/5 hover:bg-white/5 transition-all group"
                       >
                         <div className="flex justify-between items-center mb-2">
                           <h4 className="text-lg font-serif italic">{signal.label}</h4>
@@ -139,15 +139,15 @@ export const InteractivePortfolio: React.FC<InteractivePortfolioProps> = ({ data
                 <button
                   onClick={prevPage}
                   disabled={activePageIndex === 0}
-                  className="p-4 border border-[#141414] rounded-full disabled:opacity-10 hover:bg-[#141414] hover:text-[#E4E3E0] transition-all"
+                  className="p-4 border border-white/10 rounded-full disabled:opacity-10 hover:bg-white/10 hover:text-white transition-all"
                 >
                   <ChevronLeft className="w-6 h-6" />
                 </button>
-                <div className="flex-1 h-[1px] bg-[#141414] opacity-20" />
+                <div className="flex-1 h-[1px] bg-white/10 opacity-20" />
                 <button
                   onClick={nextPage}
                   disabled={activePageIndex === data.pages.length - 1}
-                  className="p-4 border border-[#141414] rounded-full disabled:opacity-10 hover:bg-[#141414] hover:text-[#E4E3E0] transition-all"
+                  className="p-4 border border-white/10 rounded-full disabled:opacity-10 hover:bg-white/10 hover:text-white transition-all"
                 >
                   <ChevronRight className="w-6 h-6" />
                 </button>
@@ -161,10 +161,10 @@ export const InteractivePortfolio: React.FC<InteractivePortfolioProps> = ({ data
       <motion.div
         initial={{ y: 100 }}
         animate={{ y: 0 }}
-        className="absolute bottom-12 left-12 right-12 p-8 bg-[#141414] text-[#E4E3E0] flex items-center justify-between border-t-4 border-neon-cyan"
+        className="absolute bottom-12 left-12 right-12 p-8 bg-white/10 text-white flex items-center justify-between border-t-4 border-neon-cyan"
       >
         <div className="flex items-center gap-6">
-          <div className="w-12 h-12 rounded-full bg-white/10 flex items-center justify-center">
+          <div className="w-12 h-12 rounded-full bg-white/5/10 flex items-center justify-center">
             <Sparkles className="w-6 h-6 text-neon-cyan" />
           </div>
           <div>
@@ -181,7 +181,7 @@ export const InteractivePortfolio: React.FC<InteractivePortfolioProps> = ({ data
             </p>
             <p className="text-2xl font-mono font-bold text-neon-cyan">94%</p>
           </div>
-          <div className="w-[1px] h-12 bg-white/10" />
+          <div className="w-[1px] h-12 bg-white/5/10" />
           <ShieldCheck className="w-8 h-8 opacity-40" />
         </div>
       </motion.div>
