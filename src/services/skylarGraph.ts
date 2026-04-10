@@ -5,12 +5,14 @@ import { z } from 'zod';
 import { BaseMessage, HumanMessage, AIMessage, SystemMessage } from '@langchain/core/messages';
 import { getGeminiApiKey } from './aiConfig';
 import { JourneyStageDefinition } from '../types/skylar';
+import { SkylarStageConfig } from '../types/skylar-config';
 import { skylar } from './skylarService';
+import { interpolatePrompt } from '../utils/interpolation';
 
 // Define the state for the graph
 export interface SkylarGraphState {
   messages: BaseMessage[];
-  stageConfig?: JourneyStageDefinition;
+  stageConfig?: JourneyStageDefinition | SkylarStageConfig;
   userId: string;
   executedActions: any[];
   token?: string;
@@ -210,9 +212,23 @@ async function agentNode(state: SkylarGraphState) {
     }
   }
 
-  const baseInstruction = state.stageConfig 
-    ? skylar.buildContextualPrompt({ displayName: 'User' }, state.stageConfig)
-    : skylar.getSystemPromptForPhase('dive-in', { displayName: 'User' });
+  let baseInstruction = '';
+  if (state.stageConfig) {
+    const template = state.stageConfig.systemPromptTemplate;
+      
+    const stageTitle = 'stageTitle' in state.stageConfig 
+      ? (state.stageConfig as SkylarStageConfig).stageTitle 
+      : (state.stageConfig as JourneyStageDefinition).title;
+      
+    const artifactName = state.stageConfig.requiredArtifacts?.[0];
+
+    baseInstruction = interpolatePrompt(template, {
+      user: { displayName: 'User' }, // In a real app, fetch from user profile
+      stage: { title: stageTitle, artifactName }
+    });
+  } else {
+    baseInstruction = skylar.getSystemPromptForPhase('dive-in', { displayName: 'User' });
+  }
     
   const systemInstruction = `${baseInstruction}${currentTruth}`;
 

@@ -4,6 +4,11 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 ### Added
+- **Track 038**: Phase 4 - The Admin Dashboard - Step 1 (Created `src/pages/admin/AgentOps.tsx` to allow editing of `SkylarGlobalConfig`).
+- **Track 037**: Phase 3 - Connecting the Home Page UI (Updated `SkylarIntro` component to use `SkylarConfigContext` for dynamic avatar and scrolling ticker text).
+- **Track 036**: Connecting the Wires (Created `src/utils/interpolation.ts` to replace `{{variable}}` tags in system prompts and updated `skylarGraph.ts` to sanitize prompts before chat sessions).
+- **Track 035**: Phase 2 - Global State Integration (Implemented `SkylarConfigContext` and `useSkylarConfig` hook, added real-time listener for `skylar_global`, and wrapped the application with `SkylarConfigProvider`).
+- **Track 034**: Database Infrastructure - Centralized Configuration System (Created `metadata` and `journey_stages` Firestore collections, updated `firebase-blueprint.json` and `firestore.rules`, and added `configService.ts` with in-memory caching).
 - **Track 033**: Home Page and User Dashboard Changes (Updated NavBar to show Dashboard Login/Vault/User Profile conditionally, added Dive-In section to Home Page, and updated Dive-In auth flow).
 - **Track 031**: Regression Tests & Admin Feedback (Added Playwright JSON reporting, `smoke` test suite, `System Tests` and `User Feedback` panels in the Admin Dashboard, and a global `FeedbackModal` in the NavBar).
 - **Track 030**: Fix Skylar Chat Error (Updated the deprecated `gemini-1.5-pro` model to `gemini-3.1-pro-preview` in `skylarService.ts` to resolve the "Failed to communicate with Skylar" error).

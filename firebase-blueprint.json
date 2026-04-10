@@ -77,6 +77,63 @@
       },
       "required": ["uid", "email", "tenantId"]
     },
+    "SkylarGlobal": {
+      "title": "SkylarGlobal",
+      "description": "Global metadata configuration for Skylar",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "enum": ["skylar_global"] },
+        "version": { "type": "string" },
+        "lastUpdated": { "type": "string", "format": "date-time" },
+        "avatar": {
+          "type": "object",
+          "properties": {
+            "url": { "type": "string" },
+            "scale": { "type": "number" }
+          },
+          "required": ["url", "scale"]
+        },
+        "homeBenefits": {
+          "type": "array",
+          "items": { "type": "string" }
+        }
+      },
+      "required": ["id", "version", "lastUpdated", "avatar", "homeBenefits"]
+    },
+    "JourneyStage": {
+      "title": "JourneyStage",
+      "description": "Configuration for a specific journey stage",
+      "type": "object",
+      "properties": {
+        "stageId": { "type": "string" },
+        "stageTitle": { "type": "string" },
+        "description": { "type": "string" },
+        "systemPromptTemplate": { "type": "string" },
+        "requiredArtifacts": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "allowedModalities": {
+          "type": "object",
+          "properties": {
+            "text": { "type": "boolean" },
+            "audio": { "type": "boolean" },
+            "image": { "type": "boolean" },
+            "video": { "type": "boolean" }
+          },
+          "required": ["text", "audio", "image", "video"]
+        },
+        "theme": {
+          "type": "object",
+          "properties": {
+            "primaryColor": { "type": "string" },
+            "layout": { "type": "string", "enum": ["chat", "split", "artifact"] }
+          },
+          "required": ["primaryColor", "layout"]
+        }
+      },
+      "required": ["stageId", "stageTitle", "description", "systemPromptTemplate", "requiredArtifacts", "allowedModalities"]
+    },
     "AgentConfig": {
       "title": "AgentConfig",
       "description": "Configuration for a Skylar journey stage",
@@ -446,6 +503,14 @@
     "/users/{uid}": {
       "schema": "User",
       "description": "User profiles"
+    },
+    "/metadata/{documentId}": {
+      "schema": "SkylarGlobal",
+      "description": "Global metadata configuration"
+    },
+    "/journey_stages/{stageId}": {
+      "schema": "JourneyStage",
+      "description": "Configuration for specific journey stages"
     },
     "/agent_configs/{stageId}": {
       "schema": { "$ref": "#/entities/AgentConfig" },

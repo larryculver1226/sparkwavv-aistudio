@@ -541,6 +541,36 @@ service cloud.firestore {
              (!('completedAt' in data) || (resource == null ? isRecent(data.completedAt) : data.completedAt == resource.data.completedAt));
     }
 
+    function isValidSkylarGlobal(data) {
+      let allowedFields = ['id', 'version', 'lastUpdated', 'avatar', 'homeBenefits'];
+      return hasRequiredFields(allowedFields) &&
+             hasOnlyAllowedFields(allowedFields) &&
+             data.id == 'skylar_global' &&
+             data.version is string && data.version.size() < 50 &&
+             (resource == null ? isRecent(data.lastUpdated) : data.lastUpdated == resource.data.lastUpdated || isRecent(data.lastUpdated)) &&
+             data.avatar is map &&
+             'url' in data.avatar && data.avatar.url is string &&
+             'scale' in data.avatar && (data.avatar.scale is number) &&
+             data.homeBenefits is list;
+    }
+
+    function isValidJourneyStage(data) {
+      let allowedFields = ['stageId', 'stageTitle', 'description', 'systemPromptTemplate', 'requiredArtifacts', 'allowedModalities', 'theme'];
+      return hasRequiredFields(['stageId', 'stageTitle', 'description', 'systemPromptTemplate', 'requiredArtifacts', 'allowedModalities']) &&
+             hasOnlyAllowedFields(allowedFields) &&
+             data.stageId is string && data.stageId.size() < 100 &&
+             data.stageTitle is string && data.stageTitle.size() < 200 &&
+             data.description is string && data.description.size() < 1000 &&
+             data.systemPromptTemplate is string && data.systemPromptTemplate.size() < 100000 &&
+             data.requiredArtifacts is list &&
+             data.allowedModalities is map &&
+             'text' in data.allowedModalities && data.allowedModalities.text is bool &&
+             'audio' in data.allowedModalities && data.allowedModalities.audio is bool &&
+             'image' in data.allowedModalities && data.allowedModalities.image is bool &&
+             'video' in data.allowedModalities && data.allowedModalities.video is bool &&
+             (!('theme' in data) || (data.theme is map && 'primaryColor' in data.theme && data.theme.primaryColor is string && 'layout' in data.theme && data.theme.layout in ['chat', 'split', 'artifact']));
+    }
+
     // ===============================================================
     // Rules
     // ===============================================================
@@ -580,6 +610,16 @@ service cloud.firestore {
                       (isOwner(uid) || isAdmin()) &&
                       unchanged('uid') && unchanged('email') && unchanged('tenantId') &&
                       (request.resource.data.role == resource.data.role || isAdmin());
+    }
+
+    match /metadata/{documentId} {
+      allow read: if isAuthenticated();
+      allow write: if isAdmin() && isValidSkylarGlobal(request.resource.data);
+    }
+
+    match /journey_stages/{stageId} {
+      allow read: if isAuthenticated();
+      allow write: if isAdmin() && isValidJourneyStage(request.resource.data);
     }
 
     match /dashboards/{userId} {

@@ -51,11 +51,21 @@
   - Implement `buildContextualPrompt(user, stageConfig, artifacts)` for dynamic context injection.
   - Centralize tool execution logic to be driven by the stage config.
 - **Firestore Collections**:
+  - `metadata`: Stores global configuration (e.g., `skylar_global`).
+  - `journey_stages`: Stores configuration for specific journey stages.
   - `user_activities`: Stores user activity events.
   - `dashboards`: Stores user dashboard state, including `phaseProgress`.
   - `wavvault_artifacts`: Stores distilled artifacts.
 - **Firebase Storage**:
   - `users/{userId}/profile.*`: Stores user profile images uploaded via the ProfilePage.
+- **`configService.ts`**:
+  - Fetches and caches `SkylarGlobalConfig` and `SkylarStageConfig` from Firestore.
+  - Subscribes to real-time updates for `skylar_global`.
+- **`SkylarConfigContext.tsx`**:
+  - Manages global configuration state and current journey stage metadata.
+  - Exposes `useSkylarConfig` hook for components to access `global`, `currentStage`, `isLoading`, and `refreshConfig`.
+- **`interpolation.ts`**:
+  - Replaces `{{variable}}` tags in system prompts with real user/session data (e.g., `{{user.displayName}}`, `{{stage.title}}`).
 
 ## Data Models
 - `Dashboard.phaseProgress`: Object containing percentage completion (0-100) for `diveIn`, `ignition`, `discovery`, `branding`, `outreach`.

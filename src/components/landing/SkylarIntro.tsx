@@ -1,10 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import { motion } from 'motion/react';
 import { X, Sparkles } from 'lucide-react';
-import { PERSONA_CONFIG } from '../../services/skylarService';
+import { useSkylarConfig } from '../../contexts/SkylarConfigContext';
 
 export const SkylarAvatar: React.FC = () => {
-  const skylarAvatar = PERSONA_CONFIG['discovery'].avatar;
+  const { global } = useSkylarConfig();
+  const skylarAvatar = global?.avatar?.url || 'https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?auto=format&fit=crop&q=80&w=800';
+  const scale = global?.avatar?.scale || 1;
 
   return (
     <motion.div
@@ -14,11 +16,12 @@ export const SkylarAvatar: React.FC = () => {
       transition={{ duration: 0.8 }}
       className="relative"
     >
-      <div className="w-32 h-32 md:w-40 md:h-40 rounded-full overflow-hidden border-2 border-neon-cyan/30 shadow-[0_0_30px_rgba(0,243,255,0.1)] group">
+      <div className="w-40 h-40 md:w-[200px] md:h-[200px] rounded-full overflow-hidden border-2 border-neon-cyan/30 shadow-[0_0_30px_rgba(0,243,255,0.1)] group">
         <img
           src={skylarAvatar}
           alt="Skylar"
           className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110"
+          style={{ transform: `scale(${scale})` }}
           referrerPolicy="no-referrer"
         />
         <div className="absolute inset-0 bg-gradient-to-t from-black/40 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
@@ -31,17 +34,15 @@ export const SkylarAvatar: React.FC = () => {
 };
 
 export const SkylarScrollingText: React.FC = () => {
+  const { global } = useSkylarConfig();
   const [text, setText] = useState('');
   const [isDeleting, setIsDeleting] = useState(false);
   const [loopNum, setLoopNum] = useState(0);
-  const [typingSpeed, setTypingSpeed] = useState(150);
+  const [typingSpeed, setTypingSpeed] = useState(50);
 
-  const messages = [
-    "I've analyzed 10,000 career paths. Yours is unique.",
-    "Let's extract your Career DNA and find the work that truly energizes you.",
-    "Stop settling for 'good enough'. Aim for 'indispensable'.",
-    'Your next chapter starts with a single spark.',
-  ];
+  const messages = global?.homeBenefits && global.homeBenefits.length > 0 
+    ? global.homeBenefits 
+    : ["Loading SPARKWavv Experience..."];
 
   useEffect(() => {
     const handleType = () => {
@@ -52,10 +53,10 @@ export const SkylarScrollingText: React.FC = () => {
         isDeleting ? fullText.substring(0, text.length - 1) : fullText.substring(0, text.length + 1)
       );
 
-      setTypingSpeed(isDeleting ? 30 : 150);
+      setTypingSpeed(isDeleting ? 20 : 50);
 
       if (!isDeleting && text === fullText) {
-        setTimeout(() => setIsDeleting(true), 2000);
+        setTimeout(() => setIsDeleting(true), 3000);
       } else if (isDeleting && text === '') {
         setIsDeleting(false);
         setLoopNum(loopNum + 1);
@@ -66,10 +67,25 @@ export const SkylarScrollingText: React.FC = () => {
     return () => clearTimeout(timer);
   }, [text, isDeleting, loopNum, typingSpeed, messages]);
 
+  const renderText = (currentText: string) => {
+    const colonIndex = currentText.indexOf(':');
+    if (colonIndex !== -1) {
+      const hook = currentText.substring(0, colonIndex + 1);
+      const rest = currentText.substring(colonIndex + 1);
+      return (
+        <>
+          <strong className="font-bold text-white not-italic">{hook}</strong>
+          {rest}
+        </>
+      );
+    }
+    return currentText;
+  };
+
   return (
     <div className="min-h-[60px] flex items-center justify-center">
       <p className="text-xl md:text-2xl text-white/80 font-display italic leading-relaxed max-w-2xl text-center">
-        {text}
+        {renderText(text)}
         <span className="inline-block w-0.5 h-6 bg-neon-cyan ml-1 animate-blink" />
       </p>
     </div>

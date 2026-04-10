@@ -56,6 +56,7 @@ import { auth, isFirebaseConfigured, db } from './lib/firebase';
 import { handleFirestoreError, OperationType } from './lib/firestore-errors';
 import { ROLES } from './constants';
 import { IdentityProvider, useIdentity } from './contexts/IdentityContext';
+import { SkylarConfigProvider } from './contexts/SkylarConfigContext';
 import { AccessDenied } from './components/AccessDenied';
 
 // Lazy load page components to improve initial load time
@@ -3338,7 +3339,7 @@ export default function App() {
   }
 
   return (
-    <>
+    <SkylarConfigProvider>
       <ScrollToTop />
 
       <Suspense
@@ -3442,6 +3443,6 @@ export default function App() {
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </Suspense>
-    </>
+    </SkylarConfigProvider>
   );
 }

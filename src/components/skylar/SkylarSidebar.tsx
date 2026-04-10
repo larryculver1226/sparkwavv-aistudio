@@ -682,7 +682,7 @@ export const SkylarSidebar: React.FC<SkylarSidebarProps> = ({ onLogin }) => {
       {!isOpen && (
         <button
           onClick={() => setIsOpen(true)}
-          className="fixed bottom-8 right-8 z-50 w-16 h-16 rounded-full bg-[#0a0a0a] border-2 border-neon-cyan/50 text-black flex items-center justify-center shadow-[0_0_20px_rgba(0,255,255,0.3)] hover:scale-110 transition-transform group overflow-hidden"
+          className="fixed bottom-8 right-8 z-50 w-20 h-20 rounded-full bg-[#0a0a0a] border-2 border-neon-cyan/50 text-black flex items-center justify-center shadow-[0_0_20px_rgba(0,255,255,0.3)] hover:scale-110 transition-transform group overflow-hidden"
         >
           <img
             src={PERSONA_CONFIG[persona].avatar}
@@ -710,7 +710,7 @@ export const SkylarSidebar: React.FC<SkylarSidebarProps> = ({ onLogin }) => {
                 <div className="flex items-center gap-3">
                   <div className="relative group">
                     <div
-                      className={`w-12 h-12 rounded-xl overflow-hidden border-2 ${isSpeaking ? 'border-neon-cyan shadow-[0_0_15px_rgba(0,255,255,0.3)]' : 'border-white/10'}`}
+                      className={`w-[60px] h-[60px] rounded-xl overflow-hidden border-2 ${isSpeaking ? 'border-neon-cyan shadow-[0_0_15px_rgba(0,255,255,0.3)]' : 'border-white/10'}`}
                     >
                       <img
                         src={PERSONA_CONFIG[persona].avatar}
@@ -873,7 +873,7 @@ export const SkylarSidebar: React.FC<SkylarSidebarProps> = ({ onLogin }) => {
                             className={`flex items-start gap-3 ${msg.role === 'user' ? 'flex-row-reverse' : 'flex-row'}`}
                           >
                             {msg.role === 'model' && (
-                              <div className="w-8 h-8 rounded-lg overflow-hidden border border-white/10 shrink-0 mt-1">
+                              <div className="w-10 h-10 rounded-lg overflow-hidden border border-white/10 shrink-0 mt-1">
                                 <img
                                   src={PERSONA_CONFIG[persona].avatar}
                                   alt="Skylar"

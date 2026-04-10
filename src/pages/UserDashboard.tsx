@@ -889,7 +889,7 @@ export const UserDashboard: React.FC<{ userId: string; isAdmin?: boolean }> = ({
               <Sparkles className="w-16 h-16 text-neon-cyan" />
             </div>
             <div className="relative z-10 flex flex-col items-center gap-4">
-              <div className="w-24 h-24 rounded-full bg-neon-cyan/20 border-2 border-neon-cyan/40 p-1">
+              <div className="w-[120px] h-[120px] rounded-full bg-neon-cyan/20 border-2 border-neon-cyan/40 p-1">
                 <div className="w-full h-full rounded-full overflow-hidden bg-black">
                   <img
                     src="https://picsum.photos/seed/skylar/200"

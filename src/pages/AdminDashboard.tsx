@@ -56,7 +56,7 @@ import { FirebaseSetup } from './FirebaseSetup';
 import { IdentityReconciliation } from './IdentityReconciliation';
 import { VertexDashboard } from '../components/admin/VertexDashboard';
 import { ValidationGateReview } from '../components/admin/ValidationGateReview';
-import { AgentOpsPanel } from '../components/admin/AgentOpsPanel';
+import { AgentOps } from './admin/AgentOps';
 import {
   JOURNEY_STAGES,
   TENANTS,
@@ -1452,7 +1452,7 @@ export const AdminDashboard: React.FC<{ onLogout: () => void }> = ({ onLogout })
             </div>
           ) : activeTab === 'agent-ops' ? (
             <div className="col-span-4">
-              <AgentOpsPanel />
+              <AgentOps />
             </div>
           ) : (
             <div className="col-span-4 glass-panel p-12 text-center border-white/5 bg-white/[0.02] rounded-3xl">

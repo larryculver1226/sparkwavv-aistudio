@@ -4,6 +4,7 @@ import * as mammoth from 'mammoth';
 import { KnowledgeGraph, WavvaultData, TargetOpportunity } from '../types/wavvault';
 import { JOURNEY_STAGES } from '../config/journeyStages';
 import { JourneyStageDefinition } from '../types/skylar';
+import { SkylarStageConfig } from '../types/skylar-config';
 import { auth } from '../lib/firebase';
 
 export const GATING_CRITERIA: Record<string, string[]> = {
@@ -681,7 +682,7 @@ class SkylarService {
     userId: string,
     message: string,
     history: any[] = [],
-    stageConfig?: JourneyStageDefinition,
+    stageConfig?: JourneyStageDefinition | SkylarStageConfig,
     token?: string,
     fileData?: { data: string; mimeType: string }
   ): Promise<any> {

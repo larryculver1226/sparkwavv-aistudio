@@ -32,7 +32,7 @@ export const SkylarSidePanel: React.FC<{ userId: string }> = ({ userId }) => {
       <div className="p-8 border-b border-white/10">
         <div className="flex items-center gap-4 mb-6">
           <div className="relative">
-            <div className="w-12 h-12 rounded-full bg-neon-cyan/20 border border-neon-cyan/40 flex items-center justify-center overflow-hidden">
+            <div className="w-[60px] h-[60px] rounded-full bg-neon-cyan/20 border border-neon-cyan/40 flex items-center justify-center overflow-hidden">
               <Brain className="w-6 h-6 text-neon-cyan" />
               <motion.div
                 animate={{ scale: [1, 1.2, 1], opacity: [0.3, 0.6, 0.3] }}
