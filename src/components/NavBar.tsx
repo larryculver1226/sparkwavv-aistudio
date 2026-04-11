@@ -74,6 +74,7 @@ const FeedbackModal: React.FC<{ isOpen: boolean; onClose: () => void }> = ({ isO
   const [issueType, setIssueType] = useState('Bug');
   const [description, setDescription] = useState('');
   const [stepsToReproduce, setStepsToReproduce] = useState('');
+  const [attachment, setAttachment] = useState<File | null>(null);
   const [loading, setLoading] = useState(false);
   const [success, setSuccess] = useState(false);
 
@@ -83,17 +84,28 @@ const FeedbackModal: React.FC<{ isOpen: boolean; onClose: () => void }> = ({ isO
     e.preventDefault();
     setLoading(true);
     try {
+      let attachmentUrl = null;
+      if (attachment) {
+        const { storageService } = await import('../services/storageService');
+        attachmentUrl = await storageService.uploadFeedbackAttachment(attachment);
+      }
+
       const idToken = await auth.currentUser?.getIdToken();
+      const headers: Record<string, string> = {
+        'Content-Type': 'application/json',
+      };
+      if (idToken) {
+        headers['Authorization'] = `Bearer ${idToken}`;
+      }
+
       const res = await fetch('/api/feedback', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${idToken}`,
-        },
+        headers,
         body: JSON.stringify({
           issueType,
           description,
           stepsToReproduce,
+          attachmentUrl,
           url: window.location.href,
           browserInfo: navigator.userAgent,
         }),
@@ -105,6 +117,7 @@ const FeedbackModal: React.FC<{ isOpen: boolean; onClose: () => void }> = ({ isO
         onClose();
         setDescription('');
         setStepsToReproduce('');
+        setAttachment(null);
       }, 2000);
     } catch (error) {
       console.error('Error submitting feedback:', error);
@@ -175,6 +188,15 @@ const FeedbackModal: React.FC<{ isOpen: boolean; onClose: () => void }> = ({ isO
                 />
               </div>
             )}
+
+            <div>
+              <label className="block text-xs font-bold text-white/60 uppercase tracking-widest mb-2">Attachment (Optional)</label>
+              <input
+                type="file"
+                onChange={(e) => setAttachment(e.target.files?.[0] || null)}
+                className="w-full bg-black/50 border border-white/10 rounded-xl p-3 text-white focus:border-neon-cyan focus:outline-none transition-colors file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-neon-cyan/10 file:text-neon-cyan hover:file:bg-neon-cyan/20"
+              />
+            </div>
 
             <button
               type="submit"

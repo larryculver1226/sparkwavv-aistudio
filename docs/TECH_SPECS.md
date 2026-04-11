@@ -61,11 +61,15 @@
 - **`configService.ts`**:
   - Fetches and caches `SkylarGlobalConfig` and `SkylarStageConfig` from Firestore.
   - Subscribes to real-time updates for `skylar_global`.
+  - Provides `updateGlobalConfig` to save changes to the global configuration.
+  - Provides `updateStageConfig` to save changes to specific stage configurations.
 - **`SkylarConfigContext.tsx`**:
   - Manages global configuration state and current journey stage metadata.
   - Exposes `useSkylarConfig` hook for components to access `global`, `currentStage`, `isLoading`, and `refreshConfig`.
 - **`interpolation.ts`**:
   - Replaces `{{variable}}` tags in system prompts with real user/session data (e.g., `{{user.displayName}}`, `{{stage.title}}`).
+- **`AgentOps.tsx`**:
+  - Admin panel component to edit `SkylarGlobalConfig` (e.g., avatar scale, scrolling benefits) and `SkylarStageConfig` (e.g., system prompts, required artifacts, modalities).
 
 ## Data Models
 - `Dashboard.phaseProgress`: Object containing percentage completion (0-100) for `diveIn`, `ignition`, `discovery`, `branding`, `outreach`.

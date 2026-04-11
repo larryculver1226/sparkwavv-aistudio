@@ -49,7 +49,9 @@ import * as Tooltip from '@radix-ui/react-tooltip';
 import { useIdentity } from '../contexts/IdentityContext';
 import { ROLES } from '../constants';
 
-type TabType = 'users' | 'cohorts' | 'programs' | 'content' | 'analytics';
+import { UserFeedbackPanel } from './AdminDashboard';
+
+type TabType = 'users' | 'cohorts' | 'programs' | 'content' | 'analytics' | 'feedback';
 
 const TENANTS = [
   { id: 'all', name: 'Global (All Tenants)' },
@@ -385,6 +387,7 @@ export const OperationsDashboard: React.FC<{ onLogout?: () => void }> = ({ onLog
             { id: 'cohorts', label: 'Cohorts', icon: GraduationCap },
             { id: 'programs', label: 'Programs', icon: Layers },
             { id: 'content', label: 'Moderation', icon: MessageSquare },
+            { id: 'feedback', label: 'Feedback', icon: MessageSquare },
             { id: 'analytics', label: 'Business Insights', icon: TrendingUp },
           ].map((tab) => (
             <button
@@ -404,7 +407,11 @@ export const OperationsDashboard: React.FC<{ onLogout?: () => void }> = ({ onLog
 
         {/* Content Area */}
         <div className="glass-panel rounded-[32px] border border-white/5 bg-white/[0.02] overflow-hidden backdrop-blur-xl">
-          <div className="p-8 border-b border-white/5 flex justify-between items-center bg-white/[0.01]">
+          {activeTab === 'feedback' ? (
+            <UserFeedbackPanel />
+          ) : (
+            <React.Fragment>
+              <div className="p-8 border-b border-white/5 flex justify-between items-center bg-white/[0.01]">
             <div className="flex items-center gap-4">
               <h2 className="text-xl font-display font-bold capitalize">{activeTab} Management</h2>
               <div className="px-3 py-1 rounded-full bg-white/5 border border-white/10 text-[10px] font-bold text-white/40 uppercase tracking-widest">
@@ -994,6 +1001,8 @@ export const OperationsDashboard: React.FC<{ onLogout?: () => void }> = ({ onLog
               </table>
             </div>
           )}
+          </React.Fragment>
+        )}
         </div>
         {/* Resource Modal */}
         {isModalOpen && (

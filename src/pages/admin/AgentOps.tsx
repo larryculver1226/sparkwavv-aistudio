@@ -10,10 +10,66 @@ export const AgentOps: React.FC = () => {
   const [editGlobal, setEditGlobal] = useState<SkylarGlobalConfig | null>(null);
   const [isSaving, setIsSaving] = useState(false);
 
+  // Stage Management State
+  const [stages, setStages] = useState<Record<string, SkylarStageConfig>>({});
+  const [selectedStageId, setSelectedStageId] = useState<string>('');
+  const [editStage, setEditStage] = useState<SkylarStageConfig | null>(null);
+  const [isStageSaving, setIsStageSaving] = useState(false);
+
   // Sync local state when global context loads
   useEffect(() => {
-    if (global) setEditGlobal(global);
+    if (global) {
+      setEditGlobal(global);
+    } else {
+      // Initialize with default if it doesn't exist in Firestore
+      setEditGlobal({
+        id: "skylar_global",
+        version: "1.0.0",
+        lastUpdated: new Date().toISOString(),
+        avatar: {
+          url: "/skylar-avatar.png",
+          scale: 1.0
+        },
+        homeBenefits: ["Welcome to SPARKWavv"]
+      });
+    }
   }, [global]);
+
+  const PREDEFINED_STAGES = [
+    { id: 'dive-in', title: 'Dive-In' },
+    { id: 'ignition', title: 'Ignition' },
+    { id: 'discovery', title: 'Discovery' },
+    { id: 'branding', title: 'Branding' },
+    { id: 'outreach', title: 'Outreach' }
+  ];
+
+  // Load stages on mount
+  useEffect(() => {
+    const loadStages = async () => {
+      try {
+        const fetchedStages = await configService.getJourneyStages();
+        setStages(fetchedStages);
+        
+        // Default to dive-in
+        setSelectedStageId('dive-in');
+        if (fetchedStages['dive-in']) {
+          setEditStage(fetchedStages['dive-in']);
+        } else {
+          setEditStage({
+            stageId: 'dive-in',
+            stageTitle: 'Dive-In',
+            description: '',
+            systemPromptTemplate: '',
+            requiredArtifacts: [],
+            allowedModalities: { text: true, audio: false, image: false, video: false }
+          });
+        }
+      } catch (error) {
+        console.error("Failed to load stages", error);
+      }
+    };
+    loadStages();
+  }, []);
 
   const handleGlobalSave = async () => {
     if (!editGlobal) return;
@@ -35,6 +91,50 @@ export const AgentOps: React.FC = () => {
     const newBenefits = [...editGlobal.homeBenefits];
     newBenefits[index] = value;
     setEditGlobal({ ...editGlobal, homeBenefits: newBenefits });
+  };
+
+  const handleStageSelect = (e: React.ChangeEvent<HTMLSelectElement>) => {
+    const id = e.target.value;
+    setSelectedStageId(id);
+    if (stages[id]) {
+      setEditStage(stages[id]);
+    } else {
+      const predefined = PREDEFINED_STAGES.find(s => s.id === id);
+      setEditStage({
+        stageId: id,
+        stageTitle: predefined ? predefined.title : id,
+        description: '',
+        systemPromptTemplate: '',
+        requiredArtifacts: [],
+        allowedModalities: { text: true, audio: false, image: false, video: false }
+      });
+    }
+  };
+
+  const handleStageSave = async () => {
+    if (!editStage || !selectedStageId) return;
+    setIsStageSaving(true);
+    try {
+      await configService.updateStageConfig(selectedStageId, editStage);
+      setStages(prev => ({ ...prev, [selectedStageId]: editStage }));
+      alert('Stage Settings saved successfully.');
+    } catch (error) {
+      console.error("Failed to save stage config", error);
+      alert('Error saving stage configuration.');
+    } finally {
+      setIsStageSaving(false);
+    }
+  };
+
+  const handleModalityToggle = (modality: keyof SkylarStageConfig['allowedModalities']) => {
+    if (!editStage) return;
+    setEditStage({
+      ...editStage,
+      allowedModalities: {
+        ...editStage.allowedModalities,
+        [modality]: !editStage.allowedModalities[modality]
+      }
+    });
   };
 
   if (!editGlobal) return <div className="p-8 text-white">Loading Agent Ops...</div>;
@@ -105,7 +205,109 @@ export const AgentOps: React.FC = () => {
         </button>
       </section>
       
-      {/* Note: Stage Settings to be built by AI Studio based on prompt below */}
+      {/* STAGE MANAGEMENT SECTION */}
+      <section className="bg-gray-900 p-6 rounded-lg border border-gray-800 space-y-6">
+        <h2 className="text-xl font-semibold border-b border-gray-700 pb-2">Stage Management</h2>
+        
+        {/* Stage Selector */}
+        <div className="space-y-2">
+          <label className="block text-sm font-medium text-gray-300">Select Stage</label>
+          <select 
+            value={selectedStageId} 
+            onChange={handleStageSelect}
+            className="w-full bg-gray-800 border border-gray-700 rounded px-3 py-2 text-sm focus:border-cyan-500 focus:outline-none text-white"
+          >
+            {PREDEFINED_STAGES.map(stage => (
+              <option key={stage.id} value={stage.id}>
+                {stage.title} ({stage.id}) {stages[stage.id] ? '' : ' - (Not Created)'}
+              </option>
+            ))}
+            {/* Add any custom stages that might exist in the DB but aren't predefined */}
+            {Object.keys(stages)
+              .filter(id => !PREDEFINED_STAGES.some(s => s.id === id))
+              .map(id => (
+                <option key={id} value={id}>
+                  {stages[id].stageTitle} ({id})
+                </option>
+              ))}
+          </select>
+        </div>
+
+        {editStage && (
+          <div className="space-y-4">
+            {/* Stage Title */}
+            <div className="space-y-2">
+              <label className="block text-sm font-medium text-gray-300">Stage Title</label>
+              <input 
+                type="text"
+                value={editStage.stageTitle}
+                onChange={(e) => setEditStage({ ...editStage, stageTitle: e.target.value })}
+                className="w-full bg-gray-800 border border-gray-700 rounded px-3 py-2 text-sm focus:border-cyan-500 focus:outline-none text-white"
+              />
+            </div>
+
+            {/* Description */}
+            <div className="space-y-2">
+              <label className="block text-sm font-medium text-gray-300">Description</label>
+              <textarea 
+                value={editStage.description}
+                onChange={(e) => setEditStage({ ...editStage, description: e.target.value })}
+                className="w-full bg-gray-800 border border-gray-700 rounded px-3 py-2 text-sm focus:border-cyan-500 focus:outline-none text-white h-24"
+              />
+            </div>
+
+            {/* System Prompt Template */}
+            <div className="space-y-2">
+              <label className="block text-sm font-medium text-gray-300">System Prompt Template</label>
+              <textarea 
+                value={editStage.systemPromptTemplate}
+                onChange={(e) => setEditStage({ ...editStage, systemPromptTemplate: e.target.value })}
+                className="w-full bg-gray-800 border border-gray-700 rounded px-3 py-2 text-sm focus:border-cyan-500 focus:outline-none text-white font-mono h-64"
+              />
+            </div>
+
+            {/* Required Artifacts */}
+            <div className="space-y-2">
+              <label className="block text-sm font-medium text-gray-300">Required Artifacts (comma-separated)</label>
+              <input 
+                type="text"
+                value={editStage.requiredArtifacts.join(', ')}
+                onChange={(e) => setEditStage({ 
+                  ...editStage, 
+                  requiredArtifacts: e.target.value.split(',').map(s => s.trim()).filter(Boolean) 
+                })}
+                className="w-full bg-gray-800 border border-gray-700 rounded px-3 py-2 text-sm focus:border-cyan-500 focus:outline-none text-white"
+              />
+            </div>
+
+            {/* Modality Toggles */}
+            <div className="space-y-2">
+              <label className="block text-sm font-medium text-gray-300">Allowed Modalities</label>
+              <div className="flex gap-4">
+                {(['text', 'audio', 'image', 'video'] as const).map(modality => (
+                  <label key={modality} className="flex items-center gap-2 cursor-pointer">
+                    <input 
+                      type="checkbox"
+                      checked={editStage.allowedModalities[modality]}
+                      onChange={() => handleModalityToggle(modality)}
+                      className="accent-cyan-500 w-4 h-4"
+                    />
+                    <span className="text-sm text-gray-300 capitalize">{modality}</span>
+                  </label>
+                ))}
+              </div>
+            </div>
+
+            <button 
+              onClick={handleStageSave}
+              disabled={isStageSaving}
+              className="bg-cyan-600 hover:bg-cyan-500 text-white font-bold py-2 px-6 rounded transition disabled:opacity-50 mt-4"
+            >
+              {isStageSaving ? 'Saving...' : 'Save Stage Settings'}
+            </button>
+          </div>
+        )}
+      </section>
     </div>
   );
 };

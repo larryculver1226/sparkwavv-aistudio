@@ -711,7 +711,7 @@ async function startServer() {
 
   const verifyToken = async (req: express.Request) => {
     const idToken = req.headers.authorization?.split('Bearer ')[1];
-    if (!idToken) return null;
+    if (!idToken || idToken === 'undefined') return null;
 
     try {
       // Try Admin Project First
@@ -2562,19 +2562,29 @@ async function startServer() {
     });
 
     // User Feedback Submission
-    app.post("/api/feedback", requireRole([ROLES.USER, ROLES.ADMIN, ROLES.OPERATOR, ROLES.MENTOR, ROLES.AGENT]), async (req, res) => {
+    app.post("/api/feedback", async (req, res) => {
       try {
-        const { issueType, description, stepsToReproduce, url, browserInfo } = req.body;
-        const authenticatedUser = (req as any).user;
+        const { issueType, description, stepsToReproduce, attachmentUrl, url, browserInfo } = req.body;
+        
+        let userId = 'anonymous';
+        let userEmail = 'anonymous';
+        
+        const decodedToken = await verifyToken(req);
+        if (decodedToken) {
+          userId = decodedToken.uid;
+          userEmail = decodedToken.email || 'anonymous';
+        }
+
         const db = getFirestoreDb();
         if (!db) throw new Error("Firestore not initialized");
 
         const feedbackDoc = {
-          userId: authenticatedUser.uid,
-          userEmail: authenticatedUser.email,
+          userId,
+          userEmail,
           issueType,
           description,
           stepsToReproduce,
+          attachmentUrl: attachmentUrl || null,
           url,
           browserInfo,
           status: 'Open',
@@ -2605,6 +2615,27 @@ async function startServer() {
         res.json({ feedback });
       } catch (error: any) {
         console.error("Error fetching feedback:", error);
+        res.status(500).json({ error: error.message });
+      }
+    });
+
+    // Admin Feedback Update
+    app.put("/api/admin/feedback/:id", requireRole([ROLES.SUPER_ADMIN, ROLES.ADMIN, ROLES.OPERATOR], 'admin'), async (req, res) => {
+      try {
+        const { id } = req.params;
+        const { status, adminNotes } = req.body;
+        const db = getFirestoreDb();
+        if (!db) throw new Error("Firestore not initialized");
+
+        await db.collection('feedback_issues').doc(id).update({
+          status,
+          adminNotes,
+          updatedAt: admin.firestore.FieldValue.serverTimestamp()
+        });
+
+        res.json({ success: true });
+      } catch (error: any) {
+        console.error("Error updating feedback:", error);
         res.status(500).json({ error: error.message });
       }
     });

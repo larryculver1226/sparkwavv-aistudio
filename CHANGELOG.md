@@ -4,6 +4,11 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 ### Added
+- **Track 043**: Update to Feedback Modal with Admin & Ops Logging (Added file attachment support to feedback submission, added admin feedback modal for viewing/updating, and added feedback tab to Operations Dashboard).
+- **Track 042**: Bug Fix - Feedback Submission (Fixed an issue where unauthenticated users could not submit feedback by updating `NavBar.tsx` and `server.ts`).
+- **Track 041**: Bug Fix - Firestore Permissions for Journey Stages (Updated `firestore.rules` to allow public read access to the `journey_stages` collection).
+- **Track 040**: Bug Fix - Firestore Permissions (Updated `firestore.rules` to allow public read access to the `metadata` collection).
+- **Track 039**: Phase 4 - Admin Dashboard - Stage Management (Step 2) (Added Stage Management section to `AgentOps.tsx` and `updateStageConfig` to `configService.ts`).
 - **Track 038**: Phase 4 - The Admin Dashboard - Step 1 (Created `src/pages/admin/AgentOps.tsx` to allow editing of `SkylarGlobalConfig`).
 - **Track 037**: Phase 3 - Connecting the Home Page UI (Updated `SkylarIntro` component to use `SkylarConfigContext` for dynamic avatar and scrolling ticker text).
 - **Track 036**: Connecting the Wires (Created `src/utils/interpolation.ts` to replace `{{variable}}` tags in system prompts and updated `skylarGraph.ts` to sanitize prompts before chat sessions).

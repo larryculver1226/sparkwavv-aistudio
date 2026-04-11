@@ -3299,29 +3299,60 @@ const SystemTestsPanel: React.FC = () => {
   );
 };
 
-const UserFeedbackPanel: React.FC = () => {
+export const UserFeedbackPanel: React.FC = () => {
   const [feedback, setFeedback] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [selectedFeedback, setSelectedFeedback] = useState<any | null>(null);
+  const [isModalOpen, setIsModalOpen] = useState(false);
+
+  const fetchFeedback = async () => {
+    try {
+      const idToken = await auth.currentUser?.getIdToken();
+      const res = await fetch('/api/admin/feedback', {
+        headers: { Authorization: `Bearer ${idToken}` },
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setFeedback(data.feedback || []);
+      }
+    } catch (error) {
+      console.error('Failed to fetch feedback:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   useEffect(() => {
-    const fetchFeedback = async () => {
-      try {
-        const idToken = await auth.currentUser?.getIdToken();
-        const res = await fetch('/api/admin/feedback', {
-          headers: { Authorization: `Bearer ${idToken}` },
-        });
-        if (res.ok) {
-          const data = await res.json();
-          setFeedback(data.feedback || []);
-        }
-      } catch (error) {
-        console.error('Failed to fetch feedback:', error);
-      } finally {
-        setLoading(false);
-      }
-    };
     fetchFeedback();
   }, []);
+
+  const handleRowClick = (item: any) => {
+    setSelectedFeedback(item);
+    setIsModalOpen(true);
+  };
+
+  const handleUpdate = async (id: string, status: string, adminNotes: string) => {
+    try {
+      const idToken = await auth.currentUser?.getIdToken();
+      const res = await fetch(`/api/admin/feedback/${id}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${idToken}`,
+        },
+        body: JSON.stringify({ status, adminNotes }),
+      });
+      if (res.ok) {
+        setIsModalOpen(false);
+        fetchFeedback();
+      } else {
+        alert('Failed to update feedback');
+      }
+    } catch (error) {
+      console.error('Error updating feedback:', error);
+      alert('Error updating feedback');
+    }
+  };
 
   return (
     <div className="glass-panel rounded-3xl border-white/5 bg-white/[0.02] overflow-hidden">
@@ -3346,7 +3377,7 @@ const UserFeedbackPanel: React.FC = () => {
               <tr><td colSpan={5} className="px-6 py-4 text-center text-white/40">No feedback found.</td></tr>
             ) : (
               feedback.map((item) => (
-                <tr key={item.id} className="hover:bg-white/[0.02] transition-colors">
+                <tr key={item.id} onClick={() => handleRowClick(item)} className="hover:bg-white/[0.02] transition-colors cursor-pointer">
                   <td className="px-6 py-4 text-xs text-white/60">
                     {item.createdAt?._seconds ? new Date(item.createdAt._seconds * 1000).toLocaleString() : 'N/A'}
                   </td>
@@ -3360,6 +3391,106 @@ const UserFeedbackPanel: React.FC = () => {
           </tbody>
         </table>
       </div>
+
+      <AnimatePresence>
+        {isModalOpen && selectedFeedback && (
+          <AdminFeedbackModal
+            feedback={selectedFeedback}
+            onClose={() => setIsModalOpen(false)}
+            onSave={handleUpdate}
+          />
+        )}
+      </AnimatePresence>
+    </div>
+  );
+};
+
+const AdminFeedbackModal: React.FC<{ feedback: any; onClose: () => void; onSave: (id: string, status: string, notes: string) => void }> = ({ feedback, onClose, onSave }) => {
+  const [status, setStatus] = useState(feedback.status || 'Open');
+  const [adminNotes, setAdminNotes] = useState(feedback.adminNotes || '');
+
+  return (
+    <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
+      <motion.div
+        initial={{ opacity: 0, scale: 0.95 }}
+        animate={{ opacity: 1, scale: 1 }}
+        exit={{ opacity: 0, scale: 0.95 }}
+        className="w-full max-w-2xl bg-dark-surface border border-white/10 rounded-3xl p-8 relative max-h-[90vh] overflow-y-auto"
+      >
+        <button onClick={onClose} className="absolute top-6 right-6 text-white/40 hover:text-white">
+          <X className="w-6 h-6" />
+        </button>
+        
+        <h2 className="text-2xl font-display font-bold mb-6">Feedback Details</h2>
+        
+        <div className="space-y-4 mb-8">
+          <div>
+            <label className="block text-xs font-bold text-white/40 uppercase tracking-widest mb-1">User</label>
+            <p className="text-white">{feedback.userEmail} ({feedback.userId})</p>
+          </div>
+          <div>
+            <label className="block text-xs font-bold text-white/40 uppercase tracking-widest mb-1">Type</label>
+            <p className="text-neon-cyan font-bold">{feedback.issueType}</p>
+          </div>
+          <div>
+            <label className="block text-xs font-bold text-white/40 uppercase tracking-widest mb-1">Description</label>
+            <p className="text-white/80 whitespace-pre-wrap">{feedback.description}</p>
+          </div>
+          {feedback.stepsToReproduce && (
+            <div>
+              <label className="block text-xs font-bold text-white/40 uppercase tracking-widest mb-1">Steps to Reproduce</label>
+              <p className="text-white/80 whitespace-pre-wrap">{feedback.stepsToReproduce}</p>
+            </div>
+          )}
+          {feedback.attachmentUrl && (
+            <div>
+              <label className="block text-xs font-bold text-white/40 uppercase tracking-widest mb-1">Attachment</label>
+              <a href={feedback.attachmentUrl} target="_blank" rel="noopener noreferrer" className="text-neon-cyan hover:underline">
+                View Attachment
+              </a>
+            </div>
+          )}
+          <div>
+            <label className="block text-xs font-bold text-white/40 uppercase tracking-widest mb-1">URL / Browser</label>
+            <p className="text-white/60 text-xs">{feedback.url}</p>
+            <p className="text-white/60 text-xs mt-1">{feedback.browserInfo}</p>
+          </div>
+        </div>
+
+        <div className="space-y-4 border-t border-white/10 pt-6">
+          <div>
+            <label className="block text-xs font-bold text-white/60 uppercase tracking-widest mb-2">Status</label>
+            <select
+              value={status}
+              onChange={(e) => setStatus(e.target.value)}
+              className="w-full bg-black/50 border border-white/10 rounded-xl p-3 text-white focus:border-neon-cyan focus:outline-none transition-colors"
+            >
+              <option value="Open">Open</option>
+              <option value="In Progress">In Progress</option>
+              <option value="Resolved">Resolved</option>
+              <option value="Closed">Closed</option>
+            </select>
+          </div>
+          
+          <div>
+            <label className="block text-xs font-bold text-white/60 uppercase tracking-widest mb-2">Admin Notes</label>
+            <textarea
+              value={adminNotes}
+              onChange={(e) => setAdminNotes(e.target.value)}
+              rows={4}
+              className="w-full bg-black/50 border border-white/10 rounded-xl p-3 text-white focus:border-neon-cyan focus:outline-none transition-colors"
+              placeholder="Internal notes..."
+            />
+          </div>
+
+          <button
+            onClick={() => onSave(feedback.id, status, adminNotes)}
+            className="w-full py-4 rounded-xl bg-neon-cyan text-black font-bold hover:bg-white transition-all mt-4"
+          >
+            Save Changes
+          </button>
+        </div>
+      </motion.div>
     </div>
   );
 };

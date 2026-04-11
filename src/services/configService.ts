@@ -131,6 +131,25 @@ export const configService = {
   },
 
   /**
+   * Updates a specific journey stage configuration in Firestore.
+   */
+  async updateStageConfig(stageId: string, config: SkylarStageConfig): Promise<void> {
+    try {
+      const docRef = doc(db, 'journey_stages', stageId);
+      await setDoc(docRef, config, { merge: true });
+      
+      // Update cache
+      if (!journeyStagesCache) {
+        journeyStagesCache = {};
+      }
+      journeyStagesCache[stageId] = config;
+    } catch (error) {
+      handleFirestoreError(error, OperationType.UPDATE, `journey_stages/${stageId}`);
+      throw error;
+    }
+  },
+
+  /**
    * Clears the in-memory cache.
    */
   clearCache() {
