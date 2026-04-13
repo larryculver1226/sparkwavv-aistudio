@@ -26,6 +26,7 @@ import { motion, AnimatePresence } from 'motion/react';
 import clsx from 'clsx';
 import { skylar, ChatMessage, SkylarPersona, PERSONA_CONFIG } from '../../services/skylarService';
 import { useIdentity } from '../../contexts/IdentityContext';
+import { useSkylarConfig } from '../../contexts/SkylarConfigContext';
 import { useLocation } from 'react-router-dom';
 import { jsPDF } from 'jspdf';
 import { Document, Packer, Paragraph, TextRun } from 'docx';
@@ -69,6 +70,7 @@ export const SkylarSidebar: React.FC<SkylarSidebarProps> = ({ onLogin }) => {
     { id: number; message: string; type: 'success' | 'info' | 'warning' }[]
   >([]);
   const { user, profile } = useIdentity();
+  const { global } = useSkylarConfig();
   const location = useLocation();
   const scrollRef = useRef<HTMLDivElement>(null);
   const audioRef = useRef<HTMLAudioElement>(null);
@@ -645,6 +647,14 @@ export const SkylarSidebar: React.FC<SkylarSidebarProps> = ({ onLogin }) => {
     }
   };
 
+  const getSkylarAvatar = () => {
+    return global?.avatar?.url || PERSONA_CONFIG[persona].avatar;
+  };
+
+  const getSkylarScale = () => {
+    return global?.avatar?.scale || 1;
+  };
+
   return (
     <>
       {/* Toast Notifications */}
@@ -685,9 +695,10 @@ export const SkylarSidebar: React.FC<SkylarSidebarProps> = ({ onLogin }) => {
           className="fixed bottom-8 right-8 z-50 w-20 h-20 rounded-full bg-[#0a0a0a] border-2 border-neon-cyan/50 text-black flex items-center justify-center shadow-[0_0_20px_rgba(0,255,255,0.3)] hover:scale-110 transition-transform group overflow-hidden"
         >
           <img
-            src={PERSONA_CONFIG[persona].avatar}
+            src={getSkylarAvatar()}
             alt="Skylar"
             className="w-full h-full object-cover object-[center_20%]"
+            style={{ transform: `scale(${getSkylarScale()})` }}
             referrerPolicy="no-referrer"
           />
           <div className="absolute inset-0 bg-gradient-to-tr from-transparent via-white/10 to-transparent -translate-x-full animate-shimmer pointer-events-none" />
@@ -713,9 +724,10 @@ export const SkylarSidebar: React.FC<SkylarSidebarProps> = ({ onLogin }) => {
                       className={`w-[60px] h-[60px] rounded-xl overflow-hidden border-2 ${isSpeaking ? 'border-neon-cyan shadow-[0_0_15px_rgba(0,255,255,0.3)]' : 'border-white/10'}`}
                     >
                       <img
-                        src={PERSONA_CONFIG[persona].avatar}
+                        src={getSkylarAvatar()}
                         alt={PERSONA_CONFIG[persona].name}
                         className="w-full h-full object-cover object-[center_20%]"
+                        style={{ transform: `scale(${getSkylarScale()})` }}
                         referrerPolicy="no-referrer"
                       />
                       {/* AI Shimmer Overlay */}
@@ -803,8 +815,14 @@ export const SkylarSidebar: React.FC<SkylarSidebarProps> = ({ onLogin }) => {
                   >
                     {messages.length === 0 && (
                       <div className="text-center py-12 space-y-4">
-                        <div className="w-16 h-16 rounded-full bg-neon-cyan/10 flex items-center justify-center mx-auto">
-                          <Sparkles className="w-8 h-8 text-neon-cyan" />
+                        <div className="w-16 h-16 rounded-full bg-neon-cyan/10 flex items-center justify-center mx-auto overflow-hidden border border-neon-cyan/20">
+                          <img
+                            src={getSkylarAvatar()}
+                            alt="Skylar"
+                            className="w-full h-full object-cover"
+                            style={{ transform: `scale(${getSkylarScale()})` }}
+                            referrerPolicy="no-referrer"
+                          />
                         </div>
                         <p className="text-xs text-white/40 italic px-8">
                           "Hello! I'm Skylar, your AI Career Assistant. I'm currently in{' '}
@@ -875,9 +893,10 @@ export const SkylarSidebar: React.FC<SkylarSidebarProps> = ({ onLogin }) => {
                             {msg.role === 'model' && (
                               <div className="w-10 h-10 rounded-lg overflow-hidden border border-white/10 shrink-0 mt-1">
                                 <img
-                                  src={PERSONA_CONFIG[persona].avatar}
+                                  src={getSkylarAvatar()}
                                   alt="Skylar"
                                   className="w-full h-full object-cover object-[center_20%]"
+                                  style={{ transform: `scale(${getSkylarScale()})` }}
                                   referrerPolicy="no-referrer"
                                 />
                               </div>

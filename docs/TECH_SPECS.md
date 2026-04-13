@@ -68,8 +68,11 @@
   - Exposes `useSkylarConfig` hook for components to access `global`, `currentStage`, `isLoading`, and `refreshConfig`.
 - **`interpolation.ts`**:
   - Replaces `{{variable}}` tags in system prompts with real user/session data (e.g., `{{user.displayName}}`, `{{stage.title}}`).
+- **`SkylarConfigPanel.tsx`**:
+  - Admin panel component to edit `SkylarGlobalConfig` (e.g., avatar scale, scrolling benefits).
+  - Includes AI-powered "Regenerate" feature for home page benefits using Gemini.
 - **`AgentOps.tsx`**:
-  - Admin panel component to edit `SkylarGlobalConfig` (e.g., avatar scale, scrolling benefits) and `SkylarStageConfig` (e.g., system prompts, required artifacts, modalities).
+  - Admin panel component to edit `SkylarStageConfig` (e.g., system prompts, required artifacts, modalities).
 
 ## Data Models
 - `Dashboard.phaseProgress`: Object containing percentage completion (0-100) for `diveIn`, `ignition`, `discovery`, `branding`, `outreach`.

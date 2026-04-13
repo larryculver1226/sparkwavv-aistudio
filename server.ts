@@ -2591,7 +2591,7 @@ async function startServer() {
           createdAt: admin.firestore.FieldValue.serverTimestamp()
         };
 
-        const docRef = await db.collection('feedback_issues').add(feedbackDoc);
+        const docRef = await withTimeout(db.collection('feedback_issues').add(feedbackDoc), 10000) as any;
         
         // Optional: Jira integration could be triggered here via a webhook or direct API call
         // if (process.env.JIRA_API_KEY) { ... }

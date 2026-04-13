@@ -4,6 +4,13 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 ### Added
+- **Track 050**: Skylar Avatar and Text Sync (Changed default Skylar avatar to a male professional, synchronized chat avatars with global config, and fixed home page scrolling text reactivity).
+- **Track 049**: Dynamic Skylar Scrolling Text (Upgraded the home page scrolling text to be dynamic and editable from the Admin Dashboard. Added a new "Skylar Config" tab with AI-powered benefit regeneration).
+- **Track 048**: Fix Feedback Attachment Upload (Bypassed missing Firebase Storage bucket by converting feedback attachments to base64 strings with an 800KB size limit).
+- **Track 047**: Fix Lint Error (Fixed a TypeScript error in `server.ts` related to the `withTimeout` wrapper on Firestore document creation).
+- **Track 046**: Feedback Modal Fixes (Fixed infinite spinning on submit by replacing `alert()` with inline UI errors, and adding timeouts to Firebase Storage uploads and Firestore writes).
+- **Track 045**: Feedback Modal Fixes (Fixed z-index and pointer-events issues that caused the Feedback and User Profile modals to appear underneath the navigation bar and be unclickable).
+- **Track 044**: Feedback Modal Fixes (Made the Feedback modal draggable and scrollable to ensure all inputs and buttons are accessible).
 - **Track 043**: Update to Feedback Modal with Admin & Ops Logging (Added file attachment support to feedback submission, added admin feedback modal for viewing/updating, and added feedback tab to Operations Dashboard).
 - **Track 042**: Bug Fix - Feedback Submission (Fixed an issue where unauthenticated users could not submit feedback by updating `NavBar.tsx` and `server.ts`).
 - **Track 041**: Bug Fix - Firestore Permissions for Journey Stages (Updated `firestore.rules` to allow public read access to the `journey_stages` collection).

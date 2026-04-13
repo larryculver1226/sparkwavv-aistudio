@@ -15,7 +15,7 @@ import {
   ShieldCheck,
   User
 } from 'lucide-react';
-import { motion, AnimatePresence } from 'motion/react';
+import { motion, AnimatePresence, useDragControls } from 'motion/react';
 import { useIdentity } from '../contexts/IdentityContext';
 import { auth } from '../lib/firebase';
 
@@ -29,7 +29,7 @@ const UserProfileModal: React.FC<{ isOpen: boolean; onClose: () => void; onNavig
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
+    <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
       <motion.div
         initial={{ opacity: 0, scale: 0.95 }}
         animate={{ opacity: 1, scale: 1 }}
@@ -77,12 +77,15 @@ const FeedbackModal: React.FC<{ isOpen: boolean; onClose: () => void }> = ({ isO
   const [attachment, setAttachment] = useState<File | null>(null);
   const [loading, setLoading] = useState(false);
   const [success, setSuccess] = useState(false);
+  const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const dragControls = useDragControls();
 
   if (!isOpen) return null;
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
+    setErrorMsg(null);
     try {
       let attachmentUrl = null;
       if (attachment) {
@@ -119,94 +122,113 @@ const FeedbackModal: React.FC<{ isOpen: boolean; onClose: () => void }> = ({ isO
         setStepsToReproduce('');
         setAttachment(null);
       }, 2000);
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error submitting feedback:', error);
-      alert('Failed to submit feedback. Please try again.');
+      setErrorMsg(error.message || 'Failed to submit feedback. Please try again.');
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
+    <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
       <motion.div
+        drag
+        dragControls={dragControls}
+        dragListener={false}
+        dragMomentum={false}
         initial={{ opacity: 0, scale: 0.95 }}
         animate={{ opacity: 1, scale: 1 }}
         exit={{ opacity: 0, scale: 0.95 }}
-        className="w-full max-w-lg bg-dark-surface border border-white/10 rounded-3xl p-8 relative"
+        className="w-full max-w-lg bg-dark-surface border border-white/10 rounded-3xl relative max-h-[90vh] flex flex-col overflow-hidden"
       >
-        <button onClick={onClose} className="absolute top-6 right-6 text-white/40 hover:text-white">
-          <X className="w-6 h-6" />
+        {/* Drag Handle */}
+        <div 
+          className="absolute top-0 left-0 right-0 h-12 cursor-move flex items-center justify-center z-10 bg-white/[0.02] border-b border-white/5"
+          onPointerDown={(e) => dragControls.start(e)}
+        >
+          <div className="w-12 h-1.5 bg-white/20 rounded-full" />
+        </div>
+        
+        <button onClick={onClose} className="absolute top-3 right-4 text-white/40 hover:text-white z-20 p-2">
+          <X className="w-5 h-5" />
         </button>
         
-        <h2 className="text-2xl font-display font-bold mb-6">Report an Issue</h2>
-        
-        {success ? (
-          <div className="text-center py-8">
-            <div className="w-16 h-16 rounded-full bg-neon-lime/20 text-neon-lime flex items-center justify-center mx-auto mb-4">
-              <ShieldCheck className="w-8 h-8" />
+        <div className="p-8 pt-14 overflow-y-auto custom-scrollbar flex-1">
+          <h2 className="text-2xl font-display font-bold mb-6">Report an Issue</h2>
+          
+          {success ? (
+            <div className="text-center py-8">
+              <div className="w-16 h-16 rounded-full bg-neon-lime/20 text-neon-lime flex items-center justify-center mx-auto mb-4">
+                <ShieldCheck className="w-8 h-8" />
+              </div>
+              <p className="text-xl font-bold text-neon-lime">Feedback Submitted!</p>
+              <p className="text-white/60 mt-2">Thank you for helping us improve Sparkwavv.</p>
             </div>
-            <p className="text-xl font-bold text-neon-lime">Feedback Submitted!</p>
-            <p className="text-white/60 mt-2">Thank you for helping us improve Sparkwavv.</p>
-          </div>
-        ) : (
-          <form onSubmit={handleSubmit} className="space-y-4">
-            <div>
-              <label className="block text-xs font-bold text-white/60 uppercase tracking-widest mb-2">Issue Type</label>
-              <select
-                value={issueType}
-                onChange={(e) => setIssueType(e.target.value)}
-                className="w-full bg-black/50 border border-white/10 rounded-xl p-3 text-white focus:border-neon-cyan focus:outline-none transition-colors"
-              >
-                <option value="Bug">Bug Report</option>
-                <option value="Feature Request">Feature Request</option>
-                <option value="General Feedback">General Feedback</option>
-              </select>
-            </div>
-            
-            <div>
-              <label className="block text-xs font-bold text-white/60 uppercase tracking-widest mb-2">Description</label>
-              <textarea
-                required
-                value={description}
-                onChange={(e) => setDescription(e.target.value)}
-                rows={4}
-                className="w-full bg-black/50 border border-white/10 rounded-xl p-3 text-white focus:border-neon-cyan focus:outline-none transition-colors"
-                placeholder="Please describe the issue or feedback..."
-              />
-            </div>
-
-            {issueType === 'Bug' && (
+          ) : (
+            <form onSubmit={handleSubmit} className="space-y-4">
+              {errorMsg && (
+                <div className="p-4 rounded-xl bg-red-500/10 border border-red-500/20 text-red-400 text-sm">
+                  {errorMsg}
+                </div>
+              )}
               <div>
-                <label className="block text-xs font-bold text-white/60 uppercase tracking-widest mb-2">Steps to Reproduce (Optional)</label>
-                <textarea
-                  value={stepsToReproduce}
-                  onChange={(e) => setStepsToReproduce(e.target.value)}
-                  rows={3}
+                <label className="block text-xs font-bold text-white/60 uppercase tracking-widest mb-2">Issue Type</label>
+                <select
+                  value={issueType}
+                  onChange={(e) => setIssueType(e.target.value)}
                   className="w-full bg-black/50 border border-white/10 rounded-xl p-3 text-white focus:border-neon-cyan focus:outline-none transition-colors"
-                  placeholder="1. Go to... 2. Click on..."
+                >
+                  <option value="Bug">Bug Report</option>
+                  <option value="Feature Request">Feature Request</option>
+                  <option value="General Feedback">General Feedback</option>
+                </select>
+              </div>
+              
+              <div>
+                <label className="block text-xs font-bold text-white/60 uppercase tracking-widest mb-2">Description</label>
+                <textarea
+                  required
+                  value={description}
+                  onChange={(e) => setDescription(e.target.value)}
+                  rows={4}
+                  className="w-full bg-black/50 border border-white/10 rounded-xl p-3 text-white focus:border-neon-cyan focus:outline-none transition-colors"
+                  placeholder="Please describe the issue or feedback..."
                 />
               </div>
-            )}
 
-            <div>
-              <label className="block text-xs font-bold text-white/60 uppercase tracking-widest mb-2">Attachment (Optional)</label>
-              <input
-                type="file"
-                onChange={(e) => setAttachment(e.target.files?.[0] || null)}
-                className="w-full bg-black/50 border border-white/10 rounded-xl p-3 text-white focus:border-neon-cyan focus:outline-none transition-colors file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-neon-cyan/10 file:text-neon-cyan hover:file:bg-neon-cyan/20"
-              />
-            </div>
+              {issueType === 'Bug' && (
+                <div>
+                  <label className="block text-xs font-bold text-white/60 uppercase tracking-widest mb-2">Steps to Reproduce (Optional)</label>
+                  <textarea
+                    value={stepsToReproduce}
+                    onChange={(e) => setStepsToReproduce(e.target.value)}
+                    rows={3}
+                    className="w-full bg-black/50 border border-white/10 rounded-xl p-3 text-white focus:border-neon-cyan focus:outline-none transition-colors"
+                    placeholder="1. Go to... 2. Click on..."
+                  />
+                </div>
+              )}
 
-            <button
-              type="submit"
-              disabled={loading}
-              className="w-full py-4 rounded-xl bg-neon-cyan text-black font-bold hover:bg-white transition-all disabled:opacity-50 mt-4"
-            >
-              {loading ? 'Submitting...' : 'Submit Feedback'}
-            </button>
-          </form>
-        )}
+              <div>
+                <label className="block text-xs font-bold text-white/60 uppercase tracking-widest mb-2">Attachment (Optional)</label>
+                <input
+                  type="file"
+                  onChange={(e) => setAttachment(e.target.files?.[0] || null)}
+                  className="w-full bg-black/50 border border-white/10 rounded-xl p-3 text-white focus:border-neon-cyan focus:outline-none transition-colors file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-neon-cyan/10 file:text-neon-cyan hover:file:bg-neon-cyan/20"
+                />
+              </div>
+
+              <button
+                type="submit"
+                disabled={loading}
+                className="w-full py-4 rounded-xl bg-neon-cyan text-black font-bold hover:bg-white transition-all disabled:opacity-50 mt-4"
+              >
+                {loading ? 'Submitting...' : 'Submit Feedback'}
+              </button>
+            </form>
+          )}
+        </div>
       </motion.div>
     </div>
   );

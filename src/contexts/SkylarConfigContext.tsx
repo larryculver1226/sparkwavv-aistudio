@@ -59,6 +59,7 @@ export function SkylarConfigProvider({ children }: { children: React.ReactNode }
   useEffect(() => {
     // Subscribe to global config changes
     const unsubscribe = configService.subscribeToSkylarGlobalConfig((globalConfig) => {
+      console.log('🛡️ [SkylarConfig] Received Global Config Update:', globalConfig);
       setState(prev => ({ ...prev, global: globalConfig }));
       setIsGlobalLoading(false);
     });

@@ -33,6 +33,7 @@ import {
   Calendar,
   Fingerprint,
   Brain,
+  Sparkles,
 } from 'lucide-react';
 import { sendPasswordResetEmail } from 'firebase/auth';
 import { collection, query, orderBy, limit, onSnapshot, doc, getDoc } from 'firebase/firestore';
@@ -57,6 +58,7 @@ import { IdentityReconciliation } from './IdentityReconciliation';
 import { VertexDashboard } from '../components/admin/VertexDashboard';
 import { ValidationGateReview } from '../components/admin/ValidationGateReview';
 import { AgentOps } from './admin/AgentOps';
+import { SkylarConfigPanel } from '../components/admin/SkylarConfigPanel';
 import {
   JOURNEY_STAGES,
   TENANTS,
@@ -1110,6 +1112,12 @@ export const AdminDashboard: React.FC<{ onLogout: () => void }> = ({ onLogout })
                       icon: Database,
                       roles: [ROLES.SUPER_ADMIN, ROLES.ADMIN],
                     },
+                    {
+                      id: 'skylar-config',
+                      label: 'Skylar Config',
+                      icon: Sparkles,
+                      roles: [ROLES.SUPER_ADMIN, ROLES.ADMIN],
+                    },
                   ]
                     .filter((item) => item.roles.includes(adminRole as any))
                     .map((item) => (
@@ -1453,6 +1461,10 @@ export const AdminDashboard: React.FC<{ onLogout: () => void }> = ({ onLogout })
           ) : activeTab === 'agent-ops' ? (
             <div className="col-span-4">
               <AgentOps />
+            </div>
+          ) : activeTab === 'skylar-config' ? (
+            <div className="col-span-4">
+              <SkylarConfigPanel />
             </div>
           ) : (
             <div className="col-span-4 glass-panel p-12 text-center border-white/5 bg-white/[0.02] rounded-3xl">
@@ -3346,11 +3358,10 @@ export const UserFeedbackPanel: React.FC = () => {
         setIsModalOpen(false);
         fetchFeedback();
       } else {
-        alert('Failed to update feedback');
+        console.error('Failed to update feedback');
       }
     } catch (error) {
       console.error('Error updating feedback:', error);
-      alert('Error updating feedback');
     }
   };
 

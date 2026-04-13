@@ -317,3 +317,49 @@ export async function parseResume(fileData: string, mimeType: string) {
     return null;
   }
 }
+
+export async function generateHomeBenefits(count: number = 5) {
+  const prompt = `
+    Generate ${count} short, punchy benefit statements for SPARKWavv and its AI assistant, Skylar.
+    These statements will be used in a scrolling ticker on the home page.
+    Each statement should be a "hook" followed by a benefit, separated by a colon.
+    Example: "Skylar: Your high-fidelity intelligence partner."
+    
+    Focus on:
+    - Decoding professional DNA
+    - Identifying hidden patterns in careers
+    - Finding high-value market opportunities
+    - Amplifying human potential
+    - Dynamic asset generation (Wavvault)
+    
+    Output a JSON object with a "benefits" array of strings.
+  `;
+
+  try {
+    const ai = getAI();
+    const response = await ai.models.generateContent({
+      model: 'gemini-3-flash-preview',
+      contents: prompt,
+      config: {
+        responseMimeType: 'application/json',
+        maxOutputTokens: 1000,
+        responseSchema: {
+          type: Type.OBJECT,
+          properties: {
+            benefits: {
+              type: Type.ARRAY,
+              items: { type: Type.STRING }
+            }
+          },
+          required: ['benefits']
+        }
+      }
+    });
+
+    const data = JSON.parse(response.text || '{"benefits": []}');
+    return data.benefits as string[];
+  } catch (error) {
+    console.error('Error generating home benefits:', error);
+    return null;
+  }
+}

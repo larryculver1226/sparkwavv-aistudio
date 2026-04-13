@@ -5,7 +5,7 @@ import { useSkylarConfig } from '../../contexts/SkylarConfigContext';
 
 export const SkylarAvatar: React.FC = () => {
   const { global } = useSkylarConfig();
-  const skylarAvatar = global?.avatar?.url || 'https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?auto=format&fit=crop&q=80&w=800';
+  const skylarAvatar = global?.avatar?.url || 'https://images.unsplash.com/photo-1560250097-0b93528c311a?auto=format&fit=crop&q=80&w=800';
   const scale = global?.avatar?.scale || 1;
 
   return (
@@ -43,6 +43,13 @@ export const SkylarScrollingText: React.FC = () => {
   const messages = global?.homeBenefits && global.homeBenefits.length > 0 
     ? global.homeBenefits 
     : ["Loading SPARKWavv Experience..."];
+
+  // Reset state when messages change to avoid indexing issues
+  useEffect(() => {
+    setText('');
+    setIsDeleting(false);
+    setLoopNum(0);
+  }, [messages.join('|')]);
 
   useEffect(() => {
     const handleType = () => {
