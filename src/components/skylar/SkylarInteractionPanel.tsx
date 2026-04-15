@@ -57,20 +57,20 @@ export const SkylarInteractionPanel: React.FC<SkylarInteractionPanelProps> = ({
     if (messages.length === 0 && stageConfig) {
       setMessages([
         {
-          id: 'init',
+          id: `init-${stageId}`,
           role: 'skylar',
           content: `Welcome to the ${stageConfig.title} phase, ${user?.displayName?.split(' ')[0] || 'there'}. ${stageConfig.description} Let's get started.`,
           timestamp: new Date()
         }
       ]);
     }
-  }, [stageConfig, user]);
+  }, [stageConfig, user, stageId]);
 
   const handleSend = async () => {
     if (!input.trim() && attachments.length === 0) return;
 
     const newUserMsg: Message = {
-      id: Date.now().toString(),
+      id: crypto.randomUUID(),
       role: 'user',
       content: input,
       timestamp: new Date(),
@@ -98,7 +98,7 @@ export const SkylarInteractionPanel: React.FC<SkylarInteractionPanelProps> = ({
       const responseText = result.response.candidates?.[0]?.content?.parts?.filter((part: any) => part.text)?.map((part: any) => part.text)?.join('') || '';
 
       const newSkylarMsg: Message = {
-        id: (Date.now() + 1).toString(),
+        id: crypto.randomUUID(),
         role: 'skylar',
         content: responseText,
         timestamp: new Date()
@@ -117,7 +117,7 @@ export const SkylarInteractionPanel: React.FC<SkylarInteractionPanelProps> = ({
     } catch (error) {
       console.error('Error communicating with Skylar:', error);
       setMessages(prev => [...prev, {
-        id: Date.now().toString(),
+        id: crypto.randomUUID(),
         role: 'skylar',
         content: "I'm having trouble connecting right now. Let's try that again.",
         timestamp: new Date()

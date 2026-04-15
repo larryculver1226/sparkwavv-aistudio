@@ -9,7 +9,7 @@ export interface JourneyStageDefinition {
   allowedModalities: Modality[];
   uiConfig: {
     theme: 'dark' | 'light' | 'neon';
-    layout: 'chat-first' | 'artifact-first' | 'split';
+    layout: 'chat-first' | 'artifact-first' | 'split' | 'sidebar';
     primaryColor?: string;
   };
 }

@@ -17,30 +17,21 @@ export interface SkylarGlobalConfig {
 }
 
 export interface SkylarStageConfig {
-  // 1. General Stage Metadata
-  stageId: string;             // e.g., "dive-in", "discovery", "branding"
-  stageTitle: string;          // User-facing name (e.g., "Ignition: Dive-In")
-  description: string;         // Purpose of this phase
-  
-  // 2. AI Behavior & Constraints
-  // Supports variables like {{user.displayName}}
-  systemPromptTemplate: string; 
-  
-  // Required data outputs before the user can move to the next stage
-  requiredArtifacts: string[];  // e.g., ["Career DNA Hypothesis"]
-  
-  // Feature Toggles
+  stageId: string;
+  stageTitle: string;
+  description: string;
+  systemPromptTemplate: string;
+  requiredArtifacts: string[];
   allowedModalities: {
     text: boolean;
     audio: boolean;
     image: boolean;
     video: boolean;
   };
-  
-  // 3. Stage-Specific UI (Optional overrides)
-  theme?: {
-    primaryColor: string;      // Tailwind class (e.g., "neon-cyan")
-    layout: 'chat' | 'split' | 'artifact';
+  uiConfig: {
+    theme: 'dark' | 'light' | 'neon';
+    layout: 'chat-first' | 'artifact-first' | 'split' | 'sidebar';
+    primaryColor?: string;
   };
 }
 

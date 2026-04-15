@@ -165,27 +165,37 @@ export function IdentityProvider({ children }: { children: React.ReactNode }) {
       setLocalTenantId(claimTenant || null);
 
       // 2. Fetch Profile and Wavvault Status
-      const [pData, exists] = await Promise.all([
-        userService.fetchProfile(idToken),
-        userService.fetchWavvaultStatus(idToken),
-      ]);
+      try {
+        const [pData, exists] = await Promise.all([
+          userService.fetchProfile(idToken),
+          userService.fetchWavvaultStatus(idToken),
+        ]);
 
-      if (pData) {
-        setProfile(pData);
+        if (pData) {
+          setProfile(pData);
 
-        if (pData.role && pData.role !== finalRole) {
-          const isAdminRole = (r: any) =>
-            [ROLES.ADMIN, ROLES.SUPER_ADMIN, ROLES.EDITOR, ROLES.MENTOR].includes(r as any);
-          if (!isAdminRole(finalRole) || isAdminRole(pData.role)) {
-            setRole(String(pData.role));
+          if (pData.role && pData.role !== finalRole) {
+            const isAdminRole = (r: any) =>
+              [ROLES.ADMIN, ROLES.SUPER_ADMIN, ROLES.EDITOR, ROLES.MENTOR].includes(r as any);
+            if (!isAdminRole(finalRole) || isAdminRole(pData.role)) {
+              setRole(String(pData.role));
+            }
           }
+        } else {
+          setProfile(null);
         }
-      } else {
-        setProfile(null);
-      }
 
-      setHasWavvault(exists);
-      setStatus('ready');
+        setHasWavvault(exists);
+        setStatus('ready');
+      } catch (profileErr) {
+        console.warn('⚠️ [Identity] Profile fetch failed, but proceeding with role:', finalRole, profileErr);
+        // If we have a role (especially super_admin), don't block the whole app
+        if (finalRole) {
+          setStatus('ready');
+        } else {
+          throw profileErr; // Re-throw if we don't even have a role
+        }
+      }
     } catch (err: any) {
       console.error('❌ Identity fetch error:', err);
       let msg = err.message;

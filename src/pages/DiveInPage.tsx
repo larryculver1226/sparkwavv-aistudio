@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { motion } from 'motion/react';
 import { Sparkles, Upload, FileText, Loader2 } from 'lucide-react';
 import { useIdentity } from '../contexts/IdentityContext';
-import { SkylarInteractionPanel } from '../components/skylar/SkylarInteractionPanel';
+import { SkylarStageWrapper } from '../components/skylar/SkylarStageWrapper';
 import { parseResume } from '../services/geminiService';
 
 export default function DiveInPage() {
@@ -57,27 +57,13 @@ export default function DiveInPage() {
         <div className="absolute bottom-1/4 right-1/4 w-96 h-96 bg-purple-500/10 blur-[120px] rounded-full animate-pulse delay-1000" />
       </div>
 
-      <div className="max-w-6xl w-full mx-auto grid grid-cols-1 lg:grid-cols-3 gap-8 relative z-10 h-[calc(100vh-3rem)]">
-        
-        {/* Left Column: Context & Upload */}
-        <div className="lg:col-span-1 flex flex-col gap-6">
-          <motion.div
-            initial={{ opacity: 0, x: -20 }}
-            animate={{ opacity: 1, x: 0 }}
-            className="space-y-4"
-          >
-            <div className="w-16 h-16 bg-white/5 border border-white/10 rounded-2xl flex items-center justify-center backdrop-blur-xl">
-              <Sparkles className="w-8 h-8 text-blue-400" />
-            </div>
-            <h1 className="text-4xl font-display font-bold tracking-tight">
-              Dive <span className="text-blue-400 italic">In</span>
-            </h1>
-            <p className="text-white/60 text-sm leading-relaxed">
-              Welcome to Sparkwavv. Before we create your dashboard, Skylar needs to understand your baseline. 
-              Upload your resume to give her context, then chat with her to finalize your Dive-In commitments.
-            </p>
-          </motion.div>
-
+      <div className="max-w-7xl w-full mx-auto relative z-10 h-[calc(100vh-3rem)]">
+        <SkylarStageWrapper 
+          stageId="dive-in" 
+          onActionTriggered={handleSkylarAction}
+          initialContext={resumeData ? `User Context: ${JSON.stringify(resumeData)}` : undefined}
+          layout="split"
+        >
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
@@ -126,24 +112,7 @@ export default function DiveInPage() {
               </div>
             )}
           </motion.div>
-        </div>
-
-        {/* Right Column: Skylar Chat */}
-        <motion.div
-          initial={{ opacity: 0, x: 20 }}
-          animate={{ opacity: 1, x: 0 }}
-          transition={{ delay: 0.2 }}
-          className="lg:col-span-2 h-full"
-        >
-          <SkylarInteractionPanel 
-            stageId="dive-in" 
-            user={null} 
-            onActionTriggered={handleSkylarAction}
-            // Pass resume data as initial context if available
-            initialContext={resumeData ? `User Context: ${JSON.stringify(resumeData)}` : undefined}
-          />
-        </motion.div>
-
+        </SkylarStageWrapper>
       </div>
     </div>
   );

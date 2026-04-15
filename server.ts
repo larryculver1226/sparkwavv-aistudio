@@ -791,7 +791,39 @@ async function startServer() {
 
   // System Status Endpoint
   app.get("/api/admin/system-status", (req, res) => {
-    res.json(envStatus);
+    const geminiKey = getGeminiApiKey();
+    res.json({
+      firebase: {
+        admin: isFirebaseAdminConfigured,
+        projectId: process.env.FIREBASE_PROJECT_ID || firebaseAppletConfig.projectId || null,
+        databaseId: process.env.VITE_FIREBASE_DATABASE_ID || firebaseAppletConfig.firestoreDatabaseId || null,
+      },
+      gemini: {
+        configured: !!geminiKey,
+        keyMasked: geminiKey ? `${geminiKey.substring(0, 4)}...${geminiKey.substring(geminiKey.length - 4)}` : null,
+      },
+      vertex: {
+        projectId: process.env.VERTEX_AI_PROJECT_ID || process.env.FIREBASE_PROJECT_ID || null,
+        searchEngineId: process.env.VERTEX_AI_SEARCH_ENGINE_ID || null,
+        dataStoreId: process.env.VERTEX_AI_SEARCH_DATA_STORE_ID || null,
+        location: process.env.VERTEX_AI_LOCATION || 'us-central1',
+        lobkowiczEndpointId: process.env.VERTEX_AI_LOBKOWICZ_ENDPOINT_ID || null,
+        financeEndpointId: process.env.VERTEX_AI_FINANCE_ENDPOINT_ID || null,
+        techEndpointId: process.env.VERTEX_AI_TECH_ENDPOINT_ID || null,
+        medlmModelId: process.env.VERTEX_AI_MEDLM_MODEL_ID || null,
+      }
+    });
+  });
+
+  app.get("/api/admin/vertex/discover", async (req, res) => {
+    try {
+      const { vertexDiscoveryService } = await import("./src/services/vertexDiscoveryService");
+      const result = await vertexDiscoveryService.discover();
+      res.json(result);
+    } catch (error: any) {
+      console.error('[Discovery API Error]', error);
+      res.status(500).json({ error: error.message });
+    }
   });
 
   // RBAC Helpers & Routes
@@ -2190,7 +2222,7 @@ async function startServer() {
 
     // Wavvault Hybrid Data Access Routes
     app.post("/api/wavvault/user", requireRole([ROLES.USER, ROLES.ADMIN, ROLES.OPERATOR, ROLES.MENTOR, ROLES.AGENT]), async (req, res) => {
-      const { userId, ...rest } = req.body;
+      const { userId, isCommit, ...rest } = req.body;
       const authenticatedUser = (req as any).user;
 
       if (userId !== authenticatedUser.uid && authenticatedUser.role !== ROLES.ADMIN) {
@@ -2201,12 +2233,37 @@ async function startServer() {
         const db = getFirestoreDb();
         if (!db) return res.status(503).json({ error: "Firestore not initialized" });
 
-        await db.collection('wavvault').doc(userId).set({
+        const updateData: any = {
           ...rest,
           userId,
           tenantId: authenticatedUser.tenantId,
           updatedAt: admin.firestore.FieldValue.serverTimestamp()
-        }, { merge: true });
+        };
+
+        if (isCommit) {
+          // Simple hash implementation consistent with wavvaultService.ts
+          const str = JSON.stringify(rest);
+          let hash = 0;
+          for (let i = 0; i < str.length; i++) {
+            const char = str.charCodeAt(i);
+            hash = (hash << 5) - hash + char;
+            hash |= 0;
+          }
+          const hashStr = 'v1-' + Math.abs(hash).toString(16);
+          
+          updateData.lastCommitHash = hashStr;
+          updateData.lastCommitTimestamp = admin.firestore.FieldValue.serverTimestamp();
+          
+          // Save snapshot using admin SDK
+          await db.collection('wavvault_snapshots').doc(userId).set({
+            data: rest,
+            hash: hashStr,
+            userId,
+            timestamp: admin.firestore.FieldValue.serverTimestamp()
+          });
+        }
+
+        await db.collection('wavvault').doc(userId).set(updateData, { merge: true });
 
         res.json({ success: true });
       } catch (error: any) {
@@ -2921,11 +2978,54 @@ async function startServer() {
       }
     });
 
-    app.post("/api/skylar/bootstrap-vector", requireRole([ROLES.ADMIN]), async (req, res) => {
+    app.post("/api/skylar/bootstrap-vector", requireRole([ROLES.ADMIN, ROLES.SUPER_ADMIN]), async (req, res) => {
       const { userId } = req.body;
+      console.log(`[SERVER] Received bootstrap-vector request for user: ${userId}`);
       try {
-        const status = await vertexService.bootstrapVectorSearchIndex(userId);
+        const db = getFirestoreDb();
+        if (!db) throw new Error("Database unavailable");
+        const status = await vertexService.bootstrapVectorSearchIndex(userId, db);
         res.json(status);
+      } catch (error: any) {
+        console.error("[SERVER] Bootstrap Vector Error:", error.message || error);
+        res.status(500).json({ error: error.message });
+      }
+    });
+
+    /**
+     * Start a Vertex AI Fine-Tuning Job
+     */
+    app.post("/api/skylar/tuning/create", requireRole([ROLES.ADMIN, ROLES.SUPER_ADMIN]), async (req, res) => {
+      const { gcsUri, modelName } = req.body;
+      try {
+        const job = await vertexService.createTuningJob(gcsUri, modelName);
+        res.json(job);
+      } catch (error: any) {
+        res.status(500).json({ error: error.message });
+      }
+    });
+
+    /**
+     * Get Status of a Vertex AI Fine-Tuning Job
+     */
+    app.get("/api/skylar/tuning/status/:jobId", requireRole([ROLES.ADMIN, ROLES.SUPER_ADMIN]), async (req, res) => {
+      const { jobId } = req.params;
+      try {
+        const status = await vertexService.getTuningJobStatus(jobId);
+        res.json(status);
+      } catch (error: any) {
+        res.status(500).json({ error: error.message });
+      }
+    });
+
+    /**
+     * Test Connectivity to specialized Vertex AI models
+     */
+    app.post("/api/skylar/test-connection", requireRole([ROLES.ADMIN, ROLES.SUPER_ADMIN]), async (req, res) => {
+      const { type } = req.body;
+      try {
+        const result = await vertexService.testModelConnection(type);
+        res.json(result);
       } catch (error: any) {
         res.status(500).json({ error: error.message });
       }

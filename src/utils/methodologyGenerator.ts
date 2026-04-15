@@ -7,7 +7,7 @@ import { getGeminiApiKey } from '../services/aiConfig';
  * on the Philip Lobkowicz coaching methodology.
  */
 export class MethodologyGenerator {
-  private model = 'gemini-3.1-pro-preview';
+  private model = 'gemini-3-flash-preview';
 
   private getAI() {
     const apiKey = getGeminiApiKey();

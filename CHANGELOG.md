@@ -4,6 +4,20 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 ### Added
+- **Track 064**: Apigee API Management Investigation (Investigated the integration of Google Apigee to secure and scale Sparkwavv's backend APIs, focusing on partner enablement and admin security).
+- **Track 063**: Vertex AI Configuration Guide (Created a comprehensive guide for finding and setting environment variables for Search Engines, Data Stores, MedLM, and Endpoints).
+- **Track 062**: Vertex AI Model Configuration Fix (Resolved "404 Not Found" errors by updating model IDs to valid Vertex AI versions, including `gemini-1.5-flash-002`, `gemini-1.5-pro`, and `medlm-medium@latest`. Fixed fallback logic in `vertexService.ts` to ensure robust industry-specific insights).
+- **Track 061**: Neural Synthesis Engine Integrity Fix (Resolved "INTEGRITY COMPROMISED" error by aligning server-side return keys with client expectations. Implemented a real hashing and snapshot mechanism for Wavvault data, ensuring data integrity is correctly verified after commits).
+- **Track 060**: Gemini API & UI Fixes (Resolved `400 INVALID_ARGUMENT` errors by switching from `gemini-3.1-pro-preview` to `gemini-3-flash-preview` across all services. Fixed React duplicate key warnings in `SkylarInteractionPanel` by improving ID generation).
+- **Track 059**: Journey Stage Config Permissions Fix (Resolved "Missing or insufficient permissions" errors by allowing public read access to `agent_configs`. Added a "Seed Defaults" button to the Admin Dashboard for easy Firestore population).
+- **Track 058**: Populate Stage Management Metadata (Enhanced system prompts for Ignition, Discovery, Branding, and Outreach stages using the "Dual-Logic AI" persona. Synchronized default content across configuration files).
+- **Track 057**: Stage Management Integration (Integrated Skylar interaction across all journey stages, created `SkylarStageWrapper`, refactored `DiveInPage` and `PhaseViews`, and enhanced Admin Stage Management with guidance).
+- **Track 056**: Completion of Vertex AI Enterprise Intelligence (Transitioned mocked prototypes to production-ready features. Implemented real GCS data export, Vertex AI Vector Search Index/Endpoint creation, Fine-Tuning job execution using `GenAiTuningServiceClient`, and specialized model connectivity testing. Updated the Admin Dashboard with real-time status polling and infrastructure bootstrapping controls).
+- **Track 055**: Automated Vertex AI Configuration (Implemented an auto-discovery system that scans Google Cloud for Search Engines, Data Stores, and Endpoints using the Service Account, with a one-click discovery UI in the Admin Dashboard. Fixed visibility issues by synchronizing mobile and desktop sidebars).
+- **Track 054**: Vertex AI Key Configuration (Documented and implemented monitoring for all Vertex AI environment variables, including sector-specific endpoints and MedLM).
+- **Track 053**: Remove Auth0 Leftovers (Cleaned up hardcoded Auth0 configuration in `vite.config.ts` and removed legacy provider references from user data files).
+- **Track 052**: Vertex and Firebase Setup/Auth Errors (Fixed "Cannot read properties of undefined (reading '0')" crash in VertexDashboard and improved authentication resilience).
+- **Track 051**: Finalize Firebase and Vertex AI Configuration (Updated tech specs, enhanced service initialization with service account support, and added a "System Status" monitoring tab to the Admin Dashboard).
 - **Track 050**: Skylar Avatar and Text Sync (Changed default Skylar avatar to a male professional, synchronized chat avatars with global config, and fixed home page scrolling text reactivity).
 - **Track 049**: Dynamic Skylar Scrolling Text (Upgraded the home page scrolling text to be dynamic and editable from the Admin Dashboard. Added a new "Skylar Config" tab with AI-powered benefit regeneration).
 - **Track 048**: Fix Feedback Attachment Upload (Bypassed missing Firebase Storage bucket by converting feedback attachments to base64 strings with an 800KB size limit).
@@ -55,6 +69,9 @@ All notable changes to this project will be documented in this file.
 - `npm run qa`, `npm run format`, `npm run test`, and `npm run generate` scripts.
 
 ### Fixed
+- Resolved "INTEGRITY COMPROMISED" error in Neural Synthesis Engine by fixing key mismatches and implementing real hashing.
+- Fixed `400 INVALID_ARGUMENT` errors in Gemini API calls by migrating to `gemini-3-flash-preview`.
+- Fixed React "duplicate key" warnings in `SkylarInteractionPanel.tsx` using `crypto.randomUUID()`.
 - Fixed GCS upload 404 error by mocking the upload process when the Firebase Storage bucket is not provisioned.
 - Fixed GCS upload permission denied error in `vertexService.ts` by removing bucket creation checks and directly saving the file.
 - Fixed `NavBar.test.tsx` to correctly assert the `navigate('/login')` call instead of the `onNavigate` prop.

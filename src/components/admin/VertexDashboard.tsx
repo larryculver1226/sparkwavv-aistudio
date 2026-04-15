@@ -38,6 +38,12 @@ export const VertexDashboard: React.FC<VertexDashboardProps> = ({ onNotify }) =>
   const [isTuning, setIsTuning] = useState(false);
   const [isBootstrapping, setIsBootstrapping] = useState(false);
   const [bootstrapStatus, setBootstrapStatus] = useState<any | null>(null);
+  const [testingStatus, setTestingStatus] = useState<Record<string, 'idle' | 'testing' | 'success' | 'error'>>({
+    healthcare: 'idle',
+    finance: 'idle',
+    tech: 'idle',
+    lobkowicz: 'idle',
+  });
 
   const fetchSyntheticData = async () => {
     setIsLoadingData(true);
@@ -197,15 +203,73 @@ export const VertexDashboard: React.FC<VertexDashboardProps> = ({ onNotify }) =>
         },
         body: JSON.stringify({ userId: auth.currentUser.uid }),
       });
-      const data = await response.json();
-      setBootstrapStatus(data);
-      onNotify('Vector Search bootstrapping initiated.', 'info');
-    } catch (error) {
-      onNotify('Failed to initiate bootstrapping', 'error');
+      
+      const contentType = response.headers.get('content-type');
+      if (contentType && contentType.includes('application/json')) {
+        const data = await response.json();
+        if (data.error) {
+          onNotify(data.error, 'error');
+        } else {
+          setBootstrapStatus(data);
+          onNotify('Vector Search bootstrapping initiated.', 'info');
+        }
+      } else {
+        const text = await response.text();
+        console.error('Non-JSON response:', text);
+        onNotify(`Server error (${response.status}). Please check logs.`, 'error');
+      }
+    } catch (error: any) {
+      onNotify(error.message || 'Failed to initiate bootstrapping', 'error');
     } finally {
       setIsBootstrapping(false);
     }
   };
+
+  const handleTestConnection = async (type: 'healthcare' | 'finance' | 'tech' | 'lobkowicz') => {
+    setTestingStatus((prev) => ({ ...prev, [type]: 'testing' }));
+    try {
+      const idToken = await auth.currentUser?.getIdToken();
+      const response = await fetch('/api/skylar/test-connection', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${idToken}`,
+        },
+        body: JSON.stringify({ type }),
+      });
+      const data = await response.json();
+      if (data.success) {
+        setTestingStatus((prev) => ({ ...prev, [type]: 'success' }));
+        onNotify(data.message, 'success');
+      } else {
+        setTestingStatus((prev) => ({ ...prev, [type]: 'error' }));
+        onNotify(data.message, 'error');
+      }
+    } catch (error) {
+      setTestingStatus((prev) => ({ ...prev, [type]: 'error' }));
+      onNotify(`Network error testing ${type} connection`, 'error');
+    }
+  };
+
+  // Poll for tuning job status if one is active
+  useEffect(() => {
+    let interval: NodeJS.Timeout;
+    if (tuningJob && tuningJob.id && tuningJob.state !== 'SUCCEEDED' && tuningJob.state !== 'FAILED') {
+      interval = setInterval(async () => {
+        try {
+          const idToken = await auth.currentUser?.getIdToken();
+          const response = await fetch(`/api/skylar/tuning/status/${encodeURIComponent(tuningJob.id)}`, {
+            headers: { Authorization: `Bearer ${idToken}` },
+          });
+          const data = await response.json();
+          setTuningJob(data);
+        } catch (error) {
+          console.error('Error polling tuning job status:', error);
+        }
+      }, 30000); // Poll every 30 seconds
+    }
+    return () => clearInterval(interval);
+  }, [tuningJob]);
 
   return (
     <div className="space-y-8">
@@ -253,16 +317,26 @@ export const VertexDashboard: React.FC<VertexDashboardProps> = ({ onNotify }) =>
           </p>
         </div>
 
-        <div className="bg-dark-surface/50 border border-white/10 p-6 rounded-xl">
-          <div className="flex items-center justify-between mb-4">
-            <Brain className="w-6 h-6 text-purple-500" />
-            <span className="text-xs font-mono text-gray-500 uppercase">Fine-Tuning</span>
+          <div className="bg-dark-surface/50 border border-white/10 p-6 rounded-xl">
+            <div className="flex items-center justify-between mb-4">
+              <Brain className="w-6 h-6 text-purple-500" />
+              <span className="text-xs font-mono text-gray-500 uppercase">Fine-Tuning</span>
+            </div>
+            <div className="text-3xl font-display font-bold text-white">Lobkowicz v1</div>
+            <div className="mt-2 space-y-2">
+              <p className="text-sm text-gray-400">
+                Methodology fine-tuning in progress (Synthetic Phase).
+              </p>
+              <button
+                onClick={() => handleTestConnection('lobkowicz')}
+                disabled={testingStatus.lobkowicz === 'testing'}
+                className="w-full py-1.5 text-xs bg-purple-500/10 border border-purple-500/30 text-purple-500 rounded hover:bg-purple-500/20 transition-all flex items-center justify-center gap-2"
+              >
+                <Zap className={`w-3 h-3 ${testingStatus.lobkowicz === 'testing' ? 'animate-pulse' : ''}`} />
+                {testingStatus.lobkowicz === 'testing' ? 'Testing...' : 'Test Methodology Model'}
+              </button>
+            </div>
           </div>
-          <div className="text-3xl font-display font-bold text-white">Lobkowicz v1</div>
-          <p className="text-sm text-gray-400 mt-2">
-            Methodology fine-tuning in progress (Synthetic Phase).
-          </p>
-        </div>
 
         <div className="bg-dark-surface/50 border border-white/10 p-6 rounded-xl">
           <div className="flex items-center justify-between mb-4">
@@ -384,10 +458,26 @@ export const VertexDashboard: React.FC<VertexDashboardProps> = ({ onNotify }) =>
                 style={{ width: `${bootstrapStatus.progress || 10}%` }}
               />
             </div>
-            <div className="flex justify-between text-[10px] font-mono text-gray-500">
+            <div className="flex justify-between text-[10px] font-mono text-gray-500 mb-4">
               <span>Progress: {bootstrapStatus.progress || 10}%</span>
               <span>Est. Completion: {bootstrapStatus.estimatedCompletion}</span>
             </div>
+
+            {bootstrapStatus.indexOperation && (
+              <div className="mt-4 p-3 bg-black/40 border border-white/5 rounded-lg space-y-2">
+                <div className="flex items-center justify-between text-[10px] font-mono">
+                  <span className="text-gray-500 uppercase">Index Operation</span>
+                  <span className="text-neon-cyan truncate max-w-[200px]">{bootstrapStatus.indexOperation}</span>
+                </div>
+                <div className="flex items-center justify-between text-[10px] font-mono">
+                  <span className="text-gray-500 uppercase">Endpoint Operation</span>
+                  <span className="text-neon-cyan truncate max-w-[200px]">{bootstrapStatus.endpointOperation}</span>
+                </div>
+                <p className="text-[10px] text-gray-400 italic mt-2">
+                  {bootstrapStatus.message}
+                </p>
+              </div>
+            )}
           </div>
         )}
       </div>
@@ -399,49 +489,79 @@ export const VertexDashboard: React.FC<VertexDashboardProps> = ({ onNotify }) =>
           Vertex AI Model Garden (Sector Intelligence)
         </h3>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <div className="flex items-center justify-between p-4 bg-white/5 border border-white/10 rounded-lg">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-full bg-green-500/20 flex items-center justify-center">
-                <Activity className="w-5 h-5 text-green-500" />
+          <div className="flex flex-col p-4 bg-white/5 border border-white/10 rounded-lg">
+            <div className="flex items-center justify-between mb-4">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-full bg-green-500/20 flex items-center justify-center">
+                  <Activity className="w-5 h-5 text-green-500" />
+                </div>
+                <div>
+                  <div className="text-white font-bold">Healthcare (MedLM)</div>
+                  <div className="text-xs text-gray-500">Active</div>
+                </div>
               </div>
-              <div>
-                <div className="text-white font-bold">Healthcare (MedLM)</div>
-                <div className="text-xs text-gray-500">Active</div>
+              <div className="px-2 py-1 bg-green-500/20 text-green-500 text-[10px] font-bold rounded uppercase">
+                Running
               </div>
             </div>
-            <div className="px-2 py-1 bg-green-500/20 text-green-500 text-[10px] font-bold rounded uppercase">
-              Running
-            </div>
+            <button
+              onClick={() => handleTestConnection('healthcare')}
+              disabled={testingStatus.healthcare === 'testing'}
+              className="w-full py-1.5 text-xs bg-white/5 border border-white/10 text-gray-300 rounded hover:bg-white/10 transition-all flex items-center justify-center gap-2"
+            >
+              <Zap className={`w-3 h-3 ${testingStatus.healthcare === 'testing' ? 'animate-pulse' : ''}`} />
+              {testingStatus.healthcare === 'testing' ? 'Testing...' : 'Test Connection'}
+            </button>
           </div>
 
-          <div className="flex items-center justify-between p-4 bg-white/5 border border-white/10 rounded-lg">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-full bg-blue-500/20 flex items-center justify-center">
-                <ShieldCheck className="w-5 h-5 text-blue-500" />
+          <div className="flex flex-col p-4 bg-white/5 border border-white/10 rounded-lg">
+            <div className="flex items-center justify-between mb-4">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-full bg-blue-500/20 flex items-center justify-center">
+                  <ShieldCheck className="w-5 h-5 text-blue-500" />
+                </div>
+                <div>
+                  <div className="text-white font-bold">Finance (Vertex)</div>
+                  <div className="text-xs text-gray-500">Active</div>
+                </div>
               </div>
-              <div>
-                <div className="text-white font-bold">Finance (Vertex)</div>
-                <div className="text-xs text-gray-500">Active</div>
+              <div className="px-2 py-1 bg-blue-500/20 text-blue-500 text-[10px] font-bold rounded uppercase">
+                Running
               </div>
             </div>
-            <div className="px-2 py-1 bg-blue-500/20 text-blue-500 text-[10px] font-bold rounded uppercase">
-              Running
-            </div>
+            <button
+              onClick={() => handleTestConnection('finance')}
+              disabled={testingStatus.finance === 'testing'}
+              className="w-full py-1.5 text-xs bg-white/5 border border-white/10 text-gray-300 rounded hover:bg-white/10 transition-all flex items-center justify-center gap-2"
+            >
+              <Zap className={`w-3 h-3 ${testingStatus.finance === 'testing' ? 'animate-pulse' : ''}`} />
+              {testingStatus.finance === 'testing' ? 'Testing...' : 'Test Connection'}
+            </button>
           </div>
 
-          <div className="flex items-center justify-between p-4 bg-white/5 border border-white/10 rounded-lg">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-full bg-purple-500/20 flex items-center justify-center">
-                <Zap className="w-5 h-5 text-purple-500" />
+          <div className="flex flex-col p-4 bg-white/5 border border-white/10 rounded-lg">
+            <div className="flex items-center justify-between mb-4">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-full bg-purple-500/20 flex items-center justify-center">
+                  <Zap className="w-5 h-5 text-purple-500" />
+                </div>
+                <div>
+                  <div className="text-white font-bold">Tech (Vertex)</div>
+                  <div className="text-xs text-gray-500">Active</div>
+                </div>
               </div>
-              <div>
-                <div className="text-white font-bold">Tech (Vertex)</div>
-                <div className="text-xs text-gray-500">Active</div>
+              <div className="px-2 py-1 bg-purple-500/20 text-purple-500 text-[10px] font-bold rounded uppercase">
+                Running
               </div>
             </div>
-            <div className="px-2 py-1 bg-purple-500/20 text-purple-500 text-[10px] font-bold rounded uppercase">
-              Running
-            </div>
+            <button
+              onClick={() => handleTestConnection('tech')}
+              disabled={testingStatus.tech === 'testing'}
+              className="w-full py-1.5 text-xs bg-white/5 border border-white/10 text-gray-300 rounded hover:bg-white/10 transition-all flex items-center justify-center gap-2"
+            >
+              <Zap className={`w-3 h-3 ${testingStatus.tech === 'testing' ? 'animate-pulse' : ''}`} />
+              {testingStatus.tech === 'testing' ? 'Testing...' : 'Test Connection'}
+            </button>
           </div>
         </div>
       </div>
@@ -472,11 +592,11 @@ export const VertexDashboard: React.FC<VertexDashboardProps> = ({ onNotify }) =>
                 {gcsUri && (
                   <button
                     onClick={handleStartTuning}
-                    disabled={isTuning || !!tuningJob}
+                    disabled={isTuning || (tuningJob && tuningJob.state !== 'FAILED' && tuningJob.state !== 'CANCELLED')}
                     className="flex items-center gap-2 px-3 py-1.5 bg-blue-500/20 border border-blue-500/30 text-blue-500 text-xs rounded-lg hover:bg-blue-500/30 transition-all disabled:opacity-50"
                   >
                     <Settings className={`w-3.5 h-3.5 ${isTuning ? 'animate-spin' : ''}`} />
-                    {isTuning ? 'Starting...' : tuningJob ? 'Job Started' : 'Start Fine-Tuning'}
+                    {isTuning ? 'Starting...' : tuningJob ? `Job: ${tuningJob.state}` : 'Start Fine-Tuning'}
                   </button>
                 )}
                 <button
@@ -536,7 +656,7 @@ export const VertexDashboard: React.FC<VertexDashboardProps> = ({ onNotify }) =>
                     <div className="flex items-center gap-3">
                       <span className="text-xs font-mono text-purple-500">#{idx + 1}</span>
                       <span className="text-sm text-gray-300 truncate max-w-md">
-                        {entry.contents[0].parts[0].text}
+                        {entry.contents?.[0]?.parts?.[0]?.text || 'No content'}
                       </span>
                     </div>
                     {expandedEntry === idx ? (
@@ -559,7 +679,7 @@ export const VertexDashboard: React.FC<VertexDashboardProps> = ({ onNotify }) =>
                               Client Input
                             </p>
                             <p className="text-sm text-gray-300 bg-white/5 p-3 rounded-lg border border-white/5">
-                              {entry.contents[0].parts[0].text}
+                              {entry.contents?.[0]?.parts?.[0]?.text || 'No input'}
                             </p>
                           </div>
                           <div className="space-y-1">
@@ -567,7 +687,7 @@ export const VertexDashboard: React.FC<VertexDashboardProps> = ({ onNotify }) =>
                               Philip Lobkowicz Response
                             </p>
                             <p className="text-sm text-white bg-purple-500/10 p-3 rounded-lg border border-purple-500/20 italic">
-                              {entry.contents[1].parts[0].text}
+                              {entry.contents?.[1]?.parts?.[0]?.text || 'No response'}
                             </p>
                           </div>
                         </div>

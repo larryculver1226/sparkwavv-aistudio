@@ -769,7 +769,7 @@ service cloud.firestore {
     }
 
     match /agent_configs/{stageId} {
-      allow read: if isAuthenticated();
+      allow read: if true;
       allow write: if isAdmin();
     }
   }

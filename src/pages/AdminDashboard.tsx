@@ -59,6 +59,7 @@ import { VertexDashboard } from '../components/admin/VertexDashboard';
 import { ValidationGateReview } from '../components/admin/ValidationGateReview';
 import { AgentOps } from './admin/AgentOps';
 import { SkylarConfigPanel } from '../components/admin/SkylarConfigPanel';
+import { SystemStatusPanel } from '../components/admin/SystemStatusPanel';
 import {
   JOURNEY_STAGES,
   TENANTS,
@@ -1083,6 +1084,12 @@ export const AdminDashboard: React.FC<{ onLogout: () => void }> = ({ onLogout })
                       roles: [ROLES.SUPER_ADMIN, ROLES.ADMIN],
                     },
                     {
+                      id: 'system-status',
+                      label: 'System Status',
+                      icon: Activity,
+                      roles: [ROLES.SUPER_ADMIN, ROLES.ADMIN],
+                    },
+                    {
                       id: 'logs',
                       label: 'System Logs',
                       icon: Activity,
@@ -1233,6 +1240,12 @@ export const AdminDashboard: React.FC<{ onLogout: () => void }> = ({ onLogout })
                 roles: [ROLES.SUPER_ADMIN, ROLES.ADMIN],
               },
               {
+                id: 'system-status',
+                label: 'System Status',
+                icon: Activity,
+                roles: [ROLES.SUPER_ADMIN, ROLES.ADMIN],
+              },
+              {
                 id: 'logs',
                 label: 'System Logs',
                 icon: Activity,
@@ -1260,6 +1273,12 @@ export const AdminDashboard: React.FC<{ onLogout: () => void }> = ({ onLogout })
                 id: 'firebase-setup',
                 label: 'Firebase Setup',
                 icon: Database,
+                roles: [ROLES.SUPER_ADMIN, ROLES.ADMIN],
+              },
+              {
+                id: 'skylar-config',
+                label: 'Skylar Config',
+                icon: Sparkles,
                 roles: [ROLES.SUPER_ADMIN, ROLES.ADMIN],
               },
             ]
@@ -1465,6 +1484,10 @@ export const AdminDashboard: React.FC<{ onLogout: () => void }> = ({ onLogout })
           ) : activeTab === 'skylar-config' ? (
             <div className="col-span-4">
               <SkylarConfigPanel />
+            </div>
+          ) : activeTab === 'system-status' ? (
+            <div className="col-span-4">
+              <SystemStatusPanel />
             </div>
           ) : (
             <div className="col-span-4 glass-panel p-12 text-center border-white/5 bg-white/[0.02] rounded-3xl">

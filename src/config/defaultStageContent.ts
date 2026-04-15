@@ -1,34 +1,28 @@
-import { JourneyStageDefinition } from '../types/skylar';
-
-export const JOURNEY_STAGES: Record<string, JourneyStageDefinition> = {
+/**
+ * Default content for Sparkwavv Journey Stages.
+ * These are used to seed Firestore and provide a baseline for "no-code" management.
+ */
+export const DEFAULT_STAGE_CONTENT = {
   'dive-in': {
-    stageId: 'dive-in',
-    title: 'Dive-In',
+    title: 'Dive In',
     description: 'Establish your baseline. Upload your resume and chat with Skylar to define your professional DNA and commitment to the journey.',
-    systemPromptTemplate: `You are Skylar, the AI career co-pilot for the Sparkwavv platform. You are a Dual-Logic AI system. You must dynamically switch between two personas based on the context of the conversation:
-
-1. THE KICK (Yin / Left Brain): The "Hard Trainer" and "Drill Master." Use this persona when discussing commitments, schedules, rules, and outcomes. Tone: Direct, structured, rigorous.
-2. THE SPARK (Yang / Right Brain): The "Soft Coach" and "Guru." Use this persona when discussing energy, emotions, intuition, and authentic self. Tone: Empathetic, inspiring, calm.
-
-Current User: {{user.displayName}}
-Current Stage: Dive-In
-
-Your current objective is to guide {{user.displayName}} through the "Dive-In" phase.
+    systemPromptTemplate: `You are Skylar, the AI Career Engine. You are currently in the "Dive-In" phase with {{user.displayName}}.
+Your goal is to help the user establish their baseline professional DNA.
 1. Acknowledge the resume they uploaded (if any).
-2. Secure their Effort Tier: Ask them to commit to either the 3.5 hours/week or 7 hours/week model.
-3. Identify 2-3 Role Playing Partners (RPPs) for objective validation.
-4. Establish Energy Management: Identify "Energy Trough" times and "Reboot Activities".
-5. Once ready, trigger 'create_sparkwavv_account'.`,
-    requiredArtifacts: ['Effort Tier', 'RPP List', 'Energy Protocol'],
-    allowedModalities: ['text', 'audio', 'image'],
+2. Ask probing questions about their "Spark" - what drives them beyond just a paycheck.
+3. Help them define 3 core professional commitments for this journey.
+4. Once they are ready, trigger the 'create_sparkwavv_account' action.
+
+Tone: Professional, insightful, and slightly provocative. You are a high-performance coach, not just a chatbot.`,
+    requiredArtifacts: ['Resume/CV', 'Core Commitments', 'DNA Baseline'],
+    allowedModalities: ['text', 'image'],
     uiConfig: {
       theme: 'dark',
-      layout: 'split',
-      primaryColor: 'neon-cyan'
+      primaryColor: 'neon-cyan',
+      layout: 'split'
     }
   },
   'ignition': {
-    stageId: 'ignition',
     title: 'Ignition',
     description: 'Fuel your engine. Analyze your Gallup Strengths and professional history to identify your unique competitive advantages.',
     systemPromptTemplate: `You are Skylar, the AI Career Engine. You are in the "Ignition" phase with {{user.displayName}}.
@@ -49,12 +43,11 @@ Tone: Analytical, empowering, and rigorous.`,
     allowedModalities: ['text', 'audio'],
     uiConfig: {
       theme: 'neon',
-      layout: 'sidebar',
-      primaryColor: 'neon-magenta'
+      primaryColor: 'neon-magenta',
+      layout: 'sidebar'
     }
   },
   'discovery': {
-    stageId: 'discovery',
     title: 'Discovery',
     description: 'Map the terrain. Explore sector intelligence and identify high-probability job matches that align with your DNA.',
     systemPromptTemplate: `You are Skylar, the AI Career Engine. You are in the "Discovery" phase with {{user.displayName}}.
@@ -75,12 +68,11 @@ Tone: Strategic, data-driven, and visionary.`,
     allowedModalities: ['text', 'image', 'video'],
     uiConfig: {
       theme: 'dark',
-      layout: 'sidebar',
-      primaryColor: 'neon-lime'
+      primaryColor: 'neon-cyan',
+      layout: 'sidebar'
     }
   },
   'branding': {
-    stageId: 'branding',
     title: 'Branding',
     description: 'Forge your identity. Use the Synthesis Lab to create cinematic portraits and outreach sequences that tell your story.',
     systemPromptTemplate: `You are Skylar, the AI Career Engine. You are in the "Branding" phase with {{user.displayName}}.
@@ -101,12 +93,11 @@ Tone: Creative, bold, and aesthetic-focused.`,
     allowedModalities: ['text', 'image'],
     uiConfig: {
       theme: 'neon',
-      layout: 'sidebar',
-      primaryColor: 'neon-cyan'
+      primaryColor: 'neon-cyan',
+      layout: 'sidebar'
     }
   },
   'outreach': {
-    stageId: 'outreach',
     title: 'Outreach',
     description: 'Launch your campaign. Execute your outreach strategy and prepare for high-stakes interviews with simulated coaching.',
     systemPromptTemplate: `You are Skylar, the AI Career Engine. You are in the "Outreach" phase with {{user.displayName}}.
@@ -127,8 +118,53 @@ Tone: Tactical, supportive, and high-energy.`,
     allowedModalities: ['text', 'audio', 'video'],
     uiConfig: {
       theme: 'dark',
-      layout: 'sidebar',
-      primaryColor: 'neon-magenta'
+      primaryColor: 'neon-magenta',
+      layout: 'sidebar'
     }
+  }
+};
+
+/**
+ * Guidance for updating Stage Management items.
+ */
+export const STAGE_MANAGEMENT_GUIDANCE = {
+  systemPromptTemplate: {
+    title: 'System Prompt Template Guidance',
+    content: `
+The System Prompt Template is the "brain" of Skylar for this specific stage. It defines her personality, goals, and constraints.
+
+### Key Variables
+You can use the following variables in your template:
+- {{user.displayName}}: The user's full name.
+- {{user.firstName}}: The user's first name.
+- {{user.role}}: The user's current or target role.
+- {{user.sector}}: The industry sector the user is focused on.
+- {{stage.title}}: The name of the current stage.
+
+### Best Practices
+1. **Define the Goal**: Clearly state what Skylar should help the user achieve in this turn.
+2. **Set the Tone**: Use adjectives like "Provocative", "Empathetic", or "Analytical".
+3. **Step-by-Step Instructions**: Give Skylar a numbered list of steps to follow.
+4. **Action Triggers**: Mention specific actions Skylar can trigger (e.g., 'save_strengths', 'generate_portrait').
+5. **Constraints**: Tell Skylar what NOT to do (e.g., "Don't give generic advice; always reference the user's Wavvault data").
+    `
+  },
+  requiredArtifacts: {
+    title: 'Required Artifacts Guidance',
+    content: `
+List the specific outputs the user must produce to "pass" this stage. 
+These will be displayed as a checklist in the UI.
+Example: ["Resume", "3 Commitments", "DNA Summary"]
+    `
+  },
+  allowedModalities: {
+    title: 'Allowed Modalities Guidance',
+    content: `
+Control how the user can interact with Skylar:
+- **text**: Standard chat input.
+- **audio**: Enables the microphone button for voice-to-text.
+- **image**: Enables file uploads (images, PDFs, docs).
+- **video**: Enables video recording or upload options.
+    `
   }
 };

@@ -71,20 +71,45 @@ export const wavvaultService = {
   subscribeToArtifacts,
 };
 
-export async function writeUserWavvault(data: any) {
+const generateHash = (data: any) => {
+  const str = JSON.stringify(data);
+  let hash = 0;
+  for (let i = 0; i < str.length; i++) {
+    const char = str.charCodeAt(i);
+    hash = (hash << 5) - hash + char;
+    hash |= 0;
+  }
+  return 'v1-' + Math.abs(hash).toString(16);
+};
+
+export async function writeUserWavvault(data: any, isCommit: boolean = false) {
   const { userId, ...rest } = data;
   if (!userId) throw new Error('userId is required for writeUserWavvault');
   const docRef = doc(db, 'wavvault', userId);
-  await setDoc(
-    docRef,
-    {
-      ...rest,
+  
+  const hash = generateHash(rest);
+  const updateData: any = {
+    ...rest,
+    userId,
+    updatedAt: serverTimestamp(),
+  };
+
+  if (isCommit) {
+    updateData.lastCommitHash = hash;
+    updateData.lastCommitTimestamp = serverTimestamp();
+    
+    // Also save to snapshots collection
+    const snapshotRef = doc(db, 'wavvault_snapshots', userId);
+    await setDoc(snapshotRef, {
+      data: rest,
+      hash,
       userId,
-      updatedAt: serverTimestamp(),
-    },
-    { merge: true }
-  );
-  return { success: true, userId };
+      timestamp: serverTimestamp()
+    });
+  }
+
+  await setDoc(docRef, updateData, { merge: true });
+  return { success: true, userId, hash };
 }
 
 export async function writeArtifact(data: any) {
@@ -134,10 +159,14 @@ export async function analyzeWavvaultDelta(userId: string, currentData: any) {
 }
 
 export async function verifyWavvaultIntegrity(userId: string, data: any) {
-  // Mock integrity check
+  const latestSnapshot = await getLatestSnapshot(userId);
+  const actualHash = generateHash(data);
+  const expectedHash = latestSnapshot?.hash || 'none';
+
   return {
-    isValid: true,
-    hash: 'v1-' + Math.random().toString(36).substring(7),
+    valid: latestSnapshot ? actualHash === expectedHash : true,
+    actualHash,
+    expectedHash,
     timestamp: new Date().toISOString(),
   };
 }

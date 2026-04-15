@@ -1,6 +1,6 @@
 import { doc, getDoc, collection, getDocs, onSnapshot, setDoc } from 'firebase/firestore';
 import { db } from '../lib/firebase';
-import { SkylarGlobalConfig, SkylarStageConfig } from '../types/skylar-config';
+import { SkylarGlobalConfig, SkylarStageConfig, DEFAULT_MODALITIES } from '../types/skylar-config';
 import { handleFirestoreError, OperationType } from '../lib/firestore-errors';
 
 // In-memory cache
@@ -82,18 +82,35 @@ export const configService = {
     }
 
     try {
-      const stagesRef = collection(db, 'journey_stages');
+      const stagesRef = collection(db, 'agent_configs');
       const snapshot = await getDocs(stagesRef);
       
       const stages: Record<string, SkylarStageConfig> = {};
       snapshot.forEach((doc) => {
-        stages[doc.id] = doc.data() as SkylarStageConfig;
+        const data = doc.data();
+        // Map JourneyStageDefinition to SkylarStageConfig if needed
+        stages[doc.id] = {
+          stageId: doc.id,
+          stageTitle: data.title || data.stageTitle || doc.id,
+          description: data.description || '',
+          systemPromptTemplate: data.systemPromptTemplate || '',
+          requiredArtifacts: data.requiredArtifacts || [],
+          allowedModalities: Array.isArray(data.allowedModalities) 
+            ? {
+                text: data.allowedModalities.includes('text'),
+                audio: data.allowedModalities.includes('audio'),
+                image: data.allowedModalities.includes('image'),
+                video: data.allowedModalities.includes('video'),
+              }
+            : data.allowedModalities || DEFAULT_MODALITIES,
+          uiConfig: data.uiConfig || { theme: 'dark', layout: 'split' }
+        } as SkylarStageConfig;
       });
 
       journeyStagesCache = stages;
       return stages;
     } catch (error) {
-      handleFirestoreError(error, OperationType.LIST, 'journey_stages');
+      handleFirestoreError(error, OperationType.LIST, 'agent_configs');
       throw error;
     }
   },
@@ -107,25 +124,41 @@ export const configService = {
     }
 
     try {
-      const docRef = doc(db, 'journey_stages', stageId);
+      const docRef = doc(db, 'agent_configs', stageId);
       const docSnap = await getDoc(docRef);
 
       if (docSnap.exists()) {
-        const data = docSnap.data() as SkylarStageConfig;
+        const data = docSnap.data();
+        const config = {
+          stageId: docSnap.id,
+          stageTitle: data.title || data.stageTitle || docSnap.id,
+          description: data.description || '',
+          systemPromptTemplate: data.systemPromptTemplate || '',
+          requiredArtifacts: data.requiredArtifacts || [],
+          allowedModalities: Array.isArray(data.allowedModalities) 
+            ? {
+                text: data.allowedModalities.includes('text'),
+                audio: data.allowedModalities.includes('audio'),
+                image: data.allowedModalities.includes('image'),
+                video: data.allowedModalities.includes('video'),
+              }
+            : data.allowedModalities || DEFAULT_MODALITIES,
+          uiConfig: data.uiConfig || { theme: 'dark', layout: 'split' }
+        } as SkylarStageConfig;
         
         // Update cache
         if (!journeyStagesCache) {
           journeyStagesCache = {};
         }
-        journeyStagesCache[stageId] = data;
+        journeyStagesCache[stageId] = config;
         
-        return data;
+        return config;
       } else {
         console.warn(`Journey stage ${stageId} not found.`);
         return null;
       }
     } catch (error) {
-      handleFirestoreError(error, OperationType.GET, `journey_stages/${stageId}`);
+      handleFirestoreError(error, OperationType.GET, `agent_configs/${stageId}`);
       throw error;
     }
   },
@@ -135,8 +168,20 @@ export const configService = {
    */
   async updateStageConfig(stageId: string, config: SkylarStageConfig): Promise<void> {
     try {
-      const docRef = doc(db, 'journey_stages', stageId);
-      await setDoc(docRef, config, { merge: true });
+      const docRef = doc(db, 'agent_configs', stageId);
+      // Save in a format compatible with JourneyStageDefinition
+      const saveFormat = {
+        stageId: config.stageId,
+        title: config.stageTitle,
+        description: config.description,
+        systemPromptTemplate: config.systemPromptTemplate,
+        requiredArtifacts: config.requiredArtifacts,
+        allowedModalities: Object.entries(config.allowedModalities)
+          .filter(([_, allowed]) => allowed)
+          .map(([modality]) => modality),
+        uiConfig: config.uiConfig
+      };
+      await setDoc(docRef, saveFormat, { merge: true });
       
       // Update cache
       if (!journeyStagesCache) {
@@ -144,7 +189,7 @@ export const configService = {
       }
       journeyStagesCache[stageId] = config;
     } catch (error) {
-      handleFirestoreError(error, OperationType.UPDATE, `journey_stages/${stageId}`);
+      handleFirestoreError(error, OperationType.UPDATE, `agent_configs/${stageId}`);
       throw error;
     }
   },

@@ -546,7 +546,7 @@ class SkylarService {
     const systemInstruction = this.getSystemPromptForPhase(phase) + `\n\nContext from Wavvault: ${JSON.stringify(wavvaultContext || {})}`;
 
     const chat = ai.chats.create({
-      model: 'gemini-3.1-pro-preview',
+      model: 'gemini-3-flash-preview',
       config: {
         systemInstruction,
         tools: tools,
@@ -900,7 +900,7 @@ class SkylarService {
     `;
 
     const response = await ai.models.generateContent({
-      model: 'gemini-3.1-pro-preview',
+      model: 'gemini-3-flash-preview',
       contents: [{ parts: [{ text: prompt }] }],
       config: {
         responseMimeType: 'application/json',
@@ -1052,7 +1052,7 @@ class SkylarService {
     `;
 
     const response = await ai.models.generateContent({
-      model: 'gemini-3.1-pro-preview',
+      model: 'gemini-3-flash-preview',
       contents: [{ parts: [{ text: prompt }] }],
       config: {
         responseMimeType: 'application/json',
@@ -1095,7 +1095,7 @@ class SkylarService {
     `;
 
     const response = await ai.models.generateContent({
-      model: 'gemini-3.1-pro-preview',
+      model: 'gemini-3-flash-preview',
       contents: [{ parts: [{ text: prompt }] }],
       config: {
         responseMimeType: 'application/json',
@@ -1183,7 +1183,7 @@ class SkylarService {
     `;
 
     const response = await ai.models.generateContent({
-      model: 'gemini-3.1-pro-preview',
+      model: 'gemini-3-flash-preview',
       contents: [{ parts: [{ text: prompt }] }],
       config: {
         responseMimeType: 'application/json',
@@ -1231,7 +1231,7 @@ class SkylarService {
     const insights = await this.fetchConfirmedInsights(userId);
 
     const response = await ai.models.generateContent({
-      model: 'gemini-3.1-pro-preview',
+      model: 'gemini-3-flash-preview',
       contents: `You are Skylar, but for this session, you are masking as ${persona}. 
       Based on the user's professional DNA: ${JSON.stringify(insights)}, 
       start a high-stakes interview. Introduce yourself in character and ask the first challenging question.
@@ -1263,7 +1263,7 @@ class SkylarService {
     const insights = await this.fetchConfirmedInsights(userId);
 
     const response = await ai.models.generateContent({
-      model: 'gemini-3.1-pro-preview',
+      model: 'gemini-3-flash-preview',
       contents: `You are Skylar masking as ${persona}. 
       User DNA: ${JSON.stringify(insights)}
       Conversation History: ${JSON.stringify(history)}
@@ -1292,7 +1292,7 @@ class SkylarService {
   async getInterviewDebrief(userId: string, sessionHistory: any[]): Promise<any> {
     const ai = getAI();
     const response = await ai.models.generateContent({
-      model: 'gemini-3.1-pro-preview',
+      model: 'gemini-3-flash-preview',
       contents: `Analyze this interview session history: ${JSON.stringify(sessionHistory)}.
       Provide a "Strategic Debrief" including a "Narrative Heatmap" of DNA signal strength, 
       key areas of resonance, and specific tactical improvements for future high-stakes conversations.`,
@@ -1379,7 +1379,7 @@ class SkylarService {
     `;
 
     const response = await ai.models.generateContent({
-      model: 'gemini-3.1-pro-preview',
+      model: 'gemini-3-flash-preview',
       contents: [{ parts: [{ text: prompt }] }],
       config: {
         responseMimeType: 'application/json',
@@ -1425,7 +1425,7 @@ class SkylarService {
     `;
 
     const response = await ai.models.generateContent({
-      model: 'gemini-3.1-pro-preview',
+      model: 'gemini-3-flash-preview',
       contents: [{ parts: [{ text: prompt }] }],
       config: {
         responseMimeType: 'application/json',

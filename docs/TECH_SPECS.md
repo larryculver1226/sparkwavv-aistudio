@@ -11,6 +11,45 @@
 - Firebase for backend services (Auth, Firestore) if configured.
 - **Local MCP Server**: A Model Context Protocol server (`scripts/mcp-server`) running via stdio to expose project history (Tracks, Changelog, Tech Specs) to local AI coding assistants (e.g., Cursor, Cline).
 
+## Configuration Guide (Track 051)
+
+To enable full enterprise intelligence, the following environment variables must be configured in the AI Studio Settings:
+
+### 1. Firebase & Core Infrastructure
+- `FIREBASE_SERVICE_ACCOUNT_JSON`: The full JSON string of your Google Cloud Service Account key. This enables Firebase Admin and Vertex AI Enterprise features.
+- `VITE_FIREBASE_DATABASE_ID`: The ID of your Firestore database (e.g., `(default)` or a custom ID like `sparkwavv-db`).
+- `SESSION_SECRET`: A random string for securing user sessions.
+
+### 2. Vertex AI (Enterprise Intelligence)
+- `VERTEX_AI_PROJECT_ID`: Your Google Cloud Project ID (defaults to Firebase Project ID if omitted).
+- `VERTEX_AI_LOCATION`: The region for Vertex AI services (e.g., `us-central1` or `global`).
+- `VERTEX_AI_SEARCH_ENGINE_ID`: The ID of your Vertex AI Search Engine for the Wavvault.
+- `VERTEX_AI_SEARCH_DATA_STORE_ID`: The ID of the associated Data Store.
+- `VERTEX_AI_MEDLM_MODEL_ID`: The specific MedLM model ID for healthcare intelligence (e.g., `medlm-medium`).
+- `VERTEX_AI_FINE_TUNING_BUCKET`: The GCS bucket name for staging training data (e.g., `my-project-fine-tuning`).
+- `VERTEX_AI_LOBKOWICZ_ENDPOINT_ID`: The Endpoint ID for the fine-tuned Philip Lobkowicz model.
+- `VERTEX_AI_FINANCE_ENDPOINT_ID`: The Endpoint ID for the Finance Sector Intelligence model.
+- `VERTEX_AI_TECH_ENDPOINT_ID`: The Endpoint ID for the Tech Sector Intelligence model.
+
+### 3. External APIs
+- `GEMINI_API_KEY`: Required for standard Skylar interactions and benefit regeneration.
+- `SENDGRID_API_KEY`: Required for sending automated career reports and notifications.
+
+## API Management (Track 064)
+
+Sparkwavv uses **Google Apigee** (planned) as the API Management layer to secure and scale its backend services.
+
+### Key Benefits:
+- **Security**: Centralized OAuth2/JWT verification and RBAC enforcement.
+- **Rate Limiting**: Protection against DoS and quota management for AI-intensive endpoints.
+- **Analytics**: Real-time monitoring of API usage across tenants (e.g., Sparkwavv, Kwieri).
+- **Partner Enablement**: Securely exposing career intelligence APIs to third-party partners.
+
+### Managed Endpoints:
+- `/api/partner/*`: Partner-facing career progress and invitation APIs.
+- `/api/admin/*`: Sensitive system management and Vertex AI orchestration APIs.
+- `/api/wavvault/*`: Neural Synthesis Engine data access.
+
 ## Skylar Agent Architecture (Track 022 & 027)
 ### Orchestration (LangGraph)
 - **Framework**: `@langchain/langgraph`, `@langchain/core`, `@langchain/google-vertexai`.
@@ -83,13 +122,17 @@
     - `perfectDay`: `{ morning: string, afternoon: string, evening: string }`
   - `careerDnaHypothesis`: Array of strings representing core attributes.
 
-## Model Garden Fine-Tuned Models
-- **Routing Logic**: `vertexService.ts` routes requests to specific fine-tuned models if their corresponding endpoint IDs are set in the environment variables.
-- **Environment Variables**:
-  - `VERTEX_AI_LOBKOWICZ_ENDPOINT_ID`: Endpoint ID for the Philip Lobkowicz Strategic Coaching Methodology model.
-  - `VERTEX_AI_FINANCE_ENDPOINT_ID`: Endpoint ID for the Finance Sector Intelligence model.
-  - `VERTEX_AI_TECH_ENDPOINT_ID`: Endpoint ID for the Tech Sector Intelligence model.
-- **Fallback Mechanism**: If an endpoint ID is not configured (e.g., in local development), the service safely falls back to the standard `gemini-3.1-pro-preview` model.
+## Vertex AI Enterprise Intelligence (Track 056)
+### Current Status
+- **Managed RAG (v1)**: Active via Vertex AI Search (Discovery Engine).
+- **Vector Search (v2)**: In development (currently mocked).
+- **Fine-Tuning**: Synthetic data generation active; Tuning job execution in development.
+- **Sector Intelligence**: Active with fallbacks; Endpoint integration in progress.
+
+### Planned Completions
+- **Vector Search**: Transition to real Index/Endpoint deployment on Vertex AI.
+- **Tuning Jobs**: Integration with Vertex AI Tuning API for methodology fine-tuning.
+- **GCS Pipeline**: Automated data staging and bucket management.
 
 ## Track 031: Regression Tests & Admin Feedback
 ### Test Architecture

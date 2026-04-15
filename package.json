@@ -20,6 +20,7 @@
     "test:e2e:smoke": "playwright install chromium && playwright test --grep @smoke"
   },
   "dependencies": {
+    "@google-cloud/aiplatform": "^6.5.0",
     "@google-cloud/discoveryengine": "^2.6.0",
     "@google-cloud/storage": "^7.19.0",
     "@google-cloud/vertexai": "^1.10.0",
