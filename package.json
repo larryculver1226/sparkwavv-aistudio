@@ -20,6 +20,9 @@
     "test:e2e:smoke": "playwright install chromium && playwright test --grep @smoke"
   },
   "dependencies": {
+    "@genkit-ai/core": "^1.32.0",
+    "@genkit-ai/googleai": "^1.28.0",
+    "@genkit-ai/vertexai": "^1.32.0",
     "@google-cloud/aiplatform": "^6.5.0",
     "@google-cloud/discoveryengine": "^2.6.0",
     "@google-cloud/storage": "^7.19.0",
@@ -47,7 +50,7 @@
     "fast-xml-parser": "^5.5.8",
     "file-saver": "^2.0.5",
     "firebase": "^12.9.0",
-    "firebase-admin": "^13.7.0",
+    "firebase-admin": "^13.8.0",
     "jspdf": "^4.2.1",
     "lucide-react": "^0.546.0",
     "mammoth": "^1.12.0",

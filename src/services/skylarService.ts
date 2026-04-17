@@ -2,7 +2,7 @@ import { GoogleGenAI, Modality, Type, FunctionDeclaration, ThinkingLevel } from 
 import { getGeminiApiKey } from './aiConfig';
 import * as mammoth from 'mammoth';
 import { KnowledgeGraph, WavvaultData, TargetOpportunity } from '../types/wavvault';
-import { JOURNEY_STAGES } from '../config/journeyStages';
+import { DEFAULT_JOURNEY_STAGES } from '../config/defaultStageContent';
 import { JourneyStageDefinition } from '../types/skylar';
 import { SkylarStageConfig } from '../types/skylar-config';
 import { auth } from '../lib/firebase';
@@ -503,10 +503,10 @@ export const PERSONA_CONFIG = {
 class SkylarService {
   public getStageConfig(stageId: string): JourneyStageDefinition {
     const normalizedId = stageId.toLowerCase();
-    const config = JOURNEY_STAGES[normalizedId];
+    const config = DEFAULT_JOURNEY_STAGES[normalizedId];
     if (!config) {
       console.warn(`No config found for stage: ${stageId}. Falling back to dive-in.`);
-      return JOURNEY_STAGES['dive-in'];
+      return DEFAULT_JOURNEY_STAGES['dive-in'];
     }
     return config;
   }
@@ -677,7 +677,7 @@ class SkylarService {
     return base64Audio ? `data:audio/mp3;base64,${base64Audio}` : '';
   }
 
-  // Vertex AI Agentic Chat - Migrated to LangGraph
+  // Vertex AI Agentic Chat - Migrated to Genkit
   async chatWithVertex(
     userId: string,
     message: string,
@@ -688,46 +688,38 @@ class SkylarService {
   ): Promise<any> {
     try {
       // Dynamically import to avoid circular dependency issues at load time
-      const { skylarGraph } = await import('./skylarGraph');
-      const { HumanMessage, AIMessage } = await import('@langchain/core/messages');
+      const { runJourneyStageFlow } = await import('./genkitService');
 
-      // Convert history to LangChain format
-      const lcHistory = history.map((h) => {
-        if (h.role === 'user') return new HumanMessage(h.parts[0].text);
-        return new AIMessage(h.parts[0].text);
-      });
-
-      let content: any = message;
+      const attachments: any[] = [];
       if (fileData) {
-        content = [
-          { type: 'text', text: message },
-          {
-            type: 'image_url',
-            image_url: { url: `data:${fileData.mimeType};base64,${fileData.data}` }
-          }
-        ];
+        attachments.push({
+          type: fileData.mimeType,
+          data: `data:${fileData.mimeType};base64,${fileData.data}`,
+        });
       }
 
-      const inputMessage = new HumanMessage({ content });
+      const stageId = stageConfig && 'stageId' in stageConfig ? stageConfig.stageId : 'dive-in';
 
-      const initialState = {
-        messages: [...lcHistory, inputMessage],
-        stageConfig,
+      const result = await runJourneyStageFlow({
         userId,
-        executedActions: [],
-        token
-      };
+        stageId,
+        message,
+        history,
+        attachments,
+        stageConfig
+      });
+      
+      if (result.debugData) {
+        const { genkitTracer } = await import('./agentOpsService');
+        genkitTracer.addTrace(result.debugData);
+      }
 
-      const finalState = await skylarGraph.invoke(initialState) as any;
-      
-      const lastMessage = finalState.messages[finalState.messages.length - 1];
-      
       return { 
         response: {
-          text: lastMessage.content,
-          candidates: [{ content: { parts: [{ text: lastMessage.content }] } }] // Mocking original response structure for UI compatibility
+          text: result.text,
+          candidates: [{ content: { parts: [{ text: result.text }] } }] // Mocking original response structure for UI compatibility
         }, 
-        executedActions: finalState.executedActions 
+        executedActions: result.executedActions 
       };
     } catch (error) {
       console.error('Skylar Chat Error:', error);

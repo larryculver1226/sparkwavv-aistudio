@@ -169,16 +169,15 @@ export const configService = {
   async updateStageConfig(stageId: string, config: SkylarStageConfig): Promise<void> {
     try {
       const docRef = doc(db, 'agent_configs', stageId);
-      // Save in a format compatible with JourneyStageDefinition
+      // Save the exact format we use internally, so fields like widgets aren't lost
       const saveFormat = {
         stageId: config.stageId,
-        title: config.stageTitle,
+        stageTitle: config.stageTitle,
+        title: config.stageTitle, // Explicitly save title too
         description: config.description,
         systemPromptTemplate: config.systemPromptTemplate,
         requiredArtifacts: config.requiredArtifacts,
-        allowedModalities: Object.entries(config.allowedModalities)
-          .filter(([_, allowed]) => allowed)
-          .map(([modality]) => modality),
+        allowedModalities: config.allowedModalities,
         uiConfig: config.uiConfig
       };
       await setDoc(docRef, saveFormat, { merge: true });

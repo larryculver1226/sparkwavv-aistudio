@@ -74,12 +74,7 @@ import { skylar } from '../services/skylarService';
 import { GaugeChart } from '../components/dashboard/Gauges';
 import { JourneyTimeline } from '../components/dashboard/JourneyTimeline';
 import { MentorNote } from '../components/dashboard/MentorNote';
-import {
-  IgnitionView,
-  DiscoveryView,
-  BrandingView,
-  OutreachView,
-} from '../components/dashboard/PhaseViews';
+import { DynamicPhaseView } from '../components/dashboard/DynamicPhaseView';
 
 // Map journey stages to timeline stages
 export const getTimelineStage = (s: string) => {
@@ -1215,8 +1210,7 @@ export const UserDashboard: React.FC<{ userId: string; isAdmin?: boolean }> = ({
 
                   {/* Phase Specific View */}
                   <div className="mb-12">
-                    {timelineStage === 'Ignition' && (
-                      <IgnitionView
+                      <DynamicPhaseView
                         userId={userId}
                         currentStage={timelineStage}
                         data={data}
@@ -1231,52 +1225,6 @@ export const UserDashboard: React.FC<{ userId: string; isAdmin?: boolean }> = ({
                         onNavigate={handleViewChange}
                         onActivityClick={handleActivityClick}
                       />
-                    )}
-                    {timelineStage === 'Discovery' && (
-                      <DiscoveryView
-                        userId={userId}
-                        currentStage={timelineStage}
-                        data={data}
-                        artifacts={artifacts}
-                        profile={profile}
-                        wavvaultData={wavvaultData}
-                        onActionClick={(actionId) => {
-                          if (actionId === 'validation') setIsGateModalOpen(true);
-                        }}
-                        onNavigate={handleViewChange}
-                        onActivityClick={handleActivityClick}
-                      />
-                    )}
-                    {timelineStage === 'Branding' && (
-                      <BrandingView
-                        userId={userId}
-                        currentStage={timelineStage}
-                        data={data}
-                        artifacts={artifacts}
-                        profile={profile}
-                        wavvaultData={wavvaultData}
-                        onActionClick={(actionId) => {
-                          if (actionId === 'validation') setIsGateModalOpen(true);
-                        }}
-                        onNavigate={handleViewChange}
-                        onActivityClick={handleActivityClick}
-                      />
-                    )}
-                    {timelineStage === 'Outreach' && (
-                      <OutreachView
-                        userId={userId}
-                        currentStage={timelineStage}
-                        data={data}
-                        artifacts={artifacts}
-                        profile={profile}
-                        wavvaultData={wavvaultData}
-                        onActionClick={(actionId) => {
-                          if (actionId === 'validation') setIsGateModalOpen(true);
-                        }}
-                        onNavigate={handleViewChange}
-                        onActivityClick={handleActivityClick}
-                      />
-                    )}
                   </div>
 
                   {/* Evolution Visualizer Modal */}

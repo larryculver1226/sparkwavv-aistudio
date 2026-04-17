@@ -9,7 +9,7 @@ interface SkylarStageWrapperProps {
   children?: React.ReactNode;
   onActionTriggered?: (action: string, payload: any) => void;
   initialContext?: string;
-  layout?: 'split' | 'sidebar' | 'overlay';
+  layout?: 'split' | 'sidebar' | 'overlay' | 'chat-first' | 'artifact-first';
 }
 
 /**

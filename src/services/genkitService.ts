@@ -1,0 +1,326 @@
+import { genkit, z } from 'genkit';
+import { googleAI, gemini15Flash } from '@genkit-ai/googleai';
+import { getGeminiApiKey } from './aiConfig';
+import { skylar } from './skylarService';
+import { interpolatePrompt } from '../utils/interpolation';
+import { agentOpsService } from './agentOpsService';
+
+// Initialize Genkit
+export const ai = genkit({
+  plugins: [googleAI({ apiKey: getGeminiApiKey() || process.env.GEMINI_API_KEY })],
+  model: gemini15Flash,
+});
+
+// Define Tools
+export const createSparkwavvAccountTool = ai.defineTool(
+  {
+    name: 'create_sparkwavv_account',
+    description: 'Trigger the account creation flow for a prospective user. Call this ONLY when the user has provided their Effort Tier, RPPs, and Energy Protocol during the Dive-In phase.',
+    inputSchema: z.object({
+      effortTier: z.string().describe('The selected effort tier (e.g., 3.5 hrs/week or 7 hrs/week)'),
+      rpps: z.array(z.string()).describe('List of Role Playing Partners'),
+      energyProtocol: z.string().describe('The defined energy management protocol'),
+    }),
+  },
+  async (input) => {
+    return { status: 'success', message: 'Account creation flow triggered.', data: input };
+  }
+);
+
+export const searchWavvaultTool = ai.defineTool(
+  {
+    name: 'search_wavvault',
+    description: 'Search the collective, anonymized Wavvault for similar career paths, strengths, and stories from other users to provide comparative insights.',
+    inputSchema: z.object({
+      query: z.string().describe("The career-related query to search for (e.g., 'career switch from nursing to tech')"),
+    }),
+  },
+  async (input) => {
+    // In a real flow, we would pass the token via context, but for now we'll use a generic search
+    const results = await skylar.performAnonymizedSearch(input.query);
+    return { content: results };
+  }
+);
+
+export const executeMinorUpdateTool = ai.defineTool(
+  {
+    name: 'execute_minor_update',
+    description: "Automatically execute a minor update to the user's dashboard (e.g., skills, attributes, journeyStage, careerHappiness). Use this for non-strategic updates.",
+    inputSchema: z.object({
+      field: z.string().describe("The field to update (e.g., 'journeyStage', 'careerHappiness', 'resumeStatus')"),
+      value: z.string().describe('The new value for the field'),
+      reasoning: z.string().describe('The reason why this update is being executed'),
+      userId: z.string().optional().describe('The user ID to update'),
+    }),
+  },
+  async (input) => {
+    if (!input.userId) {
+      return { status: 'error', message: 'User ID is required for this action.' };
+    }
+    const result = await skylar.executeAction(input.userId, 'update_dashboard', { 
+      field: input.field, 
+      value: input.value, 
+      reasoning: input.reasoning 
+    });
+    return result;
+  }
+);
+
+export const getMarketIntelligenceTool = ai.defineTool(
+  {
+    name: 'get_market_intelligence',
+    description: 'Fetch real-time market trends, industry shifts, and skill demand data from the Market Intelligence Grid (MIG).',
+    inputSchema: z.object({
+      industry: z.string().describe("The industry to search for (e.g., 'Tech', 'Healthcare', 'Finance')"),
+      role: z.string().describe("The specific role to analyze (e.g., 'Software Architect', 'Nurse Practitioner')"),
+    }),
+  },
+  async (input) => {
+    const results = await skylar.performMarketIntelligenceSearch(input.industry, input.role);
+    return results;
+  }
+);
+
+export const performGateReviewTool = ai.defineTool(
+  {
+    name: 'perform_gate_review',
+    description: "Perform a 'Validation Gate' review to ensure the user is ready to move to the next phase. Phases: Dive-In, Ignition, Discovery, Branding, Outreach.",
+    inputSchema: z.object({
+      currentPhase: z.string().describe('The current phase the user is in (Dive-In, Ignition, Discovery, Branding, Outreach)'),
+      targetPhase: z.string().describe('The phase the user wants to move to (Dive-In, Ignition, Discovery, Branding, Outreach)'),
+      userData: z.string().describe("A summary of the user's progress and data relevant to the gate criteria"),
+      userId: z.string().optional().describe('The user ID'),
+    }),
+  },
+  async (input) => {
+    if (input.userId) {
+      const results = await skylar.performGateReview(input.userId, input.currentPhase, input.targetPhase, []);
+      return results;
+    }
+    return { status: 'warning', message: 'User context not found.' };
+  }
+);
+
+export const proposeMajorShiftTool = ai.defineTool(
+  {
+    name: 'propose_major_shift',
+    description: "Propose a major shift in the user's professional DNA (e.g., a pivot, a new core value, or a change in primary goal).",
+    inputSchema: z.object({
+      type: z.string().describe("The type of shift: 'pivot', 'core_value', 'primary_goal', or 'strength'"),
+      content: z.string().describe('The description of the proposed shift'),
+      evidence: z.string().describe('The reasoning or evidence from the conversation that led to this proposal'),
+      tags: z.array(z.string()).optional().describe('Optional tags for categorization'),
+    }),
+  },
+  async (input) => {
+    return { status: 'proposed', data: input };
+  }
+);
+
+export const flagDnaConflictTool = ai.defineTool(
+  {
+    name: 'flag_dna_conflict',
+    description: "Flag a conflict between a new insight and an existing confirmed 'Current Truth' in the user's professional DNA.",
+    inputSchema: z.object({
+      newInsight: z.object({ type: z.string(), content: z.string(), evidence: z.string() }),
+      existingInsightId: z.string().describe('The ID of the existing confirmed insight that is being conflicted'),
+      conflictReason: z.string().describe('Explanation of why these two insights are in conflict'),
+    }),
+  },
+  async (input) => {
+    return { status: 'flagged', data: input };
+  }
+);
+
+export const proposeDashboardUpdateTool = ai.defineTool(
+  {
+    name: 'propose_dashboard_update',
+    description: "Propose an update to a specific field in the user's dashboard based on the conversation progress. This will NOT execute until the user confirms.",
+    inputSchema: z.object({
+      field: z.string().describe("The field to update (e.g., 'journeyStage', 'careerHappiness', 'resumeStatus')"),
+      value: z.string().describe('The new value for the field'),
+      reasoning: z.string().describe('The reason why this update is being proposed'),
+    }),
+  },
+  async (input) => {
+    return { status: 'proposed', data: input };
+  }
+);
+
+export const proposeMilestoneAdditionTool = ai.defineTool(
+  {
+    name: 'propose_milestone_addition',
+    description: "Propose adding a new milestone to the user's career roadmap. This will NOT execute until the user confirms.",
+    inputSchema: z.object({
+      title: z.string().describe('The title of the milestone'),
+      description: z.string().describe('Detailed description of the milestone'),
+      targetDate: z.string().describe('Expected completion date (ISO format or descriptive)'),
+      reasoning: z.string().describe('The reason why this milestone is being proposed'),
+    }),
+  },
+  async (input) => {
+    return { status: 'proposed', data: input };
+  }
+);
+
+export const parseCareerArtifactTool = ai.defineTool(
+  {
+    name: 'parse_career_artifact',
+    description: "Analyze a user-provided career artifact (resume, cover letter, LinkedIn profile) for ATS compliance and alignment with their professional DNA.",
+    inputSchema: z.object({
+      artifactType: z.string().describe("The type of artifact (e.g., 'resume', 'linkedin_profile')"),
+      content: z.string().describe('The text content of the artifact'),
+    }),
+  },
+  async (input) => {
+    return { status: 'analyzed', message: 'Artifact analyzed for DNA and ATS compliance.', data: input };
+  }
+);
+
+export const generateAtsOptimizedContentTool = ai.defineTool(
+  {
+    name: 'generate_ats_optimized_content',
+    description: "Generate ATS-optimized content (e.g., resume bullets, summary) based on the user's professional DNA and target role.",
+    inputSchema: z.object({
+      targetRole: z.string().describe('The target role or job title'),
+      sourceMaterial: z.string().describe('The source material to optimize (e.g., existing resume bullets)'),
+    }),
+  },
+  async (input) => {
+    return { status: 'generated', message: 'Content generated.', data: input };
+  }
+);
+
+const allTools = [
+  createSparkwavvAccountTool,
+  searchWavvaultTool,
+  executeMinorUpdateTool,
+  getMarketIntelligenceTool,
+  performGateReviewTool,
+  proposeMajorShiftTool,
+  flagDnaConflictTool,
+  proposeDashboardUpdateTool,
+  proposeMilestoneAdditionTool,
+  parseCareerArtifactTool,
+  generateAtsOptimizedContentTool
+];
+
+// Define the main Journey Stage Flow
+export const runJourneyStageFlow = ai.defineFlow(
+  {
+    name: 'runJourneyStage',
+    inputSchema: z.object({
+      userId: z.string(),
+      stageId: z.string(),
+      message: z.string(),
+      history: z.array(z.any()).optional(),
+      attachments: z.array(z.any()).optional(),
+      stageConfig: z.any().optional(),
+    }),
+    outputSchema: z.object({
+      text: z.string(),
+      executedActions: z.array(z.any()),
+      debugData: z.any().optional(),
+    }),
+  },
+  async (input) => {
+    // 1. Fetch Current Truth
+    let currentTruth = '';
+    if (input.userId && input.userId !== 'anonymous') {
+      const insights = await skylar.fetchConfirmedInsights(input.userId);
+      if (insights.length > 0) {
+        currentTruth = `\n\nConfirmed Professional DNA (Current Truth):\n${insights.map((i: any) => `- [${i.type.toUpperCase()}] ${i.content}`).join('\n')}`;
+      }
+    }
+
+    // 2. Build System Prompt
+    let baseInstruction = '';
+    let stageConfig = input.stageConfig;
+    
+    if (!stageConfig && input.stageId) {
+      try {
+        stageConfig = await agentOpsService.getConfig(input.stageId);
+      } catch (error) {
+        console.error(`Failed to fetch config for stage ${input.stageId}:`, error);
+      }
+    }
+
+    if (stageConfig) {
+      const template = stageConfig.systemPromptTemplate;
+      const stageTitle = stageConfig.stageTitle || stageConfig.title;
+      const artifactName = stageConfig.requiredArtifacts?.[0];
+
+      baseInstruction = interpolatePrompt(template, {
+        user: { displayName: 'User' }, // In a real app, fetch from user profile
+        stage: { title: stageTitle, artifactName }
+      });
+    } else {
+      baseInstruction = skylar.getSystemPromptForPhase(input.stageId || 'dive-in', { displayName: 'User' });
+    }
+
+    const systemInstruction = `${baseInstruction}${currentTruth}`;
+
+    // 3. Format History for Genkit
+    const formattedHistory = (input.history || []).map((msg: any) => {
+      const role = msg.role === 'user' ? 'user' : 'model';
+      return { role, content: [{ text: msg.content }] };
+    });
+
+    // 4. Handle Multi-Modal Attachments
+    const userContent: any[] = [{ text: input.message }];
+    if (input.attachments && input.attachments.length > 0) {
+      for (const attachment of input.attachments) {
+        if (attachment.type.startsWith('image/')) {
+          userContent.push({ media: { url: attachment.data, contentType: attachment.type } });
+        } else if (attachment.type === 'application/pdf') {
+           // Genkit supports PDFs if the model supports it
+           userContent.push({ media: { url: attachment.data, contentType: attachment.type } });
+        } else {
+           // Fallback for text-based attachments
+           userContent.push({ text: `\n[Attachment: ${attachment.name}]\n${attachment.text || ''}` });
+        }
+      }
+    }
+
+    // 5. Generate Response
+    const response = await ai.generate({
+      model: gemini15Flash,
+      system: systemInstruction,
+      messages: [...formattedHistory, { role: 'user', content: userContent }] as any,
+      tools: allTools,
+      config: {
+        temperature: 0.7,
+      }
+    });
+
+    // 6. Extract Executed Actions
+    const executedActions: any[] = [];
+    if (response.toolRequests) {
+      for (const req of response.toolRequests as any[]) {
+        executedActions.push({
+          action: req.toolRequest?.name || req.name || req.tool?.name,
+          data: req.toolRequest?.input || req.input || req.tool?.input,
+        });
+      }
+    }
+
+    // 7. Construct Debug Payload
+    const debugData = {
+      timestamp: new Date().toISOString(),
+      stageId: input.stageId,
+      systemInstruction,
+      messages: [...formattedHistory, { role: 'user', content: userContent }],
+      toolsAvailable: allTools.map(t => t.name),
+      executedActions,
+      rawResponseText: response.text,
+      // Simplify the raw response to avoid massive deeply nested circular objects
+      usage: response.usage,
+    };
+
+    return {
+      text: response.text,
+      executedActions,
+      debugData,
+    };
+  }
+);

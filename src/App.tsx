@@ -3248,20 +3248,30 @@ export default function App() {
             </p>
           </div>
           <div className="pt-4 space-y-3">
-            <button
-              onClick={() => {
-                if (location.pathname === '/dive-in' || location.pathname === '/') {
-                  window.location.href = '/';
-                } else {
-                  window.location.href = '/admin/login';
-                }
-              }}
-              className="w-full py-4 bg-white text-black rounded-2xl font-bold hover:scale-[1.02] transition-transform"
-            >
-              {location.pathname === '/dive-in' || location.pathname === '/'
-                ? 'Retry Login'
-                : 'Retry Admin Login'}
-            </button>
+            {error?.includes('auth/network-request-failed') || error?.includes('popup-blocked') || error?.includes('3rd party cookies') ? (
+              <button
+                onClick={() => window.open(window.location.href, '_blank')}
+                className="w-full py-4 bg-white text-black rounded-2xl font-bold hover:scale-[1.02] transition-transform flex items-center justify-center gap-2"
+              >
+                Open in New Tab (Fixes Preview Issue)
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" /></svg>
+              </button>
+            ) : (
+              <button
+                onClick={() => {
+                  if (location.pathname === '/dive-in' || location.pathname === '/') {
+                    window.location.href = '/';
+                  } else {
+                    window.location.href = '/admin/login';
+                  }
+                }}
+                className="w-full py-4 bg-white text-black rounded-2xl font-bold hover:scale-[1.02] transition-transform"
+              >
+                {location.pathname === '/dive-in' || location.pathname === '/'
+                  ? 'Retry Login'
+                  : 'Retry Admin Login'}
+              </button>
+            )}
             <button
               onClick={() => window.location.reload()}
               className="w-full py-4 bg-white/5 text-white rounded-2xl font-bold hover:bg-white/10 transition-colors"

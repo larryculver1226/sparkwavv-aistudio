@@ -51,6 +51,19 @@ Sparkwavv uses **Google Apigee** (planned) as the API Management layer to secure
 - `/api/wavvault/*`: Neural Synthesis Engine data access.
 
 ## Skylar Agent Architecture (Track 022 & 027)
+
+### System Prompt Standardization Framework
+All Journey Phase Prompts must adhere to the standardized framework:
+- **IDENTITY & CONTEXT**: Strict usage of {{stage.title}}, {{user.displayName}}, {{user.firstName}}, {{user.role}}, and {{user.sector}}.
+- **GOAL**: Clearly defining the objective of the turn/phase.
+- **STAGE GATE REQUIREMENTS**: Explicit listing of artifacts that must be validated before unlocking future stage access.
+- **DUAL-LOGIC PERSONAS**: The Kick (Yin) / The Spark (Yang) logic splits.
+- **UI & DYNAMIC CONTENT AWARENESS**: Instructions on how the UI changes result from Skylar's actions.
+- **STEP-BY-STEP INSTRUCTIONS**: Actionable, numbered imperatives outlining the path.
+- **ACTION TRIGGERS**: Specific Conversation Triggers mapping directly to Tool Execution.
+- **CONSTRAINTS**: Explicit limits (e.g., "Don't give generic advice; always reference the user's Wavvault data").
+- **TONE**: Required stylistic characteristics (e.g., three descriptive adjectives).
+
 ### Orchestration (LangGraph)
 - **Framework**: `@langchain/langgraph`, `@langchain/core`, `@langchain/google-vertexai`.
 - **Graph State**: Tracks `messages` (conversation history), `stageConfig` (current journey stage definition), and `executedActions` (tools called during the run).

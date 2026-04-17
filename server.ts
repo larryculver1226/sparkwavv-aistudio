@@ -23,6 +23,13 @@ import admin from "firebase-admin";
 import { getFirestore, FieldValue } from "firebase-admin/firestore";
 import fs from "fs";
 import sgMail from "@sendgrid/mail";
+import {
+  generateDiscoverySummary,
+  parseResume,
+  generateBrandImage,
+  generateCinematicManifesto,
+  generateHomeBenefits
+} from './src/services/geminiBackend';
 import { XMLParser } from "fast-xml-parser";
 import { GoogleGenAI } from "@google/genai";
 import { 
@@ -81,7 +88,7 @@ const RSS_FEEDS = [
 // RBAC Roles
 // Using imported ROLES from constants
 
-let isFirestoreInitialized = true;
+const isFirestoreInitialized = true;
 
 async function getDashboard(db_unused: any, userId: string, sparkwavvId?: string) {
   if (!isFirebaseAdminConfigured || !userId) {
@@ -1770,7 +1777,7 @@ async function startServer() {
         const db = getAdminDb();
         if (!db) return res.status(503).json({ error: "Admin database not available" });
         
-        let query = db.collection('security_logs').orderBy('timestamp', 'desc');
+        const query = db.collection('security_logs').orderBy('timestamp', 'desc');
         
         const snapshot = await query.limit(limit).offset(offset).get();
         const logs = snapshot.docs.map(doc => {
@@ -2961,9 +2968,9 @@ async function startServer() {
 
         // 2. Check Cache for general feeds
         const cacheDoc = await db.collection('market_cache').doc('daily_pulse').get();
-        let cacheData = cacheDoc.exists ? cacheDoc.data() : null;
+        const cacheData = cacheDoc.exists ? cacheDoc.data() : null;
         
-        let relevantCache = cacheData?.feeds?.filter((f: any) => 
+        const relevantCache = cacheData?.feeds?.filter((f: any) => 
           f.source.toLowerCase().includes(industry.toLowerCase()) || 
           f.items.some((i: any) => i.title.toLowerCase().includes(industry.toLowerCase()))
         ) || [];
@@ -4056,7 +4063,7 @@ async function startServer() {
         
         // Fetch Firestore users to get journeyStage
         const db = getFirestoreDb();
-        let firestoreUsersMap = new Map();
+        const firestoreUsersMap = new Map();
         if (db) {
           const fsSnapshot = await db.collection('users').get();
           fsSnapshot.docs.forEach(doc => firestoreUsersMap.set(doc.id, doc.data()));
@@ -4171,6 +4178,61 @@ async function startServer() {
     } catch (error: any) {
       console.error("Error fetching Firebase users list:", error);
       res.status(500).json({ error: "Failed to fetch users", details: error.message });
+    }
+  });
+
+  app.post("/api/ai/brand-image", async (req, res) => {
+    try {
+      const { prompt, base64Image, mimeType, size } = req.body;
+      const result = await generateBrandImage(prompt, base64Image, mimeType, size);
+      res.json({ result });
+    } catch (error: any) {
+      console.error(error);
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.post("/api/ai/discovery-summary", async (req, res) => {
+    try {
+      const { userData } = req.body;
+      const result = await generateDiscoverySummary(userData);
+      res.json({ result });
+    } catch (error: any) {
+      console.error(error);
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.post("/api/ai/cinematic-manifesto", async (req, res) => {
+    try {
+      const { userData } = req.body;
+      const result = await generateCinematicManifesto(userData);
+      res.json({ result });
+    } catch (error: any) {
+      console.error(error);
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.post("/api/ai/parse-resume", async (req, res) => {
+    try {
+      const { fileData, mimeType } = req.body;
+      const result = await parseResume(fileData, mimeType);
+      res.json({ result });
+    } catch (error: any) {
+      console.error(error);
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.post("/api/ai/home-benefits", async (req, res) => {
+    try {
+      const { count } = req.body;
+      const result = await generateHomeBenefits(count);
+      res.json({ result });
+    } catch (error: any) {
+      console.error(error);
+      res.status(500).json({ error: error.message });
     }
   });
 

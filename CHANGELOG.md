@@ -4,6 +4,9 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 ### Added
+- **Track 006**: Revised System Prompt Templates (Second Pass) (Strictly enforced {{user.displayName}}, {{user.firstName}}, {{user.role}}, {{user.sector}}, and {{stage.title}} variables. Introduced new structural sections: GOAL, STAGE GATE REQUIREMENTS, STEP-BY-STEP INSTRUCTIONS, ACTION TRIGGERS, and CONSTRAINTS to heavily limit generic Skylar responses and lock future phase features until artifacts are validated).
+- **Track 005**: Consistent System Prompt Templates for Stage Management (Standardized Prompts across all 5 Journey phases with unified IDENTITY & CONTEXT, DUAL-LOGIC PERSONAS, UI AWARENESS, and TRIGGERS mapping).
+- **Track 065**: Genkit Integration for Journey Flow Control (Migrated Sparkwavv's journey orchestration from LangGraph to Google Genkit. Created `genkitService.ts` with `runJourneyStageFlow` to enable dynamic "no-code" editability via the Admin Dashboard, multi-modal support, and advanced telemetry).
 - **Track 064**: Apigee API Management Investigation (Investigated the integration of Google Apigee to secure and scale Sparkwavv's backend APIs, focusing on partner enablement and admin security).
 - **Track 063**: Vertex AI Configuration Guide (Created a comprehensive guide for finding and setting environment variables for Search Engines, Data Stores, MedLM, and Endpoints).
 - **Track 062**: Vertex AI Model Configuration Fix (Resolved "404 Not Found" errors by updating model IDs to valid Vertex AI versions, including `gemini-1.5-flash-002`, `gemini-1.5-pro`, and `medlm-medium@latest`. Fixed fallback logic in `vertexService.ts` to ensure robust industry-specific insights).

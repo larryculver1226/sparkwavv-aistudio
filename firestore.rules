@@ -555,20 +555,18 @@ service cloud.firestore {
     }
 
     function isValidJourneyStage(data) {
-      let allowedFields = ['stageId', 'stageTitle', 'description', 'systemPromptTemplate', 'requiredArtifacts', 'allowedModalities', 'theme'];
-      return hasRequiredFields(['stageId', 'stageTitle', 'description', 'systemPromptTemplate', 'requiredArtifacts', 'allowedModalities']) &&
+      let allowedFields = ['stageId', 'stageTitle', 'description', 'systemPromptTemplate', 'requiredArtifacts', 'allowedModalities', 'theme', 'uiConfig', 'title'];
+      return hasRequiredFields(['stageId']) &&
              hasOnlyAllowedFields(allowedFields) &&
              data.stageId is string && data.stageId.size() < 100 &&
-             data.stageTitle is string && data.stageTitle.size() < 200 &&
-             data.description is string && data.description.size() < 1000 &&
-             data.systemPromptTemplate is string && data.systemPromptTemplate.size() < 100000 &&
-             data.requiredArtifacts is list &&
-             data.allowedModalities is map &&
-             'text' in data.allowedModalities && data.allowedModalities.text is bool &&
-             'audio' in data.allowedModalities && data.allowedModalities.audio is bool &&
-             'image' in data.allowedModalities && data.allowedModalities.image is bool &&
-             'video' in data.allowedModalities && data.allowedModalities.video is bool &&
-             (!('theme' in data) || (data.theme is map && 'primaryColor' in data.theme && data.theme.primaryColor is string && 'layout' in data.theme && data.theme.layout in ['chat', 'split', 'artifact']));
+             (!('stageTitle' in data) || (data.stageTitle is string && data.stageTitle.size() < 200)) &&
+             (!('title' in data) || (data.title is string && data.title.size() < 200)) &&
+             (!('description' in data) || (data.description is string && data.description.size() < 10000)) &&
+             (!('systemPromptTemplate' in data) || (data.systemPromptTemplate is string && data.systemPromptTemplate.size() < 100000)) &&
+             (!('requiredArtifacts' in data) || data.requiredArtifacts is list) &&
+             (!('allowedModalities' in data) || data.allowedModalities is map || data.allowedModalities is list) &&
+             (!('uiConfig' in data) || data.uiConfig is map) &&
+             (!('theme' in data) || data.theme is map);
     }
 
     // ===============================================================

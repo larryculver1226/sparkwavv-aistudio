@@ -3,6 +3,8 @@
  * Blueprints for the SPARKWavv Dynamic Configuration System
  */
 
+import { StageWidgetConfig } from './skylar';
+
 export interface SkylarGlobalConfig {
   id: "skylar_global";
   version: string;             // e.g., "1.0.0"
@@ -32,6 +34,7 @@ export interface SkylarStageConfig {
     theme: 'dark' | 'light' | 'neon';
     layout: 'chat-first' | 'artifact-first' | 'split' | 'sidebar';
     primaryColor?: string;
+    widgets?: StageWidgetConfig[];
   };
 }
 
