@@ -3822,6 +3822,32 @@ async function startServer() {
       }
     });
 
+    // User: Get active partners
+    app.get("/api/user/partners", async (req, res) => {
+      try {
+        const idToken = req.headers.authorization?.split('Bearer ')[1];
+        if (!idToken) return res.status(401).json({ error: "Unauthorized" });
+        const decodedToken = await sparkwavvAdmin.auth().verifyIdToken(idToken);
+
+        const db = getFirestoreDb();
+        if (!db) return res.status(503).json({ error: "Database not available" });
+
+        const snapshot = await db.collection('partner_access')
+          .where('userUid', '==', decodedToken.uid)
+          .get();
+        
+        const partners = snapshot.docs.map((doc: any) => ({
+           id: doc.id,
+           partnerUid: doc.data().partnerUid,
+           relationship: doc.data().relationship,
+           grantedAt: doc.data().grantedAt
+        }));
+        res.json(partners);
+      } catch (error: any) {
+        res.status(500).json({ error: error.message });
+      }
+    });
+
     // User: Get suggestions
     app.get("/api/user/suggestions", async (req, res) => {
       try {

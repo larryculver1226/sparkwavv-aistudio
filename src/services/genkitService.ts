@@ -216,6 +216,7 @@ export const runJourneyStageFlow = ai.defineFlow(
       history: z.array(z.any()).optional(),
       attachments: z.array(z.any()).optional(),
       stageConfig: z.any().optional(),
+      missingArtifacts: z.array(z.string()).optional(),
     }),
     outputSchema: z.object({
       text: z.string(),
@@ -266,8 +267,22 @@ export const runJourneyStageFlow = ai.defineFlow(
       return { role, content: [{ text: msg.content }] };
     });
 
-    // 4. Handle Multi-Modal Attachments
-    const userContent: any[] = [{ text: input.message }];
+    // 4. Intercept [SYSTEM_INIT] and Handle Multi-Modal Attachments
+    const userContent: any[] = [];
+    
+    if (input.message.includes('[SYSTEM_INIT]')) {
+      const missingList = input.missingArtifacts && input.missingArtifacts.length > 0
+        ? input.missingArtifacts.join(', ')
+        : 'None';
+      
+      const initPrompt = `[SYSTEM_INIT] CURRENT_PHASE: ${stageConfig?.title || input.stageId} | MISSING_ARTIFACTS: [${missingList}]
+      Look to the ## INITIATION PROTOCOL section of your instructions for exactly how to handle this system event.`;
+      
+      userContent.push({ text: initPrompt });
+    } else {
+      userContent.push({ text: input.message });
+    }
+
     if (input.attachments && input.attachments.length > 0) {
       for (const attachment of input.attachments) {
         if (attachment.type.startsWith('image/')) {

@@ -75,6 +75,9 @@ import { GaugeChart } from '../components/dashboard/Gauges';
 import { JourneyTimeline } from '../components/dashboard/JourneyTimeline';
 import { MentorNote } from '../components/dashboard/MentorNote';
 import { DynamicPhaseView } from '../components/dashboard/DynamicPhaseView';
+import { useJourneyStage } from '../hooks/useJourneyStage';
+import { WavvaultContentsWidget } from '../components/dashboard/widgets/WavvaultContentsWidget';
+import { WavvaultSeedingWidget } from '../components/dashboard/widgets/WavvaultSeedingWidget';
 
 // Map journey stages to timeline stages
 export const getTimelineStage = (s: string) => {
@@ -151,6 +154,8 @@ export const UserDashboard: React.FC<{ userId: string; isAdmin?: boolean }> = ({
   const currentStage =
     data?.discoveryProgress || (isAdmin ? 'Ignition' : profile?.journeyStage) || 'Ignition';
   const timelineStage = getTimelineStage(currentStage);
+
+  const { config: currentStageConfig } = useJourneyStage(timelineStage);
 
   useEffect(() => {
     if (timelineStage === 'Discovery') {
@@ -603,6 +608,30 @@ export const UserDashboard: React.FC<{ userId: string; isAdmin?: boolean }> = ({
 
   const handleCompletePhase = async (nextStage: string) => {
     if (!data || !user) return;
+
+    // Strict Gateway Validation
+    if (currentStageConfig?.requiredArtifacts) {
+      const missingItems = currentStageConfig.requiredArtifacts.filter(req => 
+          !artifacts.some(a => a.type.toLowerCase() === req.toLowerCase())
+      );
+      
+      if (missingItems.length > 0 && !(isAdmin || profile?.role === 'operator')) {
+          setGateData({
+            currentPhase: timelineStage,
+            targetPhase: nextStage,
+            status: 'denied',
+            message: 'Phase progression blocked. You are missing required artifacts.',
+            criteria: missingItems.map(item => ({
+              id: item,
+              title: item,
+              status: 'failed',
+              feedback: 'This artifact has not been synthesized in your Wavvault yet.'
+            }))
+          });
+          setIsGateModalOpen(true);
+          return; // Block progression!
+      }
+    }
 
     try {
       const idToken = await user.getIdToken();
@@ -1207,6 +1236,18 @@ export const UserDashboard: React.FC<{ userId: string; isAdmin?: boolean }> = ({
                       </div>
                     </div>
                   </div>
+
+                  {/* Persistent Wavvault Contents Widget */}
+                  <div className="mb-12">
+                    <WavvaultContentsWidget timelineStage={timelineStage} />
+                  </div>
+
+                  {/* Ignition Phase WavVault Seeding for New Users */}
+                  {timelineStage === 'Ignition' && (!wavvaultData || artifacts.length === 0) && (
+                    <div className="mb-12">
+                      <WavvaultSeedingWidget onSeedingComplete={() => refreshWavvaultData()} />
+                    </div>
+                  )}
 
                   {/* Phase Specific View */}
                   <div className="mb-12">

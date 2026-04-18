@@ -10,6 +10,7 @@ interface SkylarInteractionPanelProps {
   stageId: string;
   user: any;
   artifacts?: SkylarArtifact[];
+  missingArtifacts?: string[];
   onArtifactCreated?: (artifact: SkylarArtifact) => void;
   onActionTriggered?: (action: string, payload: any) => void;
   initialContext?: string;
@@ -27,6 +28,7 @@ export const SkylarInteractionPanel: React.FC<SkylarInteractionPanelProps> = ({
   stageId,
   user,
   artifacts = [],
+  missingArtifacts = [],
   onArtifactCreated,
   onActionTriggered,
   initialContext
@@ -52,19 +54,67 @@ export const SkylarInteractionPanel: React.FC<SkylarInteractionPanelProps> = ({
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages, isTyping]);
 
-  // Initial greeting based on stage
+  // Initial greeting based on stage using Genkit
   useEffect(() => {
-    if (messages.length === 0 && stageConfig) {
-      setMessages([
-        {
-          id: `init-${stageId}`,
-          role: 'skylar',
-          content: `Welcome to the ${stageConfig.title} phase, ${user?.displayName?.split(' ')[0] || 'there'}. ${stageConfig.description} Let's get started.`,
-          timestamp: new Date()
+    let mounted = true;
+
+    const initGenkitGreeting = async () => {
+      if (messages.length === 0 && stageConfig) {
+        setIsTyping(true);
+        try {
+          const result = await skylar.chatWithVertex(
+            user?.uid || 'anonymous',
+            '[SYSTEM_INIT]',
+            [], // Empty history
+            stageConfig,
+            undefined, // No token
+            undefined, // No file
+            missingArtifacts
+          );
+
+          if (mounted && result.response?.candidates?.length) {
+            const responseText = result.response.candidates[0].content.parts[0].text;
+            setMessages([
+              {
+                id: `init-${stageId}`,
+                role: 'skylar',
+                content: responseText,
+                timestamp: new Date()
+              }
+            ]);
+            
+            if (result.executedActions && result.executedActions.length > 0) {
+              result.executedActions.forEach((action: any) => {
+                if (onActionTriggered) {
+                  onActionTriggered(action.action, action.data);
+                }
+              });
+            }
+          }
+        } catch (error) {
+          console.error("Failed to initialize Genkit interaction:", error);
+          if (mounted) {
+            setMessages([
+              {
+                id: `init-${stageId}`,
+                role: 'skylar',
+                content: `Welcome to the ${stageConfig.title} phase, ${user?.displayName?.split(' ')[0] || 'there'}. Let's get started.`,
+                timestamp: new Date()
+              }
+            ]);
+          }
+        } finally {
+          if (mounted) setIsTyping(false);
         }
-      ]);
-    }
-  }, [stageConfig, user, stageId]);
+      }
+    };
+
+    initGenkitGreeting();
+
+    return () => {
+      mounted = false;
+    };
+  }, [stageConfig, user, stageId, missingArtifacts]);
 
   const handleSend = async () => {
     if (!input.trim() && attachments.length === 0) return;
@@ -90,9 +140,11 @@ export const SkylarInteractionPanel: React.FC<SkylarInteractionPanelProps> = ({
       const result = await skylar.chatWithVertex(
         user?.uid || 'anonymous',
         initialContext ? `${initialContext}\n\nUser Message: ${input}` : input,
-        [], // history
+        messages.filter(m => !m.content.includes('[SYSTEM_INIT]')).map(m => ({ role: m.role, content: m.content })),
         stageConfig,
-        undefined // token
+        undefined, // token
+        undefined, // file
+        missingArtifacts
       );
 
       const responseText = result.response.candidates?.[0]?.content?.parts?.filter((part: any) => part.text)?.map((part: any) => part.text)?.join('') || '';

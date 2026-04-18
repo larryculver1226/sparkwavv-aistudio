@@ -684,7 +684,8 @@ class SkylarService {
     history: any[] = [],
     stageConfig?: JourneyStageDefinition | SkylarStageConfig,
     token?: string,
-    fileData?: { data: string; mimeType: string }
+    fileData?: { data: string; mimeType: string },
+    missingArtifacts?: string[]
   ): Promise<any> {
     try {
       // Dynamically import to avoid circular dependency issues at load time
@@ -706,7 +707,8 @@ class SkylarService {
         message,
         history,
         attachments,
-        stageConfig
+        stageConfig,
+        missingArtifacts
       });
       
       if (result.debugData) {

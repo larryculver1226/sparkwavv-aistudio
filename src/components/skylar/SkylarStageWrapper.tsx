@@ -10,6 +10,7 @@ interface SkylarStageWrapperProps {
   onActionTriggered?: (action: string, payload: any) => void;
   initialContext?: string;
   layout?: 'split' | 'sidebar' | 'overlay' | 'chat-first' | 'artifact-first';
+  missingArtifacts?: string[];
 }
 
 /**
@@ -21,7 +22,8 @@ export const SkylarStageWrapper: React.FC<SkylarStageWrapperProps> = ({
   children,
   onActionTriggered,
   initialContext,
-  layout = 'split'
+  layout = 'split',
+  missingArtifacts = []
 }) => {
   const { config, isLoading, error } = useJourneyStage(stageId);
   const { user } = useIdentity();
@@ -74,6 +76,7 @@ export const SkylarStageWrapper: React.FC<SkylarStageWrapperProps> = ({
             user={user}
             onActionTriggered={onActionTriggered}
             initialContext={initialContext}
+            missingArtifacts={missingArtifacts}
           />
         </div>
       </div>
@@ -97,6 +100,7 @@ export const SkylarStageWrapper: React.FC<SkylarStageWrapperProps> = ({
             user={user}
             onActionTriggered={onActionTriggered}
             initialContext={initialContext}
+            missingArtifacts={missingArtifacts}
           />
         </div>
       </div>
@@ -118,6 +122,7 @@ export const SkylarStageWrapper: React.FC<SkylarStageWrapperProps> = ({
             user={user}
             onActionTriggered={onActionTriggered}
             initialContext={initialContext}
+            missingArtifacts={missingArtifacts}
           />
         </div>
       </div>

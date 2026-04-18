@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { SkylarStageWrapper } from '../skylar/SkylarStageWrapper';
 import { ActionCenter } from './ActionCenter';
 import { NeuralSynthesisEngine } from './NeuralSynthesisEngine';
@@ -8,6 +8,7 @@ import { WavvaultHighlights } from './WavvaultHighlights';
 import { StrengthsProfileWidget } from './widgets/StrengthsProfileWidget';
 import { JobMatchesPreviewWidget } from './widgets/JobMatchesPreviewWidget';
 import { SynthesisLabEntryWidget } from './widgets/SynthesisLabEntryWidget';
+import { PhaseGateBanner } from './PhaseGateBanner';
 
 import { useJourneyStage } from '../../hooks/useJourneyStage';
 import { DashboardData } from '../../types/dashboard';
@@ -37,10 +38,35 @@ export const DynamicPhaseView: React.FC<DynamicPhaseViewProps> = ({
   wavvaultData
 }) => {
   const { config: stageConfig, isLoading: loading } = useJourneyStage(currentStage);
+  const [missingArtifacts, setMissingArtifacts] = useState<string[]>([]);
+  const [isReady, setIsReady] = useState(false);
 
-  if (loading || !stageConfig) {
+  useEffect(() => {
+    if (stageConfig && stageConfig.requiredArtifacts) {
+      const userArtifacts = wavvaultData?.artifacts || [];
+      const missing = stageConfig.requiredArtifacts.filter(reqName => 
+        !userArtifacts.some(a => a.type.toLowerCase().includes(reqName.toLowerCase()) || a.title?.toLowerCase().includes(reqName.toLowerCase()))
+      );
+      setMissingArtifacts(missing);
+    } else {
+      setMissingArtifacts([]);
+    }
+    // We delay readiness slightly to ensure missingArtifacts calculation is complete before Skylar mounts
+    const timer = setTimeout(() => setIsReady(true), 100);
+    return () => clearTimeout(timer);
+  }, [stageConfig, wavvaultData]);
+
+  if (loading || !stageConfig || !isReady) {
     return <div className="p-8 text-white/50">Loading phase configuration...</div>;
   }
+
+  const handleHelpRequested = (artifactName: string) => {
+    // Optionally auto-populate Skylar's input or trigger an action
+    // But Skylar already prompts them automatically via [SYSTEM_INIT]
+    // A quick way is to trigger an event that Skylar Interaction Panel listens for, or just scroll to Skylar
+    const skylarPanel = document.querySelector('.skylar-interaction-panel');
+    if (skylarPanel) skylarPanel.scrollIntoView({ behavior: 'smooth' });
+  };
 
   const renderWidget = (widget: any) => {
     switch (widget.type) {
@@ -79,8 +105,16 @@ export const DynamicPhaseView: React.FC<DynamicPhaseViewProps> = ({
   const sidebarWidgets = widgets.filter(w => w.position === 'sidebar').sort((a, b) => a.order - b.order);
 
   return (
-    <SkylarStageWrapper stageId={currentStage} layout={stageConfig.uiConfig.layout}>
+    <SkylarStageWrapper stageId={currentStage} layout={stageConfig.uiConfig.layout} missingArtifacts={missingArtifacts}>
       <div className="space-y-8">
+        
+        {/* Phase Gate Tracker (Track 069) */}
+        <PhaseGateBanner 
+          currentStageId={currentStage} 
+          wavvaultData={wavvaultData || null} 
+          onHelpRequested={handleHelpRequested}
+        />
+
         {/* Header Zone */}
         {headerWidgets.map(renderWidget)}
         
