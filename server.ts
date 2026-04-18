@@ -29,7 +29,7 @@ import {
   generateBrandImage,
   generateCinematicManifesto,
   generateHomeBenefits
-} from './src/services/geminiBackend';
+} from './backend/services/geminiBackend';
 import { XMLParser } from "fast-xml-parser";
 import { GoogleGenAI } from "@google/genai";
 import { 
@@ -42,11 +42,11 @@ import {
   analyzeWavvaultDelta,
   getLatestSnapshot
 } from './src/services/wavvaultService.js';
-import { logEvent } from './src/services/loggingService.js';
+import { logEvent } from './backend/services/loggingService.js';
 import axios from "axios";
 import { ROLES, JOURNEY_STAGES, TENANTS } from './src/constants.js';
 import { getGeminiApiKey } from './src/services/aiConfig.js';
-import { vertexService } from './src/services/vertexService.js';
+import { vertexService } from './backend/services/vertexService.js';
 import { methodologyGenerator } from './src/utils/methodologyGenerator.js';
 import { DocumentServiceClient } from '@google-cloud/discoveryengine';
 
@@ -824,7 +824,7 @@ async function startServer() {
 
   app.get("/api/admin/vertex/discover", async (req, res) => {
     try {
-      const { vertexDiscoveryService } = await import("./src/services/vertexDiscoveryService");
+      const { vertexDiscoveryService } = await import("./backend/services/vertexDiscoveryService");
       const result = await vertexDiscoveryService.discover();
       res.json(result);
     } catch (error: any) {
@@ -2846,6 +2846,95 @@ async function startServer() {
       }
     });
 
+    app.post("/api/skylar/chat-journey", requireRole([ROLES.USER, ROLES.ADMIN, ROLES.OPERATOR, ROLES.MENTOR, ROLES.AGENT]), async (req, res) => {
+      try {
+        const { userId, stageId, message, history, attachments, stageConfig, missingArtifacts } = req.body;
+        const authenticatedUser = (req as any).user;
+ 
+        if (authenticatedUser.uid !== userId && ![ROLES.ADMIN, ROLES.SUPER_ADMIN, ROLES.MENTOR, ROLES.OPERATOR, ROLES.AGENT].some(r => (authenticatedUser.roles || []).includes(r))) {
+          return res.status(403).json({ error: "Unauthorized access to this chat session" });
+        }
+ 
+        const { runJourneyStageFlow } = await import('./src/services/genkitService.js');
+        const { genkitTracer } = await import('./src/services/agentOpsService.js');
+ 
+        const { response, trace } = await runJourneyStageFlow({
+          userId,
+          stageId,
+          message,
+          history: history || [],
+          attachments: attachments || [],
+          stageConfig,
+          missingArtifacts
+        });
+ 
+        if (trace) {
+           genkitTracer.addTrace(trace);
+        }
+ 
+        res.json({ response });
+      } catch (error: any) {
+        console.error("Error in /api/skylar/chat-journey:", error);
+        res.status(500).json({ error: error.message });
+      }
+    });
+
+    app.post("/api/parse-document", requireRole([ROLES.USER, ROLES.ADMIN]), async (req, res) => {
+      try {
+        const { default: formidable } = await import('formidable');
+        const fs = await import('fs/promises');
+        const form = formidable({});
+        
+        form.parse(req, async (err: any, fields: any, files: any) => {
+          if (err) {
+            return res.status(500).json({ error: "Failed to parse form data" });
+          }
+          
+          const file = Array.isArray(files.file) ? files.file[0] : files.file;
+          if (!file) {
+            return res.status(400).json({ error: "No file provided" });
+          }
+
+          const originalFilename = file.originalFilename || '';
+          const buffer = await fs.readFile(file.filepath);
+          let extractedText = '';
+
+          try {
+            if (originalFilename.toLowerCase().endsWith('.pdf')) {
+              const pdfjs = await import('pdfjs-dist');
+              // use standard PDFJS node
+              const loadingTask = pdfjs.getDocument({ data: new Uint8Array(buffer) });
+              const pdf = await loadingTask.promise;
+              const numPages = pdf.numPages;
+              for (let i = 1; i <= numPages; i++) {
+                const page = await pdf.getPage(i);
+                const textContent = await page.getTextContent();
+                const pageText = textContent.items.map((item: any) => item.str).join(' ');
+                extractedText += pageText + '\n';
+              }
+            } else if (originalFilename.toLowerCase().endsWith('.docx')) {
+              const mammoth = await import('mammoth');
+              const result = await mammoth.extractRawText({ buffer });
+              extractedText = result.value;
+            } else {
+              extractedText = buffer.toString('utf-8');
+            }
+          } catch (parseError: any) {
+            console.error("Error parsing document:", parseError);
+            return res.status(500).json({ error: parseError.message });
+          } finally {
+            try {
+              await fs.unlink(file.filepath);
+            } catch(e) {}
+          }
+
+          res.json({ text: extractedText });
+        });
+      } catch (error: any) {
+        console.error("Error in /api/parse-document:", error);
+        res.status(500).json({ error: error.message });
+      }
+    });
     // RSS Sync Endpoint
     app.post("/api/skylar/rss-sync", requireRole([ROLES.ADMIN, ROLES.OPERATOR]), async (req, res) => {
       const db = getFirestoreDb();

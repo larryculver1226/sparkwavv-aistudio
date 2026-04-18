@@ -1,6 +1,5 @@
 import { GoogleGenAI, Modality, Type, FunctionDeclaration, ThinkingLevel } from '@google/genai';
 import { getGeminiApiKey } from './aiConfig';
-import * as mammoth from 'mammoth';
 import { KnowledgeGraph, WavvaultData, TargetOpportunity } from '../types/wavvault';
 import { DEFAULT_JOURNEY_STAGES } from '../config/defaultStageContent';
 import { JourneyStageDefinition } from '../types/skylar';
@@ -688,38 +687,43 @@ class SkylarService {
     missingArtifacts?: string[]
   ): Promise<any> {
     try {
-      // Dynamically import to avoid circular dependency issues at load time
-      const { runJourneyStageFlow } = await import('./genkitService');
-
       const attachments: any[] = [];
       if (fileData) {
         attachments.push({
           type: fileData.mimeType,
           data: `data:${fileData.mimeType};base64,${fileData.data}`,
+          name: 'attachment'
         });
       }
 
       const stageId = stageConfig && 'stageId' in stageConfig ? stageConfig.stageId : 'dive-in';
 
-      const result = await runJourneyStageFlow({
-        userId,
-        stageId,
-        message,
-        history,
-        attachments,
-        stageConfig,
-        missingArtifacts
+      const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+      if (token) headers['Authorization'] = `Bearer ${token}`;
+
+      const response = await fetch('/api/skylar/chat-journey', {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({
+          userId,
+          stageId,
+          message,
+          history,
+          attachments,
+          stageConfig,
+          missingArtifacts
+        }),
       });
-      
-      if (result.debugData) {
-        const { genkitTracer } = await import('./agentOpsService');
-        genkitTracer.addTrace(result.debugData);
+
+      if (!response.ok) {
+        throw new Error('Failed to chat with Skylar.');
       }
 
+      const result = await response.json();
       return { 
         response: {
-          text: result.text,
-          candidates: [{ content: { parts: [{ text: result.text }] } }] // Mocking original response structure for UI compatibility
+          text: result.response.text,
+          candidates: result.response.candidates
         }, 
         executedActions: result.executedActions 
       };
@@ -830,34 +834,13 @@ class SkylarService {
   }
 
   async parseDocx(file: File): Promise<string> {
-    const arrayBuffer = await file.arrayBuffer();
-    const result = await mammoth.extractRawText({ arrayBuffer });
-    return result.value;
+    console.warn("DEPRECATED: Use /api/parse-document instead");
+    return "";
   }
 
   async parsePdf(file: File): Promise<string> {
-    try {
-      const pdfjs = await import('pdfjs-dist');
-      // Set worker source
-      pdfjs.GlobalWorkerOptions.workerSrc = `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjs.version}/pdf.worker.min.js`;
-
-      const arrayBuffer = await file.arrayBuffer();
-      const loadingTask = pdfjs.getDocument({ data: arrayBuffer });
-      const pdf = await loadingTask.promise;
-
-      let fullText = '';
-      for (let i = 1; i <= pdf.numPages; i++) {
-        const page = await pdf.getPage(i);
-        const textContent = await page.getTextContent();
-        const pageText = textContent.items.map((item: any) => item.str).join(' ');
-        fullText += pageText + '\n';
-      }
-
-      return fullText;
-    } catch (error) {
-      console.error('PDF Parsing Error:', error);
-      throw new Error('Failed to parse PDF document.');
-    }
+    console.warn("DEPRECATED: Use /api/parse-document instead");
+    return "";
   }
 
   async performSynthesis(

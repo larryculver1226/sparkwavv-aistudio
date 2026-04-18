@@ -21,7 +21,7 @@ export const WavvaultContentsWidget: React.FC<WavvaultContentsWidgetProps> = ({ 
 
   // Ensure config exists and parse missing items
   const requiredArtifacts = config?.requiredArtifacts || [];
-  const completedArtifactsCount = artifacts.filter(a => a.relatedStage === timelineStage).length;
+  const completedArtifactsCount = artifacts.filter(a => a.journeyPhase === timelineStage).length;
   
   const pendingItems = requiredArtifacts.filter(reqActionString => {
       // Very naive check, normally we'd match exact types

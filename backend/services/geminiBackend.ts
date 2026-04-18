@@ -1,5 +1,5 @@
 import { GoogleGenAI, Type, ThinkingLevel } from '@google/genai';
-import { getGeminiApiKey } from './aiConfig';
+import { getGeminiApiKey } from '../../src/services/aiConfig';
 
 // Lazy initialization of Gemini
 let aiInstance: GoogleGenAI | null = null;

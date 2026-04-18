@@ -7,7 +7,19 @@ export default defineConfig(({mode}) => {
   const env = loadEnv(mode, '.', '');
   
   return {
-    plugins: [react(), tailwindcss()],
+    plugins: [
+      react(),
+      tailwindcss(),
+      {
+        name: 'debug-resolve',
+        resolveId(id, importer) {
+          if (id.includes('pdfjs') || id.includes('mammoth') || id.includes('lucide')) {
+            console.log(`[DEBUG RESOLVE] ${id} imported by ${importer}`);
+          }
+          return null;
+        }
+      }
+    ],
     define: {
       'process.env.GEMINI_API_KEY': JSON.stringify(env.GEMINI_API_KEY),
     },
@@ -15,16 +27,15 @@ export default defineConfig(({mode}) => {
       alias: {
         '@': path.resolve(__dirname, '.'),
       },
+      conditions: ['browser', 'module', 'import', 'default'],
+      mainFields: ['browser', 'module', 'jsnext:main', 'jsnext', 'main'],
     },
     build: {
+      reportCompressedSize: false,
+      minify: false,
+      sourcemap: false,
       rollupOptions: {
-        external: [
-          'node:perf_hooks', 'worker_threads', 'crypto', 'node:crypto',
-          'fs', 'node:fs', 'path', 'node:path', 'os', 'node:os',
-          'stream', 'node:stream', 'util', 'node:util', 'url', 'node:url',
-          'http', 'node:http', 'https', 'node:https', 'buffer', 'node:buffer',
-          'net', 'node:net', 'tls', 'node:tls', 'zlib', 'node:zlib', 'events', 'node:events'
-        ],
+        external: ['pdfjs-dist', 'mammoth']
       },
     },
     server: {

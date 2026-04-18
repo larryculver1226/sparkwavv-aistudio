@@ -205,12 +205,28 @@ export const NeuralSynthesisEngine: React.FC<NeuralSynthesisEngineProps> = ({
       await new Promise((r) => setTimeout(r, 1000));
 
       let content = '';
-      if (file.name.endsWith('.docx')) {
-        addLog('Parsing DOCX structure via Mammoth Engine...', 'info', 'parse');
-        content = await skylar.parseDocx(file);
-      } else if (file.name.endsWith('.pdf')) {
-        addLog('Initializing PDF.js Worker for text extraction...', 'info', 'parse');
-        content = await skylar.parsePdf(file);
+      if (file.name.endsWith('.docx') || file.name.endsWith('.pdf')) {
+        addLog(`Parsing ${file.name.endsWith('.docx') ? 'DOCX' : 'PDF'} structure via backend engine...`, 'info', 'parse');
+        
+        try {
+          const auth = (await import('../../lib/firebase')).auth;
+          const token = await auth.currentUser?.getIdToken();
+          
+          const formData = new FormData();
+          formData.append('file', file);
+          
+          const res = await fetch('/api/parse-document', {
+            method: 'POST',
+            body: formData,
+            headers: token ? { Authorization: `Bearer ${token}` } : {}
+          });
+          
+          if (!res.ok) throw new Error(`Parse failed: ${res.statusText}`);
+          const parsedData = await res.json();
+          content = parsedData.text;
+        } catch (err: any) {
+             throw new Error(`Failed to parse document: ${err.message}`);
+        }
       } else {
         addLog('Parsing raw text stream...', 'info', 'parse');
         content = await file.text();

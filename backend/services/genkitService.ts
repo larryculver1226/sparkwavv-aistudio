@@ -1,9 +1,9 @@
 import { genkit, z } from 'genkit';
 import { googleAI, gemini15Flash } from '@genkit-ai/googleai';
-import { getGeminiApiKey } from './aiConfig';
-import { skylar } from './skylarService';
-import { interpolatePrompt } from '../utils/interpolation';
-import { agentOpsService } from './agentOpsService';
+import { getGeminiApiKey } from '../../src/services/aiConfig';
+import { skylar } from '../../src/services/skylarService';
+import { interpolatePrompt } from '../../src/utils/interpolation';
+import { agentOpsService } from '../../src/services/agentOpsService';
 
 // Initialize Genkit
 export const ai = genkit({
