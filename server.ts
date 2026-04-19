@@ -47,6 +47,7 @@ import axios from "axios";
 import { ROLES, JOURNEY_STAGES, TENANTS } from './src/constants.js';
 import { getGeminiApiKey } from './src/services/aiConfig.js';
 import { vertexService } from './backend/services/vertexService.js';
+import { initializeMcpClient } from './backend/services/mcpBridge.js';
 import { methodologyGenerator } from './src/utils/methodologyGenerator.js';
 import { DocumentServiceClient } from '@google-cloud/discoveryengine';
 
@@ -607,8 +608,13 @@ import { skylar } from './src/services/skylarService';
 
 async function startServer() {
   console.log('Starting server initialization...');
+  
   const app = express();
   const PORT = 3000;
+
+  // Initialize MCP Client in the background so it doesn't block server startup
+  console.log('Starting MCP Client connection in background...');
+  initializeMcpClient().catch(err => console.error('Background MCP initialization failed:', err));
 
   console.log('Configuring session middleware...');
   app.set("trust proxy", 1); // Trust first proxy (Nginx)
@@ -2900,27 +2906,40 @@ async function startServer() {
           let extractedText = '';
 
           try {
-            if (originalFilename.toLowerCase().endsWith('.pdf')) {
-              const pdfjs = await import('pdfjs-dist');
-              // use standard PDFJS node
-              const loadingTask = pdfjs.getDocument({ data: new Uint8Array(buffer) });
-              const pdf = await loadingTask.promise;
-              const numPages = pdf.numPages;
-              for (let i = 1; i <= numPages; i++) {
-                const page = await pdf.getPage(i);
-                const textContent = await page.getTextContent();
-                const pageText = textContent.items.map((item: any) => item.str).join(' ');
-                extractedText += pageText + '\n';
-              }
-            } else if (originalFilename.toLowerCase().endsWith('.docx')) {
-              const mammoth = await import('mammoth');
-              const result = await mammoth.extractRawText({ buffer });
-              extractedText = result.value;
-            } else {
-              extractedText = buffer.toString('utf-8');
+            const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
+            
+            // Upload the file natively via GenAI File API
+            const uploadResult = await ai.files.upload({
+              file: file.filepath,
+              mimeType: file.mimetype || 'application/pdf'
+            });
+
+            // Instruct Gemini to extract all text as standard format
+            const prompt = "Please read this document carefully and extract all its text content. Output ONLY the raw text without any markdown or formatting blocks.";
+            
+            const response = await ai.models.generateContent({
+              model: 'gemini-1.5-flash',
+              contents: [
+                {
+                   role: 'user',
+                   parts: [
+                     { fileData: { fileUri: uploadResult.uri, mimeType: uploadResult.mimeType } },
+                     { text: prompt }
+                   ]
+                }
+              ]
+            });
+            
+            extractedText = response.text || '';
+            
+            // Cleanup the file from Gemini storage
+            try {
+               await ai.files.delete({ name: uploadResult.name });
+            } catch(e) {
+               console.warn("Failed to delete Gemini file:", e);
             }
           } catch (parseError: any) {
-            console.error("Error parsing document:", parseError);
+            console.error("Error parsing document with Gemini File API:", parseError);
             return res.status(500).json({ error: parseError.message });
           } finally {
             try {

@@ -1,5 +1,6 @@
 import { genkit, z } from 'genkit';
 import { googleAI, gemini15Flash } from '@genkit-ai/googleai';
+import { promptRef } from '@genkit-ai/dotprompt';
 import { getGeminiApiKey } from '../../src/services/aiConfig';
 import { skylar } from '../../src/services/skylarService';
 import { interpolatePrompt } from '../../src/utils/interpolation';
@@ -7,8 +8,11 @@ import { agentOpsService } from '../../src/services/agentOpsService';
 
 // Initialize Genkit
 export const ai = genkit({
-  plugins: [googleAI({ apiKey: getGeminiApiKey() || process.env.GEMINI_API_KEY })],
+  plugins: [
+    googleAI({ apiKey: getGeminiApiKey() || process.env.GEMINI_API_KEY })
+  ],
   model: gemini15Flash,
+  promptDir: './backend/prompts'
 });
 
 // Define Tools
@@ -191,6 +195,21 @@ export const generateAtsOptimizedContentTool = ai.defineTool(
   }
 );
 
+export const searchWebTool = ai.defineTool(
+  {
+    name: 'search_web',
+    description: 'Perform a live web search to gather real-time data, specific company news, or current market trends that the Market Intelligence Grid may not have cached.',
+    inputSchema: z.object({
+      query: z.string().describe("The search query to execute"),
+    }),
+  },
+  async (input) => {
+    // Note: To fully implement this, you would wire up a live API like Tavily, Serper, or 
+    // the native Genkit Google Search Grounding plugin here.
+    return { status: 'executed', message: `MOCK: Searched web for "${input.query}". In production, connect Tavily or Google Search API here.`, results: [] };
+  }
+);
+
 const allTools = [
   createSparkwavvAccountTool,
   searchWavvaultTool,
@@ -202,8 +221,11 @@ const allTools = [
   proposeDashboardUpdateTool,
   proposeMilestoneAdditionTool,
   parseCareerArtifactTool,
-  generateAtsOptimizedContentTool
+  generateAtsOptimizedContentTool,
+  searchWebTool
 ];
+
+import { mcpTools } from './mcpBridge.js';
 
 // Define the main Journey Stage Flow
 export const runJourneyStageFlow = ai.defineFlow(
@@ -297,16 +319,34 @@ export const runJourneyStageFlow = ai.defineFlow(
       }
     }
 
-    // 5. Generate Response
-    const response = await ai.generate({
-      model: gemini15Flash,
-      system: systemInstruction,
-      messages: [...formattedHistory, { role: 'user', content: userContent }] as any,
-      tools: allTools,
-      config: {
-        temperature: 0.7,
-      }
-    });
+   // 5. Generate Response via Dotprompt (fallback to regular config if prompt fails)
+    const currentTools = [...allTools, ...mcpTools];
+    let response;
+    try {
+      const skylarPrompt = await promptRef('skylarBase');
+      response = await skylarPrompt.generate({
+        input: {
+          userDisplayName: 'User',
+          stageTitle: stageConfig?.title || input.stageId,
+          artifactName: stageConfig?.requiredArtifacts?.[0],
+          additionalContext: currentTruth,
+        },
+        messages: [...formattedHistory, { role: 'user', content: userContent }] as any,
+        tools: currentTools,
+        config: { temperature: 0.7 }
+      });
+    } catch (error) {
+      console.warn("Dotprompt failed or not found, falling back to raw generate...", error);
+      response = await ai.generate({
+        model: gemini15Flash,
+        system: systemInstruction,
+        messages: [...formattedHistory, { role: 'user', content: userContent }] as any,
+        tools: currentTools,
+        config: {
+          temperature: 0.7,
+        }
+      });
+    }
 
     // 6. Extract Executed Actions
     const executedActions: any[] = [];
