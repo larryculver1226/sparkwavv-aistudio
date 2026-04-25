@@ -1,13 +1,13 @@
+.git/
+.gitignore
 node_modules/
-build/
 dist/
-coverage/
 playwright-report/
 test-results/
-.DS_Store
-*.log
-.env*
+.env
+.env.*
 !.env.example
+*.log
 
 # Dynamically generated files
 users-debug.json
@@ -15,3 +15,4 @@ env-status.json
 users-v2-last-response.json
 synthetic-training-data.jsonl
 *.jsonl
+

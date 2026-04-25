@@ -4,6 +4,7 @@ import { Clock, LogOut } from 'lucide-react';
 import { signOut } from 'firebase/auth';
 import { auth } from '../../lib/firebase';
 import { useNavigate } from 'react-router-dom';
+import { useIdentity } from '../../contexts/IdentityContext';
 
 const WARNING_TIME = 20 * 60 * 1000; // 20 minutes
 const LOGOUT_TIME = 5 * 60 * 1000; // 5 minutes
@@ -12,17 +13,16 @@ export const InactivityTimeout: React.FC = () => {
   const [showWarning, setShowWarning] = useState(false);
   const [timeLeft, setTimeLeft] = useState(LOGOUT_TIME / 1000);
   const navigate = useNavigate();
+  const { logout } = useIdentity();
 
   const warningTimerRef = useRef<NodeJS.Timeout | null>(null);
   const logoutTimerRef = useRef<NodeJS.Timeout | null>(null);
   const countdownIntervalRef = useRef<NodeJS.Timeout | null>(null);
 
   const handleLogout = useCallback(async () => {
-    if (auth) {
-      await signOut(auth);
-      navigate('/');
-    }
-  }, [navigate]);
+    await logout();
+    navigate('/');
+  }, [navigate, logout]);
 
   const resetTimers = useCallback(() => {
     // Clear existing timers

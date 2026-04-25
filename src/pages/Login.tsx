@@ -46,10 +46,20 @@ export default function Login() {
           error={error}
         />
 
-        <div className="text-center">
+        <div className="text-center space-y-4">
+          <p className="text-white/60 text-sm">
+            Don't have an account yet?{' '}
+            <button
+              onClick={() => navigate('/dive-in')}
+              className="text-neon-cyan hover:text-white font-bold transition-colors"
+            >
+              Start Free Dive-In
+            </button>
+          </p>
+
           <button
             onClick={() => navigate('/')}
-            className="text-white/40 hover:text-white transition-colors text-sm uppercase tracking-widest font-bold"
+            className="text-white/40 hover:text-white transition-colors text-sm uppercase tracking-widest font-bold block mx-auto"
           >
             Back to Home
           </button>

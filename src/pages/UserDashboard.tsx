@@ -96,7 +96,7 @@ export const UserDashboard: React.FC<{ userId: string; isAdmin?: boolean }> = ({
   userId,
   isAdmin = false,
 }) => {
-  const { user, profile, status, error: authError } = useIdentity();
+  const { user, profile, status, error: authError, logout } = useIdentity();
   const isConfirmed = status === 'authenticated';
   const navigate = useNavigate();
   const { artifacts, wavvaultData, refreshWavvaultData } = useWavvaultData();
@@ -668,10 +668,8 @@ export const UserDashboard: React.FC<{ userId: string; isAdmin?: boolean }> = ({
   };
 
   const handleLogout = async () => {
-    if (auth) {
-      await signOut(auth);
-      navigate('/');
-    }
+    await logout();
+    navigate('/');
   };
 
   if (status === 'initializing' || (loading && !data)) {
@@ -820,7 +818,7 @@ export const UserDashboard: React.FC<{ userId: string; isAdmin?: boolean }> = ({
                   className="w-full flex items-center gap-4 px-5 py-4 rounded-2xl text-neon-magenta hover:bg-neon-magenta/10 transition-all group"
                 >
                   <LogOut className="w-5 h-5 group-hover:scale-110 transition-transform" />
-                  <span className="text-sm font-bold tracking-wide">Logout</span>
+                  <span className="text-sm font-bold tracking-wide">Dashboard Logout</span>
                 </button>
               </div>
             </motion.aside>
@@ -902,7 +900,7 @@ export const UserDashboard: React.FC<{ userId: string; isAdmin?: boolean }> = ({
             className="w-full flex items-center gap-4 px-5 py-4 rounded-2xl text-neon-magenta hover:bg-neon-magenta/10 transition-all group"
           >
             <LogOut className="w-5 h-5 group-hover:scale-110 transition-transform" />
-            <span className="text-sm font-bold tracking-wide">Logout</span>
+            <span className="text-sm font-bold tracking-wide">Dashboard Logout</span>
           </button>
 
           <button

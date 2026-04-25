@@ -1,12 +1,15 @@
 import React, { useState } from 'react';
 import { motion } from 'motion/react';
 import { Sparkles, Upload, FileText, Loader2 } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 import { useIdentity } from '../contexts/IdentityContext';
 import { SkylarStageWrapper } from '../components/skylar/SkylarStageWrapper';
 import { parseResume } from '../services/geminiService';
+import { OnboardingContainer } from '../containers/OnboardingContainer';
 
 export default function DiveInPage() {
-  const { loginWithPopup } = useIdentity();
+  const { user, status } = useIdentity();
+  const navigate = useNavigate();
   const [resumeData, setResumeData] = useState<any>(null);
   const [isParsing, setIsParsing] = useState(false);
 
@@ -43,12 +46,34 @@ export default function DiveInPage() {
 
   const handleSkylarAction = (action: string, payload: any) => {
     if (action === 'create_sparkwavv_account') {
-      // In a real app, we would pass payload and resumeData to the signup flow
-      console.log('Triggering account creation with:', { payload, resumeData });
-      loginWithPopup();
+      // User is already authenticated from Step 1, so we just transition
+      console.log('Finished Dive-In commitments. Transitioning to dashboard:', { payload, resumeData });
+      navigate('/');
     }
   };
 
+  // Step 1: Authentication Screen (for unauthenticated users)
+  if (!user && status !== 'initializing') {
+    return (
+      <div className="min-h-screen bg-[#050505] text-white flex flex-col p-6 relative overflow-hidden">
+        <div className="absolute inset-0 overflow-hidden pointer-events-none">
+          <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-blue-500/10 blur-[120px] rounded-full animate-pulse" />
+          <div className="absolute bottom-1/4 right-1/4 w-96 h-96 bg-purple-500/10 blur-[120px] rounded-full animate-pulse delay-1000" />
+        </div>
+        <div className="relative z-10 w-full h-full flex-1 flex flex-col justify-center items-center pt-10">
+          <OnboardingContainer 
+            onBackToHome={() => navigate('/')}
+            onSuccess={() => {
+              // Once authenticated, the component will re-render and skip this block,
+              // moving to Step 2 (Context Injection / Resume Upload).
+            }}
+          />
+        </div>
+      </div>
+    );
+  }
+
+  // Step 2 & 3: Context Injection & Skylar Chat (for authenticated users)
   return (
     <div className="min-h-screen bg-[#050505] text-white flex flex-col p-6 relative overflow-hidden">
       {/* Background Atmosphere */}

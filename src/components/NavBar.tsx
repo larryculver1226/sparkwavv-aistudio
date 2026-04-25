@@ -25,7 +25,8 @@ interface NavItem {
   subItems?: { label: string; href: string }[];
 }
 
-const UserProfileModal: React.FC<{ isOpen: boolean; onClose: () => void; onNavigate: (href: string) => void; logout: () => void }> = ({ isOpen, onClose, onNavigate, logout }) => {
+const UserProfileModal: React.FC<{ isOpen: boolean; onClose: () => void; onNavigate: (href: string) => void; logout: () => void; userId?: string }> = ({ isOpen, onClose, onNavigate, logout, userId }) => {
+  const navigate = useNavigate();
   if (!isOpen) return null;
 
   return (
@@ -43,6 +44,19 @@ const UserProfileModal: React.FC<{ isOpen: boolean; onClose: () => void; onNavig
         <h2 className="text-2xl font-display font-bold mb-6">User Profile</h2>
         
         <div className="space-y-4">
+          {userId && (
+            <button
+              onClick={() => {
+                onClose();
+                navigate(`/dashboard/${userId}`);
+              }}
+              className="w-full flex items-center gap-3 p-4 rounded-xl bg-white/5 border border-white/10 hover:bg-white/10 hover:border-neon-cyan/30 transition-all text-left"
+            >
+              <LayoutDashboard className="w-5 h-5 text-neon-cyan" />
+              <span className="font-medium text-white">My Dashboard</span>
+            </button>
+          )}
+
           <button
             onClick={() => {
               onClose();
@@ -55,9 +69,10 @@ const UserProfileModal: React.FC<{ isOpen: boolean; onClose: () => void; onNavig
           </button>
           
           <button
-            onClick={() => {
+            onClick={async () => {
               onClose();
-              logout();
+              await logout();
+              navigate('/');
             }}
             className="w-full flex items-center gap-3 p-4 rounded-xl bg-white/5 border border-white/10 hover:bg-white/10 hover:border-neon-magenta/30 transition-all text-left"
           >
@@ -312,7 +327,7 @@ export const NavBar: React.FC<NavBarProps> = ({ onNavigate }) => {
   return (
     <>
       <FeedbackModal isOpen={isFeedbackOpen} onClose={() => setIsFeedbackOpen(false)} />
-      <UserProfileModal isOpen={isUserProfileOpen} onClose={() => setIsUserProfileOpen(false)} onNavigate={onNavigate} logout={logout} />
+      <UserProfileModal isOpen={isUserProfileOpen} onClose={() => setIsUserProfileOpen(false)} onNavigate={onNavigate} logout={logout} userId={profile?.uid || user?.uid} />
       <nav
         className={`fixed top-0 left-0 right-0 z-[100] transition-all duration-500 ${
         scrolled
@@ -398,33 +413,23 @@ export const NavBar: React.FC<NavBarProps> = ({ onNavigate }) => {
               (user ? (
                 isConfirmed ? (
                   <>
-                    {!isDashboard && (
+                    {isDashboard && (
                       <button
-                        onClick={() => navigate(`/dashboard/${profile?.uid || user.uid}`)}
-                        className="flex items-center gap-2 px-4 py-2 rounded-full bg-white/5 border border-white/10 text-white text-sm font-bold hover:bg-white/10 hover:border-white/20 transition-all duration-300 group"
+                        onClick={() => navigate('/vault')}
+                        className="hidden md:flex items-center gap-2 px-4 py-2 rounded-full bg-white/5 border border-white/10 text-white text-sm font-bold hover:bg-white/10 hover:border-white/20 transition-all duration-300 group"
                       >
-                        <LayoutDashboard className="w-3.5 h-3.5 text-neon-cyan" />
-                        <span>Dashboard Login</span>
+                        <Database className="w-3.5 h-3.5 text-neon-magenta" />
+                        <span>Vault</span>
                       </button>
                     )}
-                    {isDashboard && (
-                      <>
-                        <button
-                          onClick={() => navigate('/vault')}
-                          className="flex items-center gap-2 px-4 py-2 rounded-full bg-white/5 border border-white/10 text-white text-sm font-bold hover:bg-white/10 hover:border-white/20 transition-all duration-300 group"
-                        >
-                          <Database className="w-3.5 h-3.5 text-neon-magenta" />
-                          <span>Vault</span>
-                        </button>
-                        <button
-                          onClick={() => setIsUserProfileOpen(true)}
-                          className="p-2 rounded-full bg-white/5 border border-white/10 text-white/60 hover:text-neon-cyan hover:border-neon-cyan/30 transition-all duration-300"
-                          title="User Profile"
-                        >
-                          <User className="w-4 h-4" />
-                        </button>
-                      </>
-                    )}
+                    <button
+                      onClick={() => setIsUserProfileOpen(true)}
+                      className="flex items-center gap-2 px-4 py-2 rounded-full bg-white/5 border border-white/10 text-white text-sm font-medium hover:bg-white/10 hover:border-neon-cyan/30 hover:text-neon-cyan transition-all duration-300"
+                      title="User Profile"
+                    >
+                      <User className="w-4 h-4" />
+                      <span className="max-w-[140px] truncate">{user.email || 'Profile'}</span>
+                    </button>
                     <button
                       onClick={() => setIsFeedbackOpen(true)}
                       className="p-2 rounded-full bg-white/5 border border-white/10 text-white/60 hover:text-neon-cyan hover:border-neon-cyan/30 transition-all duration-300"
@@ -523,42 +528,31 @@ export const NavBar: React.FC<NavBarProps> = ({ onNavigate }) => {
                   (user ? (
                     isConfirmed ? (
                       <div className="flex flex-col gap-4">
-                        {!isDashboard && (
+                        {isDashboard && (
                           <button
                             onClick={() => {
-                              navigate(`/dashboard/${profile?.uid || user.uid}`);
+                              navigate('/vault');
                               setIsOpen(false);
                             }}
                             className="w-full py-5 rounded-2xl bg-white/5 border border-white/10 text-white font-bold text-2xl flex items-center justify-center gap-3"
                           >
-                            <LayoutDashboard className="w-7 h-7 text-neon-cyan" />
-                            Dashboard Login
+                            <Database className="w-7 h-7 text-neon-magenta" />
+                            Vault
                           </button>
                         )}
-                        {isDashboard && (
-                          <>
-                            <button
-                              onClick={() => {
-                                navigate('/vault');
-                                setIsOpen(false);
-                              }}
-                              className="w-full py-5 rounded-2xl bg-white/5 border border-white/10 text-white font-bold text-2xl flex items-center justify-center gap-3"
-                            >
-                              <Database className="w-7 h-7 text-neon-magenta" />
-                              Vault
-                            </button>
-                            <button
-                              onClick={() => {
-                                setIsUserProfileOpen(true);
-                                setIsOpen(false);
-                              }}
-                              className="w-full py-5 rounded-2xl bg-white/5 border border-white/10 text-white font-bold text-2xl flex items-center justify-center gap-3"
-                            >
-                              <User className="w-7 h-7 text-neon-cyan" />
-                              User Profile
-                            </button>
-                          </>
-                        )}
+                        <button
+                          onClick={() => {
+                            setIsUserProfileOpen(true);
+                            setIsOpen(false);
+                          }}
+                          className="w-full py-5 rounded-2xl bg-white/5 border border-white/10 text-white font-bold text-2xl flex items-center justify-center gap-3"
+                        >
+                          <User className="w-7 h-7 text-neon-cyan" />
+                          <div className="flex flex-col items-center leading-tight">
+                            <span>User Profile</span>
+                            {user.email && <span className="text-sm text-white/60 font-normal mt-1">{user.email}</span>}
+                          </div>
+                        </button>
                         <button
                           onClick={() => {
                             setIsFeedbackOpen(true);

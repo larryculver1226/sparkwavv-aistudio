@@ -255,20 +255,36 @@ export const AgentOps: React.FC = () => {
           Global UI & Branding
         </h2>
         
-        {/* Avatar Scale */}
-        <div className="space-y-4">
-          <label className="block text-sm font-medium text-gray-300">
-            Avatar Scale Multiplier ({editGlobal.avatar.scale}x)
-          </label>
-          <input 
-            type="range" min="0.5" max="2.0" step="0.05"
-            value={editGlobal.avatar.scale}
-            onChange={(e) => setEditGlobal({
-              ...editGlobal, 
-              avatar: { ...editGlobal.avatar, scale: parseFloat(e.target.value) }
-            })}
-            className="w-full h-2 bg-gray-800 rounded-lg appearance-none cursor-pointer accent-cyan-500"
-          />
+        {/* Avatar Setup */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <div className="space-y-2">
+            <label className="block text-sm font-medium text-gray-300">Avatar Image URL</label>
+            <input 
+              type="text"
+              value={editGlobal.avatar.url}
+              onChange={(e) => setEditGlobal({
+                ...editGlobal, 
+                avatar: { ...editGlobal.avatar, url: e.target.value }
+              })}
+              placeholder="e.g. https://images.unsplash.com/..."
+              className="w-full bg-gray-800 border border-gray-700 rounded-xl px-4 py-3 text-sm focus:border-cyan-500 focus:outline-none transition-colors text-white"
+            />
+          </div>
+
+          <div className="space-y-4">
+            <label className="block text-sm font-medium text-gray-300">
+              Avatar Scale Multiplier ({editGlobal.avatar.scale}x)
+            </label>
+            <input 
+              type="range" min="0.5" max="2.0" step="0.05"
+              value={editGlobal.avatar.scale}
+              onChange={(e) => setEditGlobal({
+                ...editGlobal, 
+                avatar: { ...editGlobal.avatar, scale: parseFloat(e.target.value) }
+              })}
+              className="w-full h-2 mt-3 bg-gray-800 rounded-lg appearance-none cursor-pointer accent-cyan-500"
+            />
+          </div>
         </div>
 
         {/* Scrolling Benefits */}

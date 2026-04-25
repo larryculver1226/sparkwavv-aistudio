@@ -588,6 +588,7 @@ class SkylarService {
           
           functionResponses.push({
             functionResponse: {
+              id: call.id,
               name: call.name,
               response: result
             }
@@ -657,10 +658,10 @@ class SkylarService {
 
   async generateSpeech(text: string, persona: SkylarPersona): Promise<string> {
     const ai = getAI();
-    const voiceName = PERSONA_CONFIG[persona].voice;
+    const voiceName = PERSONA_CONFIG[persona].voice || 'Kore';
 
     const response = await ai.models.generateContent({
-      model: 'gemini-2.5-flash-preview-tts',
+      model: 'gemini-3.1-flash-tts-preview',
       contents: [{ parts: [{ text }] }],
       config: {
         responseModalities: [Modality.AUDIO],
@@ -672,8 +673,61 @@ class SkylarService {
       },
     });
 
-    const base64Audio = response.candidates?.[0]?.content?.parts?.[0]?.inlineData?.data;
-    return base64Audio ? `data:audio/mp3;base64,${base64Audio}` : '';
+    const inlineData = response.candidates?.[0]?.content?.parts?.[0]?.inlineData;
+    if (!inlineData || !inlineData.data) return '';
+
+    const base64Audio = inlineData.data;
+    const mimeType = inlineData.mimeType || 'audio/pcm';
+
+    if (mimeType.includes('pcm')) {
+      // Decode base64 PCM data to a Uint8Array
+      const binaryString = window.atob(base64Audio);
+      const len = binaryString.length;
+      const pcmBytes = new Uint8Array(len);
+      for (let i = 0; i < len; i++) {
+        pcmBytes[i] = binaryString.charCodeAt(i);
+      }
+      
+      // Create WAV header for 24000Hz, 1 channel, 16-bit PCM
+      // Gemini TTS usually outputs 24kHz PCM.
+      const sampleRate = 24000;
+      const numChannels = 1;
+      const bitsPerSample = 16;
+      const byteRate = (sampleRate * numChannels * bitsPerSample) / 8;
+      const blockAlign = (numChannels * bitsPerSample) / 8;
+      
+      const buffer = new ArrayBuffer(44 + pcmBytes.length);
+      const view = new DataView(buffer);
+      
+      // RIFF chunk descriptor
+      view.setUint32(0, 0x52494646, false); // "RIFF"
+      view.setUint32(4, 36 + pcmBytes.length, true);
+      view.setUint32(8, 0x57415645, false); // "WAVE"
+      
+      // fmt sub-chunk
+      view.setUint32(12, 0x666d7420, false); // "fmt "
+      view.setUint32(16, 16, true); // Subchunk1Size (16 for PCM)
+      view.setUint16(20, 1, true); // AudioFormat (1 for PCM)
+      view.setUint16(22, numChannels, true);
+      view.setUint32(24, sampleRate, true);
+      view.setUint32(28, byteRate, true);
+      view.setUint16(32, blockAlign, true);
+      view.setUint16(34, bitsPerSample, true);
+      
+      // data sub-chunk
+      view.setUint32(36, 0x64617461, false); // "data"
+      view.setUint32(40, pcmBytes.length, true);
+      
+      // Write PCM data
+      const out = new Uint8Array(buffer, 44);
+      out.set(pcmBytes);
+      
+      // Convert WAV to object URL for immediate playback without base64 length errors
+      const blob = new Blob([buffer], { type: 'audio/wav' });
+      return URL.createObjectURL(blob);
+    }
+
+    return `data:${mimeType};base64,${base64Audio}`;
   }
 
   // Vertex AI Agentic Chat - Migrated to Genkit
@@ -704,6 +758,7 @@ class SkylarService {
       const response = await fetch('/api/skylar/chat-journey', {
         method: 'POST',
         headers,
+        credentials: 'include',
         body: JSON.stringify({
           userId,
           stageId,
@@ -717,6 +772,21 @@ class SkylarService {
 
       if (!response.ok) {
         throw new Error('Failed to chat with Skylar.');
+      }
+
+      // Ensure the response is actually JSON before parsing to avoid generic 'Unexpected token <' proxy errors
+      const contentType = response.headers.get('content-type');
+      if (!contentType || !contentType.includes('application/json')) {
+        const text = await response.text();
+        console.error('[Skylar] Non-JSON response received:', text.substring(0, 200));
+        
+        if (text.includes('Starting Server...</title>')) {
+          throw new Error('The backend server is currently starting up. Please wait a few seconds and try again.');
+        } else if (text.includes('Cookie check')) {
+          throw new Error('Please authenticate in a new window or enable cookies for this preview to continue.');
+        }
+        
+        throw new Error('Skylar response was obstructed by a network or proxy restriction.');
       }
 
       const result = await response.json();
@@ -741,6 +811,7 @@ class SkylarService {
       const response = await fetch('/api/skylar/search-wavvault', {
         method: 'POST',
         headers,
+        credentials: 'include',
         body: JSON.stringify({ query }),
       });
 

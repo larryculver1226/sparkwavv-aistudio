@@ -40,12 +40,6 @@ export const WavvaultSeedingWidget: React.FC<WavvaultSeedingWidgetProps> = ({ on
         userId: user.uid,
         identity: "Driven professional entering a transition phase.",
         strengths: ["Analytical Thinking", "Strategic Planning", "Adaptability"],
-        skills: ["Project Management", "Stakeholder Communication"],
-        metadata: {
-          linkedinUrl: linkedin,
-          targetRoles: rolesArray,
-          resumeParsedAt: new Date().toISOString()
-        },
         graph: { nodes: [], links: [] },
         logs: [],
         journeyEvents: [],
@@ -57,24 +51,25 @@ export const WavvaultSeedingWidget: React.FC<WavvaultSeedingWidgetProps> = ({ on
       await skylar.saveWavvaultData(seededData, true);
 
       // Create an artifact for the resume explicitly to seed it
-      import('../../../services/wavvaultService').then(async ({ writeArtifact }) => {
-        await writeArtifact({
-            id: crypto.randomUUID(),
-            userId: user.uid,
-            type: 'Resume Summary',
-            title: 'Initial Resume Parse',
-            content: {
-                rawRoles: targetRoles,
-                linkedin,
-                status: 'Parsed successfully'
-            },
-            summary: 'Initial parsing of the uploaded resume and contact information.',
-            relatedStage: 'ignition'
-        });
-        
-        setIsProcessing(false);
-        onSeedingComplete();
+      const { writeArtifact } = await import('../../../services/wavvaultService');
+      await writeArtifact({
+          id: crypto.randomUUID(),
+          userId: user.uid,
+          type: 'spark',
+          title: 'Initial Resume Parse',
+          content: {
+              rawRoles: targetRoles,
+              linkedin,
+              status: 'Parsed successfully'
+          },
+          journeyPhase: 'Ignition',
+          metadata: {
+              summary: 'Initial parsing of the uploaded resume and contact information.'
+          }
       });
+      
+      setIsProcessing(false);
+      onSeedingComplete();
 
     } catch (err) {
       console.error('Failed to seed WavVault data', err);

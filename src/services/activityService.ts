@@ -14,17 +14,18 @@ export async function logUserActivity(
 ) {
   try {
     const docRef = doc(collection(db, 'user_activities'));
-    const activity: Omit<UserActivity, 'id'> = {
+    const activity: any = {
+      id: docRef.id,
       userId,
       tenantId,
       type,
       title,
-      description,
-      timestamp: serverTimestamp() as any, // Will be replaced by Firestore
-      journeyPhase,
-      relatedEntityId,
-      tags,
+      timestamp: serverTimestamp(),
     };
+    if (description !== undefined) activity.description = description;
+    if (journeyPhase !== undefined) activity.journeyPhase = journeyPhase;
+    if (relatedEntityId !== undefined) activity.relatedEntityId = relatedEntityId;
+    if (tags !== undefined) activity.tags = tags;
 
     await setDoc(docRef, activity);
     return { success: true, activityId: docRef.id };

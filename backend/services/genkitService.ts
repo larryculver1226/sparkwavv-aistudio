@@ -1,17 +1,17 @@
 import { genkit, z } from 'genkit';
-import { googleAI, gemini15Flash } from '@genkit-ai/googleai';
+import { googleAI } from '@genkit-ai/googleai';
 import { promptRef } from '@genkit-ai/dotprompt';
 import { getGeminiApiKey } from '../../src/services/aiConfig';
 import { skylar } from '../../src/services/skylarService';
 import { interpolatePrompt } from '../../src/utils/interpolation';
-import { agentOpsService } from '../../src/services/agentOpsService';
+import { DEFAULT_JOURNEY_STAGES } from '../../src/config/defaultStageContent';
 
 // Initialize Genkit
 export const ai = genkit({
   plugins: [
     googleAI({ apiKey: getGeminiApiKey() || process.env.GEMINI_API_KEY })
   ],
-  model: gemini15Flash,
+  model: 'googleai/gemini-3-flash-preview',
   promptDir: './backend/prompts'
 });
 
@@ -261,11 +261,7 @@ export const runJourneyStageFlow = ai.defineFlow(
     let stageConfig = input.stageConfig;
     
     if (!stageConfig && input.stageId) {
-      try {
-        stageConfig = await agentOpsService.getConfig(input.stageId);
-      } catch (error) {
-        console.error(`Failed to fetch config for stage ${input.stageId}:`, error);
-      }
+      stageConfig = DEFAULT_JOURNEY_STAGES[input.stageId] || DEFAULT_JOURNEY_STAGES['dive-in'];
     }
 
     if (stageConfig) {
@@ -284,10 +280,21 @@ export const runJourneyStageFlow = ai.defineFlow(
     const systemInstruction = `${baseInstruction}${currentTruth}`;
 
     // 3. Format History for Genkit
-    const formattedHistory = (input.history || []).map((msg: any) => {
-      const role = msg.role === 'user' ? 'user' : 'model';
-      return { role, content: [{ text: msg.content }] };
-    });
+    const formattedHistory = (input.history || [])
+      .map((msg: any) => {
+        let textContent = '';
+        if (msg.content && typeof msg.content === 'string') {
+          textContent = msg.content;
+        } else if (msg.parts && Array.isArray(msg.parts)) {
+          textContent = msg.parts.map((p: any) => p.text || '').join('\n');
+        }
+        return { 
+          role: msg.role === 'user' ? 'user' : 'model', 
+          content: textContent.trim() 
+        };
+      })
+      .filter((msg: any) => msg.content.length > 0)
+      .map((msg: any) => ({ role: msg.role, content: [{ text: msg.content }] }));
 
     // 4. Intercept [SYSTEM_INIT] and Handle Multi-Modal Attachments
     const userContent: any[] = [];
@@ -301,8 +308,8 @@ export const runJourneyStageFlow = ai.defineFlow(
       Look to the ## INITIATION PROTOCOL section of your instructions for exactly how to handle this system event.`;
       
       userContent.push({ text: initPrompt });
-    } else {
-      userContent.push({ text: input.message });
+    } else if (input.message && input.message.trim().length > 0) {
+      userContent.push({ text: input.message.trim() });
     }
 
     if (input.attachments && input.attachments.length > 0) {
@@ -322,23 +329,32 @@ export const runJourneyStageFlow = ai.defineFlow(
    // 5. Generate Response via Dotprompt (fallback to regular config if prompt fails)
     const currentTools = [...allTools, ...mcpTools];
     let response;
+
+    // Filter out userContent if it's completely empty and attach an explicit empty prompt if needed to satisfy Genkit payload structure
+    if (userContent.length === 0) {
+      userContent.push({ text: ' ' }); 
+    }
+
     try {
-      const skylarPrompt = await promptRef('skylarBase');
-      response = await skylarPrompt.generate({
-        input: {
+      const skylarPrompt = ai.prompt('skylarBase');
+      console.dir({ messages: [...formattedHistory, { role: 'user', content: userContent }] }, { depth: null });
+      response = await skylarPrompt(
+        {
           userDisplayName: 'User',
           stageTitle: stageConfig?.title || input.stageId,
           artifactName: stageConfig?.requiredArtifacts?.[0],
           additionalContext: currentTruth,
         },
-        messages: [...formattedHistory, { role: 'user', content: userContent }] as any,
-        tools: currentTools,
-        config: { temperature: 0.7 }
-      });
+        {
+          messages: [...formattedHistory, { role: 'user', content: userContent }] as any,
+          tools: currentTools,
+          config: { temperature: 0.7 }
+        }
+      );
     } catch (error) {
       console.warn("Dotprompt failed or not found, falling back to raw generate...", error);
       response = await ai.generate({
-        model: gemini15Flash,
+        model: 'googleai/gemini-3-flash-preview',
         system: systemInstruction,
         messages: [...formattedHistory, { role: 'user', content: userContent }] as any,
         tools: currentTools,

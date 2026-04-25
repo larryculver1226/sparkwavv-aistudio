@@ -81,7 +81,7 @@ export function IdentityProvider({ children }: { children: React.ReactNode }) {
 
   const loginWithPopup = useCallback(async (providedTenantId?: string) => {
     try {
-      setStatus('initializing');
+      // Intentionally not setting status to 'initializing' to avoid blocking the UI if popup is closed
       const effectiveTenant = getEffectiveTenant(providedTenantId);
       setLocalTenantId(effectiveTenant);
 
@@ -90,7 +90,7 @@ export function IdentityProvider({ children }: { children: React.ReactNode }) {
     } catch (err: any) {
       console.error('❌ [Identity] Google Login Error:', err);
       setError(err.message);
-      setStatus('error');
+      setStatus('unauthenticated');
       throw err;
     }
   }, []);
@@ -98,7 +98,7 @@ export function IdentityProvider({ children }: { children: React.ReactNode }) {
   const login = useCallback(
     async (email?: string, pass?: string, providedTenantId?: string) => {
       try {
-        setStatus('initializing');
+        // Intentionally not setting status to 'initializing' to avoid UI jumps on error
         const effectiveTenant = getEffectiveTenant(providedTenantId);
         setLocalTenantId(effectiveTenant);
 
@@ -112,7 +112,7 @@ export function IdentityProvider({ children }: { children: React.ReactNode }) {
       } catch (err: any) {
         console.error('❌ [Identity] Login Error:', err);
         setError(err.message);
-        setStatus('error');
+        setStatus('unauthenticated');
         throw err;
       }
     },
@@ -122,7 +122,7 @@ export function IdentityProvider({ children }: { children: React.ReactNode }) {
   const signUpWithEmail = useCallback(
     async (email: string, pass: string, name: string, providedTenantId?: string) => {
       try {
-        setStatus('initializing');
+        // Intentionally not setting status to 'initializing' to avoid blocking the UI on error
         const effectiveTenant = getEffectiveTenant(providedTenantId);
         setLocalTenantId(effectiveTenant);
 
@@ -131,7 +131,7 @@ export function IdentityProvider({ children }: { children: React.ReactNode }) {
       } catch (err: any) {
         console.error('❌ [Identity] Email Sign-up Error:', err);
         setError(err.message);
-        setStatus('error');
+        setStatus('unauthenticated');
         throw err;
       }
     },
@@ -243,8 +243,9 @@ export function IdentityProvider({ children }: { children: React.ReactNode }) {
       const idToken = await user.getIdToken();
       const updatedProfile = await userService.updateProfile(idToken, updates);
       setProfile(updatedProfile);
+      await fetchIdentity(user, true);
     },
-    [user]
+    [user, fetchIdentity]
   );
 
   const reloadUser = useCallback(async () => {

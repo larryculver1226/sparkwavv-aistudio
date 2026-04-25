@@ -1,6 +1,7 @@
 ---
 name: skylarBase
 description: The core system prompt for Skylar, the AI Career Partner.
+model: googleai/gemini-3-flash-preview
 input:
   schema:
     userDisplayName?: string

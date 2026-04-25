@@ -46,9 +46,16 @@ export function OnboardingContainer({ onBackToHome, onSuccess }: OnboardingConta
       <div className="glass-panel p-8 space-y-6 text-center">
         {!showEmailSignup ? (
           <SocialAuth
-            onGoogleLogin={loginWithPopup}
+            onGoogleLogin={async () => {
+              try {
+                await loginWithPopup();
+              } catch (err) {
+                // Caught to prevent unhandled promise rejection
+              }
+            }}
             onEmailSignup={() => setShowEmailSignup(true)}
             loading={loading}
+            error={error}
           />
         ) : (
           <SignupForm

@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Button } from '../Button';
-import { ArrowRight, Loader2 } from 'lucide-react';
+import { ArrowRight, Loader2, AlertCircle } from 'lucide-react';
 
 interface LoginFormProps {
   onEmailLogin: (email: string, pass: string) => Promise<void>;
@@ -20,8 +20,21 @@ export function LoginForm({ onEmailLogin, onGoogleLogin, loading, error }: Login
 
   return (
     <div className="glass-panel p-8 space-y-6">
+      {error && (
+        <div className="bg-red-500/10 border border-red-500/20 rounded-xl p-4 flex items-start gap-3 text-left">
+          <AlertCircle className="w-5 h-5 text-red-500 shrink-0 mt-0.5" />
+          <p className="text-sm text-red-500">{error}</p>
+        </div>
+      )}
+
       <Button
-        onClick={onGoogleLogin}
+        onClick={async () => {
+          try {
+            await onGoogleLogin();
+          } catch (err) {
+            // Handled to prevent unhandled rejection
+          }
+        }}
         disabled={loading}
         className="w-full py-4 text-lg bg-white text-black hover:bg-white/90"
       >
@@ -70,7 +83,6 @@ export function LoginForm({ onEmailLogin, onGoogleLogin, loading, error }: Login
             placeholder="••••••••"
           />
         </div>
-        {error && <p className="text-xs text-red-500">{error}</p>}
         <Button type="submit" disabled={loading} className="w-full py-4 mt-4">
           {loading ? <Loader2 className="w-5 h-5 animate-spin mx-auto" /> : 'Sign In'}
         </Button>

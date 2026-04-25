@@ -1066,38 +1066,30 @@ export function SPARKWavvApp({
                 </motion.div>
 
                 {/* Dive-In Section */}
-                <div className="w-full max-w-7xl mx-auto mt-16 px-6 pb-12 text-center space-y-8">
-                  <h2 className="text-4xl md:text-5xl font-display font-bold text-white tracking-tight">
-                    Begin Your <span className="text-neon-cyan italic">Dive-In</span>
-                  </h2>
-                  <p className="text-xl text-white/60 max-w-3xl mx-auto leading-relaxed">
-                    The Dive-In is a comprehensive, AI-guided onboarding process designed to extract your core professional DNA. Through a series of targeted interactions, Skylar will analyze your background, identify your unique strengths, and establish your baseline. This initial deep dive is completely free and sets the foundation for your entire Sparkwavv journey.
-                  </p>
-                  <button
-                    onClick={() => {
-                      if (user) {
-                        navigate(`/dashboard/${profile?.uid || user.uid}`);
-                      } else {
-                        loginWithPopup();
-                      }
-                    }}
-                    className="inline-flex items-center gap-3 px-8 py-4 rounded-full bg-neon-cyan text-black font-bold text-lg hover:bg-white transition-all duration-300 shadow-[0_0_30px_rgba(0,243,255,0.3)] hover:shadow-[0_0_50px_rgba(0,243,255,0.5)] group"
-                  >
-                    Start Free Dive-In
-                    <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
-                  </button>
-                </div>
+                {!user && (
+                  <div className="w-full max-w-7xl mx-auto mt-16 px-6 pb-12 text-center space-y-8">
+                    <h2 className="text-4xl md:text-5xl font-display font-bold text-white tracking-tight">
+                      Begin Your <span className="text-neon-cyan italic">Dive-In</span>
+                    </h2>
+                    <p className="text-xl text-white/60 max-w-3xl mx-auto leading-relaxed">
+                      The Dive-In is a comprehensive, AI-guided onboarding process designed to extract your core professional DNA. Through a series of targeted interactions, Skylar will analyze your background, identify your unique strengths, and establish your baseline. This initial deep dive is completely free and sets the foundation for your entire Sparkwavv journey.
+                    </p>
+                    <button
+                      onClick={() => navigate('/dive-in')}
+                      className="inline-flex items-center gap-3 px-8 py-4 rounded-full bg-neon-cyan text-black font-bold text-lg hover:bg-white transition-all duration-300 shadow-[0_0_30px_rgba(0,243,255,0.3)] hover:shadow-[0_0_50px_rgba(0,243,255,0.5)] group"
+                    >
+                      Start Free Dive-In
+                      <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
+                    </button>
+                  </div>
+                )}
 
                 {/* Quick DNA Scan Section */}
-                <QuickScan
-                  onDiveIn={() => {
-                    if (user) {
-                      navigate(`/dashboard/${profile?.uid || user.uid}`);
-                    } else {
-                      loginWithPopup();
-                    }
-                  }}
-                />
+                {!user && (
+                  <QuickScan
+                    onDiveIn={() => navigate('/dive-in')}
+                  />
+                )}
 
                 <BrainModel />
                 <Roadmap />
@@ -3431,14 +3423,35 @@ export default function App() {
             }
           />
           <Route path="/sparkwavv-admin" element={<Navigate to="/admin" replace />} />
-          <Route path="/dashboard/:userId" element={<UserDashboardWrapper isAdmin={!!isAdmin} />} />
-          <Route path="/partner-dashboard" element={<PartnerDashboard />} />
+          <Route
+            path="/dashboard/:userId"
+            element={
+              <ProtectedRoute user={user} onRedirect={() => (window.location.href = '/login')}>
+                <UserDashboardWrapper isAdmin={!!isAdmin} />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/partner-dashboard"
+            element={
+              <ProtectedRoute user={user} onRedirect={() => (window.location.href = '/login')}>
+                <PartnerDashboard />
+              </ProtectedRoute>
+            }
+          />
           <Route path="/accept-invitation/:token" element={<AcceptInvitation />} />
-          <Route path="/profile" element={<ProfilePage />} />
+          <Route
+            path="/profile"
+            element={
+              <ProtectedRoute user={user} onRedirect={() => (window.location.href = '/login')}>
+                <ProfilePage />
+              </ProtectedRoute>
+            }
+          />
           <Route
             path="/vault"
             element={
-              <ProtectedRoute user={user} onRedirect={() => (window.location.href = '/')}>
+              <ProtectedRoute user={user} onRedirect={() => (window.location.href = '/login')}>
                 <OnboardingGate>
                   <WavvaultPage />
                 </OnboardingGate>

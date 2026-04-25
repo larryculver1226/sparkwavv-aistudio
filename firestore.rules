@@ -342,7 +342,9 @@ service cloud.firestore {
       let allowedFields = [
         'userId', 'tenantId', 'identity', 'strengths', 'careerStories', 'embedding', 
         'updatedAt', 'graph', 'logs', 'journeyEvents', 'artifacts', 'lastSynthesis', 
-        'isDiscoveryUnlocked', 'contentHash', 'previousHash'
+        'isDiscoveryUnlocked', 'contentHash', 'previousHash', 'lastCommitHash', 'lastCommitTimestamp',
+        'effortTier', 'energyManagement', 'rppPartners', 'twentyOneQuestions', 'perfectDay', 'prioritizationRankings',
+        'pieOfLife', 'extinguishers', 'accomplishmentLedger', 'fiveStories', 'attributeAssignments'
       ];
       return hasRequiredFields(['userId', 'tenantId']) &&
              hasOnlyAllowedFields(allowedFields) &&
@@ -359,6 +361,8 @@ service cloud.firestore {
              (!('isDiscoveryUnlocked' in data) || data.isDiscoveryUnlocked is bool) &&
              (!('contentHash' in data) || (data.contentHash is string && data.contentHash.size() < 128)) &&
              (!('previousHash' in data) || (data.previousHash is string && data.previousHash.size() < 128)) &&
+             (!('lastCommitHash' in data) || (data.lastCommitHash is string && data.lastCommitHash.size() < 128)) &&
+             (!('lastCommitTimestamp' in data) || isRecent(data.lastCommitTimestamp)) &&
              (!('updatedAt' in data) || (resource == null ? isRecent(data.updatedAt) : data.updatedAt == resource.data.updatedAt));
     }
 

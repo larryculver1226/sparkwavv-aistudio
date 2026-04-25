@@ -86,11 +86,12 @@ export const agentOpsService = {
           title: data.title || data.stageTitle || docSnap.id
         } as JourneyStageDefinition;
       } else {
-        console.warn(`Agent config for ${stageId} not found in Firestore. Falling back to hardcoded.`);
+        // Silently fall back to hardcoded if not found in Firestore
+        // console.log(`Using default agent config for ${stageId}`);
         return DEFAULT_JOURNEY_STAGES[stageId];
       }
     } catch (error) {
-      console.error(`Error fetching agent config for ${stageId}:`, error);
+      // console.warn(`Agent config for ${stageId} not found in Firestore. Falling back to hardcoded.`);
       return DEFAULT_JOURNEY_STAGES[stageId];
     }
   },

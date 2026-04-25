@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useIdentity } from '../contexts/IdentityContext';
 import { auth } from '../lib/firebase';
 import { signOut } from 'firebase/auth';
 import { motion, AnimatePresence } from 'motion/react';
@@ -50,6 +51,7 @@ export const PartnerDashboard: React.FC = () => {
   const [partnerInfo, setPartnerInfo] = useState<any>(null);
   const [applications, setApplications] = useState<any[]>([]);
   const navigate = useNavigate();
+  const { logout } = useIdentity();
 
   useEffect(() => {
     const fetchData = async () => {
@@ -93,7 +95,7 @@ export const PartnerDashboard: React.FC = () => {
   }, []);
 
   const handleLogout = async () => {
-    await signOut(auth);
+    await logout();
     navigate('/partner/login');
   };
 

@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Button } from '../Button';
-import { Loader2 } from 'lucide-react';
+import { Loader2, AlertCircle } from 'lucide-react';
 
 interface SignupFormProps {
   onSubmit: (email: string, pass: string, name: string) => Promise<void>;
@@ -60,7 +60,14 @@ export function SignupForm({ onSubmit, onCancel, loading, error }: SignupFormPro
           placeholder="••••••••"
         />
       </div>
-      {error && <p className="text-xs text-red-500">{error}</p>}
+
+      {error && (
+        <div className="bg-red-500/10 border border-red-500/20 rounded-xl p-4 flex items-start gap-3 text-left">
+          <AlertCircle className="w-5 h-5 text-red-500 shrink-0 mt-0.5" />
+          <p className="text-sm text-red-500">{error}</p>
+        </div>
+      )}
+
       <Button type="submit" disabled={loading} className="w-full py-4 mt-4">
         {loading ? <Loader2 className="w-5 h-5 animate-spin mx-auto" /> : 'Create Account'}
       </Button>

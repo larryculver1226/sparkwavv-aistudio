@@ -119,12 +119,13 @@ export const configService = {
    * Fetches a specific journey stage configuration by ID.
    */
   async getJourneyStage(stageId: string, forceRefresh = false): Promise<SkylarStageConfig | null> {
-    if (!forceRefresh && journeyStagesCache && journeyStagesCache[stageId]) {
-      return journeyStagesCache[stageId];
+    const normalizedStageId = stageId.toLowerCase();
+    if (!forceRefresh && journeyStagesCache && journeyStagesCache[normalizedStageId]) {
+      return journeyStagesCache[normalizedStageId];
     }
 
     try {
-      const docRef = doc(db, 'agent_configs', stageId);
+      const docRef = doc(db, 'agent_configs', normalizedStageId);
       const docSnap = await getDoc(docRef);
 
       if (docSnap.exists()) {
@@ -150,15 +151,15 @@ export const configService = {
         if (!journeyStagesCache) {
           journeyStagesCache = {};
         }
-        journeyStagesCache[stageId] = config;
+        journeyStagesCache[normalizedStageId] = config;
         
         return config;
       } else {
-        console.warn(`Journey stage ${stageId} not found.`);
+        console.warn(`Journey stage ${normalizedStageId} not found.`);
         return null;
       }
     } catch (error) {
-      handleFirestoreError(error, OperationType.GET, `agent_configs/${stageId}`);
+      handleFirestoreError(error, OperationType.GET, `agent_configs/${normalizedStageId}`);
       throw error;
     }
   },

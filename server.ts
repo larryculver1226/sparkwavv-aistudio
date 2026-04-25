@@ -1,6 +1,14 @@
 import dotenv from "dotenv";
 dotenv.config();
 
+// Prevent silent crashes on unhandled rejections
+process.on('uncaughtException', (err) => {
+  console.error('[CRITICAL] Uncaught Exception:', err);
+});
+process.on('unhandledRejection', (reason, promise) => {
+  console.error('[CRITICAL] Unhandled Rejection at:', promise, 'reason:', reason);
+});
+
 // Debug environment variables
 console.log("[SERVER] Environment Variables Check:");
 Object.keys(process.env).forEach(key => {
@@ -487,6 +495,12 @@ try {
   if (serviceAccountJson) {
     console.log(`[AUTH] Initializing Firebase Admin via FIREBASE_SERVICE_ACCOUNT_JSON`);
     const serviceAccount = JSON.parse(serviceAccountJson);
+    
+    // Normalize private key newlines inside the parsed service account
+    if (serviceAccount && serviceAccount.private_key) {
+      serviceAccount.private_key = serviceAccount.private_key.replace(/\\n/g, '\n');
+    }
+    
     sparkwavvAdmin = admin.initializeApp({
       credential: admin.credential.cert(serviceAccount),
       projectId: serviceAccount.project_id
@@ -516,20 +530,48 @@ try {
       console.log(`[AUTH] Initializing Firebase Admin for Project: ${projectId}`);
       
       // Normalize private key
-      if (privateKey && privateKey.trim().startsWith('{')) {
-        try {
-          const parsed = JSON.parse(privateKey);
-          if (parsed.private_key) privateKey = parsed.private_key;
-          if (parsed.client_email) clientEmail = parsed.client_email;
-        } catch (e) {}
+      if (privateKey) {
+        if (privateKey.trim().startsWith('{')) {
+          try {
+            const parsed = JSON.parse(privateKey);
+            if (parsed.private_key) privateKey = parsed.private_key;
+            if (parsed.client_email) clientEmail = parsed.client_email;
+          } catch (e) {}
+        } else {
+          // Remove wrapping double quotes if they exist from env injection
+          if (privateKey.startsWith('"') && privateKey.endsWith('"')) {
+            privateKey = privateKey.slice(1, -1);
+          }
+          if (privateKey.startsWith("'") && privateKey.endsWith("'")) {
+            privateKey = privateKey.slice(1, -1);
+          }
+        }
       }
 
       const options: any = { projectId };
       if (clientEmail && privateKey) {
+        
+        let processedKey = privateKey;
+        // Check if it's JSON stringified
+        try {
+          if (processedKey.startsWith('"') && processedKey.endsWith('"')) {
+            const parsed = JSON.parse(processedKey);
+            if (typeof parsed === 'string') {
+                processedKey = parsed;
+            }
+          }
+        } catch(e) {}
+        
+        // Final normalization for raw literal \n
+        processedKey = processedKey.replace(/\\n/g, '\n');
+
+        let keySnippet = processedKey.substring(0, 30) + '...' + processedKey.substring(processedKey.length - 30);
+        console.log(`[AUTH] Private key length: ${processedKey.length}, starts/ends: ${keySnippet.replace(/\n/g, '\\n')}`);
+        
         options.credential = admin.credential.cert({
           projectId,
           clientEmail,
-          privateKey: privateKey.replace(/\\n/g, '\n'),
+          privateKey: processedKey,
         });
       }
 
@@ -743,6 +785,16 @@ async function startServer() {
       const decodedToken = await verifyToken(req);
       
       if (!decodedToken) {
+        if (roles.includes(ROLES.GUEST)) {
+          // Explicitly allow unauthenticated paths for guests (demo mode)
+          (req as any).user = {
+            uid: 'anonymous',
+            email: 'guest@sparkwavv.com',
+            role: ROLES.GUEST,
+            tenantId: 'sparkwavv'
+          };
+          return next();
+        }
         return res.status(401).json({ error: "Unauthorized" });
       }
 
@@ -772,8 +824,8 @@ async function startServer() {
         }
       }
 
-      // Check if user has one of the required roles
-      if (!roles.includes(role)) {
+      // Check if user has one of the required roles (Super Admins have universal access)
+      if (!roles.includes(role) && role !== ROLES.SUPER_ADMIN) {
         console.warn(`[AUTH] Access denied for ${decodedToken.email}. Role: ${role}, Required: ${roles.join(', ')}`);
         return res.status(403).json({ error: "Access Denied" });
       }
@@ -2164,13 +2216,18 @@ async function startServer() {
         const uid = decodedToken.uid;
         const updates = req.body;
 
+        const db = getFirestoreDb();
+        if (!db) {
+          throw new Error("Firestore not initialized");
+        }
+
         // Prevent updating sensitive fields via this route
         const forbiddenFields = ['role', 'tenantId', 'uid', 'email'];
         forbiddenFields.forEach(field => delete updates[field]);
 
         await db.collection('users').doc(uid).set({
           ...updates,
-          updatedAt: admin.firestore.FieldValue.serverTimestamp()
+          updatedAt: new Date().toISOString()
         }, { merge: true });
 
         const updatedDoc = await db.collection('users').doc(uid).get();
@@ -2711,7 +2768,7 @@ async function startServer() {
     });
 
     // Skylar AI Agentic Routes
-    app.post("/api/agent/chat", requireRole([ROLES.USER, ROLES.ADMIN, ROLES.OPERATOR, ROLES.MENTOR, ROLES.AGENT]), async (req, res) => {
+    app.post("/api/agent/chat", requireRole([ROLES.USER, ROLES.ADMIN, ROLES.OPERATOR, ROLES.MENTOR, ROLES.AGENT, ROLES.GUEST]), async (req, res) => {
       try {
         const { message, history, wavvaultContext } = req.body;
         const authenticatedUser = (req as any).user;
@@ -2852,19 +2909,19 @@ async function startServer() {
       }
     });
 
-    app.post("/api/skylar/chat-journey", requireRole([ROLES.USER, ROLES.ADMIN, ROLES.OPERATOR, ROLES.MENTOR, ROLES.AGENT]), async (req, res) => {
+    app.post("/api/skylar/chat-journey", requireRole([ROLES.USER, ROLES.ADMIN, ROLES.OPERATOR, ROLES.MENTOR, ROLES.AGENT, ROLES.GUEST]), async (req, res) => {
       try {
         const { userId, stageId, message, history, attachments, stageConfig, missingArtifacts } = req.body;
         const authenticatedUser = (req as any).user;
  
-        if (authenticatedUser.uid !== userId && ![ROLES.ADMIN, ROLES.SUPER_ADMIN, ROLES.MENTOR, ROLES.OPERATOR, ROLES.AGENT].some(r => (authenticatedUser.roles || []).includes(r))) {
+        if (authenticatedUser.role !== ROLES.GUEST && authenticatedUser.uid !== userId && ![ROLES.ADMIN, ROLES.SUPER_ADMIN, ROLES.MENTOR, ROLES.OPERATOR, ROLES.AGENT].some(r => (authenticatedUser.roles || []).includes(r))) {
           return res.status(403).json({ error: "Unauthorized access to this chat session" });
         }
  
-        const { runJourneyStageFlow } = await import('./src/services/genkitService.js');
+        const { runJourneyStageFlow } = await import('./backend/services/genkitService.js');
         const { genkitTracer } = await import('./src/services/agentOpsService.js');
  
-        const { response, trace } = await runJourneyStageFlow({
+        const result = await runJourneyStageFlow({
           userId,
           stageId,
           message,
@@ -2874,11 +2931,10 @@ async function startServer() {
           missingArtifacts
         });
  
-        if (trace) {
-           genkitTracer.addTrace(trace);
-        }
- 
-        res.json({ response });
+        res.json({ 
+          response: { text: result.text },
+          executedActions: result.executedActions
+        });
       } catch (error: any) {
         console.error("Error in /api/skylar/chat-journey:", error);
         res.status(500).json({ error: error.message });

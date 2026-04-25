@@ -152,12 +152,14 @@ export const SkylarSidebar: React.FC<SkylarSidebarProps> = ({ onLogin }) => {
 
         recognitionRef.current.start();
         setIsListening(true);
-      } catch (err) {
-        console.error('Microphone access denied:', err);
-        if (!isAuto) {
-          setError(
-            'Microphone access is required for voice-to-text. Please enable it in your browser settings.'
-          );
+      } catch (err: any) {
+        if (isAuto) {
+           console.warn('Auto-listen restricted by browser (user interaction required for microphone).');
+        } else {
+           console.error('Microphone access denied:', err);
+           setError(
+             'Microphone access is required for voice-to-text. Please enable it in your browser settings.'
+           );
         }
       }
     }
@@ -294,6 +296,18 @@ export const SkylarSidebar: React.FC<SkylarSidebarProps> = ({ onLogin }) => {
           })
         });
 
+        // Ensure the response is actually JSON before parsing to avoid generic errors
+        const contentType = res.headers.get('content-type');
+        if (!contentType || !contentType.includes('application/json')) {
+          const text = await res.text();
+          if (text.includes('Starting Server...</title>')) {
+            throw new Error('The backend server is currently starting up. Please wait a few seconds and try again.');
+          } else if (text.includes('Cookie check')) {
+            throw new Error('Please authenticate in a new window or enable cookies for this preview to continue.');
+          }
+          throw new Error('Skylar response was obstructed by a network or proxy restriction.');
+        }
+
         if (!res.ok) throw new Error('Failed to communicate with Skylar');
         
         const data = await res.json();
@@ -315,7 +329,7 @@ export const SkylarSidebar: React.FC<SkylarSidebarProps> = ({ onLogin }) => {
           token,
           currentFile || undefined
         );
-        responseText = result.response.candidates?.[0]?.content?.parts?.filter((part) => part.text)?.map((part) => part.text)?.join('') || '';
+        responseText = result.response.text || result.response.candidates?.[0]?.content?.parts?.filter((part: any) => part.text)?.map((part: any) => part.text)?.join('') || '';
         executedActions = result.executedActions || [];
       }
 

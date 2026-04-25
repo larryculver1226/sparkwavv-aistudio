@@ -25,7 +25,13 @@ export const LocalIntelligenceWidget: React.FC = () => {
     setError(null);
     try {
       const position = await new Promise<GeolocationPosition>((resolve, reject) => {
-        navigator.geolocation.getCurrentPosition(resolve, reject);
+        navigator.geolocation.getCurrentPosition(resolve, (err) => {
+          if (err.code === err.PERMISSION_DENIED) {
+            reject(new Error("Location permission denied. Please allow location access."));
+          } else {
+            reject(new Error(err.message || "Failed to retrieve location due to a browser restriction."));
+          }
+        });
       });
 
       const { latitude, longitude } = position.coords;
