@@ -652,7 +652,7 @@ async function startServer() {
   console.log('Starting server initialization...');
   
   const app = express();
-  const PORT = 3000;
+  const PORT = process.env.PORT || 3000;
 
   // Initialize MCP Client in the background so it doesn't block server startup
   console.log('Starting MCP Client connection in background...');
