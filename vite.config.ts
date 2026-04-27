@@ -47,7 +47,7 @@ export default defineConfig(({mode}) => {
     },
     preview: {
       host: true,
-      port: 8080,
+      port: 3000,
       strictPort: true,
       allowedHosts: 'all', // Apply to preview as well
     }
