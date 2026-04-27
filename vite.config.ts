@@ -39,23 +39,18 @@ export default defineConfig(({mode}) => {
       },
     },
     server: {
-      // Updated for Cloud Run Production
       hmr: false,
-      host: true, 
-      port: 8080, // Matches Cloud Run default port
+      host: true,
+      port: 8080,
       strictPort: true,
-      allowedHosts: [
-        'sparkwavv-aistudio-56128254195.us-east1.run.app'
-      ],
+      allowedHosts: 'all', // This will allow any host to access the server
     },
-    // Adding preview config as well, in case your start command uses 'vite preview'
     preview: {
       host: true,
       port: 8080,
       strictPort: true,
-      allowedHosts: [
-        'sparkwavv-aistudio-56128254195.us-east1.run.app'
-      ],
+      allowedHosts: 'all', // Apply to preview as well
     }
+
   };
 });
