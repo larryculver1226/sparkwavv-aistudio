@@ -35,7 +35,13 @@ export default defineConfig(({mode}) => {
       minify: false,
       sourcemap: false,
       rollupOptions: {
-        external: ['pdfjs-dist', 'mammoth']
+        external: ['pdfjs-dist', 'mammoth'],
+        onwarn(warning, warn) {
+          if (warning.code === 'MODULE_LEVEL_DIRECTIVE' && warning.message.includes('use client')) {
+            return;
+          }
+          warn(warning);
+        }
       },
     },
     server: {
@@ -43,7 +49,9 @@ export default defineConfig(({mode}) => {
       host: true,
       port: 8080,
       strictPort: true,
-      allowedHosts: 'all', // This will allow any host to access the server
+      allowedHosts: [
+      'sparkwavv-aistudio-56128254195.us-east1.run.app'
+      ]
     },
     preview: {
       host: true,
