@@ -5,7 +5,7 @@ RUN apk add --no-cache python3 make g++
 
 WORKDIR /app
 COPY package*.json ./
-RUN npm ci
+RUN npm install
 
 COPY . .
 # We use npm run build which compiles both vite assets and server.ts to dist/
@@ -21,7 +21,7 @@ RUN apk add --no-cache python3 make g++
 # However, esbuild bundles the server.ts but sets --packages=external 
 # meaning we STILL NEED node_modules for production backend execution.
 COPY package*.json ./
-RUN npm ci --omit=dev
+RUN npm install --omit=dev
 
 COPY --from=builder /app/dist ./dist
 COPY --from=builder /app/firebase-applet-config.json ./
