@@ -39,12 +39,23 @@ export default defineConfig(({mode}) => {
       },
     },
     server: {
-      // HMR is disabled in AI Studio via DISABLE_HMR env var.
-      // Do not modifyâfile watching is disabled to prevent flickering during agent edits.
+      // Updated for Cloud Run Production
       hmr: false,
-      allowedHosts: true,
-      host: true,
-      port: 3000,
+      host: true, 
+      port: 8080, // Matches Cloud Run default port
+      strictPort: true,
+      allowedHosts: [
+        'sparkwavv-aistudio-56128254195.us-east1.run.app'
+      ],
     },
+    // Adding preview config as well, in case your start command uses 'vite preview'
+    preview: {
+      host: true,
+      port: 8080,
+      strictPort: true,
+      allowedHosts: [
+        'sparkwavv-aistudio-56128254195.us-east1.run.app'
+      ],
+    }
   };
 });
