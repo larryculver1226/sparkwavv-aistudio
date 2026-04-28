@@ -4,6 +4,7 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 ### Added
+- **Track 073**: Fix 403 Forbidden Error for `favicon.ico` in Production. Implemented safe Helmet middleware to manage referrer headers, added standard CORS configuration (`npm run build` dependencies), and added a 204 No Content interceptor for `/favicon.ico` to stop wildcard catch-all fall-through overhead. Generated & linked a modern `/favicon.svg`.
 - **Track 069**: Initialization of User Journey Phase from Wavvault (Built `PhaseGateBanner` component into user dashboards to enforce artifact completion gates. Intercepted `[SYSTEM_INIT]` via Genkit to allow Skylar to proactively greet users and offer context-aware help on missing milestones when navigating to a phase.)
 - **Track 006**: Revised System Prompt Templates (Second Pass) (Strictly enforced {{user.displayName}}, {{user.firstName}}, {{user.role}}, {{user.sector}}, and {{stage.title}} variables. Introduced new structural sections: GOAL, STAGE GATE REQUIREMENTS, STEP-BY-STEP INSTRUCTIONS, ACTION TRIGGERS, and CONSTRAINTS to heavily limit generic Skylar responses and lock future phase features until artifacts are validated).
 - **Track 005**: Consistent System Prompt Templates for Stage Management (Standardized Prompts across all 5 Journey phases with unified IDENTITY & CONTEXT, DUAL-LOGIC PERSONAS, UI AWARENESS, and TRIGGERS mapping).

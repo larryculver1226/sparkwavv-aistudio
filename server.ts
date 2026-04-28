@@ -22,6 +22,8 @@ Object.keys(process.env).forEach(key => {
 });
 
 import express from "express";
+import cors from "cors";
+import helmet from "helmet";
 import { createServer as createViteServer } from "vite";
 import session from "express-session";
 import path from "path";
@@ -660,6 +662,25 @@ async function startServer() {
 
   console.log('Configuring session middleware...');
   app.set("trust proxy", 1); // Trust first proxy (Nginx)
+
+  // Configure Helmet safely to allow iframe preview and cross-origin usage
+  app.use(helmet({
+    contentSecurityPolicy: false,
+    crossOriginEmbedderPolicy: false,
+    crossOriginResourcePolicy: false,
+    frameguard: false,
+  }));
+  
+  // Enable CORS securely
+  app.use(cors({
+    origin: '*',
+    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization']
+  }));
+
+  // Handle favicon to prevent 403 / 404 from falling through to the React App wildcards
+  app.get('/favicon.ico', (req, res) => res.status(204).end());
+
   app.use(express.json({ limit: '50mb' }));
   app.use(
     session({
