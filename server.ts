@@ -24,7 +24,6 @@ Object.keys(process.env).forEach(key => {
 import express from "express";
 import cors from "cors";
 import helmet from "helmet";
-import { createServer as createViteServer } from "vite";
 import session from "express-session";
 import path from "path";
 import { fileURLToPath } from "url";
@@ -4453,32 +4452,12 @@ async function startServer() {
     res.status(404).json({ error: "API route not found" });
   });
 
-  // Vite middleware for development
-  if (process.env.NODE_ENV !== "production") {
-    console.log('Initializing Vite server promise...');
-    const vitePromise = createViteServer({
-      server: { 
-        middlewareMode: true,
-        hmr: false
-      },
-      appType: "spa",
-    });
-    
-    app.use(async (req, res, next) => {
-      try {
-        const vite = await vitePromise;
-        vite.middlewares(req, res, next);
-      } catch (err) {
-        console.error('Vite middleware error:', err);
-        next(err);
-      }
-    });
-  } else {
-    app.use(express.static(__dirname));
-    app.get("*", (req, res) => {
-      res.sendFile(path.join(__dirname, "index.html"));
-    });
-  }
+  // Static serving for BOTH dev and prod
+  const publicPath = path.join(process.cwd(), 'dist/public');
+  app.use(express.static(publicPath));
+  app.get("*", (req, res) => {
+    res.sendFile(path.join(publicPath, "index.html"));
+  });
 
   console.log(`Attempting to listen on port ${PORT}...`);
   app.listen(PORT, "0.0.0.0", () => {

@@ -1,7 +1,6 @@
 import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
 import { BrowserRouter as Router } from 'react-router-dom';
-import './index.css';
 
 // Firebase Configuration Checks
 const firebaseApiKey = import.meta.env.VITE_FIREBASE_API_KEY?.trim();
