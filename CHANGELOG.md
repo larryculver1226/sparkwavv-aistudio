@@ -4,6 +4,7 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 ### Added
+- **Track 075**: Fix Cloud Run Deployment Failure (`API key does not start with "SG."`). Wrapped `sgMail.setApiKey()` initialization inside a try-catch block and added a strict `startsWith("SG.")` check to prevent invalid placeholder keys from bubbling an unhandled exception during Node server startup.
 - **Track 074**: Fix `Uncaught TypeError: Cannot read properties of undefined (reading 'VITE_FIREBASE_API_KEY')`. Fully replaced `import.meta.env` references within the unified pipeline by statically defining an inclusive `import.meta.env` object in the ESBuild plugin mapping algorithm, mapping all standard `MODE`, `DEV`, `PROD` context switches over from `process.env`.
 - **Track 074**: Removed Vite and transitioned to a unified `esbuild` + `tailwindcss/cli` build pipeline. This unifies development and production environments, eliminating all Vite Dev Middleware behavior (such as `allowedHosts` 403 errors and websocket connection bugs) while streamlining the CI/CD pipeline.
 - **Track 073**: Fix 403 Forbidden Error for `favicon.ico` in Production. Implemented safe Helmet middleware to manage referrer headers, added standard CORS configuration (`npm run build` dependencies), and added a 204 No Content interceptor for `/favicon.ico` to stop wildcard catch-all fall-through overhead. Generated & linked a modern `/favicon.svg`. Investigated source archive extraction errors when publishing and confirmed workspace ignore settings are fully intact.

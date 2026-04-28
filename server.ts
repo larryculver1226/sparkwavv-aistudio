@@ -1053,10 +1053,14 @@ async function startServer() {
     bootstrapPartnerEcosystem();
 
     // Configure SendGrid
-    if (process.env.SENDGRID_API_KEY) {
-      sgMail.setApiKey(process.env.SENDGRID_API_KEY);
+    if (process.env.SENDGRID_API_KEY && process.env.SENDGRID_API_KEY.startsWith("SG.")) {
+      try {
+        sgMail.setApiKey(process.env.SENDGRID_API_KEY);
+      } catch (error) {
+        console.error("[SENDGRID ERROR] Failed to set API Key:", error);
+      }
     } else {
-      console.warn("[SENDGRID] API Key missing. Email features will be simulated.");
+      console.warn("[SENDGRID] API Key missing or invalid (must start with 'SG.'). Email features will be simulated.");
     }
 
     // Identity Platform Middleware (Lazy Initialization)
