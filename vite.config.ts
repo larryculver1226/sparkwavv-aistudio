@@ -49,10 +49,7 @@ export default defineConfig(({mode}) => {
       host: true,
       port: 8080,
       strictPort: true,
-      allowedHosts: [
-      'sparkwavv.ai','www.sparkwavv.ai',  
-      'sparkwavv-aistudio-56128254195.us-east1.run.app'
-      ]
+      allowedHosts: true
     },
     preview: {
       host: true,
