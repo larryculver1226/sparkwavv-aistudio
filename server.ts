@@ -4458,9 +4458,40 @@ async function startServer() {
 
   // Static serving for BOTH dev and prod
   const publicPath = path.join(process.cwd(), 'dist/public');
-  app.use(express.static(publicPath));
+  app.use(express.static(publicPath, { index: false })); // Disable automatic index.html serving to allow templating
   app.get("*", (req, res) => {
-    res.sendFile(path.join(publicPath, "index.html"));
+    const indexPath = path.join(publicPath, "index.html");
+    if (!fs.existsSync(indexPath)) {
+      return res.status(404).send('index.html not found. Ensure frontend is built.');
+    }
+    
+    // Read and inject environment variables dynamically
+    fs.readFile(indexPath, 'utf8', (err, html) => {
+      if (err) return res.status(500).send('Error reading index.html');
+      
+      const clientEnv = {
+        MODE: process.env.NODE_ENV || 'development',
+        DEV: process.env.NODE_ENV !== 'production',
+        PROD: process.env.NODE_ENV === 'production',
+        GEMINI_API_KEY: process.env.GEMINI_API_KEY || '',
+      };
+      
+      // Add all VITE_ prefixed variables
+      Object.keys(process.env).forEach(key => {
+        if (key.startsWith('VITE_')) {
+          clientEnv[key] = process.env[key];
+        }
+      });
+      
+      const safeEnvStr = JSON.stringify(clientEnv).replace(/</g, '\\u003c');
+      
+      const injectedHtml = html.replace(
+        '</head>',
+        `<script>window.__ENV__ = ${safeEnvStr};</script></head>`
+      );
+      
+      res.send(injectedHtml);
+    });
   });
 
   console.log(`Attempting to listen on port ${PORT}...`);

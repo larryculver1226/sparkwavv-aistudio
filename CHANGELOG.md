@@ -4,6 +4,7 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 ### Added
+- **Track 076**: Implemented dynamic runtime environment variable injection for production deployment. Fixed an issue where ESBuild would statically compile out `import.meta.env` references to `<undefined>` during Cloud Run deployments (as secrets are unavailable at `npm run build` time). Implemented a `window.__ENV__` secure payload inside Express server HTML requests, successfully mirroring Vite's `import.meta.env` behavior on the frontend.
 - **Track 075**: Fix Cloud Run Deployment Failure (`API key does not start with "SG."`). Wrapped `sgMail.setApiKey()` initialization inside a try-catch block and added a strict `startsWith("SG.")` check to prevent invalid placeholder keys from bubbling an unhandled exception during Node server startup.
 - **Track 074**: Fix `Uncaught TypeError: Cannot read properties of undefined (reading 'VITE_FIREBASE_API_KEY')`. Fully replaced `import.meta.env` references within the unified pipeline by statically defining an inclusive `import.meta.env` object in the ESBuild plugin mapping algorithm, mapping all standard `MODE`, `DEV`, `PROD` context switches over from `process.env`.
 - **Track 074**: Removed Vite and transitioned to a unified `esbuild` + `tailwindcss/cli` build pipeline. This unifies development and production environments, eliminating all Vite Dev Middleware behavior (such as `allowedHosts` 403 errors and websocket connection bugs) while streamlining the CI/CD pipeline.

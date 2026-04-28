@@ -20,18 +20,7 @@ export const config = {
   publicPath: '/', // for the loader
   define: {
     'process.env.NODE_ENV': JSON.stringify(process.env.NODE_ENV || 'development'),
-    'import.meta.env': JSON.stringify({
-      MODE: process.env.NODE_ENV || 'development',
-      DEV: process.env.NODE_ENV !== 'production',
-      PROD: process.env.NODE_ENV === 'production',
-      GEMINI_API_KEY: process.env.GEMINI_API_KEY || '',
-      ...Object.keys(process.env).reduce((acc, key) => {
-        if (key.startsWith('VITE_')) {
-          acc[key] = process.env[key];
-        }
-        return acc;
-      }, {})
-    }),
+    'import.meta.env': 'window.__ENV__',
     ...Object.keys(process.env).filter(key => key.startsWith('VITE_')).reduce((acc, key) => {
       acc[`process.env.${key}`] = JSON.stringify(process.env[key]);
       return acc;
