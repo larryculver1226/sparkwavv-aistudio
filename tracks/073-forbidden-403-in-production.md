@@ -15,4 +15,15 @@
 3. **Add explicit `favicon.ico` route fallback:** Add a lightweight `app.get('/favicon.ico', (req, res) => res.status(204).end());` to prevent falling through to the React App's `index.html` fallback if the file isn't found.
 4. **(Optional pending your approval) Add `cors` or `helmet`**: If you explicitly want to open up CORS or manage the `Referrer-Policy` headers properly across the app, I can also add standard `head` securing packages.
 
-Please review this plan. Say **Approved** or **Proceed** and I will implement these fixes!
+## 2. Setup & Execution
+
+1. Added `public/favicon.svg` to prevent actual missing files.
+2. Updated `index.html` to reference the new svg favicon.
+3. Added `helmet` and `cors` to `server.ts` with open standard headers to prevent CORS issues.
+4. Added an explicit `app.get('/favicon.ico')` interceptor that returns 204 No Content.
+5. **CRITICAL DISCOVERY:** Verified Application Logic and Middleware. There was NO Express logic blocking `req.hostname` or `req.ip`. However, because `process.env.NODE_ENV` was potentially missing in the Cloud Run container runtime, `server.ts` could accidentally fallback into the branch that boots up the **Vite Dev Middleware**. Vite's built-in Dev Middleware enforces strict `allowedHosts` checks and throws a 403 Forbidden for unrecognized hosts (like internal load balancer IPs). 
+6. **Solution:** Installed `cross-env` and updated `package.json` to hardcode `"start": "cross-env NODE_ENV=production node dist/server.js"`, explicitly bypassing Vite middleware when running in Cloud Run.
+
+## 3. Build & QA
+- `npm run build` completed successfully.
+- Added changes to `CHANGELOG.md`.
