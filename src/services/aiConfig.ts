@@ -35,6 +35,11 @@ export const getGeminiApiKey = () => {
         console.log(
           `[AIConfig] SUCCESS: Found valid key in ${name}: ${masked} (length: ${trimmed.length})`
         );
+        // Force set the standard environment variable so Genkit and @google/genai can implicitly use it
+        // even if not explicitly passed during instantiation correctly.
+        if (!process.env.GEMINI_API_KEY) {
+          process.env.GEMINI_API_KEY = trimmed;
+        }
         return trimmed;
       } else if (trimmed) {
         console.warn(

@@ -2936,6 +2936,10 @@ async function startServer() {
 
     app.post("/api/skylar/chat-journey", requireRole([ROLES.USER, ROLES.ADMIN, ROLES.OPERATOR, ROLES.MENTOR, ROLES.AGENT, ROLES.GUEST]), async (req, res) => {
       try {
+        // Guarantee that process.env.GEMINI_API_KEY is populated before Genkit parses the request internally.
+        // Even if VITE_GEMINI_API_KEY was the only one loaded by dotenv, this explicitly copies it over.
+        getGeminiApiKey();
+        
         const { userId, stageId, message, history, attachments, stageConfig, missingArtifacts } = req.body;
         let authenticatedUser = (req as any).user;
         if (req.headers['custom-auth-bypass-test'] === 'realActor') {
