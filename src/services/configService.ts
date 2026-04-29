@@ -82,7 +82,7 @@ export const configService = {
     }
 
     try {
-      const stagesRef = collection(db, 'agent_configs');
+      const stagesRef = collection(db, 'journeyPhaseConfigs');
       const snapshot = await getDocs(stagesRef);
       
       const stages: Record<string, SkylarStageConfig> = {};
@@ -110,7 +110,7 @@ export const configService = {
       journeyStagesCache = stages;
       return stages;
     } catch (error) {
-      handleFirestoreError(error, OperationType.LIST, 'agent_configs');
+      handleFirestoreError(error, OperationType.LIST, 'journeyPhaseConfigs');
       throw error;
     }
   },
@@ -125,7 +125,7 @@ export const configService = {
     }
 
     try {
-      const docRef = doc(db, 'agent_configs', normalizedStageId);
+      const docRef = doc(db, 'journeyPhaseConfigs', normalizedStageId);
       const docSnap = await getDoc(docRef);
 
       if (docSnap.exists()) {
@@ -159,7 +159,7 @@ export const configService = {
         return null;
       }
     } catch (error) {
-      handleFirestoreError(error, OperationType.GET, `agent_configs/${normalizedStageId}`);
+      handleFirestoreError(error, OperationType.GET, `journeyPhaseConfigs/${normalizedStageId}`);
       throw error;
     }
   },
@@ -169,7 +169,7 @@ export const configService = {
    */
   async updateStageConfig(stageId: string, config: SkylarStageConfig): Promise<void> {
     try {
-      const docRef = doc(db, 'agent_configs', stageId);
+      const docRef = doc(db, 'journeyPhaseConfigs', stageId);
       // Save the exact format we use internally, so fields like widgets aren't lost
       const saveFormat = {
         stageId: config.stageId,
@@ -189,7 +189,7 @@ export const configService = {
       }
       journeyStagesCache[stageId] = config;
     } catch (error) {
-      handleFirestoreError(error, OperationType.UPDATE, `agent_configs/${stageId}`);
+      handleFirestoreError(error, OperationType.UPDATE, `journeyPhaseConfigs/${stageId}`);
       throw error;
     }
   },

@@ -7,18 +7,40 @@ import { skylar } from '../../src/services/skylarService';
 import { interpolatePrompt } from '../../src/utils/interpolation';
 import { DEFAULT_JOURNEY_STAGES } from '../../src/config/defaultStageContent';
 
-const geminiKey = getGeminiApiKey() || process.env.GEMINI_API_KEY;
+const activeGeminiKey = getGeminiApiKey() || process.env.GEMINI_API_KEY;
+
+// Only initialize Vertex AI if a robust project ID is provided.
+// Explicitly ignore internal AI Studio placeholder 'gen-lang-client' projects
+const vertexProjectId = process.env.VERTEX_AI_PROJECT_ID;
+const isVertexAvailable =
+  vertexProjectId &&
+  vertexProjectId.trim() !== '' &&
+  !vertexProjectId.includes('gen-lang-client');
+
+const targetModel = activeGeminiKey
+  ? 'googleai/gemini-3-flash-preview'
+  : isVertexAvailable
+  ? 'vertexai/gemini-1.5-flash'
+  : 'googleai/gemini-3-flash-preview';
+
+const vertexConfig: any = {
+  location: process.env.VERTEX_AI_LOCATION || 'us-central1',
+};
+
+if (isVertexAvailable) {
+  vertexConfig.projectId = vertexProjectId;
+}
+
+const activePlugins = [googleAI()];
+if (isVertexAvailable) {
+  activePlugins.push(vertexAI(vertexConfig));
+}
 
 // Initialize Genkit
 export const ai = genkit({
-  plugins: [
-    geminiKey ? googleAI({ apiKey: geminiKey }) : vertexAI({
-      projectId: process.env.VERTEX_AI_PROJECT_ID || process.env.FIREBASE_PROJECT_ID || process.env.VITE_FIREBASE_PROJECT_ID,
-      location: process.env.VERTEX_AI_LOCATION || 'us-central1'
-    })
-  ],
-  model: geminiKey ? 'googleai/gemini-3-flash-preview' : 'vertexai/gemini-1.5-flash',
-  promptDir: './backend/prompts'
+  plugins: activePlugins,
+  model: targetModel,
+  promptDir: './backend/prompts',
 });
 
 // Define Tools
@@ -194,18 +216,34 @@ export const generateAtsOptimizedContentTool = ai.defineTool(
   }
 );
 
-export const searchWebTool = ai.defineTool(
+export const searchGoogleMapsTool = ai.defineTool(
   {
-    name: 'search_web',
-    description: 'Perform a live web search to gather real-time data, specific company news, or current market trends that the Market Intelligence Grid may not have cached.',
+    name: 'search_google_maps',
+    description: 'Search Google Maps for places, locations, or geographic coordinates. Use when users ask for locations, places, or directions.',
     inputSchema: z.object({
-      query: z.string().describe("The search query to execute"),
+      query: z.string().describe('The location or place to search for on Google Maps'),
     }),
   },
   async (input) => {
-    // Note: To fully implement this, you would wire up a live API like Tavily, Serper, or 
-    // the native Genkit Google Search Grounding plugin here.
-    return { status: 'executed', message: `MOCK: Searched web for "${input.query}". In production, connect Tavily or Google Search API here.`, results: [] };
+    if (!process.env.GOOGLE_MAPS_API_KEY) {
+       console.warn('[Skylar] GOOGLE_MAPS_API_KEY is not set. Returning mocked data.');
+       return { 
+         status: 'executed_mock', 
+         message: `MOCK: Searched Google Maps for "${input.query}". Please configure a GOOGLE_MAPS_API_KEY in the Environment Secrets settings.`,
+         results: [
+           { name: `Mocked Location for ${input.query}`, formatted_address: "123 Mocked St, Tech City", rating: 4.5 }
+         ]
+       };
+    }
+
+    try {
+      const response = await fetch(`https://maps.googleapis.com/maps/api/place/textsearch/json?query=${encodeURIComponent(input.query)}&key=${process.env.GOOGLE_MAPS_API_KEY}`);
+      const data = await response.json();
+      return { status: 'executed', results: data.results || [] };
+    } catch (error) {
+       console.error("Error calling Google Maps:", error);
+       return { status: 'error', message: 'Failed to search Google Maps' };
+    }
   }
 );
 
@@ -221,7 +259,7 @@ const allTools = [
   proposeMilestoneAdditionTool,
   parseCareerArtifactTool,
   generateAtsOptimizedContentTool,
-  searchWebTool
+  searchGoogleMapsTool
 ];
 
 import { mcpTools } from './mcpBridge.js';
@@ -273,7 +311,19 @@ export const runJourneyStageFlow = ai.defineFlow(
     let stageConfig = input.stageConfig;
     
     if (!stageConfig && input.stageId) {
-      stageConfig = DEFAULT_JOURNEY_STAGES[input.stageId] || DEFAULT_JOURNEY_STAGES['dive-in'];
+      try {
+        const { getDoc, doc } = await import('firebase/firestore');
+        const { db } = await import('../../src/lib/firebase');
+        const stageDoc = await getDoc(doc(db, 'journeyPhaseConfigs', input.stageId));
+        if (stageDoc.exists()) {
+          stageConfig = stageDoc.data();
+        } else {
+          stageConfig = DEFAULT_JOURNEY_STAGES[input.stageId] || DEFAULT_JOURNEY_STAGES['dive-in'];
+        }
+      } catch (e) {
+        console.error('Failed to fetch journeyPhaseConfigs', e);
+        stageConfig = DEFAULT_JOURNEY_STAGES[input.stageId] || DEFAULT_JOURNEY_STAGES['dive-in'];
+      }
     }
 
     if (stageConfig) {
@@ -349,7 +399,11 @@ export const runJourneyStageFlow = ai.defineFlow(
 
     try {
       const skylarPrompt = ai.prompt('skylarBase');
-      console.dir({ messages: [...formattedHistory, { role: 'user', content: userContent }] }, { depth: null });
+      console.dir(
+        { messages: [...formattedHistory, { role: 'user', content: userContent }] },
+        { depth: null }
+      );
+
       response = await skylarPrompt(
         {
           userDisplayName: 'User',
@@ -358,21 +412,46 @@ export const runJourneyStageFlow = ai.defineFlow(
           additionalContext: currentTruth,
         },
         {
+          model: targetModel,
           messages: [...formattedHistory, { role: 'user', content: userContent }] as any,
           tools: currentTools,
-          config: { temperature: 0.7 }
+          config: { 
+            temperature: 0.7,
+            googleSearchRetrieval: {}
+          },
         }
       );
     } catch (error) {
-      console.warn("Dotprompt failed or not found, falling back to raw generate...", error);
+      // Gracefully handle invalid API keys by catching the specific error string
+      const errorString = error instanceof Error ? error.message : String(error);
+      let activeTargetModel = targetModel;
+
+      if (errorString.includes('API_KEY_INVALID') || errorString.includes('API key not valid')) {
+        if (!isVertexAvailable) {
+          console.warn(
+            '[Skylar] The provided Gemini API Key is invalid or missing, and Vertex AI is not configured. Returning graceful fallback message to user.'
+          );
+          return {
+            text: "I'm having trouble connecting to my central systems because the Gemini API Key currently provided appears to be invalid or missing. Please check your project settings and ensure you have supplied a valid Gemini API Key.",
+            executedActions: [],
+          };
+        } else {
+          console.warn('[Skylar] Invalid Gemini API Key detected but Vertex AI is configured. Falling back to Vertex AI.');
+          activeTargetModel = 'vertexai/gemini-1.5-flash';
+        }
+      }
+
+      console.warn('Dotprompt failed or not found, falling back to raw generate...', error);
+
       response = await ai.generate({
-        model: geminiKey ? 'googleai/gemini-3-flash-preview' : 'vertexai/gemini-1.5-flash',
+        model: activeTargetModel,
         system: systemInstruction,
         messages: [...formattedHistory, { role: 'user', content: userContent }] as any,
         tools: currentTools,
         config: {
           temperature: 0.7,
-        }
+          googleSearchRetrieval: {}
+        },
       });
     }
 
@@ -405,5 +484,59 @@ export const runJourneyStageFlow = ai.defineFlow(
       executedActions,
       debugData,
     };
+  }
+);
+
+export const analyzeWavvaultArtifactFlow = ai.defineFlow(
+  {
+    name: 'analyzeWavvaultArtifact',
+    description: 'Analyzes a document or user interaction and produces WavVault artifacts like extracted skills, relevance, and summaries.',
+    inputSchema: z.object({
+      userId: z.string(),
+      content: z.string(),
+      type: z.enum(['document', 'chat_interaction']),
+    }),
+    outputSchema: z.object({
+      title: z.string(),
+      extractedSkills: z.array(z.string()),
+      industryRelevance: z.string(),
+      documentSummary: z.string(),
+    })
+  },
+  async (input) => {
+    let activeTargetModel = 'googleai/gemini-1.5-flash';
+    if (!process.env.GEMINI_API_KEY && process.env.VERTEX_AI_PROJECT_ID) {
+      activeTargetModel = 'vertexai/gemini-1.5-flash';
+    }
+    const prompt = `Analyze the following ${input.type} content and extract the following metadata for the user's career WavVault:
+
+Content:
+${input.content}
+
+Provide a descriptive title, a list of professional skills, a brief explanation of industry relevance, and a concise summary.`;
+    
+    // Default to empty array if generation fails or returned output is missing fields
+    try {
+      const response = await ai.generate({
+        model: activeTargetModel,
+        system: 'You are an elite career intelligence engine analyzing artifacts.',
+        prompt: prompt,
+        output: { schema: z.object({
+          title: z.string(),
+          extractedSkills: z.array(z.string()),
+          industryRelevance: z.string(),
+          documentSummary: z.string()
+        }) }
+      });
+      return response.output;
+    } catch(err) {
+      console.error(err);
+      return {
+        title: "Synthesis Error",
+        extractedSkills: [],
+        industryRelevance: "Failed to analyze artifact.",
+        documentSummary: "Failed to summarize artifact."
+      };
+    }
   }
 );

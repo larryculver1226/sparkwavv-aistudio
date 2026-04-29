@@ -512,7 +512,7 @@
       "schema": "JourneyStage",
       "description": "Configuration for specific journey stages"
     },
-    "/agent_configs/{stageId}": {
+    "/journeyPhaseConfigs/{stageId}": {
       "schema": { "$ref": "#/entities/AgentConfig" },
       "description": "Configuration for Skylar agent stages"
     },

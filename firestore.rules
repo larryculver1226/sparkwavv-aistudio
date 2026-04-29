@@ -770,7 +770,7 @@ service cloud.firestore {
       allow delete: if isAdmin();
     }
 
-    match /agent_configs/{stageId} {
+    match /journeyPhaseConfigs/{stageId} {
       allow read: if true;
       allow write: if isAdmin();
     }

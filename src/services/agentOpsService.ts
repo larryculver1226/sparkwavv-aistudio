@@ -3,7 +3,7 @@ import { doc, getDoc, setDoc, collection, getDocs } from 'firebase/firestore';
 import { JourneyStageDefinition } from '../types/skylar';
 import { DEFAULT_JOURNEY_STAGES } from '../config/defaultStageContent';
 
-const COLLECTION_NAME = 'agent_configs';
+const COLLECTION_NAME = 'journeyPhaseConfigs';
 
 export type GenkitTraceListener = (traces: any[]) => void;
 

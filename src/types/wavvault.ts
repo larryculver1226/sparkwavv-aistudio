@@ -40,14 +40,33 @@ export interface ValidationGateEvent {
 
 export interface DistilledArtifact {
   id: string;
-  type: 'spark' | 'pie-of-life' | 'perfect-day' | 'five-stories' | 'brand-pillar' | 'manifesto' | 'live_resume' | 'interactive_portfolio' | 'outreach_sequence' | 'portrait' | 'likeness';
+  type:
+    | 'spark'
+    | 'pie-of-life'
+    | 'perfect-day'
+    | 'five-stories'
+    | 'brand-pillar'
+    | 'manifesto'
+    | 'live_resume'
+    | 'interactive_portfolio'
+    | 'outreach_sequence'
+    | 'portrait'
+    | 'likeness'
+    | 'intel'
+    | 'document';
   title: string;
-  journeyPhase?: 'Dive-In' | 'Ignition' | 'Discovery' | 'Branding' | 'Outreach';
+  journeyPhase?: 'Dive-In' | 'Ignition' | 'Discovery' | 'Branding' | 'Outreach' | string;
   status?: 'draft' | 'review' | 'approved';
-  content: any;
+  content: any; // Can be chat summary, document metadata, etc
   timestamp: string;
   sourceGateId?: string;
-  metadata?: Record<string, any>;
+  metadata?: {
+    extractedSkills?: string[];
+    industryRelevance?: string;
+    documentSummary?: string;
+    verified?: boolean;
+    [key: string]: any;
+  };
 }
 
 export type EffortTier = '3.5 Hours/Week' | '7 Hours/Week';
@@ -106,7 +125,7 @@ export interface WavvaultData {
   isDiscoveryUnlocked: boolean;
   contentHash?: string;
   previousHash?: string;
-  
+
   // Draft V9 Schema Additions
   effortTier?: EffortTier;
   energyManagement?: EnergyManagement;

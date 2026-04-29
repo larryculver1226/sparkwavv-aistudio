@@ -27,7 +27,7 @@ import { skylar } from '../../services/skylarService';
 import { useIdentity } from '../../contexts/IdentityContext';
 import { analyzeDelta } from '../../services/assetEngineService';
 import SkylarCommitSuggestion from './SkylarCommitSuggestion';
-import AssetSynthesizer from '../synthesis/AssetSynthesizer';
+import { WavvaultIntelHub } from './WavvaultIntelHub';
 
 interface NeuralSynthesisEngineProps {
   userId: string;
@@ -43,7 +43,7 @@ export const NeuralSynthesisEngine: React.FC<NeuralSynthesisEngineProps> = ({
   const [isIngesting, setIsIngesting] = useState(false);
   const [processingLogs, setProcessingLogs] = useState<ProcessingLogEntry[]>([]);
   const [graphData, setGraphData] = useState<GraphData>({ nodes: [], links: [] });
-  const [activeTab, setActiveTab] = useState<'graph' | 'logs' | 'assets'>('graph');
+  const [activeTab, setActiveTab] = useState<'graph' | 'logs' | 'intel'>('graph');
   const [isSimulating, setIsSimulating] = useState(false);
   const [integrityStatus, setIntegrityStatus] = useState<{
     valid: boolean;
@@ -206,26 +206,30 @@ export const NeuralSynthesisEngine: React.FC<NeuralSynthesisEngineProps> = ({
 
       let content = '';
       if (file.name.endsWith('.docx') || file.name.endsWith('.pdf')) {
-        addLog(`Parsing ${file.name.endsWith('.docx') ? 'DOCX' : 'PDF'} structure via backend engine...`, 'info', 'parse');
-        
+        addLog(
+          `Parsing ${file.name.endsWith('.docx') ? 'DOCX' : 'PDF'} structure via backend engine...`,
+          'info',
+          'parse'
+        );
+
         try {
           const auth = (await import('../../lib/firebase')).auth;
           const token = await auth.currentUser?.getIdToken();
-          
+
           const formData = new FormData();
           formData.append('file', file);
-          
+
           const res = await fetch('/api/parse-document', {
             method: 'POST',
             body: formData,
-            headers: token ? { Authorization: `Bearer ${token}` } : {}
+            headers: token ? { Authorization: `Bearer ${token}` } : {},
           });
-          
+
           if (!res.ok) throw new Error(`Parse failed: ${res.statusText}`);
           const parsedData = await res.json();
           content = parsedData.text;
         } catch (err: any) {
-             throw new Error(`Failed to parse document: ${err.message}`);
+          throw new Error(`Failed to parse document: ${err.message}`);
         }
       } else {
         addLog('Parsing raw text stream...', 'info', 'parse');
@@ -256,6 +260,56 @@ export const NeuralSynthesisEngine: React.FC<NeuralSynthesisEngineProps> = ({
         'success',
         'complete'
       );
+
+      // EXTRACT DOCUMENT ARTIFACT
+      try {
+        const auth = (await import('../../lib/firebase')).auth;
+        const token = await auth.currentUser?.getIdToken();
+        const analyzeRes = await fetch('/api/wavvault/analyze', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            ...(token ? { Authorization: `Bearer ${token}` } : {}),
+          },
+          body: JSON.stringify({
+            content: content.substring(0, 5000), // pass a chunk
+            type: 'document',
+          }),
+        });
+        if (analyzeRes.ok) {
+          const { metadata } = await analyzeRes.json();
+          if (metadata && metadata.title !== 'Synthesis Error') {
+            // save artifact
+            await fetch('/api/wavvault/artifact', {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                ...(token ? { Authorization: `Bearer ${token}` } : {}),
+              },
+              body: JSON.stringify({
+                type: 'document',
+                title: `Parsed Document: ${metadata.title}`,
+                content: content.substring(0, 1000) + '...',
+                metadata: {
+                  extractedSkills: metadata.extractedSkills,
+                  industryRelevance: metadata.industryRelevance,
+                  documentSummary: metadata.documentSummary,
+                  verified: true,
+                  source: file.name,
+                },
+              }),
+            });
+            addLog(
+              'Document successfully cataloged into WavVault Artifacts.',
+              'success',
+              'catalog'
+            );
+          }
+        }
+      } catch (err) {
+        console.error('Failed to extract document intel', err);
+        addLog('Failed to catalog document metadata.', 'warning', 'catalog');
+      }
 
       // Analyze delta for versioning suggestion
       const deltaResult = await analyzeDelta({
@@ -410,16 +464,16 @@ export const NeuralSynthesisEngine: React.FC<NeuralSynthesisEngineProps> = ({
               Graph
             </button>
             <button
+              onClick={() => setActiveTab('intel')}
+              className={`px-3 py-1.5 rounded-md text-[10px] font-bold uppercase transition-all ${activeTab === 'intel' ? 'bg-neon-cyan text-black' : 'text-white/40 hover:text-white'}`}
+            >
+              Intelligence
+            </button>
+            <button
               onClick={() => setActiveTab('logs')}
               className={`px-3 py-1.5 rounded-md text-[10px] font-bold uppercase transition-all ${activeTab === 'logs' ? 'bg-neon-cyan text-black' : 'text-white/40 hover:text-white'}`}
             >
               Logs
-            </button>
-            <button
-              onClick={() => setActiveTab('assets')}
-              className={`px-3 py-1.5 rounded-md text-[10px] font-bold uppercase transition-all ${activeTab === 'assets' ? 'bg-neon-cyan text-black' : 'text-white/40 hover:text-white'}`}
-            >
-              Assets
             </button>
           </div>
 
@@ -503,8 +557,8 @@ export const NeuralSynthesisEngine: React.FC<NeuralSynthesisEngineProps> = ({
               </div>
             </div>
           ) : (
-            <div className="w-full h-full overflow-y-auto custom-scrollbar">
-              <AssetSynthesizer userId={userId} />
+            <div className="w-full h-full overflow-hidden">
+              <WavvaultIntelHub userId={userId} />
             </div>
           )}
         </div>

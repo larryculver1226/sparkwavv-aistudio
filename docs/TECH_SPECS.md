@@ -34,6 +34,7 @@ To enable full enterprise intelligence, the following environment variables must
 ### 3. External APIs
 - `GEMINI_API_KEY`: Required for standard Skylar interactions and benefit regeneration.
 - `SENDGRID_API_KEY`: Required for sending automated career reports and notifications.
+- `GOOGLE_MAPS_API_KEY`: Required for the custom Google Maps tool for geographic data.
 
 ## API Management (Track 064)
 
