@@ -771,21 +771,33 @@ class SkylarService {
       });
 
       if (!response.ok) {
-        throw new Error('Failed to chat with Skylar.');
+        const contentType = response.headers.get('content-type');
+        let errorMsg = 'Failed to chat with Skylar.';
+        
+        if (contentType && contentType.includes('application/json')) {
+          try {
+            const errData = await response.json();
+            if (errData && errData.error) {
+              errorMsg = errData.error;
+            }
+          } catch (e) {}
+        } else {
+          const text = await response.text();
+          if (text.includes('Starting Server...</title>')) {
+            errorMsg = 'The backend server is currently starting up. Please wait a few seconds and try again.';
+          } else if (text.includes('Cookie check')) {
+            errorMsg = 'Please authenticate in a new window or enable cookies for this preview to continue.';
+          } else {
+             errorMsg = 'Skylar response was obstructed by a network or proxy restriction.';
+          }
+        }
+        throw new Error(errorMsg);
       }
 
-      // Ensure the response is actually JSON before parsing to avoid generic 'Unexpected token <' proxy errors
       const contentType = response.headers.get('content-type');
       if (!contentType || !contentType.includes('application/json')) {
         const text = await response.text();
         console.error('[Skylar] Non-JSON response received:', text.substring(0, 200));
-        
-        if (text.includes('Starting Server...</title>')) {
-          throw new Error('The backend server is currently starting up. Please wait a few seconds and try again.');
-        } else if (text.includes('Cookie check')) {
-          throw new Error('Please authenticate in a new window or enable cookies for this preview to continue.');
-        }
-        
         throw new Error('Skylar response was obstructed by a network or proxy restriction.');
       }
 
