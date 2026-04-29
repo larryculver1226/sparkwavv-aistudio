@@ -39,6 +39,8 @@ import {
   generateCinematicManifesto,
   generateHomeBenefits
 } from './backend/services/geminiBackend';
+import { runJourneyStageFlow } from './backend/services/genkitService';
+import { vertexDiscoveryService } from "./backend/services/vertexDiscoveryService";
 import { XMLParser } from "fast-xml-parser";
 import { GoogleGenAI } from "@google/genai";
 import { 
@@ -902,7 +904,6 @@ async function startServer() {
 
   app.get("/api/admin/vertex/discover", async (req, res) => {
     try {
-      const { vertexDiscoveryService } = await import("./backend/services/vertexDiscoveryService");
       const result = await vertexDiscoveryService.discover();
       res.json(result);
     } catch (error: any) {
@@ -2941,9 +2942,6 @@ async function startServer() {
         if (authenticatedUser.role !== ROLES.GUEST && authenticatedUser.uid !== userId && ![ROLES.ADMIN, ROLES.SUPER_ADMIN, ROLES.MENTOR, ROLES.OPERATOR, ROLES.AGENT].some(r => (authenticatedUser.roles || []).includes(r))) {
           return res.status(403).json({ error: "Unauthorized access to this chat session" });
         }
- 
-        const { runJourneyStageFlow } = await import('./backend/services/genkitService.js');
-        const { genkitTracer } = await import('./src/services/agentOpsService.js');
  
         const result = await runJourneyStageFlow({
           userId,
