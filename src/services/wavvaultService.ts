@@ -18,6 +18,8 @@ import { db } from '../lib/firebase';
 import { ValidationGateEvent, DistilledArtifact } from '../types/wavvault';
 import { logUserActivity } from './activityService';
 
+import { handleFirestoreError, OperationType } from '../lib/firestore-errors';
+
 export const subscribeToEvents = (
   userId: string,
   onUpdate: (events: ValidationGateEvent[]) => void,
@@ -37,6 +39,7 @@ export const subscribeToEvents = (
     },
     (err) => {
       console.error('Error fetching events:', err);
+      handleFirestoreError(err, OperationType.LIST, 'wavvault_events');
       onError(err);
     }
   );
@@ -61,6 +64,7 @@ export const subscribeToArtifacts = (
     },
     (err) => {
       console.error('Error fetching artifacts:', err);
+      handleFirestoreError(err, OperationType.LIST, 'wavvault_artifacts');
       onError(err);
     }
   );

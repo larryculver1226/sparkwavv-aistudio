@@ -2,6 +2,7 @@ import { doc, getDoc, collection, getDocs, onSnapshot, setDoc } from 'firebase/f
 import { db } from '../lib/firebase';
 import { SkylarGlobalConfig, SkylarStageConfig, DEFAULT_MODALITIES } from '../types/skylar-config';
 import { handleFirestoreError, OperationType } from '../lib/firestore-errors';
+import { DEFAULT_JOURNEY_STAGES } from '../config/defaultStageContent';
 
 // In-memory cache
 let globalConfigCache: SkylarGlobalConfig | null = null;
@@ -155,7 +156,32 @@ export const configService = {
         
         return config;
       } else {
-        console.warn(`Journey stage ${normalizedStageId} not found.`);
+        console.info(`[Config Service] Journey stage "${normalizedStageId}" not found in Firestore. Falling back to hardcoded default. (Visit the Agent Ops dashboard to seed this to your database)`);
+        const defaultData = DEFAULT_JOURNEY_STAGES[normalizedStageId] || DEFAULT_JOURNEY_STAGES['dive-in'];
+        if (defaultData) {
+          const config = {
+            stageId: normalizedStageId,
+            stageTitle: defaultData.title || normalizedStageId,
+            description: defaultData.description || '',
+            systemPromptTemplate: defaultData.systemPromptTemplate || '',
+            requiredArtifacts: defaultData.requiredArtifacts || [],
+            allowedModalities: Array.isArray(defaultData.allowedModalities) 
+              ? {
+                  text: defaultData.allowedModalities.includes('text'),
+                  audio: defaultData.allowedModalities.includes('audio'),
+                  image: defaultData.allowedModalities.includes('image'),
+                  video: defaultData.allowedModalities.includes('video'),
+                }
+              : defaultData.allowedModalities || DEFAULT_MODALITIES,
+            uiConfig: defaultData.uiConfig || { theme: 'dark', layout: 'split' }
+          } as SkylarStageConfig;
+          
+          if (!journeyStagesCache) {
+            journeyStagesCache = {};
+          }
+          journeyStagesCache[normalizedStageId] = config;
+          return config;
+        }
         return null;
       }
     } catch (error) {

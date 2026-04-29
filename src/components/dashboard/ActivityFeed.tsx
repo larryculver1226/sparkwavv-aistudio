@@ -5,6 +5,8 @@ import { UserActivity } from '../../types/dashboard';
 import { Activity, Sparkles, FileText, Target, Award, Clock } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 
+import { handleFirestoreError, OperationType } from '../../lib/firestore-errors';
+
 interface ActivityFeedProps {
   userId: string;
   limitCount?: number;
@@ -36,6 +38,7 @@ export const ActivityFeed: React.FC<ActivityFeedProps> = ({ userId, limitCount =
     }, (error) => {
       console.error("Error fetching activities:", error);
       setLoading(false);
+      handleFirestoreError(error, OperationType.LIST, 'user_activities');
     });
 
     return () => unsubscribe();

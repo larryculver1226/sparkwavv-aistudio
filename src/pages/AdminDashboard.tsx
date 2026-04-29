@@ -55,6 +55,7 @@ import { AuthDiagnostics } from './AuthDiagnostics';
 import { auth, db, adminDb } from '../lib/firebase';
 import { FirebaseSetup } from './FirebaseSetup';
 import { IdentityReconciliation } from './IdentityReconciliation';
+import { handleFirestoreError, OperationType } from '../lib/firestore-errors';
 import { VertexDashboard } from '../components/admin/VertexDashboard';
 import { ValidationGateReview } from '../components/admin/ValidationGateReview';
 import { AgentOps } from './admin/AgentOps';
@@ -313,6 +314,8 @@ export const AdminDashboard: React.FC<{ onLogout: () => void }> = ({ onLogout })
         } as RealTimeLog;
       });
       setSystemLogs(logs);
+    }, (error) => {
+      handleFirestoreError(error, OperationType.LIST, 'system_logs');
     });
 
     return () => unsubscribe();

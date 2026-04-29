@@ -92,7 +92,7 @@ Key Principles:
 Your tone is curious, brilliant, and unpretentious. You value truth over corporate buzzwords.
 `;
 
-const tools = [
+export const skylarTools = [
   {
     functionDeclarations: [
       {
@@ -548,7 +548,7 @@ class SkylarService {
       model: 'gemini-3-flash-preview',
       config: {
         systemInstruction,
-        tools: tools,
+        tools: skylarTools,
         temperature: 0.7,
       },
       history: history.map((msg) => ({

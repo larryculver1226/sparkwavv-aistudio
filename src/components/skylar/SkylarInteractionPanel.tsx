@@ -5,6 +5,7 @@ import { JourneyStageDefinition, SkylarArtifact } from '../../types/skylar';
 import { skylar } from '../../services/skylarService';
 
 import { agentOpsService } from '../../services/agentOpsService';
+import { useSkylarLive } from '../../hooks/useSkylarLive';
 
 interface SkylarInteractionPanelProps {
   stageId: string;
@@ -40,6 +41,8 @@ export const SkylarInteractionPanel: React.FC<SkylarInteractionPanelProps> = ({
   const [attachments, setAttachments] = useState<File[]>([]);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  
+  const { isLive, isConnecting, startLiveSession, stopLiveSession, error: liveError } = useSkylarLive();
 
   useEffect(() => {
     const loadConfig = async () => {
@@ -279,6 +282,13 @@ export const SkylarInteractionPanel: React.FC<SkylarInteractionPanelProps> = ({
 
       {/* Input Area */}
       <div className="p-4 bg-black/40 border-t border-white/10">
+        {/* Error Preview */}
+        {liveError && (
+          <div className="mb-3 p-2 bg-red-500/20 border border-red-500/50 rounded-lg text-xs text-red-200">
+            {liveError}
+          </div>
+        )}
+
         {/* Attachment Preview */}
         {attachments.length > 0 && (
           <div className="flex flex-wrap gap-2 mb-3">
@@ -326,8 +336,19 @@ export const SkylarInteractionPanel: React.FC<SkylarInteractionPanelProps> = ({
               </button>
               
               {stageConfig.allowedModalities.includes('audio') && (
-                <button className="p-2 text-white/40 hover:text-white hover:bg-white/10 rounded-xl transition-colors">
-                  <Mic className="w-5 h-5" />
+                <button 
+                  onClick={() => isLive ? stopLiveSession() : startLiveSession(`You are Skylar, operating in the ${stageConfig.title} stage. ${stageConfig.systemPrompt}`)}
+                  disabled={isConnecting}
+                  className={`p-2 rounded-xl transition-colors ${
+                    isLive 
+                      ? 'text-red-500 bg-red-500/10 hover:bg-red-500/20' 
+                      : isConnecting 
+                        ? 'text-neon-cyan animate-pulse bg-neon-cyan/10'
+                        : 'text-white/40 hover:text-white hover:bg-white/10'
+                  }`}
+                  title={isLive ? "Stop Live Session" : "Start Live Session"}
+                >
+                  {isConnecting ? <Loader2 className="w-5 h-5 animate-spin" /> : <Mic className="w-5 h-5" />}
                 </button>
               )}
             </div>

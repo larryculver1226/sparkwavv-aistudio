@@ -24,6 +24,7 @@ import {
   Filter,
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
+import { handleFirestoreError, OperationType } from '../../lib/firestore-errors';
 
 interface ValidationRequest {
   id: string;
@@ -77,6 +78,7 @@ export const ValidationGateReview: React.FC<{ onNotify: (msg: string, type: stri
         console.error('Error fetching validation requests:', error);
         onNotify('Failed to load validation requests', 'error');
         setLoading(false);
+        handleFirestoreError(error, OperationType.LIST, 'validationRequests');
       }
     );
 
