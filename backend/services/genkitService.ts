@@ -1,17 +1,23 @@
 import { genkit, z } from 'genkit';
 import { googleAI } from '@genkit-ai/googleai';
+import { vertexAI } from '@genkit-ai/vertexai';
 import { promptRef } from '@genkit-ai/dotprompt';
 import { getGeminiApiKey } from '../../src/services/aiConfig';
 import { skylar } from '../../src/services/skylarService';
 import { interpolatePrompt } from '../../src/utils/interpolation';
 import { DEFAULT_JOURNEY_STAGES } from '../../src/config/defaultStageContent';
 
+const geminiKey = getGeminiApiKey() || process.env.GEMINI_API_KEY;
+
 // Initialize Genkit
 export const ai = genkit({
   plugins: [
-    googleAI({ apiKey: getGeminiApiKey() || process.env.GEMINI_API_KEY })
+    geminiKey ? googleAI({ apiKey: geminiKey }) : vertexAI({
+      projectId: process.env.VERTEX_AI_PROJECT_ID || process.env.FIREBASE_PROJECT_ID || process.env.VITE_FIREBASE_PROJECT_ID,
+      location: process.env.VERTEX_AI_LOCATION || 'us-central1'
+    })
   ],
-  model: 'googleai/gemini-3-flash-preview',
+  model: geminiKey ? 'googleai/gemini-3-flash-preview' : 'vertexai/gemini-1.5-flash',
   promptDir: './backend/prompts'
 });
 
@@ -360,7 +366,7 @@ export const runJourneyStageFlow = ai.defineFlow(
     } catch (error) {
       console.warn("Dotprompt failed or not found, falling back to raw generate...", error);
       response = await ai.generate({
-        model: 'googleai/gemini-3-flash-preview',
+        model: geminiKey ? 'googleai/gemini-3-flash-preview' : 'vertexai/gemini-1.5-flash',
         system: systemInstruction,
         messages: [...formattedHistory, { role: 'user', content: userContent }] as any,
         tools: currentTools,
