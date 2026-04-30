@@ -1,12 +1,12 @@
 steps:
   # Step 1: Install dependencies
-  # Required so the build environment has 'tsx' and your project files
+  # Required so the build container has 'tsx' to run the config validator
   - name: 'node:20'
     entrypoint: 'npm'
     args: ['install']
 
-  # Step 2: Run the Config Validator
-  # We "inject" the secrets into this step's environment so the script can verify them
+  # Step 2: Run the Config Validator (The "Bouncer")
+  # This stops the build if any required secrets are missing from your vault
   - name: 'node:20'
     entrypoint: 'npm'
     args: ['run', 'check-env']
@@ -14,8 +14,9 @@ steps:
       - 'GEMINI_API_KEY'
       - 'SESSION_SECRET'
       - 'APP_URL'
-      - 'SKYLAR_FROM_EMAIL'
+      - 'GOOGLE_MAPS_API_KEY'
       - 'VERTEX_AI_SEARCH_ENGINE_ID'
+      - 'VERTEX_AI_VECTOR_SEARCH_INDEX_ID'
 
   # Step 3: Build the Docker image
   - name: 'gcr.io/cloud-builders/docker'
@@ -25,7 +26,7 @@ steps:
       '.'
     ]
 
-  # Step 4: Push the image to Container Registry
+  # Step 4: Push the image to Google Container Registry
   - name: 'gcr.io/cloud-builders/docker'
     args: ['push', 'gcr.io/$PROJECT_ID/sparkwavv-prod:$COMMIT_SHA']
 
@@ -43,10 +44,11 @@ steps:
       - '--platform'
       - 'managed'
       - '--allow-unauthenticated'
-      # This maps the secrets to the LIVE production service
-      - '--set-secrets=APP_URL=APP_URL:latest,GEMINI_API_KEY=GEMINI_API_KEY:latest,SESSION_SECRET=SESSION_SECRET:latest,SKYLAR_FROM_EMAIL=SKYLAR_FROM_EMAIL:latest,VERTEX_AI_SEARCH_ENGINE_ID=VERTEX_AI_SEARCH_ENGINE_ID:latest'
+      # CRITICAL: Secret Mapping
+      # We map GEMINI_API_KEY to GOOGLE_GENAI_API_KEY to fix the Genkit chat error
+      - '--set-secrets=APP_URL=APP_URL:latest,GEMINI_API_KEY=GEMINI_API_KEY:latest,GOOGLE_GENAI_API_KEY=GEMINI_API_KEY:latest,SESSION_SECRET=SESSION_SECRET:latest,GOOGLE_MAPS_API_KEY=GOOGLE_MAPS_API_KEY:latest,VERTEX_AI_SEARCH_ENGINE_ID=VERTEX_AI_SEARCH_ENGINE_ID:latest,VERTEX_AI_VECTOR_SEARCH_INDEX_ID=VERTEX_AI_VECTOR_SEARCH_INDEX_ID:latest'
 
-# This section tells Cloud Build HOW to fetch the secrets from your "Vault"
+# This section tells Cloud Build where to find your secrets in Secret Manager
 availableSecrets:
   secretManager:
     - versionName: projects/$PROJECT_ID/secrets/GEMINI_API_KEY/versions/latest
@@ -55,10 +57,12 @@ availableSecrets:
       env: 'SESSION_SECRET'
     - versionName: projects/$PROJECT_ID/secrets/APP_URL/versions/latest
       env: 'APP_URL'
-    - versionName: projects/$PROJECT_ID/secrets/SKYLAR_FROM_EMAIL/versions/latest
-      env: 'SKYLAR_FROM_EMAIL'
+    - versionName: projects/$PROJECT_ID/secrets/GOOGLE_MAPS_API_KEY/versions/latest
+      env: 'GOOGLE_MAPS_API_KEY'
     - versionName: projects/$PROJECT_ID/secrets/VERTEX_AI_SEARCH_ENGINE_ID/versions/latest
       env: 'VERTEX_AI_SEARCH_ENGINE_ID'
+    - versionName: projects/$PROJECT_ID/secrets/VERTEX_AI_VECTOR_SEARCH_INDEX_ID/versions/latest
+      env: 'VERTEX_AI_VECTOR_SEARCH_INDEX_ID'
 
 options:
   logging: CLOUD_LOGGING_ONLY
