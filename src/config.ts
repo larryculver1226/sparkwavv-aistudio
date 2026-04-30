@@ -1,8 +1,15 @@
 // src/config.ts
 
+import firebaseConfig from '../firebase-applet-config.json';
+
 // Safely access environment variables in both Vite and Node.js environments
-const getEnvVar = (viteVal: string | undefined, processKey: string): string | undefined => {
+const getEnvVar = (viteVal: string | undefined, processKey: string, jsonFallback?: string): string | undefined => {
   let val: string | undefined = viteVal;
+
+  // Fallback to json if provided
+  if (!val && jsonFallback) {
+    val = (firebaseConfig as any)[jsonFallback];
+  }
 
   // Fallback to process.env for Node/Backend usage
   try {
@@ -31,14 +38,14 @@ try {
 // Map environment variables to clean property names
 export const config = {
   // Client (Vite) Configs - Statically written so Vite replaces them during build
-  firebaseApiKey: getEnvVar(metaEnv.VITE_FIREBASE_API_KEY, 'VITE_FIREBASE_API_KEY'),
-  firebaseAuthDomain: getEnvVar(metaEnv.VITE_FIREBASE_AUTH_DOMAIN, 'VITE_FIREBASE_AUTH_DOMAIN'),
-  firebaseProjectId: getEnvVar(metaEnv.VITE_FIREBASE_PROJECT_ID, 'VITE_FIREBASE_PROJECT_ID'),
-  firebaseStorageBucket: getEnvVar(metaEnv.VITE_FIREBASE_STORAGE_BUCKET, 'VITE_FIREBASE_STORAGE_BUCKET'),
-  firebaseMessagingSenderId: getEnvVar(metaEnv.VITE_FIREBASE_MESSAGING_SENDER_ID, 'VITE_FIREBASE_MESSAGING_SENDER_ID'),
-  firebaseAppId: getEnvVar(metaEnv.VITE_FIREBASE_APP_ID, 'VITE_FIREBASE_APP_ID'),
-  firebaseMeasurementId: getEnvVar(metaEnv.VITE_FIREBASE_MEASUREMENT_ID, 'VITE_FIREBASE_MEASUREMENT_ID'),
-  firebaseDatabaseId: getEnvVar(metaEnv.VITE_FIREBASE_DATABASE_ID, 'VITE_FIREBASE_DATABASE_ID'),
+  firebaseApiKey: getEnvVar(metaEnv.VITE_FIREBASE_API_KEY, 'VITE_FIREBASE_API_KEY', 'apiKey'),
+  firebaseAuthDomain: getEnvVar(metaEnv.VITE_FIREBASE_AUTH_DOMAIN, 'VITE_FIREBASE_AUTH_DOMAIN', 'authDomain'),
+  firebaseProjectId: getEnvVar(metaEnv.VITE_FIREBASE_PROJECT_ID, 'VITE_FIREBASE_PROJECT_ID', 'projectId'),
+  firebaseStorageBucket: getEnvVar(metaEnv.VITE_FIREBASE_STORAGE_BUCKET, 'VITE_FIREBASE_STORAGE_BUCKET', 'storageBucket'),
+  firebaseMessagingSenderId: getEnvVar(metaEnv.VITE_FIREBASE_MESSAGING_SENDER_ID, 'VITE_FIREBASE_MESSAGING_SENDER_ID', 'messagingSenderId'),
+  firebaseAppId: getEnvVar(metaEnv.VITE_FIREBASE_APP_ID, 'VITE_FIREBASE_APP_ID', 'appId'),
+  firebaseMeasurementId: getEnvVar(metaEnv.VITE_FIREBASE_MEASUREMENT_ID, 'VITE_FIREBASE_MEASUREMENT_ID', 'measurementId'),
+  firebaseDatabaseId: getEnvVar(metaEnv.VITE_FIREBASE_DATABASE_ID, 'VITE_FIREBASE_DATABASE_ID', 'firestoreDatabaseId'),
   viteGeminiApiKey: getEnvVar(metaEnv.VITE_GEMINI_API_KEY, 'VITE_GEMINI_API_KEY'),
 
   // Server (Backend) Configs
