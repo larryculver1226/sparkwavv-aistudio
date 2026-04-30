@@ -2,10 +2,14 @@ import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
 import { BrowserRouter as Router } from 'react-router-dom';
 import firebaseConfig from '../firebase-applet-config.json';
+import { validateConfig, config } from './config';
+
+// Validate core configuration to prevent silent failures in Production
+validateConfig();
 
 // Firebase Configuration Checks
-const firebaseApiKey = import.meta.env.VITE_FIREBASE_API_KEY?.trim() || firebaseConfig.apiKey;
-const firebaseProjectId = import.meta.env.VITE_FIREBASE_PROJECT_ID?.trim() || firebaseConfig.projectId;
+const firebaseApiKey = config.firebaseApiKey || firebaseConfig.apiKey;
+const firebaseProjectId = config.firebaseProjectId || firebaseConfig.projectId;
 const isFirebasePlaceholder = (val?: string) => !val || val.includes('PLACEHOLDER');
 
 // We also check the config file via dynamic import later, but for the initial screen

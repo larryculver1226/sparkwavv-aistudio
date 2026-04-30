@@ -1,6 +1,9 @@
 import dotenv from 'dotenv';
 dotenv.config();
 
+import { validateConfig } from './src/config';
+validateConfig();
+
 // Prevent silent crashes on unhandled rejections
 process.on('uncaughtException', (err) => {
   console.error('[CRITICAL] Uncaught Exception:', err);
