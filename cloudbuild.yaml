@@ -1,16 +1,23 @@
 steps:
-  # Step 1: Install dependencies and run the Config Validator
+  # Step 1: Install dependencies
+  # Required so the build environment has 'tsx' and your project files
   - name: 'node:20'
     entrypoint: 'npm'
     args: ['install']
+
+  # Step 2: Run the Config Validator
+  # We "inject" the secrets into this step's environment so the script can verify them
   - name: 'node:20'
     entrypoint: 'npm'
     args: ['run', 'check-env']
-    env:
-      - 'NODE_ENV=production'
+    secretEnv:
+      - 'GEMINI_API_KEY'
+      - 'SESSION_SECRET'
+      - 'APP_URL'
+      - 'SKYLAR_FROM_EMAIL'
+      - 'VERTEX_AI_SEARCH_ENGINE_ID'
 
-  # Step 2: Build the Docker image
-  # We use the Project ID and Service Name as tags
+  # Step 3: Build the Docker image
   - name: 'gcr.io/cloud-builders/docker'
     args: [
       'build', 
@@ -18,12 +25,11 @@ steps:
       '.'
     ]
 
-  # Step 3: Push the image to Container Registry
+  # Step 4: Push the image to Container Registry
   - name: 'gcr.io/cloud-builders/docker'
     args: ['push', 'gcr.io/$PROJECT_ID/sparkwavv-prod:$COMMIT_SHA']
 
-  # Step 4: Deploy to Cloud Run
-  # This maps your Secret Manager secrets to Environment Variables at runtime
+  # Step 5: Deploy to Cloud Run
   - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
     entrypoint: gcloud
     args:
@@ -37,11 +43,22 @@ steps:
       - '--platform'
       - 'managed'
       - '--allow-unauthenticated'
-      # Mapping Secrets from Secret Manager to Env Vars
-      - '--set-secrets=APP_URL=APP_URL:latest,GEMINI_API_KEY=GEMINI_API_KEY:latest,SKYLAR_FROM_EMAIL=SKYLAR_FROM_EMAIL:latest,VERTEX_AI_SEARCH_ENGINE_ID=VERTEX_AI_SEARCH_ENGINE_ID:latest'
+      # This maps the secrets to the LIVE production service
+      - '--set-secrets=APP_URL=APP_URL:latest,GEMINI_API_KEY=GEMINI_API_KEY:latest,SESSION_SECRET=SESSION_SECRET:latest,SKYLAR_FROM_EMAIL=SKYLAR_FROM_EMAIL:latest,VERTEX_AI_SEARCH_ENGINE_ID=VERTEX_AI_SEARCH_ENGINE_ID:latest'
 
-images:
-  - 'gcr.io/$PROJECT_ID/sparkwavv-prod:$COMMIT_SHA'
+# This section tells Cloud Build HOW to fetch the secrets from your "Vault"
+availableSecrets:
+  secretManager:
+    - versionName: projects/$PROJECT_ID/secrets/GEMINI_API_KEY/versions/latest
+      env: 'GEMINI_API_KEY'
+    - versionName: projects/$PROJECT_ID/secrets/SESSION_SECRET/versions/latest
+      env: 'SESSION_SECRET'
+    - versionName: projects/$PROJECT_ID/secrets/APP_URL/versions/latest
+      env: 'APP_URL'
+    - versionName: projects/$PROJECT_ID/secrets/SKYLAR_FROM_EMAIL/versions/latest
+      env: 'SKYLAR_FROM_EMAIL'
+    - versionName: projects/$PROJECT_ID/secrets/VERTEX_AI_SEARCH_ENGINE_ID/versions/latest
+      env: 'VERTEX_AI_SEARCH_ENGINE_ID'
 
 options:
   logging: CLOUD_LOGGING_ONLY
