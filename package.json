@@ -24,7 +24,8 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "test:e2e": "playwright install chromium && playwright test",
-    "test:e2e:smoke": "playwright install chromium && playwright test --grep @smoke"
+    "test:e2e:smoke": "playwright install chromium && playwright test --grep @smoke",
+    "check-env": "node -e 'import(\"./src/config.ts\").then(m => m.validateConfig()).catch(e => { console.error(e.message); process.exit(1); })'"
   },
   "dependencies": {
     "@genkit-ai/core": "^1.32.0",
