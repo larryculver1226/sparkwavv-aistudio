@@ -4,6 +4,7 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 ### Added
+- **Track 096 (Maintenance)**: Adjusted Dockerfile to receive VITE_FIREBASE_API_KEY and VITE_FIREBASE_PROJECT_ID as build arguments and set them as environment variables during `npm run build` to support Google Cloud Build secret injection.
 - **Track 095 (Documentation)**: Establish the Google Cloud "Vault". Generated a summary table of all current environment variables and their purposes, formatted for easy copying into the Google Cloud Secret Manager console. Outputted details pulling active configurations from `firebase-applet-config.json` into a formal `Application Environment Variables.md` reference guide.
 - **Track 094 (Feature)**: Implemented Centralized Config Validator. Created `src/config.ts` mapping all frontend and backend variables to a rigid schema leveraging fallback heuristics between `import.meta.env` and `process.env`. Added `validateConfig()` to enforce failure boundaries directly inside `src/main.tsx` and `server.ts` to ensure the application crashes immediately upon missing variables (preventing silent failures in Production).
 - **Track 093 (Maintenance)**: Audited and Standardized Environment Variables. Mapped all active variables across the server (`process.env.*`) and the client (`import.meta.env.*`). Generated a master schema template inside `.env.example` with blank values, explicitly categorizing UI/Client variables with the `VITE_` prefix and decoupling backend security layers.

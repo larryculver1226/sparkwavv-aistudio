@@ -9,6 +9,14 @@ RUN npm install
 
 COPY . .
 # We use npm run build which compiles both vite assets and server.ts to dist/
+# Accept build arguments
+ARG VITE_FIREBASE_API_KEY
+ARG VITE_FIREBASE_PROJECT_ID
+
+# Set them as environment variables for the build process
+ENV VITE_FIREBASE_API_KEY=$VITE_FIREBASE_API_KEY
+ENV VITE_FIREBASE_PROJECT_ID=$VITE_FIREBASE_PROJECT_ID
+
 RUN npm run build
 
 FROM node:20-alpine AS runner
