@@ -6,7 +6,14 @@ import firebaseConfig from '../firebase-applet-config.json';
 const getEnvVar = (viteVal: string | undefined, processKey: string, jsonFallback?: string): string | undefined => {
   let val: string | undefined = viteVal;
 
-  // Fallback to json if provided
+  // Treat explicit placeholder strings, unresolved cloudbuild variables, or empty strings as 'missing'
+  if (val) {
+    if (val.trim() === '' || val.includes('PLACEHOLDER') || val.startsWith('$$')) {
+      val = undefined;
+    }
+  }
+
+  // Fallback to config file
   if (!val && jsonFallback) {
     val = (firebaseConfig as any)[jsonFallback];
   }
@@ -20,9 +27,12 @@ const getEnvVar = (viteVal: string | undefined, processKey: string, jsonFallback
     // Ignored
   }
 
-  // Check for undefined, empty string, or PLACEHOLDER
-  if (val && val.trim() !== '' && !val.includes('PLACEHOLDER')) {
-    return val.trim();
+  // Final sanitization check before returning
+  if (val && typeof val === 'string') {
+    const trimmed = val.trim();
+    if (trimmed !== '' && !trimmed.includes('PLACEHOLDER') && !trimmed.startsWith('$$')) {
+      return trimmed;
+    }
   }
 
   return undefined;
@@ -38,15 +48,50 @@ try {
 // Map environment variables to clean property names
 export const config = {
   // Client (Vite) Configs - Statically written so Vite replaces them during build
-  firebaseApiKey: getEnvVar(metaEnv.VITE_FIREBASE_API_KEY, 'VITE_FIREBASE_API_KEY', 'apiKey'),
-  firebaseAuthDomain: getEnvVar(metaEnv.VITE_FIREBASE_AUTH_DOMAIN, 'VITE_FIREBASE_AUTH_DOMAIN', 'authDomain'),
-  firebaseProjectId: getEnvVar(metaEnv.VITE_FIREBASE_PROJECT_ID, 'VITE_FIREBASE_PROJECT_ID', 'projectId'),
-  firebaseStorageBucket: getEnvVar(metaEnv.VITE_FIREBASE_STORAGE_BUCKET, 'VITE_FIREBASE_STORAGE_BUCKET', 'storageBucket'),
-  firebaseMessagingSenderId: getEnvVar(metaEnv.VITE_FIREBASE_MESSAGING_SENDER_ID, 'VITE_FIREBASE_MESSAGING_SENDER_ID', 'messagingSenderId'),
-  firebaseAppId: getEnvVar(metaEnv.VITE_FIREBASE_APP_ID, 'VITE_FIREBASE_APP_ID', 'appId'),
-  firebaseMeasurementId: getEnvVar(metaEnv.VITE_FIREBASE_MEASUREMENT_ID, 'VITE_FIREBASE_MEASUREMENT_ID', 'measurementId'),
-  firebaseDatabaseId: getEnvVar(metaEnv.VITE_FIREBASE_DATABASE_ID, 'VITE_FIREBASE_DATABASE_ID', 'firestoreDatabaseId'),
-  viteGeminiApiKey: getEnvVar(metaEnv.VITE_GEMINI_API_KEY, 'VITE_GEMINI_API_KEY'),
+  firebaseApiKey: getEnvVar(
+    typeof import.meta !== 'undefined' && import.meta.env ? import.meta.env.VITE_FIREBASE_API_KEY : undefined, 
+    'VITE_FIREBASE_API_KEY', 
+    'apiKey'
+  ),
+  firebaseAuthDomain: getEnvVar(
+    typeof import.meta !== 'undefined' && import.meta.env ? import.meta.env.VITE_FIREBASE_AUTH_DOMAIN : undefined, 
+    'VITE_FIREBASE_AUTH_DOMAIN', 
+    'authDomain'
+  ),
+  firebaseProjectId: getEnvVar(
+    typeof import.meta !== 'undefined' && import.meta.env ? import.meta.env.VITE_FIREBASE_PROJECT_ID : undefined, 
+    'VITE_FIREBASE_PROJECT_ID', 
+    'projectId'
+  ),
+  firebaseStorageBucket: getEnvVar(
+    typeof import.meta !== 'undefined' && import.meta.env ? import.meta.env.VITE_FIREBASE_STORAGE_BUCKET : undefined, 
+    'VITE_FIREBASE_STORAGE_BUCKET', 
+    'storageBucket'
+  ),
+  firebaseMessagingSenderId: getEnvVar(
+    typeof import.meta !== 'undefined' && import.meta.env ? import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID : undefined, 
+    'VITE_FIREBASE_MESSAGING_SENDER_ID', 
+    'messagingSenderId'
+  ),
+  firebaseAppId: getEnvVar(
+    typeof import.meta !== 'undefined' && import.meta.env ? import.meta.env.VITE_FIREBASE_APP_ID : undefined, 
+    'VITE_FIREBASE_APP_ID', 
+    'appId'
+  ),
+  firebaseMeasurementId: getEnvVar(
+    typeof import.meta !== 'undefined' && import.meta.env ? import.meta.env.VITE_FIREBASE_MEASUREMENT_ID : undefined, 
+    'VITE_FIREBASE_MEASUREMENT_ID', 
+    'measurementId'
+  ),
+  firebaseDatabaseId: getEnvVar(
+    typeof import.meta !== 'undefined' && import.meta.env ? import.meta.env.VITE_FIREBASE_DATABASE_ID : undefined, 
+    'VITE_FIREBASE_DATABASE_ID', 
+    'firestoreDatabaseId'
+  ),
+  viteGeminiApiKey: getEnvVar(
+    typeof import.meta !== 'undefined' && import.meta.env ? import.meta.env.VITE_GEMINI_API_KEY : undefined, 
+    'VITE_GEMINI_API_KEY'
+  ),
 
   // Server (Backend) Configs
   nodeEnv: getEnvVar(undefined, 'NODE_ENV'),

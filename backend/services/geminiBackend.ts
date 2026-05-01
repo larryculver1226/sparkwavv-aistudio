@@ -136,7 +136,7 @@ export async function generateDiscoverySummary(userData: UserData) {
   try {
     const ai = getAI();
     const response = await ai.models.generateContent({
-      model: 'gemini-3-flash-preview',
+      model: 'gemini-2.5-flash',
       contents: prompt,
       config: {
         responseMimeType: 'application/json',
@@ -208,7 +208,7 @@ export async function generateCinematicManifesto(userData: UserData) {
   try {
     const ai = getAI();
     const response = await ai.models.generateContent({
-      model: 'gemini-3-flash-preview',
+      model: 'gemini-2.5-flash',
       contents: prompt,
       config: {
         responseMimeType: 'application/json',
@@ -276,7 +276,7 @@ export async function parseResume(fileData: string, mimeType: string) {
     }
 
     const response = await ai.models.generateContent({
-      model: 'gemini-3-flash-preview',
+      model: 'gemini-2.5-flash',
       contents,
       config: {
         responseMimeType: 'application/json',
@@ -338,7 +338,7 @@ export async function generateHomeBenefits(count: number = 5) {
   try {
     const ai = getAI();
     const response = await ai.models.generateContent({
-      model: 'gemini-3-flash-preview',
+      model: 'gemini-2.5-flash',
       contents: prompt,
       config: {
         responseMimeType: 'application/json',

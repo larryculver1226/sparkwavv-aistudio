@@ -597,7 +597,7 @@ export function SPARKWavvApp({
     ];
     const currentIndex = steps.indexOf(step);
 
-    if (currentIndex > 1 && !emailVerified && process.env.NODE_ENV !== 'development') {
+    if (currentIndex > 1 && !emailVerified && import.meta.env.MODE !== 'development') {
       setStep('landing');
       setErrors({ general: 'Please confirm your registration via email before continuing.' });
     }

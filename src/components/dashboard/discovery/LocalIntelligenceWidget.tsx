@@ -38,7 +38,7 @@ export const LocalIntelligenceWidget: React.FC = () => {
 
       const ai = new GoogleGenAI({ apiKey: getGeminiApiKey() });
       const response = await ai.models.generateContent({
-        model: 'gemini-3-flash-preview',
+        model: 'gemini-2.5-flash',
         contents: `Find networking events, conferences, and industry meetups within ${radius} miles of my location (${latitude}, ${longitude}). Prioritize events over static locations like co-working spaces or company headquarters.`,
         config: {
           tools: [{ googleMaps: {} }],

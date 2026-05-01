@@ -258,7 +258,7 @@ export const UserDashboard: React.FC<{ userId: string; isAdmin?: boolean }> = ({
           const { GoogleGenAI } = await import('@google/genai');
           const ai = new GoogleGenAI({ apiKey: getGeminiApiKey() });
           const response = await ai.models.generateContent({
-            model: 'gemini-3-flash-preview',
+            model: 'gemini-2.5-flash',
             contents: prompt,
           });
           synthesisNote = response.text || 'Insight synthesized into your professional DNA.';

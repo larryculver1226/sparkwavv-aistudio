@@ -37,7 +37,7 @@ export const getGeminiApiKey = () => {
         );
         // Force set the standard environment variable so Genkit and @google/genai can implicitly use it
         // even if not explicitly passed during instantiation correctly.
-        if (!process.env.GEMINI_API_KEY) {
+        if (typeof process !== 'undefined' && process.env && !process.env.GEMINI_API_KEY) {
           process.env.GEMINI_API_KEY = trimmed;
         }
         return trimmed;

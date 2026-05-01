@@ -1,6 +1,15 @@
 import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
 import { BrowserRouter as Router } from 'react-router-dom';
+
+// Safely polyfill process to prevent third-party libraries (like @google/genai SDK) 
+// from throwing ReferenceError in the browser.
+if (typeof window !== 'undefined' && typeof window.process === 'undefined') {
+  (window as any).process = {
+    env: {}
+  };
+}
+
 import firebaseConfig from '../firebase-applet-config.json';
 import { validateConfig, config } from './config';
 

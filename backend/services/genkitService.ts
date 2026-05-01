@@ -16,10 +16,10 @@ const isVertexAvailable =
   vertexProjectId && vertexProjectId.trim() !== '' && !vertexProjectId.includes('gen-lang-client');
 
 const targetModel = activeGeminiKey
-  ? 'googleai/gemini-3-flash-preview'
+  ? 'googleai/gemini-2.5-flash'
   : isVertexAvailable
     ? 'vertexai/gemini-1.5-flash'
-    : 'googleai/gemini-3-flash-preview';
+    : 'googleai/gemini-2.5-flash';
 
 const vertexConfig: any = {
   location: process.env.VERTEX_AI_LOCATION || 'us-central1',
