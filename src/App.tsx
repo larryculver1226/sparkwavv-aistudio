@@ -133,6 +133,7 @@ import { TimeoutManager } from './components/TimeoutManager';
 import { PrecisionMatchingCard } from './components/landing/PrecisionMatchingCard';
 import { authService } from './services/authService';
 import { OnboardingContainer } from './containers/OnboardingContainer';
+import { SEOManager } from './components/SEOManager';
 
 type Step =
   | 'landing'
@@ -935,8 +936,10 @@ export function SPARKWavvApp({
   }, [step, userData, posterVibe]);
 
   return (
-    <div
-      className="min-h-screen selection:bg-neon-cyan selection:text-black relative transition-all duration-1000 overflow-x-hidden"
+    <>
+      <SEOManager step={step} />
+      <div
+        className="min-h-screen selection:bg-neon-cyan selection:text-black relative transition-all duration-1000 overflow-x-hidden"
       style={
         userData.brandImage
           ? {
@@ -3310,6 +3313,7 @@ export default function App() {
 
   return (
     <SkylarConfigProvider>
+      <SEOManager />
       <ScrollToTop />
 
       <Suspense

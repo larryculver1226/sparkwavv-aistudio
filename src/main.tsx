@@ -136,16 +136,19 @@ if (isFirebasePlaceholder(firebaseProjectId) || isFirebasePlaceholder(firebaseAp
     import('./App'),
     import('./contexts/IdentityContext'),
     import('./components/ErrorBoundary'),
-  ]).then(([{ default: App }, { IdentityProvider }, { ErrorBoundary }]) => {
+    import('react-helmet-async'),
+  ]).then(([{ default: App }, { IdentityProvider }, { ErrorBoundary }, { HelmetProvider }]) => {
     createRoot(document.getElementById('root')!).render(
       <StrictMode>
-        <ErrorBoundary>
-          <Router>
-            <IdentityProvider>
-              <App />
-            </IdentityProvider>
-          </Router>
-        </ErrorBoundary>
+        <HelmetProvider>
+          <ErrorBoundary>
+            <Router>
+              <IdentityProvider>
+                <App />
+              </IdentityProvider>
+            </Router>
+          </ErrorBoundary>
+        </HelmetProvider>
       </StrictMode>
     );
   });
