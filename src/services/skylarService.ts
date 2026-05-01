@@ -674,22 +674,27 @@ class SkylarService {
     });
 
     const inlineData = response.candidates?.[0]?.content?.parts?.[0]?.inlineData;
-    if (!inlineData || !inlineData.data) {
-      console.warn('generateSpeech: No inlineData found in response');
+    if (!inlineData || !inlineData.data || inlineData.data.length === 0) {
+      console.warn('generateSpeech: No valid inlineData.data found in response');
       return '';
     }
 
     const base64Audio = inlineData.data;
-    const mimeType = inlineData.mimeType || 'audio/pcm';
+    const mimeType = (inlineData.mimeType || 'audio/pcm').toLowerCase();
+    
+    console.log(`[skylarService] generateSpeech parsed mimeType: ${mimeType}, length: ${base64Audio.length}`);
 
     if (mimeType.includes('pcm') || mimeType.includes('l16')) {
-      // Decode base64 PCM data to a Uint8Array
-      const binaryString = window.atob(base64Audio);
-      const len = binaryString.length;
-      const pcmBytes = new Uint8Array(len);
-      for (let i = 0; i < len; i++) {
-        pcmBytes[i] = binaryString.charCodeAt(i);
-      }
+      try {
+        // Decode base64 PCM data to a Uint8Array
+        const binaryString = window.atob(base64Audio);
+        const len = binaryString.length;
+        if (len === 0) return '';
+        
+        const pcmBytes = new Uint8Array(len);
+        for (let i = 0; i < len; i++) {
+          pcmBytes[i] = binaryString.charCodeAt(i) & 0xff;
+        }
       
       // Create WAV header for 24000Hz, 1 channel, 16-bit PCM
       // Gemini TTS usually outputs 24kHz PCM.
@@ -728,6 +733,10 @@ class SkylarService {
       // Convert WAV to object URL for immediate playback without base64 length errors
       const blob = new Blob([buffer], { type: 'audio/wav' });
       return URL.createObjectURL(blob);
+      } catch (err) {
+        console.error('Error generating WAV blob:', err);
+        return '';
+      }
     }
 
     return `data:${mimeType};base64,${base64Audio}`;
