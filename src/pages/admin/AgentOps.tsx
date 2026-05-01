@@ -443,10 +443,33 @@ export const AgentOps: React.FC = () => {
                 </div>
                 <div className="lg:col-span-3 bg-black rounded-xl border border-gray-700 overflow-hidden flex flex-col h-96">
                   {selectedTraceId !== null && genkitTraces[selectedTraceId] ? (
-                    <div className="flex-1 overflow-y-auto p-4 custom-scrollbar">
-                      <pre className="text-[11px] font-mono text-green-400">
-                        {JSON.stringify(genkitTraces[selectedTraceId], null, 2)}
-                      </pre>
+                    <div className="flex-1 flex flex-col overflow-hidden">
+                      <div className="bg-gray-900 border-b border-gray-800 p-3 flex gap-4 text-xs font-bold uppercase tracking-wider text-gray-500">
+                        <span>Stage: <span className="text-cyan-400">{genkitTraces[selectedTraceId].stageId}</span></span>
+                        <span>Time: <span className="text-gray-300">{new Date(genkitTraces[selectedTraceId].timestamp).toLocaleTimeString()}</span></span>
+                        <span>Executed Tools: <span className="text-purple-400">{genkitTraces[selectedTraceId].executedActions?.length || 0}</span></span>
+                      </div>
+                      <div className="flex-1 overflow-y-auto p-4 custom-scrollbar space-y-4">
+                        {genkitTraces[selectedTraceId].executedActions?.length > 0 && (
+                          <div className="space-y-2">
+                            <h3 className="text-xs uppercase font-bold text-gray-500 border-b border-gray-800 pb-1">Sub-Agents / Tool Invocations</h3>
+                            {genkitTraces[selectedTraceId].executedActions.map((action: any, idx: number) => (
+                              <div key={idx} className="bg-gray-800 rounded-lg p-3 border border-gray-700">
+                                <div className="text-cyan-400 font-mono text-sm mb-2 opacity-90">{action.action}</div>
+                                <pre className="text-[10px] font-mono text-green-300 bg-black/50 p-2 rounded overflow-x-auto custom-scrollbar">
+                                  {JSON.stringify(action.data, null, 2)}
+                                </pre>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                        <div className="space-y-2">
+                          <h3 className="text-xs uppercase font-bold text-gray-500 border-b border-gray-800 pb-1">Raw Trace Payload</h3>
+                          <pre className="text-[11px] font-mono text-gray-400 bg-black p-3 rounded border border-gray-800 overflow-x-auto custom-scrollbar">
+                            {JSON.stringify(genkitTraces[selectedTraceId], null, 2)}
+                          </pre>
+                        </div>
+                      </div>
                     </div>
                   ) : (
                     <div className="flex-1 flex items-center justify-center text-gray-600 italic">

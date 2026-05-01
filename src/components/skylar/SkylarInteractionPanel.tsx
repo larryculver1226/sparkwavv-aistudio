@@ -337,7 +337,7 @@ export const SkylarInteractionPanel: React.FC<SkylarInteractionPanelProps> = ({
               
               {stageConfig.allowedModalities.includes('audio') && (
                 <button 
-                  onClick={() => isLive ? stopLiveSession() : startLiveSession(`You are Skylar, operating in the ${stageConfig.title} stage. ${stageConfig.systemPrompt}`)}
+                  onClick={() => isLive ? stopLiveSession() : startLiveSession(`You are Skylar, operating in the ${stageConfig.title} stage. ${stageConfig.systemPromptTemplate}`)}
                   disabled={isConnecting}
                   className={`p-2 rounded-xl transition-colors ${
                     isLive 

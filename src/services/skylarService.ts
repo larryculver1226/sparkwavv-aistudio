@@ -1,5 +1,6 @@
 import { GoogleGenAI, Modality, Type, FunctionDeclaration, ThinkingLevel } from '@google/genai';
 import { getGeminiApiKey } from './aiConfig';
+import { genkitTracer } from './agentOpsService';
 import { KnowledgeGraph, WavvaultData, TargetOpportunity } from '../types/wavvault';
 import { DEFAULT_JOURNEY_STAGES } from '../config/defaultStageContent';
 import { JourneyStageDefinition } from '../types/skylar';
@@ -814,12 +815,16 @@ class SkylarService {
       }
 
       const result = await response.json();
+      if (result.debugData) {
+        genkitTracer.addTrace(result.debugData);
+      }
+      
       return { 
         response: {
-          text: result.response.text,
-          candidates: result.response.candidates
+          text: result.response?.text || '',
+          candidates: result.response?.candidates || []
         }, 
-        executedActions: result.executedActions 
+        executedActions: result.executedActions || []
       };
     } catch (error) {
       console.error('Skylar Chat Error:', error);
@@ -944,46 +949,20 @@ class SkylarService {
     fileContent?: string,
     currentGraph?: KnowledgeGraph
   ): Promise<KnowledgeGraph> {
-    const ai = getAI();
-
-    const prompt = `
-      You are the Skylar Analytical Architect. Your task is to perform a "Neural Synthesis" of the user's career data.
-      Analyze the provided chat history and document content to extract a structured Knowledge Graph of the user's professional identity.
-      
-      Focus on three critical node types:
-      1. Skills (Blue): Technical and soft competencies.
-      2. Goals (Magenta): Short and long-term professional trajectories.
-      3. Values (Cyan): Core drivers and cultural alignment markers.
-      
-      The "Spark" (Ignition data) should be the central anchor of the graph.
-      
-      Current Graph (if any): ${JSON.stringify(currentGraph || { nodes: [], links: [] })}
-      
-      Chat History: ${JSON.stringify(history)}
-      Document Content: ${fileContent || 'None'}
-      
-      Return ONLY a JSON object matching this structure:
-      {
-        "nodes": [{ "id": "string", "label": "string", "type": "skill|goal|value|spark", "strength": 0-1, "description": "string" }],
-        "links": [{ "source": "nodeId", "target": "nodeId", "weight": 0-1, "type": "connection|dependency|influence" }]
-      }
-      
-      Ensure you identify secondary connections (e.g., how two different skills are related to each other).
-    `;
-
-    const response = await ai.models.generateContent({
-      model: 'gemini-2.5-flash',
-      contents: [{ parts: [{ text: prompt }] }],
-      config: {
-        responseMimeType: 'application/json',
-      },
-    });
-
+    const token = await auth.currentUser?.getIdToken();
     try {
-      const graph = JSON.parse(response.text || '{}');
-      return graph as KnowledgeGraph;
-    } catch (error) {
-      console.error('Synthesis Parsing Error:', error);
+      const response = await fetch('/api/skylar/synthesis', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { 'Authorization': `Bearer ${token}` } : {})
+        },
+        body: JSON.stringify({ userId, history, fileContent }),
+      });
+      const data = await response.json();
+      return data as KnowledgeGraph;
+    } catch (e) {
+      console.error('Error in performSynthesis:', e);
       return currentGraph || { nodes: [], links: [] };
     }
   }
@@ -1096,42 +1075,23 @@ class SkylarService {
     targetRole: string,
     tone: { formal: number; detail: number }
   ): Promise<any> {
-    const ai = getAI();
     const insights = await this.fetchConfirmedInsights(userId);
-    const dnaContext = insights.map((i) => `${i.type}: ${i.content}`).join(', ');
+    const token = await auth.currentUser?.getIdToken();
 
-    const prompt = `
-      Generate a targeted professional outreach sequence for ${targetRole} at ${targetCompany}.
-      The user's professional DNA is: ${dnaContext}.
-      
-      Tone Settings:
-      - Formal vs Casual: ${tone.formal}/100 (100 is most formal)
-      - Brief vs Detailed: ${tone.detail}/100 (100 is most detailed)
-      
-      The sequence should include:
-      1. A LinkedIn Connection Request (short)
-      2. A First Outreach Email (personalized)
-      3. A Follow-up Email (value-add)
-      
-      Return ONLY a JSON object:
-      {
-        "steps": [
-          { "type": "linkedin_request", "content": "..." },
-          { "type": "email_1", "subject": "...", "content": "..." },
-          { "type": "email_followup", "subject": "...", "content": "..." }
-        ]
-      }
-    `;
-
-    const response = await ai.models.generateContent({
-      model: 'gemini-2.5-flash',
-      contents: [{ parts: [{ text: prompt }] }],
-      config: {
-        responseMimeType: 'application/json',
-      },
-    });
-
-    return JSON.parse(response.text || '{}');
+    try {
+      const response = await fetch('/api/skylar/targeted-sequence', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { 'Authorization': `Bearer ${token}` } : {})
+        },
+        body: JSON.stringify({ userId, targetCompany, targetRole, tone, dnaContext: insights }),
+      });
+      return await response.json();
+    } catch (e) {
+      console.error('Error in generateTargetedSequence:', e);
+      return {};
+    }
   }
 
   async performGateReview(
@@ -1140,50 +1100,32 @@ class SkylarService {
     targetPhase: string,
     history: ChatMessage[]
   ): Promise<any> {
-    const ai = getAI();
     const insights = await this.fetchConfirmedInsights(userId);
-    const dnaContext = insights.map((i) => `${i.type}: ${i.content}`).join(', ');
+    const token = await auth.currentUser?.getIdToken();
 
-    const prompt = `
-      You are the Skylar Validation Architect. Perform a "Validation Gate" review for the user moving from ${currentPhase} to ${targetPhase}.
-      
-      User DNA: ${dnaContext}
-      Recent History: ${JSON.stringify(history.slice(-10))}
-      
-      Criteria for ${targetPhase}:
-      - Dive-In to Ignition: Commitment to the 12-week process and initial "Spark" identified.
-      - Ignition to Discovery: Completion of "Pie of Life" and "Perfect Day" exercises; clear initial career DNA hypothesis.
-      - Discovery to Branding: Synthesis of the "Cinematic Brand DNA" (3 pillars); extraction of at least 5 core attributes from accomplishments; validation of "Five Stories" by an RPP.
-      - Branding to Outreach: Completion of "Journalist" and "Reflective" versions of the Five Stories; alignment with the Market Intelligence Grid (MIG) and the Cinematic Brand DNA.
-      
-      Return ONLY a JSON object:
-      {
-        "status": "passed" | "warning" | "failed",
-        "message": "Detailed explanation of the decision",
-        "criteria": [
-          { "label": "Criteria description", "met": boolean }
-        ]
-      }
-    `;
+    try {
+      const response = await fetch('/api/skylar/gate-review', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { 'Authorization': `Bearer ${token}` } : {})
+        },
+        body: JSON.stringify({ userId, currentPhase, targetPhase, history, dnaContext: insights }),
+      });
+      const result = await response.json();
 
-    const response = await ai.models.generateContent({
-      model: 'gemini-2.5-flash',
-      contents: [{ parts: [{ text: prompt }] }],
-      config: {
-        responseMimeType: 'application/json',
-      },
-    });
+      // Record the gate event in the Wavvault Ledger
+      await this.recordGateEvent(userId, {
+        phase: targetPhase,
+        status: result.status,
+        verdict: result.message,
+      });
 
-    const result = JSON.parse(response.text || '{}');
-
-    // Record the gate event in the Wavvault Ledger
-    await this.recordGateEvent(userId, {
-      phase: targetPhase,
-      status: result.status,
-      verdict: result.message,
-    });
-
-    return result;
+      return result;
+    } catch (e) {
+      console.error('Error in performGateReview:', e);
+      return { status: 'failed', message: 'Error processing gate review', criteria: [] };
+    }
   }
 
   async recordGateEvent(
@@ -1237,32 +1179,22 @@ class SkylarService {
   }
 
   async getEmotionalIntelligence(userId: string, history: ChatMessage[]): Promise<any> {
-    const ai = getAI();
+    const token = await auth.currentUser?.getIdToken();
 
-    const prompt = `
-      Analyze the user's emotional state and motivation based on their career journey and chat history.
-      
-      History: ${JSON.stringify(history.slice(-20))}
-      
-      Return ONLY a JSON object:
-      {
-        "sentiment": number (0-100),
-        "motivation": number (0-100),
-        "topDrivers": ["string"],
-        "anxieties": ["string"],
-        "summary": "A brief, empathetic summary of their current emotional state and what's driving them."
-      }
-    `;
-
-    const response = await ai.models.generateContent({
-      model: 'gemini-2.5-flash',
-      contents: [{ parts: [{ text: prompt }] }],
-      config: {
-        responseMimeType: 'application/json',
-      },
-    });
-
-    return JSON.parse(response.text || '{}');
+    try {
+      const response = await fetch('/api/skylar/emotional-intelligence', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { 'Authorization': `Bearer ${token}` } : {})
+        },
+        body: JSON.stringify({ userId, history }),
+      });
+      return await response.json();
+    } catch (e) {
+      console.error('Error in getEmotionalIntelligence:', e);
+      return { sentiment: 50, motivation: 50, topDrivers: [], anxieties: [], summary: 'Error processing.' };
+    }
   }
 
   async saveUserAsset(userId: string, asset: any, token?: string) {
@@ -1299,30 +1231,23 @@ class SkylarService {
   }
 
   async startInterviewSession(userId: string, persona: string): Promise<any> {
-    const ai = getAI();
     const insights = await this.fetchConfirmedInsights(userId);
+    const token = await auth.currentUser?.getIdToken();
 
-    const response = await ai.models.generateContent({
-      model: 'gemini-2.5-flash',
-      contents: `You are Skylar, but for this session, you are masking as ${persona}. 
-      Based on the user's professional DNA: ${JSON.stringify(insights)}, 
-      start a high-stakes interview. Introduce yourself in character and ask the first challenging question.
-      Keep the tone professional and consistent with the ${persona} archetype.`,
-      config: {
-        responseMimeType: 'application/json',
-        responseSchema: {
-          type: Type.OBJECT,
-          properties: {
-            question: { type: Type.STRING },
-            personaContext: { type: Type.STRING },
-            initialResonance: { type: Type.NUMBER },
-          },
-          required: ['question', 'personaContext', 'initialResonance'],
+    try {
+      const response = await fetch('/api/skylar/interview/start', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { 'Authorization': `Bearer ${token}` } : {})
         },
-      },
-    });
-
-    return JSON.parse(response.text || '{}');
+        body: JSON.stringify({ userId, persona, dnaContext: insights }),
+      });
+      return await response.json();
+    } catch (e) {
+      console.error('Error in startInterviewSession:', e);
+      return {};
+    }
   }
 
   async sendInterviewResponse(
@@ -1331,68 +1256,41 @@ class SkylarService {
     history: any[],
     userResponse: string
   ): Promise<any> {
-    const ai = getAI();
     const insights = await this.fetchConfirmedInsights(userId);
+    const token = await auth.currentUser?.getIdToken();
 
-    const response = await ai.models.generateContent({
-      model: 'gemini-2.5-flash',
-      contents: `You are Skylar masking as ${persona}. 
-      User DNA: ${JSON.stringify(insights)}
-      Conversation History: ${JSON.stringify(history)}
-      User's Latest Response: "${userResponse}"
-      
-      Evaluate the response for DNA resonance (0-100) and provide the next interview question or follow-up.
-      Maintain the ${persona} character strictly.`,
-      config: {
-        responseMimeType: 'application/json',
-        responseSchema: {
-          type: Type.OBJECT,
-          properties: {
-            feedback: { type: Type.STRING },
-            nextQuestion: { type: Type.STRING },
-            resonanceScore: { type: Type.NUMBER },
-            dnaAlignment: { type: Type.ARRAY, items: { type: Type.STRING } },
-          },
-          required: ['feedback', 'nextQuestion', 'resonanceScore', 'dnaAlignment'],
+    try {
+      const response = await fetch('/api/skylar/interview/respond', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { 'Authorization': `Bearer ${token}` } : {})
         },
-      },
-    });
-
-    return JSON.parse(response.text || '{}');
+        body: JSON.stringify({ userId, persona, history, userResponse, dnaContext: insights }),
+      });
+      return await response.json();
+    } catch (e) {
+      console.error('Error in sendInterviewResponse:', e);
+      return {};
+    }
   }
 
   async getInterviewDebrief(userId: string, sessionHistory: any[]): Promise<any> {
-    const ai = getAI();
-    const response = await ai.models.generateContent({
-      model: 'gemini-2.5-flash',
-      contents: `Analyze this interview session history: ${JSON.stringify(sessionHistory)}.
-      Provide a "Strategic Debrief" including a "Narrative Heatmap" of DNA signal strength, 
-      key areas of resonance, and specific tactical improvements for future high-stakes conversations.`,
-      config: {
-        responseMimeType: 'application/json',
-        responseSchema: {
-          type: Type.OBJECT,
-          properties: {
-            heatmap: {
-              type: Type.ARRAY,
-              items: {
-                type: Type.OBJECT,
-                properties: {
-                  pillar: { type: Type.STRING },
-                  strength: { type: Type.NUMBER },
-                  insight: { type: Type.STRING },
-                },
-              },
-            },
-            overallVerdict: { type: Type.STRING },
-            tacticalAdvice: { type: Type.ARRAY, items: { type: Type.STRING } },
-          },
-          required: ['heatmap', 'overallVerdict', 'tacticalAdvice'],
+    const token = await auth.currentUser?.getIdToken();
+    try {
+      const response = await fetch('/api/skylar/interview/debrief', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { 'Authorization': `Bearer ${token}` } : {})
         },
-      },
-    });
-
-    return JSON.parse(response.text || '{}');
+        body: JSON.stringify({ userId, sessionHistory }),
+      });
+      return await response.json();
+    } catch (e) {
+      console.error('Error in getInterviewDebrief:', e);
+      return {};
+    }
   }
 
   async logOutreachAction(
@@ -1431,118 +1329,63 @@ class SkylarService {
   }
 
   async generateLiveResume(userId: string): Promise<any> {
-    const ai = getAI();
     const insights = await this.fetchConfirmedInsights(userId);
-    const dnaContext = insights.map((i) => `${i.type}: ${i.content}`).join(', ');
+    const token = await auth.currentUser?.getIdToken();
 
-    const prompt = `
-      You are the Skylar Narrative Journalist. Generate a high-fidelity "Live Resume" content based on the user's professional DNA: ${dnaContext}.
-      
-      The style must be "Editorial / Magazine" (bold, high-impact, cinematic).
-      
-      Return ONLY a JSON object:
-      {
-        "spark": { "title": "string", "narrative": "string" },
-        "dnaPillars": [{ "label": "string", "description": "string", "resonance": number }],
-        "trajectory": [{ "phase": "string", "milestone": "string", "impact": "string" }],
-        "resonanceScore": number,
-        "skylarFeedback": "string"
-      }
-    `;
-
-    const response = await ai.models.generateContent({
-      model: 'gemini-2.5-flash',
-      contents: [{ parts: [{ text: prompt }] }],
-      config: {
-        responseMimeType: 'application/json',
-        maxOutputTokens: 16384,
-      },
-    });
-
-    return JSON.parse(response.text || '{}');
+    try {
+      const response = await fetch('/api/skylar/live-resume', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { 'Authorization': `Bearer ${token}` } : {})
+        },
+        body: JSON.stringify({ userId, dnaContext: insights }),
+      });
+      return await response.json();
+    } catch (e) {
+      console.error('Error in generateLiveResume:', e);
+      return {};
+    }
   }
 
   async generateInteractivePortfolio(userId: string): Promise<any> {
-    const ai = getAI();
     const insights = await this.fetchConfirmedInsights(userId);
-    const dnaContext = insights.map((i) => `${i.type}: ${i.content}`).join(', ');
+    const token = await auth.currentUser?.getIdToken();
 
-    const prompt = `
-      You are the Skylar Narrative Journalist. Generate content for a multi-page "Interactive Portfolio" based on the user's professional DNA: ${dnaContext}.
-      
-      The style must be "Editorial / Magazine".
-      
-      Return ONLY a JSON object:
-      {
-        "pages": [
-          { 
-            "id": "spark", 
-            "title": "The Spark", 
-            "content": "string", 
-            "visualCues": ["string"] 
-          },
-          { 
-            "id": "dna", 
-            "title": "DNA Deep Dive", 
-            "signals": [{ "label": "string", "evidence": "string", "resonance": number }] 
-          },
-          { 
-            "id": "synthesis", 
-            "title": "The Synthesis", 
-            "narrative": "string" 
-          }
-        ],
-        "skylarFeedback": "string"
-      }
-    `;
-
-    const response = await ai.models.generateContent({
-      model: 'gemini-2.5-flash',
-      contents: [{ parts: [{ text: prompt }] }],
-      config: {
-        responseMimeType: 'application/json',
-        maxOutputTokens: 16384,
-      },
-    });
-
-    return JSON.parse(response.text || '{}');
+    try {
+      const response = await fetch('/api/skylar/interactive-portfolio', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { 'Authorization': `Bearer ${token}` } : {})
+        },
+        body: JSON.stringify({ userId, dnaContext: insights }),
+      });
+      return await response.json();
+    } catch (e) {
+      console.error('Error in generateInteractivePortfolio:', e);
+      return {};
+    }
   }
 
   async getResonanceFeedback(userId: string, content: string, targetRole: string): Promise<any> {
-    const ai = getAI();
     const insights = await this.fetchConfirmedInsights(userId);
-    const dnaContext = insights.map((i) => `${i.type}: ${i.content}`).join(', ');
+    const token = await auth.currentUser?.getIdToken();
 
-    const prompt = `
-      You are Skylar, the Strategic Conductor. Provide real-time resonance feedback on the following branding content:
-      
-      Content: "${content}"
-      Target Role: "${targetRole}"
-      User DNA: ${dnaContext}
-      
-      Analyze how well this content aligns with the user's DNA and the target role.
-      
-      Return ONLY a JSON object:
-      {
-        "resonanceScore": number (0-100),
-        "feedback": "string",
-        "suggestions": ["string"]
-      }
-    `;
-
-    const response = await ai.models.generateContent({
-      model: 'gemini-2.5-flash',
-      contents: [{ parts: [{ text: prompt }] }],
-      config: {
-        responseMimeType: 'application/json',
-        maxOutputTokens: 16384,
-        thinkingConfig: {
-          thinkingLevel: ThinkingLevel.LOW,
+    try {
+      const response = await fetch('/api/skylar/resonance-feedback', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { 'Authorization': `Bearer ${token}` } : {})
         },
-      },
-    });
-
-    return JSON.parse(response.text || '{}');
+        body: JSON.stringify({ userId, content, targetRole, dnaContext: insights }),
+      });
+      return await response.json();
+    } catch (e) {
+      console.error('Error in getResonanceFeedback:', e);
+      return { resonanceScore: 0, feedback: 'Error providing resonance analysis.', suggestions: [] };
+    }
   }
 
   async connectLive(config: any, callbacks: any) {

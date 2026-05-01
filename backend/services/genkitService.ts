@@ -81,6 +81,87 @@ export const searchWavvaultTool = ai.defineTool(
   }
 );
 
+export const fetchWavvaultDataTool = ai.defineTool(
+  {
+    name: 'fetch_wavvault_data',
+    description:
+      "Query and retrieve the authenticated user's data, artifacts, and journey status from their Firestore WavVault collection.",
+    inputSchema: z.object({
+      userId: z.string().describe('The ID of the user whose Wavvault data to fetch'),
+      dataType: z.enum(['dashboard', 'insights', 'artifacts', 'milestones']).describe('Which slice of WavVault data to retrieve'),
+    }),
+  },
+  async (input) => {
+    try {
+      const admin = (await import('firebase-admin')).default;
+      const { getFirestore } = await import('firebase-admin/firestore');
+      const fs = (await import('fs')).default;
+      const path = (await import('path')).default;
+      
+      let dbId = null;
+      try {
+        const configPath = path.resolve(process.cwd(), 'firebase-applet-config.json');
+        const config = JSON.parse(fs.readFileSync(configPath, 'utf8'));
+        dbId = config.firestoreDatabaseId;
+        if (dbId === '<DATABASE_ID>') dbId = null;
+      } catch (e) {}
+
+      let targetDbId = process.env.VITE_FIREBASE_DATABASE_ID || dbId;
+      const db = targetDbId ? getFirestore(admin.app(), targetDbId) : getFirestore(admin.app());
+
+      if (input.dataType === 'dashboard') {
+        const doc = await db.collection('dashboards').doc(input.userId).get();
+        return { status: 'success', data: doc.exists ? doc.data() : null };
+      } else if (input.dataType === 'insights') {
+        const snapshot = await db.collection('user_insights').where('userId', '==', input.userId).get();
+        return { status: 'success', data: snapshot.docs.map(d => d.data()) };
+      } else if (input.dataType === 'artifacts') {
+        const snapshot = await db.collection('wavvault_artifacts').where('userId', '==', input.userId).get();
+        return { status: 'success', data: snapshot.docs.map(d => d.data()) };
+      }
+      return { status: 'error', message: 'Unknown dataType requested' };
+    } catch (e: any) {
+      console.error('Error fetching WavVault data:', e);
+      return { status: 'error', message: e.message };
+    }
+  }
+);
+
+export const invokeResumeReviewerTool = ai.defineTool(
+  {
+    name: 'invoke_resume_reviewer',
+    description: 'Invoke the Resume Reviewer Sub-Agent to strictly analyze ATS compliance, keyword optimization, and structural formatting of a resume.',
+    inputSchema: z.object({
+      targetRole: z.string().describe('The ideal target role for this resume'),
+      resumeContent: z.string().describe('The raw text content of the resume'),
+      focusAreas: z.array(z.string()).optional().describe('Specific areas to focus on (e.g., ATS parsing, action verbs)'),
+    }),
+  },
+  async (input) => {
+    try {
+      const response = await reviewResumeSubAgentFlow(input);
+      return { status: 'success', data: response };
+    } catch (e: any) {
+      return { status: 'error', message: e.message };
+    }
+  }
+);
+
+export const updatePieOfLifeTool = ai.defineTool(
+  {
+    name: 'update_pie_of_life',
+    description: "Saves the user's Pie of Life and Perfect Day exercises from the Ignition phase.",
+    inputSchema: z.object({
+      pieOfLife: z.record(z.number()).describe('Percentage allocations for the Pie of Life (must total 100)'),
+      perfectDay: z.string().describe('The user\'s description of their perfect day'),
+      userId: z.string().optional().describe('The user ID'),
+    }),
+  },
+  async (input) => {
+    return { status: 'success', message: 'Ignition exercises saved successfully.', data: input };
+  }
+);
+
 export const executeMinorUpdateTool = ai.defineTool(
   {
     name: 'execute_minor_update',
@@ -314,6 +395,9 @@ export const searchGoogleMapsTool = ai.defineTool(
 const allTools = [
   createSparkwavvAccountTool,
   searchWavvaultTool,
+  fetchWavvaultDataTool,
+  invokeResumeReviewerTool,
+  updatePieOfLifeTool,
   executeMinorUpdateTool,
   getMarketIntelligenceTool,
   performGateReviewTool,
@@ -579,6 +663,213 @@ export const runJourneyStageFlow = ai.defineFlow(
   }
 );
 
+export const reviewResumeSubAgentFlow = ai.defineFlow(
+  {
+    name: 'reviewResumeSubAgent',
+    description: 'A sub-agent focused strictly on ATS compliance, keyword optimization, and resume formatting critiques.',
+    inputSchema: z.object({
+      targetRole: z.string().describe('The ideal target role for this resume'),
+      resumeContent: z.string().describe('The raw text content of the resume'),
+      focusAreas: z.array(z.string()).optional().describe('Specific areas to focus on (e.g., ATS parsing, action verbs)'),
+    }),
+    outputSchema: z.object({
+      atsScore: z.number().describe('Estimated ATS compatibility score 0-100'),
+      criticalCritique: z.string().describe('The primary critique on the structure and content'),
+      suggestedImprovements: z.array(z.string()).describe('Specific localized changes to make'),
+      optimizedContent: z.string().optional().describe('A rewritten version of the summary or bullet points if applicable'),
+    }),
+  },
+  async (input) => {
+    let activeTargetModel = 'googleai/gemini-2.5-flash';
+    if (!process.env.GEMINI_API_KEY && process.env.VERTEX_AI_PROJECT_ID) {
+      activeTargetModel = 'vertexai/gemini-1.5-flash';
+    }
+    const prompt = `Review the following resume for the target role: "${input.targetRole}".
+Focus areas: ${input.focusAreas ? input.focusAreas.join(', ') : 'ATS Compliance, Action Verbs, Formatting'}.
+
+Resume Content:
+${input.resumeContent}
+
+Provide an estimated ATS score (0-100), a critical critique of the structure/content, a list of suggested improvements, and optionally rewrite a key section.`;
+
+    try {
+      const response = await ai.generate({
+        model: activeTargetModel,
+        system: "You are the Resume Reviewer Sub-Agent. Your focus is strictly on Applicant Tracking System (ATS) compliance, keyword optimization, and structural critiques. Be direct, strict, and precise.",
+        prompt: prompt,
+        output: {
+          schema: z.object({
+            atsScore: z.number(),
+            criticalCritique: z.string(),
+            suggestedImprovements: z.array(z.string()),
+            optimizedContent: z.string().optional(),
+          }),
+        },
+      });
+      return response.output;
+    } catch (err) {
+      console.error('Error in reviewResumeSubAgentFlow:', err);
+      return {
+        atsScore: 0,
+        criticalCritique: 'Failed to analyze resume.',
+        suggestedImprovements: [],
+      };
+    }
+  }
+);
+export const startInterviewSessionFlow = ai.defineFlow(
+  {
+    name: 'startInterviewSession',
+    inputSchema: z.object({
+      userId: z.string(),
+      persona: z.string(),
+      dnaContext: z.array(z.any()).optional(),
+    }),
+    outputSchema: z.object({
+      question: z.string(),
+      personaContext: z.string(),
+      initialResonance: z.number(),
+    }),
+  },
+  async (input) => {
+    let activeTargetModel = 'googleai/gemini-2.5-flash';
+    if (!process.env.GEMINI_API_KEY && process.env.VERTEX_AI_PROJECT_ID) {
+      activeTargetModel = 'vertexai/gemini-1.5-flash';
+    }
+    
+    // Fallback if no context provided natively from backend
+    const insightsContent = input.dnaContext ? JSON.stringify(input.dnaContext) : '';
+    
+    const prompt = `You are Skylar, but for this session, you are masking as ${input.persona}. 
+Based on the user's professional DNA: ${insightsContent}, 
+start a high-stakes interview. Introduce yourself in character and ask the first challenging question.
+Keep the tone professional and consistent with the ${input.persona} archetype.`;
+
+    const response = await ai.generate({
+      model: activeTargetModel,
+      system: 'You are an expert high-stakes interviewer.',
+      prompt,
+      output: {
+        schema: z.object({
+          question: z.string(),
+          personaContext: z.string(),
+          initialResonance: z.number(),
+        }),
+      },
+    });
+    
+    return response.output || { question: '', personaContext: '', initialResonance: 0 };
+  }
+);
+
+export const sendInterviewResponseFlow = ai.defineFlow(
+  {
+    name: 'sendInterviewResponse',
+    inputSchema: z.object({
+      userId: z.string(),
+      persona: z.string(),
+      history: z.array(z.any()),
+      userResponse: z.string(),
+      dnaContext: z.array(z.any()).optional(),
+    }),
+    outputSchema: z.object({
+      feedback: z.string(),
+      nextQuestion: z.string(),
+      resonanceScore: z.number(),
+      dnaAlignment: z.array(z.string()),
+    }),
+  },
+  async (input) => {
+    let activeTargetModel = 'googleai/gemini-2.5-flash';
+    if (!process.env.GEMINI_API_KEY && process.env.VERTEX_AI_PROJECT_ID) {
+      activeTargetModel = 'vertexai/gemini-1.5-flash';
+    }
+
+    const insightsContent = input.dnaContext ? JSON.stringify(input.dnaContext) : '';
+    const historyContent = JSON.stringify(input.history);
+
+    const prompt = `You are Skylar masking as ${input.persona}. 
+User DNA: ${insightsContent}
+Conversation History: ${historyContent}
+User's Latest Response: "${input.userResponse}"
+
+Evaluate the response for DNA resonance (0-100) and provide the next interview question or follow-up.
+If the user provides information about their 'Pie of Life' or 'Perfect Day' exercises mapping, autonomously call the 'update_pie_of_life' tool.
+Maintain the ${input.persona} character strictly.`;
+
+    const response = await ai.generate({
+      model: activeTargetModel,
+      system: 'You are an expert high-stakes interviewer. You optionally use tools when the user volunteers specific artifacts.',
+      prompt,
+      tools: [updatePieOfLifeTool],
+      output: {
+        schema: z.object({
+          feedback: z.string(),
+          nextQuestion: z.string(),
+          resonanceScore: z.number(),
+          dnaAlignment: z.array(z.string()),
+        }),
+      },
+    });
+    
+    return response.output || { feedback: '', nextQuestion: '', resonanceScore: 0, dnaAlignment: [] };
+  }
+);
+
+export const getInterviewDebriefFlow = ai.defineFlow(
+  {
+    name: 'getInterviewDebrief',
+    inputSchema: z.object({
+      userId: z.string(),
+      sessionHistory: z.array(z.any()),
+    }),
+    outputSchema: z.object({
+      heatmap: z.array(
+        z.object({
+          pillar: z.string(),
+          strength: z.number(),
+          insight: z.string(),
+        })
+      ),
+      overallVerdict: z.string(),
+      tacticalAdvice: z.array(z.string()),
+    }),
+  },
+  async (input) => {
+    let activeTargetModel = 'googleai/gemini-2.5-flash';
+    if (!process.env.GEMINI_API_KEY && process.env.VERTEX_AI_PROJECT_ID) {
+      activeTargetModel = 'vertexai/gemini-1.5-flash';
+    }
+
+    const sessionHistory = JSON.stringify(input.sessionHistory);
+
+    const prompt = `Analyze this interview session history: ${sessionHistory}.
+Provide a "Strategic Debrief" including a "Narrative Heatmap" of DNA signal strength, 
+key areas of resonance, and specific tactical improvements for future high-stakes conversations.`;
+
+    const response = await ai.generate({
+      model: activeTargetModel,
+      system: 'You are an elite career intelligence engine providing a strategic review.',
+      prompt,
+      output: {
+        schema: z.object({
+          heatmap: z.array(
+            z.object({
+              pillar: z.string(),
+              strength: z.number(),
+              insight: z.string(),
+            })
+          ),
+          overallVerdict: z.string(),
+          tacticalAdvice: z.array(z.string()),
+        }),
+      },
+    });
+    
+    return response.output || { heatmap: [], overallVerdict: '', tacticalAdvice: [] };
+  }
+);
+
 export const analyzeWavvaultArtifactFlow = ai.defineFlow(
   {
     name: 'analyzeWavvaultArtifact',
@@ -632,6 +923,472 @@ Provide a descriptive title, a list of professional skills, a brief explanation 
         industryRelevance: 'Failed to analyze artifact.',
         documentSummary: 'Failed to summarize artifact.',
       };
+    }
+  }
+);
+
+export const performSynthesisFlow = ai.defineFlow(
+  {
+    name: 'performSynthesis',
+    inputSchema: z.object({
+      userId: z.string(),
+      history: z.array(z.any()),
+      fileContent: z.string().optional(),
+    }),
+    outputSchema: z.object({
+      nodes: z.array(
+        z.object({
+          id: z.string(),
+          label: z.string(),
+          type: z.string(),
+          strength: z.number(),
+          description: z.string(),
+        })
+      ),
+      links: z.array(
+        z.object({
+          source: z.string(),
+          target: z.string(),
+          weight: z.number(),
+          type: z.string(),
+        })
+      ),
+    }),
+  },
+  async (input) => {
+    let activeTargetModel = 'googleai/gemini-2.5-flash';
+    if (!process.env.GEMINI_API_KEY && process.env.VERTEX_AI_PROJECT_ID) {
+      activeTargetModel = 'vertexai/gemini-1.5-flash';
+    }
+
+    const prompt = `You are the Skylar Analytical Architect. Your task is to perform a "Neural Synthesis" of the user's career data.
+Analyze the provided chat history and document content to extract a structured Knowledge Graph of the user's professional identity.
+Extract core skills, values, overarching goals, and specific "sparks" (unique identifiers of passion or talent).
+
+Chat History:
+${JSON.stringify(input.history)}
+
+${input.fileContent ? `Document Content:\n${input.fileContent}\n` : ''}
+
+Return nodes mapping to one of these types: skill|goal|value|spark and links connecting them mapping to types: connection|dependency|influence.`;
+
+    try {
+      const response = await ai.generate({
+        model: activeTargetModel,
+        system: 'You are the Skylar Analytical Architect.',
+        prompt,
+        output: {
+          schema: z.object({
+            nodes: z.array(
+              z.object({
+                id: z.string(),
+                label: z.string(),
+                type: z.string(),
+                strength: z.number(),
+                description: z.string(),
+              })
+            ),
+            links: z.array(
+              z.object({
+                source: z.string(),
+                target: z.string(),
+                weight: z.number(),
+                type: z.string(),
+              })
+            ),
+          }),
+        },
+      });
+  
+      return response.output || { nodes: [], links: [] };
+    } catch (err) {
+      console.error('performSynthesisFlow Error:', err);
+      return { nodes: [], links: [] };
+    }
+  }
+);
+
+export const performGateReviewFlow = ai.defineFlow(
+  {
+    name: 'performGateReview',
+    inputSchema: z.object({
+      userId: z.string(),
+      currentPhase: z.string(),
+      targetPhase: z.string(),
+      history: z.array(z.any()),
+      dnaContext: z.array(z.any()).optional(),
+    }),
+    outputSchema: z.object({
+      status: z.string(),
+      message: z.string(),
+      criteria: z.array(z.object({
+        label: z.string(),
+        met: z.boolean(),
+      })),
+    }),
+  },
+  async (input) => {
+    let activeTargetModel = 'googleai/gemini-2.5-flash';
+    if (!process.env.GEMINI_API_KEY && process.env.VERTEX_AI_PROJECT_ID) activeTargetModel = 'vertexai/gemini-1.5-flash';
+
+    const dnaContent = input.dnaContext ? JSON.stringify(input.dnaContext) : '';
+    const prompt = `You are the Skylar Validation Architect. Perform a "Validation Gate" review for the user moving from ${input.currentPhase} to ${input.targetPhase}.
+User DNA: ${dnaContent}
+Recent History: ${JSON.stringify(input.history.slice(-10))}
+
+Criteria for ${input.targetPhase}:
+- Dive-In to Ignition: Commitment to the 12-week process and initial "Spark" identified.
+- Ignition to Discovery: Completion of "Pie of Life" and "Perfect Day" exercises; clear initial career DNA hypothesis.
+- Discovery to Branding: Synthesis of the "Cinematic Brand DNA" (3 pillars); extraction of at least 5 core attributes from accomplishments; validation of "Five Stories" by an RPP.
+- Branding to Outreach: Completion of "Journalist" and "Reflective" versions of the Five Stories; alignment with the Market Intelligence Grid (MIG) and the Cinematic Brand DNA.`;
+
+    try {
+      const resp = await ai.generate({
+        model: activeTargetModel,
+        system: 'You are the Skylar Validation Architect.',
+        prompt,
+        output: {
+          schema: z.object({
+            status: z.enum(['passed', 'warning', 'failed']),
+            message: z.string(),
+            criteria: z.array(
+              z.object({
+                label: z.string(),
+                met: z.boolean(),
+              })
+            ),
+          }),
+        },
+      });
+      return resp.output || { status: 'failed', message: '', criteria: [] };
+    } catch(e) {
+      return { status: 'failed', message: 'Error analyzing gate criteria.', criteria: [] };
+    }
+  }
+);
+export const getEmotionalIntelligenceFlow = ai.defineFlow(
+  {
+    name: 'getEmotionalIntelligence',
+    inputSchema: z.object({
+      history: z.array(z.any()),
+    }),
+    outputSchema: z.object({
+      sentiment: z.number(),
+      motivation: z.number(),
+      topDrivers: z.array(z.string()),
+      anxieties: z.array(z.string()),
+      summary: z.string(),
+    }),
+  },
+  async (input) => {
+    let activeTargetModel = 'googleai/gemini-2.5-flash';
+    if (!process.env.GEMINI_API_KEY && process.env.VERTEX_AI_PROJECT_ID) activeTargetModel = 'vertexai/gemini-1.5-flash';
+
+    const prompt = `Analyze the user's emotional state and motivation based on their career journey and chat history.
+History: ${JSON.stringify(input.history.slice(-20))}`;
+
+    try {
+      const resp = await ai.generate({
+        model: activeTargetModel,
+        system: 'You are an empathetic emotional intelligence engine.',
+        prompt,
+        output: {
+          schema: z.object({
+            sentiment: z.number(),
+            motivation: z.number(),
+            topDrivers: z.array(z.string()),
+            anxieties: z.array(z.string()),
+            summary: z.string(),
+          }),
+        },
+      });
+      return resp.output || { sentiment: 50, motivation: 50, topDrivers: [], anxieties: [], summary: 'Neutral' };
+    } catch(e) {
+      return { sentiment: 50, motivation: 50, topDrivers: [], anxieties: [], summary: 'Error analyzing.' };
+    }
+  }
+);
+
+export const getResonanceFeedbackFlow = ai.defineFlow(
+  {
+    name: 'getResonanceFeedback',
+    inputSchema: z.object({
+      userId: z.string(),
+      targetRole: z.string(),
+      content: z.string(),
+      dnaContext: z.array(z.any()).optional(),
+    }),
+    outputSchema: z.object({
+      resonanceScore: z.number(),
+      feedback: z.string(),
+      suggestions: z.array(z.string()),
+    }),
+  },
+  async (input) => {
+    let activeTargetModel = 'googleai/gemini-2.5-flash';
+    if (!process.env.GEMINI_API_KEY && process.env.VERTEX_AI_PROJECT_ID) activeTargetModel = 'vertexai/gemini-1.5-flash';
+
+    const dnaContent = input.dnaContext ? JSON.stringify(input.dnaContext) : '';
+    const prompt = `You are Skylar, the Strategic Conductor. Provide real-time resonance feedback on this content.
+Content: "${input.content}"
+Target Role: "${input.targetRole}"
+User DNA: ${dnaContent}`;
+
+    try {
+      const resp = await ai.generate({
+        model: activeTargetModel,
+        system: 'You are an expert career alignment engine.',
+        prompt,
+        output: {
+          schema: z.object({
+            resonanceScore: z.number(),
+            feedback: z.string(),
+            suggestions: z.array(z.string()),
+          }),
+        },
+      });
+      return resp.output || { resonanceScore: 0, feedback: '', suggestions: [] };
+    } catch(e) {
+      return { resonanceScore: 0, feedback: 'Error analyzing feedback.', suggestions: [] };
+    }
+  }
+);
+
+export const generateInteractivePortfolioFlow = ai.defineFlow(
+  {
+    name: 'generateInteractivePortfolio',
+    inputSchema: z.object({
+      userId: z.string(),
+      dnaContext: z.array(z.any()).optional(),
+    }),
+    outputSchema: z.object({
+      pages: z.array(
+        z.object({
+          id: z.string(),
+          title: z.string(),
+          content: z.string().optional(),
+          visualCues: z.array(z.string()).optional(),
+          signals: z.array(z.object({
+            label: z.string(),
+            evidence: z.string(),
+            resonance: z.number(),
+          })).optional(),
+          narrative: z.string().optional(),
+        })
+      ),
+      skylarFeedback: z.string(),
+    }),
+  },
+  async (input) => {
+    let activeTargetModel = 'googleai/gemini-2.5-flash';
+    if (!process.env.GEMINI_API_KEY && process.env.VERTEX_AI_PROJECT_ID) {
+      activeTargetModel = 'vertexai/gemini-1.5-flash';
+    }
+
+    const dnaContent = input.dnaContext ? JSON.stringify(input.dnaContext) : '';
+    const prompt = `You are the Skylar Narrative Journalist. Generate content for a multi-page "Interactive Portfolio" based on the user's professional DNA: ${dnaContent}.
+The style must be "Editorial / Magazine".
+
+Return ONLY a JSON object:
+{
+  "pages": [
+    { 
+      "id": "spark", 
+      "title": "The Spark", 
+      "content": "string", 
+      "visualCues": ["string"] 
+    },
+    { 
+      "id": "dna", 
+      "title": "DNA Deep Dive", 
+      "signals": [{ "label": "string", "evidence": "string", "resonance": number }] 
+    },
+    { 
+      "id": "synthesis", 
+      "title": "The Synthesis", 
+      "narrative": "string" 
+    }
+  ],
+  "skylarFeedback": "string"
+}`;
+
+    try {
+      const response = await ai.generate({
+        model: activeTargetModel,
+        system: 'You are the Skylar Narrative Journalist.',
+        prompt,
+        output: {
+          schema: z.object({
+            pages: z.array(
+              z.object({
+                id: z.string(),
+                title: z.string(),
+                content: z.string().optional(),
+                visualCues: z.array(z.string()).optional(),
+                signals: z.array(
+                  z.object({
+                    label: z.string(),
+                    evidence: z.string(),
+                    resonance: z.number(),
+                  })
+                ).optional(),
+                narrative: z.string().optional(),
+              })
+            ),
+            skylarFeedback: z.string(),
+          }),
+        },
+      });
+
+      return response.output || { pages: [], skylarFeedback: '' };
+    } catch (e) {
+      console.error('generateInteractivePortfolioFlow Error:', e);
+      return { pages: [], skylarFeedback: 'Error' };
+    }
+  }
+);
+export const generateTargetedSequenceFlow = ai.defineFlow(
+  {
+    name: 'generateTargetedSequence',
+    inputSchema: z.object({
+      userId: z.string(),
+      targetCompany: z.string(),
+      targetRole: z.string(),
+      tone: z.object({
+        formal: z.number(),
+        detail: z.number(),
+      }),
+      dnaContext: z.array(z.any()).optional(),
+    }),
+    outputSchema: z.object({
+      steps: z.array(
+        z.object({
+          type: z.string(),
+          subject: z.string().optional(),
+          content: z.string(),
+        })
+      ),
+    }),
+  },
+  async (input) => {
+    let activeTargetModel = 'googleai/gemini-2.5-flash';
+    if (!process.env.GEMINI_API_KEY && process.env.VERTEX_AI_PROJECT_ID) {
+      activeTargetModel = 'vertexai/gemini-1.5-flash';
+    }
+
+    const dnaContent = input.dnaContext ? JSON.stringify(input.dnaContext) : '';
+    const prompt = `Generate a targeted professional outreach sequence for ${input.targetRole} at ${input.targetCompany}.
+The user's professional DNA is: ${dnaContent}.
+
+Tone Settings:
+- Formal vs Casual: ${input.tone.formal}/100 (100 is most formal)
+- Brief vs Detailed: ${input.tone.detail}/100 (100 is most detailed)
+
+The sequence should include:
+1. A LinkedIn Connection Request (short)
+2. A First Outreach Email (personalized)
+3. A Follow-up Email (value-add)`;
+
+    try {
+      const response = await ai.generate({
+        model: activeTargetModel,
+        system: 'You are an elite career coach specialized in outreach.',
+        prompt,
+        output: {
+          schema: z.object({
+            steps: z.array(
+              z.object({
+                type: z.string(),
+                subject: z.string().optional(),
+                content: z.string(),
+              })
+            ),
+          }),
+        },
+      });
+
+      return response.output || { steps: [] };
+    } catch (e) {
+      console.error('generateTargetedSequenceFlow Error:', e);
+      return { steps: [] };
+    }
+  }
+);
+export const generateLiveResumeFlow = ai.defineFlow(
+  {
+    name: 'generateLiveResume',
+    inputSchema: z.object({
+      userId: z.string(),
+      dnaContext: z.array(z.any()).optional(),
+    }),
+    outputSchema: z.object({
+      spark: z.object({
+        title: z.string(),
+        narrative: z.string(),
+      }),
+      dnaPillars: z.array(
+        z.object({
+          label: z.string(),
+          description: z.string(),
+          resonance: z.number(),
+        })
+      ),
+      trajectory: z.array(
+        z.object({
+          phase: z.string(),
+          milestone: z.string(),
+          impact: z.string(),
+        })
+      ),
+      resonanceScore: z.number(),
+      skylarFeedback: z.string(),
+    }),
+  },
+  async (input) => {
+    let activeTargetModel = 'googleai/gemini-2.5-flash';
+    if (!process.env.GEMINI_API_KEY && process.env.VERTEX_AI_PROJECT_ID) {
+      activeTargetModel = 'vertexai/gemini-1.5-flash';
+    }
+
+    const dnaContent = input.dnaContext ? JSON.stringify(input.dnaContext) : '';
+    const prompt = `You are the Skylar Narrative Journalist. Generate a high-fidelity "Live Resume" content based on the user's professional DNA: ${dnaContent}.
+The style must be "Editorial / Magazine" (bold, high-impact, cinematic).`;
+
+    try {
+      const response = await ai.generate({
+        model: activeTargetModel,
+        system: 'You are the Skylar Narrative Journalist.',
+        prompt,
+        output: {
+          schema: z.object({
+            spark: z.object({
+              title: z.string(),
+              narrative: z.string(),
+            }),
+            dnaPillars: z.array(
+              z.object({
+                label: z.string(),
+                description: z.string(),
+                resonance: z.number(),
+              })
+            ),
+            trajectory: z.array(
+              z.object({
+                phase: z.string(),
+                milestone: z.string(),
+                impact: z.string(),
+              })
+            ),
+            resonanceScore: z.number(),
+            skylarFeedback: z.string(),
+          }),
+        },
+      });
+  
+      return response.output || { spark: { title: '', narrative: '' }, dnaPillars: [], trajectory: [], resonanceScore: 0, skylarFeedback: '' };
+    } catch (e) {
+      console.error('generateLiveResumeFlow Error:', e);
+      return { spark: { title: 'Generation Error', narrative: 'Failed to generate output' }, dnaPillars: [], trajectory: [], resonanceScore: 0, skylarFeedback: 'Error' };
     }
   }
 );

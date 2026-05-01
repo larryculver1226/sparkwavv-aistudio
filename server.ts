@@ -3636,9 +3636,160 @@ async function startServer() {
           res.json({
             response: { text: result.text },
             executedActions: result.executedActions,
+            debugData: result.debugData,
           });
         } catch (error: any) {
           console.error('Error in /api/skylar/chat-journey:', error);
+          res.status(500).json({ error: error.message });
+        }
+      }
+    );
+
+    app.post(
+      '/api/skylar/interview/start',
+      requireRole([ROLES.USER, ROLES.ADMIN]),
+      async (req, res) => {
+        try {
+          const { startInterviewSessionFlow } = await import('./backend/services/genkitService.js');
+          const result = await startInterviewSessionFlow(req.body);
+          res.json(result);
+        } catch (error: any) {
+          console.error('Error in /api/skylar/interview/start:', error);
+          res.status(500).json({ error: error.message });
+        }
+      }
+    );
+
+    app.post(
+      '/api/skylar/interview/respond',
+      requireRole([ROLES.USER, ROLES.ADMIN]),
+      async (req, res) => {
+        try {
+          const { sendInterviewResponseFlow } = await import('./backend/services/genkitService.js');
+          const result = await sendInterviewResponseFlow(req.body);
+          res.json(result);
+        } catch (error: any) {
+          console.error('Error in /api/skylar/interview/respond:', error);
+          res.status(500).json({ error: error.message });
+        }
+      }
+    );
+
+    app.post(
+      '/api/skylar/interview/debrief',
+      requireRole([ROLES.USER, ROLES.ADMIN]),
+      async (req, res) => {
+        try {
+          const { getInterviewDebriefFlow } = await import('./backend/services/genkitService.js');
+          const result = await getInterviewDebriefFlow(req.body);
+          res.json(result);
+        } catch (error: any) {
+          console.error('Error in /api/skylar/interview/debrief:', error);
+          res.status(500).json({ error: error.message });
+        }
+      }
+    );
+
+    app.post(
+      '/api/skylar/synthesis',
+      requireRole([ROLES.USER, ROLES.ADMIN]),
+      async (req, res) => {
+        try {
+          const { performSynthesisFlow } = await import('./backend/services/genkitService.js');
+          const result = await performSynthesisFlow(req.body);
+          res.json(result);
+        } catch (error: any) {
+          console.error('Error in /api/skylar/synthesis:', error);
+          res.status(500).json({ error: error.message });
+        }
+      }
+    );
+
+    app.post(
+      '/api/skylar/live-resume',
+      requireRole([ROLES.USER, ROLES.ADMIN]),
+      async (req, res) => {
+        try {
+          const { generateLiveResumeFlow } = await import('./backend/services/genkitService.js');
+          const result = await generateLiveResumeFlow(req.body);
+          res.json(result);
+        } catch (error: any) {
+          console.error('Error in /api/skylar/live-resume:', error);
+          res.status(500).json({ error: error.message });
+        }
+      }
+    );
+
+    app.post(
+      '/api/skylar/targeted-sequence',
+      requireRole([ROLES.USER, ROLES.ADMIN]),
+      async (req, res) => {
+        try {
+          const { generateTargetedSequenceFlow } = await import('./backend/services/genkitService.js');
+          const result = await generateTargetedSequenceFlow(req.body);
+          res.json(result);
+        } catch (error: any) {
+          console.error('Error in /api/skylar/targeted-sequence:', error);
+          res.status(500).json({ error: error.message });
+        }
+      }
+    );
+
+    app.post(
+      '/api/skylar/interactive-portfolio',
+      requireRole([ROLES.USER, ROLES.ADMIN]),
+      async (req, res) => {
+        try {
+          const { generateInteractivePortfolioFlow } = await import('./backend/services/genkitService.js');
+          const result = await generateInteractivePortfolioFlow(req.body);
+          res.json(result);
+        } catch (error: any) {
+          console.error('Error in /api/skylar/interactive-portfolio:', error);
+          res.status(500).json({ error: error.message });
+        }
+      }
+    );
+
+    app.post(
+      '/api/skylar/gate-review',
+      requireRole([ROLES.USER, ROLES.ADMIN]),
+      async (req, res) => {
+        try {
+          const { performGateReviewFlow } = await import('./backend/services/genkitService.js');
+          const result = await performGateReviewFlow(req.body);
+          res.json(result);
+        } catch (error: any) {
+          console.error('Error in /api/skylar/gate-review:', error);
+          res.status(500).json({ error: error.message });
+        }
+      }
+    );
+
+    app.post(
+      '/api/skylar/emotional-intelligence',
+      requireRole([ROLES.USER, ROLES.ADMIN]),
+      async (req, res) => {
+        try {
+          const { getEmotionalIntelligenceFlow } = await import('./backend/services/genkitService.js');
+          const result = await getEmotionalIntelligenceFlow(req.body);
+          res.json(result);
+        } catch (error: any) {
+          console.error('Error in /api/skylar/emotional-intelligence:', error);
+          res.status(500).json({ error: error.message });
+        }
+      }
+    );
+
+    app.post(
+      '/api/skylar/resonance-feedback',
+      requireRole([ROLES.USER, ROLES.ADMIN]),
+      async (req, res) => {
+        try {
+          const { getResonanceFeedbackFlow } = await import('./backend/services/genkitService.js');
+          const result = await getResonanceFeedbackFlow(req.body);
+          res.json(result);
+        } catch (error: any) {
+          console.error('Error in /api/skylar/resonance-feedback:', error);
           res.status(500).json({ error: error.message });
         }
       }
