@@ -3050,6 +3050,7 @@ export function SPARKWavvApp({
         {!isAdmin && <EveningSpark energyTrough={dashboardData?.energyTrough} onClose={() => {}} />}
       </div>
     </div>
+    </>
   );
 }
 
