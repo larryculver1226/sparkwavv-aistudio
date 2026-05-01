@@ -2,7 +2,6 @@ import { doc, getDoc, collection, getDocs, onSnapshot, setDoc } from 'firebase/f
 import { db } from '../lib/firebase';
 import { SkylarGlobalConfig, SkylarStageConfig, DEFAULT_MODALITIES } from '../types/skylar-config';
 import { handleFirestoreError, OperationType } from '../lib/firestore-errors';
-import { DEFAULT_JOURNEY_STAGES } from '../config/defaultStageContent';
 
 // In-memory cache
 let globalConfigCache: SkylarGlobalConfig | null = null;
@@ -86,6 +85,35 @@ export const configService = {
       const stagesRef = collection(db, 'journeyPhaseConfigs');
       const snapshot = await getDocs(stagesRef);
       
+      if (snapshot.empty) {
+        console.info('[Config Service] No journey stages found. Seeding from default JSON...');
+        const module = await import('../config/defaultJourneyStages.json');
+        const defaultStages = module.default as Record<string, any>;
+        const stages: Record<string, SkylarStageConfig> = {};
+        for (const [sId, defaultData] of Object.entries(defaultStages)) {
+          const config = {
+            stageId: sId,
+            stageTitle: defaultData.title || sId,
+            description: defaultData.description || '',
+            systemPromptTemplate: defaultData.systemPromptTemplate || '',
+            requiredArtifacts: defaultData.requiredArtifacts || [],
+            allowedModalities: Array.isArray(defaultData.allowedModalities) 
+              ? {
+                  text: defaultData.allowedModalities.includes('text'),
+                  audio: defaultData.allowedModalities.includes('audio'),
+                  image: defaultData.allowedModalities.includes('image'),
+                  video: defaultData.allowedModalities.includes('video'),
+                }
+              : defaultData.allowedModalities || DEFAULT_MODALITIES,
+            uiConfig: defaultData.uiConfig || { theme: 'dark', layout: 'split' }
+          } as SkylarStageConfig;
+          await this.updateStageConfig(sId, config);
+          stages[sId] = config;
+        }
+        journeyStagesCache = stages;
+        return stages;
+      }
+
       const stages: Record<string, SkylarStageConfig> = {};
       snapshot.forEach((doc) => {
         const data = doc.data();
@@ -156,8 +184,10 @@ export const configService = {
         
         return config;
       } else {
-        console.info(`[Config Service] Journey stage "${normalizedStageId}" not found in Firestore. Falling back to hardcoded default. (Visit the Agent Ops dashboard to seed this to your database)`);
-        const defaultData = DEFAULT_JOURNEY_STAGES[normalizedStageId] || DEFAULT_JOURNEY_STAGES['dive-in'];
+        console.warn(`[Config Service] Journey stage "${normalizedStageId}" not found. Trying to fallback to default config...`);
+        const module = await import('../config/defaultJourneyStages.json');
+        const defaultStages = module.default as Record<string, any>;
+        const defaultData = defaultStages[normalizedStageId] || defaultStages['dive-in'];
         if (defaultData) {
           const config = {
             stageId: normalizedStageId,
@@ -176,10 +206,7 @@ export const configService = {
             uiConfig: defaultData.uiConfig || { theme: 'dark', layout: 'split' }
           } as SkylarStageConfig;
           
-          if (!journeyStagesCache) {
-            journeyStagesCache = {};
-          }
-          journeyStagesCache[normalizedStageId] = config;
+          await this.updateStageConfig(normalizedStageId, config);
           return config;
         }
         return null;

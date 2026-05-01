@@ -2,49 +2,34 @@ import React from 'react';
 import { motion } from 'motion/react';
 import { Award, Target, Zap, ChevronRight, Star, Brain, Shield, Sparkles } from 'lucide-react';
 
-interface Strength {
-  id: string;
-  title: string;
-  description: string;
-  level: number;
-  category: string;
-  tags: string[];
-}
-
-const MOCK_STRENGTHS: Strength[] = [
-  {
-    id: '1',
-    title: 'Strategic Systems Design',
-    description:
-      'Ability to architect complex digital ecosystems with a focus on scalability and user resonance.',
-    level: 95,
-    category: 'Design',
-    tags: ['Architecture', 'Scalability', 'Ecosystems'],
-  },
-  {
-    id: '2',
-    title: 'Neural UX Research',
-    description:
-      'Deep understanding of cognitive patterns and behavioral psychology applied to interface design.',
-    level: 92,
-    category: 'Research',
-    tags: ['Psychology', 'Cognitive Patterns', 'Behavioral'],
-  },
-  {
-    id: '3',
-    title: 'Rapid Prototyping',
-    description: 'High-velocity iteration from concept to high-fidelity interactive models.',
-    level: 88,
-    category: 'Execution',
-    tags: ['Velocity', 'High-Fidelity', 'Iteration'],
-  },
-];
-
 interface StrengthsViewProps {
   onBack: () => void;
+  strengths?: string[];
 }
 
-export const StrengthsView: React.FC<StrengthsViewProps> = ({ onBack }) => {
+export const StrengthsView: React.FC<StrengthsViewProps> = ({ onBack, strengths = [] }) => {
+  // Transform flat strings into detailed objects for UI consistency
+  const processedStrengths = strengths.map((s, i) => ({
+    id: i.toString(),
+    title: s,
+    description: `A core competency centered around ${s.toLowerCase()}, demonstrated throughout your journey.`,
+    level: Math.max(80, 98 - (i * 3)),
+    category: 'Core trait',
+    tags: [s.split(' ')[0] || 'Skill']
+  }));
+
+  // Fallback if none provided
+  const displayStrengths = processedStrengths.length > 0 ? processedStrengths : [
+    {
+      id: 'default',
+      title: 'Awaiting Analysis',
+      description: 'Interact with Skylar to extract and verify your professional strengths.',
+      level: 0,
+      category: 'Pending',
+      tags: ['Pending']
+    }
+  ];
+
   return (
     <div className="space-y-8">
       <header className="space-y-4">
@@ -69,7 +54,7 @@ export const StrengthsView: React.FC<StrengthsViewProps> = ({ onBack }) => {
       </header>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        {MOCK_STRENGTHS.map((strength, i) => (
+        {displayStrengths.map((strength, i) => (
           <motion.div
             key={strength.id}
             initial={{ opacity: 0, y: 20 }}

@@ -2,10 +2,11 @@ import { GoogleGenAI, Modality, Type, FunctionDeclaration, ThinkingLevel } from 
 import { getGeminiApiKey } from './aiConfig';
 import { genkitTracer } from './agentOpsService';
 import { KnowledgeGraph, WavvaultData, TargetOpportunity } from '../types/wavvault';
-import { DEFAULT_JOURNEY_STAGES } from '../config/defaultStageContent';
+import defaultJourneyStages from '../config/defaultJourneyStages.json';
 import { JourneyStageDefinition } from '../types/skylar';
 import { SkylarStageConfig } from '../types/skylar-config';
-import { auth } from '../lib/firebase';
+import { auth, db } from '../lib/firebase';
+import { collection, addDoc, query, where, getDocs, serverTimestamp } from 'firebase/firestore';
 
 export const GATING_CRITERIA: Record<string, string[]> = {
   'Dive-In': [
@@ -503,10 +504,11 @@ export const PERSONA_CONFIG = {
 class SkylarService {
   public getStageConfig(stageId: string): JourneyStageDefinition {
     const normalizedId = stageId.toLowerCase();
-    const config = DEFAULT_JOURNEY_STAGES[normalizedId];
+    const defaultStages = defaultJourneyStages as any;
+    const config = defaultStages[normalizedId];
     if (!config) {
       console.warn(`No config found for stage: ${stageId}. Falling back to dive-in.`);
-      return DEFAULT_JOURNEY_STAGES['dive-in'];
+      return defaultStages['dive-in'];
     }
     return config;
   }
@@ -1303,21 +1305,27 @@ class SkylarService {
       notes?: string;
     }
   ): Promise<void> {
-    // In a real app, this would persist to Firestore
-    console.log('Logging outreach action:', action);
-    // For now, we'll simulate persistence via local storage or just a mock
-    const actions = JSON.parse(localStorage.getItem(`outreach_${userId}`) || '[]');
-    actions.push({ ...action, timestamp: new Date().toISOString() });
-    localStorage.setItem(`outreach_${userId}`, JSON.stringify(actions));
+    const timestamp = new Date().toISOString();
+    await addDoc(collection(db, 'outreach_actions'), {
+      ...action,
+      userId,
+      timestamp,
+      createdAt: serverTimestamp(),
+    });
   }
 
   async getOutreachMetrics(userId: string): Promise<any> {
-    const actions = JSON.parse(localStorage.getItem(`outreach_${userId}`) || '[]');
-    // Calculate basic metrics for visualization
+    const q = query(
+      collection(db, 'outreach_actions'),
+      where('userId', '==', userId)
+    );
+    const snapshot = await getDocs(q);
+    const actions = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+
     const metrics = {
       totalSent: actions.filter((a: any) => a.type === 'sent').length,
       totalEngaged: actions.filter((a: any) => a.type === 'engaged').length,
-      velocity: actions.length > 0 ? (actions.length / 7).toFixed(1) : 0, // Mock velocity
+      velocity: actions.length > 0 ? (actions.length / 7).toFixed(1) : 0, 
       funnel: [
         { name: 'Sent', value: actions.filter((a: any) => a.type === 'sent').length },
         { name: 'Opened', value: actions.filter((a: any) => a.type === 'opened').length },
@@ -1325,7 +1333,8 @@ class SkylarService {
         { name: 'Nurturing', value: actions.filter((a: any) => a.type === 'nurturing').length },
       ],
     };
-    return metrics;
+
+    return { metrics, actions };
   }
 
   async generateLiveResume(userId: string): Promise<any> {

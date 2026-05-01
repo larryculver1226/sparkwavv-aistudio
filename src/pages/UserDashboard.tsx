@@ -1108,7 +1108,7 @@ export const UserDashboard: React.FC<{ userId: string; isAdmin?: boolean }> = ({
               ) : activeView === 'matches' ? (
                 <JobMatchesView onBack={() => handleViewChange('dashboard')} />
               ) : activeView === 'strengths' ? (
-                <StrengthsView onBack={() => handleViewChange('dashboard')} />
+                <StrengthsView onBack={() => handleViewChange('dashboard')} strengths={wavvaultData?.strengths} />
               ) : activeView === 'history' ? (
                 <HistoryView userId={userId} />
               ) : (

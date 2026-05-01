@@ -154,11 +154,31 @@ export async function searchSimilarWavvaults(
 }
 
 export async function analyzeWavvaultDelta(userId: string, currentData: any) {
-  // Mock analysis logic
+  // basic logic to evaluate if we should commit
+  const latestSnapshot = await getLatestSnapshot(userId);
+  if (!latestSnapshot) {
+    return {
+      suggestCommit: true,
+      reason: 'No baseline snapshot found. Initializing Wavvault.',
+      deltaSummary: 'First commit of user data.',
+    };
+  }
+
+  const artifactsLength = currentData?.artifacts?.length || 0;
+  const lastArtifactsLength = latestSnapshot?.data?.artifacts?.length || 0;
+
+  if (artifactsLength > lastArtifactsLength) {
+    return {
+      suggestCommit: true,
+      reason: 'New artifacts have been distilled.',
+      deltaSummary: `Added ${artifactsLength - lastArtifactsLength} new artifact(s) since last commit.`,
+    };
+  }
+
   return {
-    suggestCommit: true,
-    reason: 'Significant evolution in career narrative detected.',
-    deltaSummary: 'Updated core strengths and professional identity based on recent interactions.',
+    suggestCommit: false,
+    reason: 'No significant changes detected.',
+    deltaSummary: 'No changes.',
   };
 }
 
@@ -176,7 +196,6 @@ export async function verifyWavvaultIntegrity(userId: string, data: any) {
 }
 
 export async function getStorageMetrics(userId?: string) {
-  // Mock metrics
   let q;
   if (userId) {
     q = query(collection(db, 'wavvault_artifacts'), where('userId', '==', userId));
@@ -185,16 +204,48 @@ export async function getStorageMetrics(userId?: string) {
   }
   const snapshot = await getDocs(q);
 
+  let usedBytes = 0;
+  snapshot.forEach(doc => {
+    // very basic approximation of JSON size in bytes
+    usedBytes += JSON.stringify(doc.data()).length;
+  });
+
   return {
-    usedBytes: snapshot.docs.length * 1024 * 50, // Mock 50KB per artifact
+    usedBytes,
     limitBytes: 100 * 1024 * 1024, // 100MB limit
     artifactCount: snapshot.docs.length,
   };
 }
 
 export async function purgeOldArtifacts(userId?: string, olderThanDays: number = 30) {
-  // Mock purge
-  return { success: true, purgedCount: 0 };
+  try {
+    const cutoffDate = new Date();
+    cutoffDate.setDate(cutoffDate.getDate() - olderThanDays);
+    
+    let q;
+    if (userId) {
+      q = query(
+        collection(db, 'wavvault_artifacts'),
+        where('userId', '==', userId),
+        where('timestamp', '<', cutoffDate.toISOString())
+      );
+    } else {
+      q = query(
+        collection(db, 'wavvault_artifacts'),
+        where('timestamp', '<', cutoffDate.toISOString())
+      );
+    }
+    
+    const snapshot = await getDocs(q);
+    
+    const deletePromises = snapshot.docs.map(docSnap => deleteDoc(doc(db, 'wavvault_artifacts', docSnap.id)));
+    await Promise.all(deletePromises);
+    
+    return { success: true, purgedCount: snapshot.docs.length };
+  } catch (err) {
+    console.error('Failed to purge old artifacts:', err);
+    return { success: false, purgedCount: 0 };
+  }
 }
 
 export async function getLatestSnapshot(userId: string) {

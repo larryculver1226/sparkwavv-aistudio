@@ -5,7 +5,7 @@ import { promptRef } from '@genkit-ai/dotprompt';
 import { getGeminiApiKey } from '../../src/services/aiConfig';
 import { skylar } from '../../src/services/skylarService';
 import { interpolatePrompt } from '../../src/utils/interpolation';
-import { DEFAULT_JOURNEY_STAGES } from '../../src/config/defaultStageContent';
+import defaultJourneyStages from '../../src/config/defaultJourneyStages.json' with { type: 'json' };
 
 const activeGeminiKey = getGeminiApiKey() || process.env.GEMINI_API_KEY;
 
@@ -489,11 +489,13 @@ export const runJourneyStageFlow = ai.defineFlow(
         if (stageDoc.exists) {
           stageConfig = stageDoc.data();
         } else {
-          stageConfig = DEFAULT_JOURNEY_STAGES[input.stageId] || DEFAULT_JOURNEY_STAGES['dive-in'];
+          const defaultStages = defaultJourneyStages as any;
+          stageConfig = defaultStages[input.stageId] || defaultStages['dive-in'];
         }
       } catch (e) {
         console.error('Failed to fetch journeyPhaseConfigs', e);
-        stageConfig = DEFAULT_JOURNEY_STAGES[input.stageId] || DEFAULT_JOURNEY_STAGES['dive-in'];
+        const defaultStages = defaultJourneyStages as any;
+        stageConfig = defaultStages[input.stageId] || defaultStages['dive-in'];
       }
     }
 

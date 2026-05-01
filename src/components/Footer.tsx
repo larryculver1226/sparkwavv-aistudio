@@ -17,13 +17,11 @@ export const Footer: React.FC<FooterProps> = ({ onNavigate }) => {
       { label: 'Features', href: 'product-features' },
       { label: 'Technology', href: 'product-technology' },
       { label: 'Wavvault', href: 'product-wavvault' },
-      { label: 'Pricing', href: 'pricing' },
     ],
     company: [
       { label: 'Vision', href: 'company-vision' },
       { label: 'About Us', href: 'company-about' },
       { label: 'Investors', href: 'company-investors' },
-      { label: 'Give a Little', href: 'company-give' },
     ],
     resources: [
       { label: 'Documentation', href: 'documentation' },

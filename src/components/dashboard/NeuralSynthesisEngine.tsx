@@ -112,26 +112,35 @@ export const NeuralSynthesisEngine: React.FC<NeuralSynthesisEngineProps> = ({
     addLog('Extracting Semantic Vectors from Onboarding Data...', 'info', 'extract');
     await new Promise((r) => setTimeout(r, 1500));
 
-    // Mock initial synthesis based on "Spark"
-    const initialGraph: GraphData = {
-      nodes: [
-        {
-          id: 'spark-1',
-          label: 'The Spark',
-          type: 'spark',
-          strength: 1,
-          description: 'Core professional driver',
-        },
-        { id: 'skill-1', label: 'Strategic Leadership', type: 'skill', strength: 0.8 },
-        { id: 'goal-1', label: 'Industry Dominance', type: 'goal', strength: 0.9 },
-        { id: 'value-1', label: 'Radical Transparency', type: 'value', strength: 0.85 },
-      ],
-      links: [
-        { source: 'spark-1', target: 'skill-1', weight: 0.8, type: 'influence' },
-        { source: 'spark-1', target: 'goal-1', weight: 0.9, type: 'influence' },
-        { source: 'spark-1', target: 'value-1', weight: 0.85, type: 'influence' },
-      ],
-    };
+    // Determine graph from the actual user's wavvaultData
+    const strengths = existingWavvault?.strengths || [];
+    const identity = existingWavvault?.identity || 'Career Transitioning';
+
+    const nodes: any[] = [
+      {
+        id: 'spark-1',
+        label: existingWavvault?.fiveStories?.[0]?.isHeroicDeed ? 'Heroic Spark' : 'The Spark',
+        type: 'spark',
+        strength: 1,
+        description: 'Core professional driver',
+      },
+      ...strengths.map((s, idx) => ({ id: `skill-${idx}`, label: s, type: 'skill', strength: 0.8 - (idx * 0.1) }))
+    ];
+
+    const links: any[] = strengths.map((_, idx) => ({
+      source: 'spark-1',
+      target: `skill-${idx}`,
+      weight: 0.8 - (idx * 0.1),
+      type: 'influence',
+    }));
+
+    if (nodes.length <= 1) {
+       // fallback if no strengths
+       nodes.push({ id: 'skill-1', label: 'Identity Exploration', type: 'skill', strength: 0.8 });
+       links.push({ source: 'spark-1', target: 'skill-1', weight: 0.8, type: 'influence' });
+    }
+
+    const initialGraph: GraphData = { nodes, links };
 
     setGraphData(initialGraph);
     addLog('Initial Synthesis Complete. Knowledge Graph Updated.', 'success', 'complete');

@@ -15,6 +15,7 @@ import {
   ShieldCheck,
 } from 'lucide-react';
 import { fetchUserAssets, lockAsset } from '../../services/assetEngineService';
+import { skylar } from '../../services/skylarService';
 import { SynthesizedAsset } from '../../types/wavvault';
 import ShareModal from '../sharing/ShareModal';
 
@@ -47,38 +48,21 @@ const AssetSynthesizer: React.FC<AssetSynthesizerProps> = ({ userId }) => {
   const handleSynthesize = async (type: 'narrative' | 'resume') => {
     setIsSynthesizing(true);
     try {
-      // In a real app, this would call a backend synthesis engine
-      // For now, we'll simulate the "locking" process
-      const mockContent =
-        type === 'resume'
-          ? {
-              headline: 'Strategic Product Leader',
-              summary:
-                '12+ years of experience driving innovation at the intersection of AI and human-centric design.',
-              experience: [
-                { company: 'TechFlow', role: 'VP Product', period: '2020-Present' },
-                { company: 'InnoVate', role: 'Senior PM', period: '2016-2020' },
-              ],
-            }
-          : {
-              headline: 'The Architect of Change',
-              identity:
-                'A visionary leader who bridges the gap between complex technology and human needs.',
-              strengths: ['Strategic Foresight', 'Empathetic Leadership', 'Rapid Prototyping'],
-              stories: [
-                {
-                  title: 'The Pivot',
-                  content:
-                    'How we transformed a failing legacy product into a market leader in 6 months.',
-                },
-              ],
-            };
+      let contentToSave;
+      if (type === 'resume') {
+        contentToSave = await skylar.generateLiveResume(userId);
+      } else {
+        contentToSave = await skylar.generateInteractivePortfolio(userId);
+      }
+
+      // Generate a simple version hash based on timestamp
+      const versionHash = `v${new Date().getTime().toString(36)}`;
 
       const { assetId } = await lockAsset({
         type,
         title: type === 'resume' ? 'High-Fidelity PDF Resume' : 'Interactive Career Narrative',
-        content: mockContent,
-        versionHash: 'v1.0-locked', // Mock version hash
+        content: contentToSave || { message: 'Generation failed or incomplete' },
+        versionHash,
       });
 
       await loadAssets();

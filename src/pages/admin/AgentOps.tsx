@@ -83,25 +83,28 @@ export const AgentOps: React.FC = () => {
         if (fetchedStages['dive-in']) {
           setEditStage(fetchedStages['dive-in']);
         } else {
-          import('../../config/defaultStageContent').then(({ DEFAULT_JOURNEY_STAGES }) => {
-            const content = DEFAULT_JOURNEY_STAGES['dive-in'];
-            const modalities = Array.isArray(content.allowedModalities)
-              ? {
-                  text: content.allowedModalities.includes('text'),
-                  audio: content.allowedModalities.includes('audio'),
-                  image: content.allowedModalities.includes('image'),
-                  video: content.allowedModalities.includes('video'),
-                }
-              : content.allowedModalities;
-            setEditStage({
-              stageId: 'dive-in',
-              stageTitle: content.title,
-              description: content.description,
-              systemPromptTemplate: content.systemPromptTemplate,
-              requiredArtifacts: content.requiredArtifacts,
-              allowedModalities: modalities as any,
-              uiConfig: content.uiConfig as any,
-            });
+          import('../../config/defaultJourneyStages.json').then((module) => {
+            const defaultStages = module.default as any;
+            const content = defaultStages['dive-in'];
+            if (content) {
+              const modalities = Array.isArray(content.allowedModalities)
+                ? {
+                    text: content.allowedModalities.includes('text'),
+                    audio: content.allowedModalities.includes('audio'),
+                    image: content.allowedModalities.includes('image'),
+                    video: content.allowedModalities.includes('video'),
+                  }
+                : content.allowedModalities;
+              setEditStage({
+                stageId: 'dive-in',
+                stageTitle: content.title,
+                description: content.description,
+                systemPromptTemplate: content.systemPromptTemplate,
+                requiredArtifacts: content.requiredArtifacts,
+                allowedModalities: modalities as any,
+                uiConfig: content.uiConfig as any,
+              });
+            }
           });
         }
       } catch (error) {
@@ -141,11 +144,10 @@ export const AgentOps: React.FC = () => {
     } else {
       let fallbackConfig: SkylarStageConfig;
 
-      // Try to load from DEFAULT_JOURNEY_STAGES dynamically or hardcode import at top
-      // Fortunately we already import it inside handleSeedDefaults,
-      // let's do a hardcode import at the top of the file!
-      import('../../config/defaultStageContent').then(({ DEFAULT_JOURNEY_STAGES }) => {
-        const content = DEFAULT_JOURNEY_STAGES[id as keyof typeof DEFAULT_JOURNEY_STAGES];
+      // Try to load from defaultJourneyStages.json dynamically
+      import('../../config/defaultJourneyStages.json').then((module) => {
+        const defaultStages = module.default as any;
+        const content = defaultStages[id];
         if (content) {
           const modalities = Array.isArray(content.allowedModalities)
             ? {
@@ -221,25 +223,27 @@ export const AgentOps: React.FC = () => {
       return;
     setIsSeeding(true);
     try {
-      const { DEFAULT_JOURNEY_STAGES } = await import('../../config/defaultStageContent');
-      for (const [stageId, content] of Object.entries(DEFAULT_JOURNEY_STAGES)) {
-        const modalities = Array.isArray(content.allowedModalities)
+      const module = await import('../../config/defaultJourneyStages.json');
+      const defaultStages = module.default as any;
+      for (const [stageId, content] of Object.entries(defaultStages)) {
+        const typedContent = content as any;
+        const modalities = Array.isArray(typedContent.allowedModalities)
           ? {
-              text: content.allowedModalities.includes('text'),
-              audio: content.allowedModalities.includes('audio'),
-              image: content.allowedModalities.includes('image'),
-              video: content.allowedModalities.includes('video'),
+              text: typedContent.allowedModalities.includes('text'),
+              audio: typedContent.allowedModalities.includes('audio'),
+              image: typedContent.allowedModalities.includes('image'),
+              video: typedContent.allowedModalities.includes('video'),
             }
-          : content.allowedModalities;
+          : typedContent.allowedModalities;
 
         const config: SkylarStageConfig = {
           stageId,
-          stageTitle: content.title,
-          description: content.description,
-          systemPromptTemplate: content.systemPromptTemplate,
-          requiredArtifacts: content.requiredArtifacts,
+          stageTitle: typedContent.title,
+          description: typedContent.description,
+          systemPromptTemplate: typedContent.systemPromptTemplate,
+          requiredArtifacts: typedContent.requiredArtifacts,
           allowedModalities: modalities as any,
-          uiConfig: content.uiConfig as any,
+          uiConfig: typedContent.uiConfig as any,
         };
         await configService.updateStageConfig(stageId, config);
       }

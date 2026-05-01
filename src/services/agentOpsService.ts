@@ -1,7 +1,7 @@
 import { db } from '../lib/firebase';
 import { doc, getDoc, setDoc, collection, getDocs } from 'firebase/firestore';
 import { JourneyStageDefinition } from '../types/skylar';
-import { DEFAULT_JOURNEY_STAGES } from '../config/defaultStageContent';
+import defaultJourneyStages from '../config/defaultJourneyStages.json';
 
 const COLLECTION_NAME = 'journeyPhaseConfigs';
 
@@ -52,7 +52,7 @@ export const agentOpsService = {
       if (querySnapshot.empty) {
         console.log('Agent configs not found in Firestore. Seeding from hardcoded config...');
         await this.seedConfigs();
-        return DEFAULT_JOURNEY_STAGES;
+        return defaultJourneyStages as any;
       }
 
       const configs: Record<string, JourneyStageDefinition> = {};
@@ -67,7 +67,7 @@ export const agentOpsService = {
     } catch (error) {
       console.error('Error fetching agent configs:', error);
       // Fallback to hardcoded if Firestore fails (e.g., permissions issue)
-      return DEFAULT_JOURNEY_STAGES;
+      return defaultJourneyStages as any;
     }
   },
 
@@ -86,13 +86,12 @@ export const agentOpsService = {
           title: data.title || data.stageTitle || docSnap.id
         } as JourneyStageDefinition;
       } else {
-        // Silently fall back to hardcoded if not found in Firestore
-        // console.log(`Using default agent config for ${stageId}`);
-        return DEFAULT_JOURNEY_STAGES[stageId];
+        // Return null if not found
+        throw new Error(`Journey Phase Config not found for ${stageId}`);
       }
     } catch (error) {
-      // console.warn(`Agent config for ${stageId} not found in Firestore. Falling back to hardcoded.`);
-      return DEFAULT_JOURNEY_STAGES[stageId];
+      // throw error instead of falling back to default
+      throw error;
     }
   },
 
@@ -111,13 +110,13 @@ export const agentOpsService = {
   },
 
   /**
-   * Seed the Firestore collection with the hardcoded DEFAULT_JOURNEY_STAGES.
+   * Seed the Firestore collection with the hardcoded defaultJourneyStages.
    */
   async seedConfigs(): Promise<void> {
     try {
-      const promises = Object.entries(DEFAULT_JOURNEY_STAGES).map(([stageId, config]) => {
+      const promises = Object.entries(defaultJourneyStages).map(([stageId, config]) => {
         const docRef = doc(db, COLLECTION_NAME, stageId);
-        return setDoc(docRef, config, { merge: true });
+        return setDoc(docRef, config as any, { merge: true });
       });
       await Promise.all(promises);
       console.log('Successfully seeded agent configs to Firestore.');

@@ -129,7 +129,6 @@ import { SkylarIntro, SkylarAvatar, SkylarScrollingText } from './components/lan
 import { QuickScan } from './components/landing/QuickScan';
 import { BrainModel } from './components/landing/BrainModel';
 import { Roadmap } from './components/landing/Roadmap';
-import { PricingPlaceholder } from './components/PricingPlaceholder';
 import { TimeoutManager } from './components/TimeoutManager';
 import { PrecisionMatchingCard } from './components/landing/PrecisionMatchingCard';
 import { authService } from './services/authService';
@@ -156,8 +155,6 @@ type Step =
   | 'company-vision'
   | 'company-about'
   | 'company-investors'
-  | 'company-give'
-  | 'pricing'
   | 'documentation'
   | 'help-center';
 
@@ -437,8 +434,6 @@ export function SPARKWavvApp({
         'company-vision',
         'company-about',
         'company-investors',
-        'company-give',
-        'pricing',
         'documentation',
         'help-center',
         'settings',
@@ -2119,33 +2114,6 @@ export function SPARKWavvApp({
                 </div>
               </motion.div>
             )}
-
-            {step === 'company-give' && (
-              <motion.div
-                key="company-give"
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: -20 }}
-                className="max-w-4xl mx-auto px-6 space-y-12 text-center pb-24"
-              >
-                <header className="space-y-4">
-                  <h2 className="text-5xl font-bold">Give a Little</h2>
-                  <p className="text-neon-cyan font-display uppercase tracking-widest">
-                    Our Social Impact
-                  </p>
-                </header>
-                <div className="glass-panel p-12 border-neon-cyan/20">
-                  <p className="text-xl text-white/60">
-                    Placeholder for our social impact and giving programs. Coming soon.
-                  </p>
-                </div>
-                <Button onClick={() => setStep('landing')} variant="outline">
-                  Back to Home
-                </Button>
-              </motion.div>
-            )}
-
-            {step === 'pricing' && <PricingPlaceholder onBack={() => setStep('landing')} />}
 
             {step === 'documentation' && (
               <motion.div

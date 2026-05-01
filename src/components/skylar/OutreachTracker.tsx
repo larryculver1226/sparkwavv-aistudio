@@ -68,11 +68,9 @@ export const OutreachTracker: React.FC<OutreachTrackerProps> = ({ userId }) => {
   const fetchData = async () => {
     setIsLoading(true);
     try {
-      const m = await skylar.getOutreachMetrics(userId);
+      const { metrics: m, actions: s } = await skylar.getOutreachMetrics(userId);
       setMetrics(m);
-      // Mock sequences for now - in real app, fetch from Firestore
-      const s = JSON.parse(localStorage.getItem(`outreach_${userId}`) || '[]');
-      setSequences(s.reverse());
+      setSequences(s.sort((a: any, b: any) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()));
     } catch (error) {
       console.error('Failed to fetch outreach data:', error);
     } finally {
