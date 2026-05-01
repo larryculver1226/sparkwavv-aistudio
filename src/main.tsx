@@ -62,6 +62,7 @@ if (isFirebasePlaceholder(firebaseProjectId) || isFirebasePlaceholder(firebaseAp
 
       const authPromise = new Promise((resolve) => {
         console.log('🛡️ [Main] Waiting for onAuthStateChanged...');
+        let timeoutId: any;
         const unsubscribe = onAuthStateChanged(
           auth,
           (user) => {
@@ -69,17 +70,19 @@ if (isFirebasePlaceholder(firebaseProjectId) || isFirebasePlaceholder(firebaseAp
               '🛡️ [Main] onAuthStateChanged resolved:',
               user ? 'User logged in' : 'No user'
             );
+            clearTimeout(timeoutId);
             unsubscribe();
             resolve(true);
           },
           (error) => {
             console.error('❌ [Main] onAuthStateChanged error:', error.message);
+            clearTimeout(timeoutId);
             unsubscribe();
             resolve(false);
           }
         );
         // Timeout after 5s
-        setTimeout(() => {
+        timeoutId = setTimeout(() => {
           console.warn('⚠️ [Main] onAuthStateChanged timed out after 5s');
           unsubscribe();
           resolve(false);

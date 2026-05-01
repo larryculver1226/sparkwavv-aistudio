@@ -467,7 +467,7 @@ export const generateNarrativeStoriesTool = ai.defineTool(
     description: 'Acting as a Five Stories engine, transforms raw user accomplishments into high-impact narratives (Journalist and Reflective versions).',
     inputSchema: z.object({
       userId: z.string(),
-      accomplishments: z.array(z.any()).describe('A list of user accomplishments to transform')
+      accomplishments: z.array(z.record(z.any())).describe('A list of user accomplishments to transform')
     }),
   },
   async (input) => {
@@ -1029,14 +1029,14 @@ export const runJourneyStageFlow = ai.defineFlow(
       userId: z.string(),
       stageId: z.string(),
       message: z.string(),
-      history: z.array(z.any()).optional(),
-      attachments: z.array(z.any()).optional(),
+      history: z.array(z.record(z.any())).optional(),
+      attachments: z.array(z.record(z.any())).optional(),
       stageConfig: z.any().optional(),
       missingArtifacts: z.array(z.string()).optional(),
     }),
     outputSchema: z.object({
       text: z.string(),
-      executedActions: z.array(z.any()),
+      executedActions: z.array(z.record(z.any())),
       debugData: z.any().optional(),
     }),
   },
@@ -1334,7 +1334,7 @@ export const startInterviewSessionFlow = ai.defineFlow(
     inputSchema: z.object({
       userId: z.string(),
       persona: z.string(),
-      dnaContext: z.array(z.any()).optional(),
+      dnaContext: z.array(z.record(z.any())).optional(),
     }),
     outputSchema: z.object({
       question: z.string(),
@@ -1379,9 +1379,9 @@ export const sendInterviewResponseFlow = ai.defineFlow(
     inputSchema: z.object({
       userId: z.string(),
       persona: z.string(),
-      history: z.array(z.any()),
+      history: z.array(z.record(z.any())),
       userResponse: z.string(),
-      dnaContext: z.array(z.any()).optional(),
+      dnaContext: z.array(z.record(z.any())).optional(),
     }),
     outputSchema: z.object({
       feedback: z.string(),
@@ -1432,7 +1432,7 @@ export const getInterviewDebriefFlow = ai.defineFlow(
     name: 'getInterviewDebrief',
     inputSchema: z.object({
       userId: z.string(),
-      sessionHistory: z.array(z.any()),
+      sessionHistory: z.array(z.record(z.any())),
     }),
     outputSchema: z.object({
       heatmap: z.array(
@@ -1543,7 +1543,7 @@ export const performSynthesisFlow = ai.defineFlow(
     name: 'performSynthesis',
     inputSchema: z.object({
       userId: z.string(),
-      history: z.array(z.any()),
+      history: z.array(z.record(z.any())),
       fileContent: z.string().optional(),
     }),
     outputSchema: z.object({
@@ -1626,8 +1626,8 @@ export const performGateReviewFlow = ai.defineFlow(
       userId: z.string(),
       currentPhase: z.string(),
       targetPhase: z.string(),
-      history: z.array(z.any()),
-      dnaContext: z.array(z.any()).optional(),
+      history: z.array(z.record(z.any())),
+      dnaContext: z.array(z.record(z.any())).optional(),
     }),
     outputSchema: z.object({
       status: z.string(),
@@ -1681,7 +1681,7 @@ export const getEmotionalIntelligenceFlow = ai.defineFlow(
   {
     name: 'getEmotionalIntelligence',
     inputSchema: z.object({
-      history: z.array(z.any()),
+      history: z.array(z.record(z.any())),
     }),
     outputSchema: z.object({
       sentiment: z.number(),
@@ -1727,7 +1727,7 @@ export const getResonanceFeedbackFlow = ai.defineFlow(
       userId: z.string(),
       targetRole: z.string(),
       content: z.string(),
-      dnaContext: z.array(z.any()).optional(),
+      dnaContext: z.array(z.record(z.any())).optional(),
     }),
     outputSchema: z.object({
       resonanceScore: z.number(),
@@ -1770,7 +1770,7 @@ export const generateInteractivePortfolioFlow = ai.defineFlow(
     name: 'generateInteractivePortfolio',
     inputSchema: z.object({
       userId: z.string(),
-      dnaContext: z.array(z.any()).optional(),
+      dnaContext: z.array(z.record(z.any())).optional(),
     }),
     outputSchema: z.object({
       pages: z.array(
@@ -1869,7 +1869,7 @@ export const generateTargetedSequenceFlow = ai.defineFlow(
         formal: z.number(),
         detail: z.number(),
       }),
-      dnaContext: z.array(z.any()).optional(),
+      dnaContext: z.array(z.record(z.any())).optional(),
     }),
     outputSchema: z.object({
       steps: z.array(
@@ -1930,7 +1930,7 @@ export const generateLiveResumeFlow = ai.defineFlow(
     name: 'generateLiveResume',
     inputSchema: z.object({
       userId: z.string(),
-      dnaContext: z.array(z.any()).optional(),
+      dnaContext: z.array(z.record(z.any())).optional(),
     }),
     outputSchema: z.object({
       spark: z.object({
