@@ -1,3 +1,5 @@
+import { BestSelfProfile, FiveStories, FutureVision, ProductivityPlan, CareerPersona, BrandIdentity, CredentialAnalysis, JobOpportunity, InterviewCoachingSession } from './schemas';
+
 export type NodeType = 'skill' | 'goal' | 'value' | 'spark';
 
 export interface KnowledgeNode {
@@ -138,9 +140,17 @@ export interface WavvaultData {
   accomplishmentLedger?: any[]; // Top 20
   fiveStories?: StoryEntity[];
   attributeAssignments?: Record<string, string>;
+  bestSelfProfile?: BestSelfProfile;
+  futureVision?: FutureVision;
+  productivityPlan?: ProductivityPlan;
+  careerPersona?: CareerPersona;
+  brandIdentity?: BrandIdentity;
+  credentialAnalysis?: CredentialAnalysis;
+  matchedOpportunities?: JobOpportunity[];
+  interviewSessions?: InterviewCoachingSession[];
 }
 
-export type AssetType = 'narrative' | 'resume' | 'portfolio';
+export type AssetType = 'narrative' | 'resume' | 'portfolio' | 'cover_letter';
 
 export interface SynthesizedAsset {
   id: string;

@@ -6,6 +6,18 @@ import { getGeminiApiKey } from '../../src/services/aiConfig';
 import { skylar } from '../../src/services/skylarService';
 import { interpolatePrompt } from '../../src/utils/interpolation';
 import defaultJourneyStages from '../../src/config/defaultJourneyStages.json' with { type: 'json' };
+import { 
+  BestSelfProfileSchema, 
+  FiveStoriesSchema, 
+  FutureVisionSchema, 
+  ProductivityPlanSchema, 
+  CareerPersonaSchema,
+  BrandIdentitySchema,
+  ApplicationMaterialsSchema,
+  CredentialAnalysisSchema,
+  JobExecutionSchema,
+  InterviewCoachingSchema
+} from '../../src/types/schemas';
 
 const activeGeminiKey = getGeminiApiKey() || process.env.GEMINI_API_KEY;
 
@@ -392,7 +404,604 @@ export const searchGoogleMapsTool = ai.defineTool(
   }
 );
 
+export const analyzeDiscoveryLaunchpadTool = ai.defineTool(
+  {
+    name: 'analyze_discovery_launchpad',
+    description: 'Analyzes multi-modal user evaluations, attributes, and Extinguishers to synthesize an aspirational best self profile.',
+    inputSchema: z.object({
+      userId: z.string(),
+      evaluations: z.any().describe('Multi-modal user evaluations'),
+      attributes: z.array(z.string()).describe('Core user attributes'),
+      extinguishers: z.array(z.string()).describe('Negative or energy-draining factors')
+    }),
+  },
+  async (input) => {
+    const admin = (await import('firebase-admin')).default;
+    const { getFirestore } = await import('firebase-admin/firestore');
+    const fs = (await import('fs')).default;
+    const path = (await import('path')).default;
+
+    let dbId = '(default)';
+    try {
+      const configPath = path.resolve(process.cwd(), 'firebase-applet-config.json');
+      if (fs.existsSync(configPath)) {
+        const config = JSON.parse(fs.readFileSync(configPath, 'utf8'));
+        dbId = config.firestoreDatabaseId || '(default)';
+      }
+    } catch (e) {}
+    const db = getFirestore(admin.app(), dbId);
+
+    let systemPrompt = "You are the Discovery Launchpad Analyzer. Synthesize the provided user inputs into an aspirational Best Self Profile mapped strictly to the required schema structure.";
+    try {
+      const doc = await db.collection('agentConfigs').doc('analyze_discovery_launchpad').get();
+      if (doc.exists && doc.data()?.systemPrompt) systemPrompt = doc.data()!.systemPrompt;
+    } catch (e) {}
+
+    let activeTargetModel = 'googleai/gemini-2.5-flash';
+    if (!process.env.GEMINI_API_KEY && process.env.VERTEX_AI_PROJECT_ID) activeTargetModel = 'vertexai/gemini-1.5-flash';
+
+    try {
+      const { output } = await ai.generate({
+        model: activeTargetModel,
+        system: systemPrompt,
+        prompt: `Inputs: ${JSON.stringify(input)}`,
+        output: { schema: BestSelfProfileSchema }
+      });
+
+      if (output) {
+        await db.collection('wavvaults').doc(input.userId).set({
+          bestSelfProfile: output
+        }, { merge: true });
+        return { status: 'success', data: output };
+      }
+      return { status: 'error', message: 'Failed to generate best self profile schema' };
+    } catch (error: any) {
+      return { status: 'error', message: error.message };
+    }
+  }
+);
+
+export const generateNarrativeStoriesTool = ai.defineTool(
+  {
+    name: 'generate_narrative_stories',
+    description: 'Acting as a Five Stories engine, transforms raw user accomplishments into high-impact narratives (Journalist and Reflective versions).',
+    inputSchema: z.object({
+      userId: z.string(),
+      accomplishments: z.array(z.any()).describe('A list of user accomplishments to transform')
+    }),
+  },
+  async (input) => {
+    const admin = (await import('firebase-admin')).default;
+    const { getFirestore } = await import('firebase-admin/firestore');
+    const fs = (await import('fs')).default;
+    const path = (await import('path')).default;
+
+    let dbId = '(default)';
+    try {
+      const configPath = path.resolve(process.cwd(), 'firebase-applet-config.json');
+      if (fs.existsSync(configPath)) {
+        const config = JSON.parse(fs.readFileSync(configPath, 'utf8'));
+        dbId = config.firestoreDatabaseId || '(default)';
+      }
+    } catch (e) {}
+    const db = getFirestore(admin.app(), dbId);
+
+    let systemPrompt = "You are the Narrative Journalist Sub-Agent. Transform raw accomplishments into highly structured, high-impact narratives with both an objective 'Journalist' version and an internal 'Reflective' emotional version.";
+    try {
+      const doc = await db.collection('agentConfigs').doc('generate_narrative_stories').get();
+      if (doc.exists && doc.data()?.systemPrompt) systemPrompt = doc.data()!.systemPrompt;
+    } catch (e) {}
+
+    let activeTargetModel = 'googleai/gemini-2.5-flash';
+    if (!process.env.GEMINI_API_KEY && process.env.VERTEX_AI_PROJECT_ID) activeTargetModel = 'vertexai/gemini-1.5-flash';
+
+    try {
+      const { output } = await ai.generate({
+        model: activeTargetModel,
+        system: systemPrompt,
+        prompt: `Accomplishments data: ${JSON.stringify(input.accomplishments)}`,
+        output: { schema: FiveStoriesSchema }
+      });
+
+      if (output) {
+        await db.collection('wavvaults').doc(input.userId).set({
+          fiveStories: output.narratives.map(n => ({
+            id: `story-${Date.now()}-${Math.random().toString(36).substr(2, 5)}`,
+            accomplishmentId: n.accomplishmentId,
+            styleAJournalist: n.journalistVersion,
+            styleBFeeling: n.reflectiveVersion,
+            isHeroicDeed: false
+          }))
+        }, { merge: true });
+        return { status: 'success', data: output };
+      }
+      return { status: 'error', message: 'Failed to generate five stories schema' };
+    } catch (error: any) {
+      return { status: 'error', message: error.message };
+    }
+  }
+);
+
+export const modelFutureVisionTool = ai.defineTool(
+  {
+    name: 'model_future_vision',
+    description: 'Parses the 21 Questions to construct a minute-by-minute Perfect Day schedule and a prioritized Make or Break decision matrix.',
+    inputSchema: z.object({
+      userId: z.string(),
+      questionsData: z.any().describe('Answers to the 21 Questions including preferences and limitations')
+    }),
+  },
+  async (input) => {
+    const admin = (await import('firebase-admin')).default;
+    const { getFirestore } = await import('firebase-admin/firestore');
+    const fs = (await import('fs')).default;
+    const path = (await import('path')).default;
+
+    let dbId = '(default)';
+    try {
+      const configPath = path.resolve(process.cwd(), 'firebase-applet-config.json');
+      if (fs.existsSync(configPath)) {
+        const config = JSON.parse(fs.readFileSync(configPath, 'utf8'));
+        dbId = config.firestoreDatabaseId || '(default)';
+      }
+    } catch (e) {}
+    const db = getFirestore(admin.app(), dbId);
+
+    let systemPrompt = "You are the Future Visioning & Lifestyle Modeler Sub-Agent. Analyze 21-Question answers and synthesize a 'Perfect Day' schedule alongside a prioritized decision matrix.";
+    try {
+      const doc = await db.collection('agentConfigs').doc('model_future_vision').get();
+      if (doc.exists && doc.data()?.systemPrompt) systemPrompt = doc.data()!.systemPrompt;
+    } catch (e) {}
+
+    let activeTargetModel = 'googleai/gemini-2.5-flash';
+    if (!process.env.GEMINI_API_KEY && process.env.VERTEX_AI_PROJECT_ID) activeTargetModel = 'vertexai/gemini-1.5-flash';
+
+    try {
+      const { output } = await ai.generate({
+        model: activeTargetModel,
+        system: systemPrompt,
+        prompt: `Questions Data: ${JSON.stringify(input.questionsData)}`,
+        output: { schema: FutureVisionSchema }
+      });
+
+      if (output) {
+        await db.collection('wavvaults').doc(input.userId).set({
+          futureVision: output
+        }, { merge: true });
+        return { status: 'success', data: output };
+      }
+      return { status: 'error', message: 'Failed to generate future vision model' };
+    } catch (error: any) {
+      return { status: 'error', message: error.message };
+    }
+  }
+);
+
+export const optimizeProductivityPlanTool = ai.defineTool(
+  {
+    name: 'optimize_productivity_plan',
+    description: 'Generates a 12-week study plan governed by the Pareto Principle containing Relax, Refresh, Review, and Reflect reboot blocks based on energy troughs.',
+    inputSchema: z.object({
+      userId: z.string(),
+      commitmentHours: z.number().describe('Availability weekly commitment in hours (e.g. 3.5 or 7)'),
+      energyTroughs: z.array(z.string()).describe('List of times when the user typically feels low energy')
+    }),
+  },
+  async (input) => {
+    const admin = (await import('firebase-admin')).default;
+    const { getFirestore } = await import('firebase-admin/firestore');
+    const fs = (await import('fs')).default;
+    const path = (await import('path')).default;
+
+    let dbId = '(default)';
+    try {
+      const configPath = path.resolve(process.cwd(), 'firebase-applet-config.json');
+      if (fs.existsSync(configPath)) {
+        const config = JSON.parse(fs.readFileSync(configPath, 'utf8'));
+        dbId = config.firestoreDatabaseId || '(default)';
+      }
+    } catch (e) {}
+    const db = getFirestore(admin.app(), dbId);
+
+    let systemPrompt = "You are the Energy & Productivity Optimizer Sub-Agent (Hybrid Drill Master/Guru). Base your strategy on the Pareto Principle (80/20) and insert the right reboot blocks at the right times to mitigate energy drain.";
+    try {
+      const doc = await db.collection('agentConfigs').doc('optimize_productivity_plan').get();
+      if (doc.exists && doc.data()?.systemPrompt) systemPrompt = doc.data()!.systemPrompt;
+    } catch (e) {}
+
+    let activeTargetModel = 'googleai/gemini-2.5-flash';
+    if (!process.env.GEMINI_API_KEY && process.env.VERTEX_AI_PROJECT_ID) activeTargetModel = 'vertexai/gemini-1.5-flash';
+
+    try {
+      const { output } = await ai.generate({
+        model: activeTargetModel,
+        system: systemPrompt,
+        prompt: `Commitment Hours: ${input.commitmentHours}\nEnergy Troughs: ${input.energyTroughs.join(', ')}`,
+        output: { schema: ProductivityPlanSchema }
+      });
+
+      if (output) {
+        await db.collection('wavvaults').doc(input.userId).set({
+          productivityPlan: output
+        }, { merge: true });
+        return { status: 'success', data: output };
+      }
+      return { status: 'error', message: 'Failed to generate productivity plan schema' };
+    } catch (error: any) {
+      return { status: 'error', message: error.message };
+    }
+  }
+);
+
+export const buildCareerPersonaTool = ai.defineTool(
+  {
+    name: 'build_career_persona',
+    description: 'Builds a Strengths Portrait and personality-based career blueprint using behavioral insights and psychological profiling.',
+    inputSchema: z.object({
+      userId: z.string(),
+      behavioralInsights: z.any().describe('Behavioral inputs/insights from the user interaction'),
+      kicksparkInputs: z.any().describe('Notes and reflections from kickspark module inputs')
+    }),
+  },
+  async (input) => {
+    const admin = (await import('firebase-admin')).default;
+    const { getFirestore } = await import('firebase-admin/firestore');
+    const fs = (await import('fs')).default;
+    const path = (await import('path')).default;
+
+    let dbId = '(default)';
+    try {
+      const configPath = path.resolve(process.cwd(), 'firebase-applet-config.json');
+      if (fs.existsSync(configPath)) {
+        const config = JSON.parse(fs.readFileSync(configPath, 'utf8'));
+        dbId = config.firestoreDatabaseId || '(default)';
+      }
+    } catch (e) {}
+    const db = getFirestore(admin.app(), dbId);
+
+    let systemPrompt = "You are the AI Career Diagnostics & Persona Builder Sub-Agent. Analyze the cognitive and behavioral attributes provided to define a precise Strengths Portrait and actionable Career Blueprint.";
+    try {
+      const doc = await db.collection('agentConfigs').doc('build_career_persona').get();
+      if (doc.exists && doc.data()?.systemPrompt) systemPrompt = doc.data()!.systemPrompt;
+    } catch (e) {}
+
+    let activeTargetModel = 'googleai/gemini-2.5-flash';
+    if (!process.env.GEMINI_API_KEY && process.env.VERTEX_AI_PROJECT_ID) activeTargetModel = 'vertexai/gemini-1.5-flash';
+
+    try {
+      const { output } = await ai.generate({
+        model: activeTargetModel,
+        system: systemPrompt,
+        prompt: `Behavioral insights: ${JSON.stringify(input.behavioralInsights)}\nKickspark inputs: ${JSON.stringify(input.kicksparkInputs)}`,
+        output: { schema: CareerPersonaSchema }
+      });
+
+      if (output) {
+        await db.collection('wavvaults').doc(input.userId).set({
+          careerPersona: output
+        }, { merge: true });
+        return { status: 'success', data: output };
+      }
+      return { status: 'error', message: 'Failed to generate career persona schema' };
+    } catch (error: any) {
+      return { status: 'error', message: error.message };
+    }
+  }
+);
+
+export const architectBrandIdentityTool = ai.defineTool(
+  {
+    name: 'architect_brand_identity',
+    description: 'Translates inner traits into a professional brand identity (narrative themes, movie poster tagline, brand attributes).',
+    inputSchema: z.object({
+      userId: z.string(),
+      innerTraits: z.any().describe('Inner traits derived from psychological profiling and values'),
+      careerPersona: z.any().describe('Strengths portrait and blueprint'),
+      bestSelfProfile: z.any().describe('Aspirational profile mapping')
+    }),
+  },
+  async (input) => {
+    const admin = (await import('firebase-admin')).default;
+    const { getFirestore } = await import('firebase-admin/firestore');
+    const fs = (await import('fs')).default;
+    const path = (await import('path')).default;
+
+    let dbId = '(default)';
+    try {
+      const configPath = path.resolve(process.cwd(), 'firebase-applet-config.json');
+      if (fs.existsSync(configPath)) {
+        const config = JSON.parse(fs.readFileSync(configPath, 'utf8'));
+        dbId = config.firestoreDatabaseId || '(default)';
+      }
+    } catch (e) {}
+    const db = getFirestore(admin.app(), dbId);
+
+    let systemPrompt = "You are the Personal Brand Architect. Translate the user's inner traits, career persona, and best self profile into a high-impact professional brand identity.";
+    try {
+      const doc = await db.collection('agentConfigs').doc('architect_brand_identity').get();
+      if (doc.exists && doc.data()?.systemPrompt) systemPrompt = doc.data()!.systemPrompt;
+    } catch (e) {}
+
+    let activeTargetModel = 'googleai/gemini-2.5-flash';
+    if (!process.env.GEMINI_API_KEY && process.env.VERTEX_AI_PROJECT_ID) activeTargetModel = 'vertexai/gemini-1.5-flash';
+
+    try {
+      const { output } = await ai.generate({
+        model: activeTargetModel,
+        system: systemPrompt,
+        prompt: `Traits: ${JSON.stringify(input.innerTraits)}\nPersona: ${JSON.stringify(input.careerPersona)}\nBest Self: ${JSON.stringify(input.bestSelfProfile)}`,
+        output: { schema: BrandIdentitySchema }
+      });
+
+      if (output) {
+        await db.collection('wavvaults').doc(input.userId).set({
+          brandIdentity: output
+        }, { merge: true });
+        return { status: 'success', data: output };
+      }
+      return { status: 'error', message: 'Failed to generate brand identity schema' };
+    } catch (error: any) {
+      return { status: 'error', message: error.message };
+    }
+  }
+);
+
+export const generateApplicationMaterialsTool = ai.defineTool(
+  {
+    name: 'generate_application_materials',
+    description: 'Generates tailored, ATS-optimized application materials based on job description and Wavvault history.',
+    inputSchema: z.object({
+      userId: z.string(),
+      targetJobDescription: z.string().describe('The job description the user is targeting'),
+      wavvaultHistory: z.any().describe('The user\'s relevant history (Five Stories, roles, skills, brand identity) provided by Skylar')
+    }),
+  },
+  async (input) => {
+    const admin = (await import('firebase-admin')).default;
+    const { getFirestore, FieldValue } = await import('firebase-admin/firestore');
+    const fs = (await import('fs')).default;
+    const path = (await import('path')).default;
+
+    let dbId = '(default)';
+    try {
+      const configPath = path.resolve(process.cwd(), 'firebase-applet-config.json');
+      if (fs.existsSync(configPath)) {
+        const config = JSON.parse(fs.readFileSync(configPath, 'utf8'));
+        dbId = config.firestoreDatabaseId || '(default)';
+      }
+    } catch (e) {}
+    const db = getFirestore(admin.app(), dbId);
+
+    let systemPrompt = "You are the AI Resume & Cover Letter Generator. Analyze the provided Wavvault history and Target Job Description to output a highly-tailored, ATS-compliant resume and a passionate cover letter.";
+    try {
+      const doc = await db.collection('agentConfigs').doc('generate_application_materials').get();
+      if (doc.exists && doc.data()?.systemPrompt) systemPrompt = doc.data()!.systemPrompt;
+    } catch (e) {}
+
+    let activeTargetModel = 'googleai/gemini-2.5-flash';
+    if (!process.env.GEMINI_API_KEY && process.env.VERTEX_AI_PROJECT_ID) activeTargetModel = 'vertexai/gemini-1.5-flash';
+
+    try {
+      const { output } = await ai.generate({
+        model: activeTargetModel,
+        system: systemPrompt,
+        prompt: `Job Description: ${input.targetJobDescription}\nWavvault History: ${JSON.stringify(input.wavvaultHistory)}`,
+        output: { schema: ApplicationMaterialsSchema }
+      });
+
+      if (output) {
+        // Appending outputs as new synthesized assets
+        const resumeAsset = {
+          id: `resume-${Date.now()}-${Math.random().toString(36).substr(2, 5)}`,
+          userId: input.userId,
+          type: 'resume',
+          title: 'ATS-Optimized Resume',
+          content: output.resume
+        };
+        const clAsset = {
+          id: `cl-${Date.now()}-${Math.random().toString(36).substr(2, 5)}`,
+          userId: input.userId,
+          type: 'cover_letter',
+          title: 'Tailored Cover Letter',
+          content: { text: output.coverLetter }
+        };
+
+        await db.collection('wavvaults').doc(input.userId).update({
+          synthesizedAssets: FieldValue.arrayUnion(resumeAsset, clAsset)
+        });
+        return { status: 'success', data: output };
+      }
+      return { status: 'error', message: 'Failed to generate application materials schema' };
+    } catch (error: any) {
+      return { status: 'error', message: error.message };
+    }
+  }
+);
+
+export const verifyCredentialsTool = ai.defineTool(
+  {
+    name: 'verify_credentials',
+    description: 'Analyzes user credentials against target roles to identify skill gaps and recommend next experiments or courses.',
+    inputSchema: z.object({
+      userId: z.string(),
+      currentCredentials: z.any().describe('Current skills and qualifications'),
+      targetRoleQualifications: z.any().describe('Required qualifications for the target role')
+    }),
+  },
+  async (input) => {
+    const admin = (await import('firebase-admin')).default;
+    const { getFirestore } = await import('firebase-admin/firestore');
+    const fs = (await import('fs')).default;
+    const path = (await import('path')).default;
+
+    let dbId = '(default)';
+    try {
+      const configPath = path.resolve(process.cwd(), 'firebase-applet-config.json');
+      if (fs.existsSync(configPath)) {
+        const config = JSON.parse(fs.readFileSync(configPath, 'utf8'));
+        dbId = config.firestoreDatabaseId || '(default)';
+      }
+    } catch (e) {}
+    const db = getFirestore(admin.app(), dbId);
+
+    let systemPrompt = "You are the Smart Credential Verifier. Instantly analyze the user's credentials against the target role's requirements to identify gaps and recommend targeted courses/experiments.";
+    try {
+      const doc = await db.collection('agentConfigs').doc('verify_credentials').get();
+      if (doc.exists && doc.data()?.systemPrompt) systemPrompt = doc.data()!.systemPrompt;
+    } catch (e) {}
+
+    let activeTargetModel = 'googleai/gemini-2.5-flash';
+    if (!process.env.GEMINI_API_KEY && process.env.VERTEX_AI_PROJECT_ID) activeTargetModel = 'vertexai/gemini-1.5-flash';
+
+    try {
+      const { output } = await ai.generate({
+        model: activeTargetModel,
+        system: systemPrompt,
+        prompt: `Current: ${JSON.stringify(input.currentCredentials)}\nTarget: ${JSON.stringify(input.targetRoleQualifications)}`,
+        output: { schema: CredentialAnalysisSchema }
+      });
+
+      if (output) {
+        await db.collection('wavvaults').doc(input.userId).set({
+          credentialAnalysis: output
+        }, { merge: true });
+        return { status: 'success', data: output };
+      }
+      return { status: 'error', message: 'Failed to generate credential analysis schema' };
+    } catch (error: any) {
+      return { status: 'error', message: error.message };
+    }
+  }
+);
+
+export const executeJobMatchingTool = ai.defineTool(
+  {
+    name: 'execute_job_matching',
+    description: 'Matches users with roles in real-time, executing applications and flagging Wrong Job Risks based on their specific Vault constraints.',
+    inputSchema: z.object({
+      userId: z.string(),
+      marketPostings: z.any().describe('Recent job postings or market data'),
+      userVaultContext: z.any().describe('User Best Self, Extinguishers, and Future Vision constraints')
+    }),
+  },
+  async (input) => {
+    const admin = (await import('firebase-admin')).default;
+    const { getFirestore, FieldValue } = await import('firebase-admin/firestore');
+    const fs = (await import('fs')).default;
+    const path = (await import('path')).default;
+
+    let dbId = '(default)';
+    try {
+      const configPath = path.resolve(process.cwd(), 'firebase-applet-config.json');
+      if (fs.existsSync(configPath)) {
+        const config = JSON.parse(fs.readFileSync(configPath, 'utf8'));
+        dbId = config.firestoreDatabaseId || '(default)';
+      }
+    } catch (e) {}
+    const db = getFirestore(admin.app(), dbId);
+
+    let systemPrompt = "You are the Job Matching & Application Execution Engine. Proactively match users with roles, draft introductions, schedule timelines, and flag 'Wrong Job Risks' based on the user's Extinguishers.";
+    try {
+      const doc = await db.collection('agentConfigs').doc('execute_job_matching').get();
+      if (doc.exists && doc.data()?.systemPrompt) systemPrompt = doc.data()!.systemPrompt;
+    } catch (e) {}
+
+    let activeTargetModel = 'googleai/gemini-2.5-flash';
+    if (!process.env.GEMINI_API_KEY && process.env.VERTEX_AI_PROJECT_ID) activeTargetModel = 'vertexai/gemini-1.5-flash';
+
+    try {
+      const { output } = await ai.generate({
+        model: activeTargetModel,
+        system: systemPrompt,
+        prompt: `Market Postings: ${JSON.stringify(input.marketPostings)}\nVault Context: ${JSON.stringify(input.userVaultContext)}`,
+        output: { schema: JobExecutionSchema }
+      });
+
+      if (output && output.opportunities && output.opportunities.length > 0) {
+        await db.collection('wavvaults').doc(input.userId).update({
+          matchedOpportunities: FieldValue.arrayUnion(...output.opportunities)
+        });
+        return { status: 'success', data: output };
+      }
+      return { status: 'error', message: 'Failed to generate job matching schema or no opportunities matched' };
+    } catch (error: any) {
+      return { status: 'error', message: error.message };
+    }
+  }
+);
+
+export const coachInterviewSimulationTool = ai.defineTool(
+  {
+    name: 'coach_interview_simulation',
+    description: 'Conducts custom interview simulations, providing real-time coaching on tone, posture, and delivery.',
+    inputSchema: z.object({
+      userId: z.string(),
+      targetRole: z.string(),
+      simulatedQuestion: z.string(),
+      userResponseContext: z.any().describe('Transcribed user response and behavioral cues')
+    }),
+  },
+  async (input) => {
+    const admin = (await import('firebase-admin')).default;
+    const { getFirestore, FieldValue } = await import('firebase-admin/firestore');
+    const fs = (await import('fs')).default;
+    const path = (await import('path')).default;
+
+    let dbId = '(default)';
+    try {
+      const configPath = path.resolve(process.cwd(), 'firebase-applet-config.json');
+      if (fs.existsSync(configPath)) {
+        const config = JSON.parse(fs.readFileSync(configPath, 'utf8'));
+        dbId = config.firestoreDatabaseId || '(default)';
+      }
+    } catch (e) {}
+    const db = getFirestore(admin.app(), dbId);
+
+    let systemPrompt = "You are the AI Job Interview Simulator & Coach, an emotion-aware AI providing real-time caching on tone, posture, delivery, and structure. Analyze the response, rate it, and provide the next simulated question.";
+    try {
+      const doc = await db.collection('agentConfigs').doc('coach_interview_simulation').get();
+      if (doc.exists && doc.data()?.systemPrompt) systemPrompt = doc.data()!.systemPrompt;
+    } catch (e) {}
+
+    let activeTargetModel = 'googleai/gemini-2.5-flash';
+    if (!process.env.GEMINI_API_KEY && process.env.VERTEX_AI_PROJECT_ID) activeTargetModel = 'vertexai/gemini-1.5-flash';
+
+    try {
+      const { output } = await ai.generate({
+        model: activeTargetModel,
+        system: systemPrompt,
+        prompt: `Role: ${input.targetRole}\nQuestion: ${input.simulatedQuestion}\nResponse: ${JSON.stringify(input.userResponseContext)}`,
+        output: { schema: InterviewCoachingSchema }
+      });
+
+      if (output) {
+        const sessionData = {
+          ...output,
+          timestamp: new Date().toISOString()
+        };
+        await db.collection('wavvaults').doc(input.userId).update({
+          interviewSessions: FieldValue.arrayUnion(sessionData)
+        });
+        return { status: 'success', data: output };
+      }
+      return { status: 'error', message: 'Failed to generate coaching feedback schema' };
+    } catch (error: any) {
+      return { status: 'error', message: error.message };
+    }
+  }
+);
+
 const allTools = [
+  executeJobMatchingTool,
+  coachInterviewSimulationTool,
+  architectBrandIdentityTool,
+  generateApplicationMaterialsTool,
+  verifyCredentialsTool,
+  analyzeDiscoveryLaunchpadTool,
+  generateNarrativeStoriesTool,
+  modelFutureVisionTool,
+  optimizeProductivityPlanTool,
+  buildCareerPersonaTool,
   createSparkwavvAccountTool,
   searchWavvaultTool,
   fetchWavvaultDataTool,
