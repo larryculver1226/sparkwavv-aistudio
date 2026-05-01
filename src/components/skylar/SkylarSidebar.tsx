@@ -244,6 +244,12 @@ export const SkylarSidebar: React.FC<SkylarSidebarProps> = ({ onLogin }) => {
   const handleSend = async () => {
     if (!input.trim() && !selectedFile) return;
 
+    // Unlock audio context for mobile/delayed playback
+    if (audioRef.current) {
+      audioRef.current.play().catch(() => {});
+      audioRef.current.pause();
+    }
+
     const parts: any[] = [];
     if (input.trim()) parts.push({ text: input });
     if (selectedFile) {

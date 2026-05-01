@@ -674,12 +674,15 @@ class SkylarService {
     });
 
     const inlineData = response.candidates?.[0]?.content?.parts?.[0]?.inlineData;
-    if (!inlineData || !inlineData.data) return '';
+    if (!inlineData || !inlineData.data) {
+      console.warn('generateSpeech: No inlineData found in response');
+      return '';
+    }
 
     const base64Audio = inlineData.data;
     const mimeType = inlineData.mimeType || 'audio/pcm';
 
-    if (mimeType.includes('pcm')) {
+    if (mimeType.includes('pcm') || mimeType.includes('l16')) {
       // Decode base64 PCM data to a Uint8Array
       const binaryString = window.atob(base64Audio);
       const len = binaryString.length;

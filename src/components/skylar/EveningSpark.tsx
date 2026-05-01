@@ -211,6 +211,11 @@ export const EveningSpark: React.FC<EveningSparkProps> = ({ energyTrough, onClos
               <div className="mt-4">
                 <button
                   onClick={() => {
+                    // Unlock audio context for mobile/delayed playback
+                    if (audioRef.current) {
+                      audioRef.current.play().catch(() => {});
+                      audioRef.current.pause();
+                    }
                     setAutoplayFailed(false);
                     handlePhaseChange(currentPhase);
                   }}
