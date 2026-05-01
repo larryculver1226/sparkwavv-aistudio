@@ -63,7 +63,7 @@ export const DiscoveryBento: React.FC<{ userId: string }> = ({ userId }) => {
 
       {/* Market Velocity - Medium Widget */}
       <div className="md:col-span-1 lg:col-span-2">
-        <VelocityWidget />
+        <VelocityWidget history={history} />
       </div>
 
       {/* DNA Gap Analysis - Medium Widget */}

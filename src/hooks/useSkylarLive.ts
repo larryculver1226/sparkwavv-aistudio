@@ -142,7 +142,7 @@ export const useSkylarLive = (): UseSkylarLiveResult => {
                 
                 const pcm16 = new Int16Array(rawData.length);
                 for (let i = 0; i < rawData.length; ++i) {
-                  let s = Math.max(-1, Math.min(1, rawData[i]));
+                  const s = Math.max(-1, Math.min(1, rawData[i]));
                   pcm16[i] = s < 0 ? s * 0x8000 : s * 0x7FFF;
                 }
                 

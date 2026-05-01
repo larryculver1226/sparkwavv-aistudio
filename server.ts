@@ -616,7 +616,7 @@ try {
         // Final normalization for raw literal \n
         processedKey = processedKey.replace(/\\n/g, '\n');
 
-        let keySnippet =
+        const keySnippet =
           processedKey.substring(0, 30) + '...' + processedKey.substring(processedKey.length - 30);
         console.log(
           `[AUTH] Private key length: ${processedKey.length}, starts/ends: ${keySnippet.replace(/\n/g, '\\n')}`
@@ -4428,6 +4428,91 @@ async function startServer() {
 
     // Redirect back to the app with a confirmation flag
     res.redirect('/?registration_confirmed=true');
+  });
+
+  // Discovery Bento Endpoint
+  app.get('/api/user/discovery-bento', async (req, res) => {
+    try {
+      const userId = req.query.userId;
+      if (!userId) return res.status(400).json({ error: 'userId required' });
+
+      const db = getFirestoreDb();
+      let wavvaultDoc = null;
+      let userDoc = null;
+      if (db) {
+        const wDoc = await db.collection('wavvaults').doc(userId as string).get();
+        if (wDoc.exists) wavvaultDoc = wDoc.data();
+        const uDoc = await db.collection('users').doc(userId as string).get();
+        if (uDoc.exists) userDoc = uDoc.data();
+      }
+
+      const { ai } = await import('./backend/services/genkitService.js');
+      const { z } = await import('genkit');
+      
+      const BentoDataSchema = z.object({
+        signals: z.array(z.object({
+          id: z.string(),
+          title: z.string(),
+          company: z.string(),
+          location: z.string(),
+          salary: z.string(),
+          resonanceScore: z.number(),
+          dnaAlignment: z.object({
+            values: z.number(),
+            capabilities: z.number(),
+            trajectory: z.number(),
+          }),
+          tags: z.array(z.string()),
+          source: z.string(),
+          url: z.string(),
+        })).optional().default([]),
+        gaps: z.array(z.object({
+          skill: z.string(),
+          currentLevel: z.number(),
+          targetLevel: z.number(),
+          importance: z.enum(['critical', 'high', 'medium', 'low']),
+          learningPath: z.array(z.object({
+            title: z.string(),
+            provider: z.string(),
+            url: z.string(),
+          })),
+        })).optional().default([]),
+        history: z.array(z.object({
+          industry: z.string(),
+          dataPoints: z.array(z.object({
+            timestamp: z.string(),
+            score: z.number(),
+          })),
+        })).optional().default([])
+      });
+
+      let activeTargetModel = 'googleai/gemini-2.5-flash';
+      if (!process.env.GEMINI_API_KEY && process.env.VERTEX_AI_PROJECT_ID) activeTargetModel = 'vertexai/gemini-1.5-flash';
+
+      const { output } = await ai.generate({
+        model: activeTargetModel,
+        system: "You are the Market Resonance Engine. Analyze the user's WavVault data and generate actionable career signals, DNA capability gaps, and industry resonance history based on the user's strengths, skills, and current journey phase.",
+        prompt: "User Data: " + JSON.stringify({ user: userDoc, wavvault: wavvaultDoc }),
+        output: { schema: BentoDataSchema }
+      });
+
+      // Add timestamps to history so formatting works smoothly
+      const processedOutput = {
+        ...output,
+        history: output?.history?.map((h: any) => ({
+          ...h,
+          dataPoints: h.dataPoints.map((dp: any) => ({
+            ...dp,
+            timestamp: dp.timestamp || new Date().toISOString()
+          }))
+        })) || []
+      };
+
+      res.json(processedOutput);
+    } catch (error) {
+      console.error('Discovery Bento error:', error);
+      res.status(500).json({ error: 'Failed to generate discovery data' });
+    }
   });
 
   // User Dashboard API

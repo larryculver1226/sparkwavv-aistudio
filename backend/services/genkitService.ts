@@ -467,7 +467,7 @@ export const generateNarrativeStoriesTool = ai.defineTool(
     description: 'Acting as a Five Stories engine, transforms raw user accomplishments into high-impact narratives (Journalist and Reflective versions).',
     inputSchema: z.object({
       userId: z.string(),
-      accomplishments: z.array(z.record(z.any())).describe('A list of user accomplishments to transform')
+      accomplishments: z.any().describe('A list of user accomplishments to transform')
     }),
   },
   async (input) => {
@@ -1029,14 +1029,14 @@ export const runJourneyStageFlow = ai.defineFlow(
       userId: z.string(),
       stageId: z.string(),
       message: z.string(),
-      history: z.array(z.record(z.any())).optional(),
-      attachments: z.array(z.record(z.any())).optional(),
+      history: z.any().optional(),
+      attachments: z.any().optional(),
       stageConfig: z.any().optional(),
       missingArtifacts: z.array(z.string()).optional(),
     }),
     outputSchema: z.object({
       text: z.string(),
-      executedActions: z.array(z.record(z.any())),
+      executedActions: z.any(),
       debugData: z.any().optional(),
     }),
   },
@@ -1334,7 +1334,7 @@ export const startInterviewSessionFlow = ai.defineFlow(
     inputSchema: z.object({
       userId: z.string(),
       persona: z.string(),
-      dnaContext: z.array(z.record(z.any())).optional(),
+      dnaContext: z.any().optional(),
     }),
     outputSchema: z.object({
       question: z.string(),
@@ -1379,9 +1379,9 @@ export const sendInterviewResponseFlow = ai.defineFlow(
     inputSchema: z.object({
       userId: z.string(),
       persona: z.string(),
-      history: z.array(z.record(z.any())),
+      history: z.any(),
       userResponse: z.string(),
-      dnaContext: z.array(z.record(z.any())).optional(),
+      dnaContext: z.any().optional(),
     }),
     outputSchema: z.object({
       feedback: z.string(),
@@ -1432,7 +1432,7 @@ export const getInterviewDebriefFlow = ai.defineFlow(
     name: 'getInterviewDebrief',
     inputSchema: z.object({
       userId: z.string(),
-      sessionHistory: z.array(z.record(z.any())),
+      sessionHistory: z.any(),
     }),
     outputSchema: z.object({
       heatmap: z.array(
@@ -1543,7 +1543,7 @@ export const performSynthesisFlow = ai.defineFlow(
     name: 'performSynthesis',
     inputSchema: z.object({
       userId: z.string(),
-      history: z.array(z.record(z.any())),
+      history: z.any(),
       fileContent: z.string().optional(),
     }),
     outputSchema: z.object({
@@ -1626,8 +1626,8 @@ export const performGateReviewFlow = ai.defineFlow(
       userId: z.string(),
       currentPhase: z.string(),
       targetPhase: z.string(),
-      history: z.array(z.record(z.any())),
-      dnaContext: z.array(z.record(z.any())).optional(),
+      history: z.any(),
+      dnaContext: z.any().optional(),
     }),
     outputSchema: z.object({
       status: z.string(),
@@ -1681,7 +1681,8 @@ export const getEmotionalIntelligenceFlow = ai.defineFlow(
   {
     name: 'getEmotionalIntelligence',
     inputSchema: z.object({
-      history: z.array(z.record(z.any())),
+      userId: z.string().optional(),
+      history: z.any(),
     }),
     outputSchema: z.object({
       sentiment: z.number(),
@@ -1692,16 +1693,48 @@ export const getEmotionalIntelligenceFlow = ai.defineFlow(
     }),
   },
   async (input) => {
+    const admin = (await import('firebase-admin')).default;
+    const { getFirestore } = await import('firebase-admin/firestore');
+    const fs = (await import('fs')).default;
+    const path = (await import('path')).default;
+
+    let dbId = '(default)';
+    try {
+      const configPath = path.resolve(process.cwd(), 'firebase-applet-config.json');
+      if (fs.existsSync(configPath)) {
+        const config = JSON.parse(fs.readFileSync(configPath, 'utf8'));
+        dbId = config.firestoreDatabaseId || '(default)';
+      }
+    } catch (e) {}
+    
+    const db = getFirestore(admin.app(), dbId);
+
+    let wavvaultDoc = null;
+    let userDoc = null;
+
+    if (input.userId) {
+      try {
+        const wDoc = await db.collection('wavvaults').doc(input.userId).get();
+        if (wDoc.exists) wavvaultDoc = wDoc.data();
+        const uDoc = await db.collection('users').doc(input.userId).get();
+        if (uDoc.exists) userDoc = uDoc.data();
+      } catch (e) {
+        console.error('Error fetching context for EQ:', e);
+      }
+    }
+
     let activeTargetModel = 'googleai/gemini-2.5-flash';
     if (!process.env.GEMINI_API_KEY && process.env.VERTEX_AI_PROJECT_ID) activeTargetModel = 'vertexai/gemini-1.5-flash';
 
-    const prompt = `Analyze the user's emotional state and motivation based on their career journey and chat history.
+    const prompt = `Analyze the user's emotional state, sentiment and motivation based on their specific WavVault profile, current Journey Stage, and recent chat history.
+${userDoc ? `\nCurrent Journey Stage: ${userDoc.timelineStage || 'Unknown'}` : ''}
+${wavvaultDoc ? `\nWavVault Context (Strengths/Fears/Sparks): ${JSON.stringify(wavvaultDoc)}` : ''}
 History: ${JSON.stringify(input.history.slice(-20))}`;
 
     try {
       const resp = await ai.generate({
         model: activeTargetModel,
-        system: 'You are an empathetic emotional intelligence engine.',
+        system: 'You are an empathetic emotional intelligence engine. Analyze the user\'s tone, underlying motivations, and career trajectory.',
         prompt,
         output: {
           schema: z.object({
@@ -1727,7 +1760,7 @@ export const getResonanceFeedbackFlow = ai.defineFlow(
       userId: z.string(),
       targetRole: z.string(),
       content: z.string(),
-      dnaContext: z.array(z.record(z.any())).optional(),
+      dnaContext: z.any().optional(),
     }),
     outputSchema: z.object({
       resonanceScore: z.number(),
@@ -1770,7 +1803,7 @@ export const generateInteractivePortfolioFlow = ai.defineFlow(
     name: 'generateInteractivePortfolio',
     inputSchema: z.object({
       userId: z.string(),
-      dnaContext: z.array(z.record(z.any())).optional(),
+      dnaContext: z.any().optional(),
     }),
     outputSchema: z.object({
       pages: z.array(
@@ -1869,7 +1902,7 @@ export const generateTargetedSequenceFlow = ai.defineFlow(
         formal: z.number(),
         detail: z.number(),
       }),
-      dnaContext: z.array(z.record(z.any())).optional(),
+      dnaContext: z.any().optional(),
     }),
     outputSchema: z.object({
       steps: z.array(
@@ -1930,7 +1963,7 @@ export const generateLiveResumeFlow = ai.defineFlow(
     name: 'generateLiveResume',
     inputSchema: z.object({
       userId: z.string(),
-      dnaContext: z.array(z.record(z.any())).optional(),
+      dnaContext: z.any().optional(),
     }),
     outputSchema: z.object({
       spark: z.object({
