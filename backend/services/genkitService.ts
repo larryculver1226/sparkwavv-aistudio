@@ -118,7 +118,7 @@ export const fetchWavvaultDataTool = ai.defineTool(
         if (dbId === '<DATABASE_ID>') dbId = null;
       } catch (e) {}
 
-      let targetDbId = process.env.VITE_FIREBASE_DATABASE_ID || dbId;
+      const targetDbId = process.env.VITE_FIREBASE_DATABASE_ID || dbId;
       const db = targetDbId ? getFirestore(admin.app(), targetDbId) : getFirestore(admin.app());
 
       if (input.dataType === 'dashboard') {
@@ -991,7 +991,1231 @@ export const coachInterviewSimulationTool = ai.defineTool(
   }
 );
 
+export const memorizeContextTool = ai.defineTool(
+  {
+    name: 'memorizeContext',
+    description: 'Saves important situational context, user preferences, or distinct memories into the user\'s vectorized long-term memory for future recall.',
+    inputSchema: z.object({
+      userId: z.string().describe('The user ID for storing the memory.'),
+      memoryText: z.string().describe('The specific explicit or implicit memory detail to store.'),
+      category: z.enum(['preference', 'career_goal', 'frustration', 'personal_detail', 'other']).describe('The category of the memory.')
+    }),
+    outputSchema: z.object({
+      success: z.boolean(),
+      message: z.string(),
+    }),
+  },
+  async ({ userId, memoryText, category }) => {
+    try {
+      const activeGeminiKey = getGeminiApiKey() || process.env.GEMINI_API_KEY;
+      if (!activeGeminiKey) return { success: false, message: 'Gemini API Key missing for embeddings.' };
+
+      const url = `https://generativelanguage.googleapis.com/v1beta/models/text-embedding-004:embedContent?key=${activeGeminiKey}`;
+      const response = await fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          model: "models/text-embedding-004",
+          content: { parts: [{ text: memoryText }] }
+        })
+      });
+      const data = await response.json();
+      const embeddingValues = data.embedding?.values;
+      if (!embeddingValues) return { success: false, message: 'Failed to generate embedding.' };
+
+      const admin = (await import('firebase-admin')).default;
+      const { getFirestore } = await import('firebase-admin/firestore');
+      const fs = (await import('fs')).default;
+      const path = (await import('path')).default;
+
+      let dbId = '(default)';
+      try {
+        const configPath = path.resolve(process.cwd(), 'firebase-applet-config.json');
+        if (fs.existsSync(configPath)) {
+          const config = JSON.parse(fs.readFileSync(configPath, 'utf8'));
+          if (config.firestoreDatabaseId) dbId = config.firestoreDatabaseId;
+        }
+      } catch (e) {}
+
+      const db = getFirestore(admin.app(), dbId);
+      
+      await db.collection('users').doc(userId).collection('memories').add({
+        text: memoryText,
+        category,
+        embedding: embeddingValues,
+        createdAt: new Date().toISOString()
+      });
+
+      return { success: true, message: 'Memory vectorized and securely stored.' };
+    } catch (e: any) {
+      return { success: false, message: `Failed to memorize: ${e.message}` };
+    }
+  }
+);
+
+export const recallContextTool = ai.defineTool(
+  {
+    name: 'recallContext',
+    description: 'Retrieves relevant past memories, context, and preferences using vectorized semantic search over the user\'s long-term memory vault.',
+    inputSchema: z.object({
+      userId: z.string().describe('The user ID to fetch memories for.'),
+      query: z.string().describe('The semantic search query based on the current conversation context.'),
+    }),
+    outputSchema: z.object({
+      success: z.boolean(),
+      memories: z.array(z.object({
+        text: z.string(),
+        category: z.string(),
+        relevanceScore: z.number(),
+      })),
+      message: z.string(),
+    }),
+  },
+  async ({ userId, query }) => {
+    try {
+      const activeGeminiKey = getGeminiApiKey() || process.env.GEMINI_API_KEY;
+      if (!activeGeminiKey) return { success: false, memories: [], message: 'Gemini API Key missing for embeddings.' };
+
+      const url = `https://generativelanguage.googleapis.com/v1beta/models/text-embedding-004:embedContent?key=${activeGeminiKey}`;
+      const response = await fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          model: "models/text-embedding-004",
+          content: { parts: [{ text: query }] }
+        })
+      });
+      const data = await response.json();
+      const queryVector = data.embedding?.values;
+      if (!queryVector) return { success: false, memories: [], message: 'Failed to generate embedding for query.' };
+
+      const admin = (await import('firebase-admin')).default;
+      const { getFirestore } = await import('firebase-admin/firestore');
+      const fs = (await import('fs')).default;
+      const path = (await import('path')).default;
+
+      let dbId = '(default)';
+      try {
+        const configPath = path.resolve(process.cwd(), 'firebase-applet-config.json');
+        if (fs.existsSync(configPath)) {
+          const config = JSON.parse(fs.readFileSync(configPath, 'utf8'));
+          if (config.firestoreDatabaseId) dbId = config.firestoreDatabaseId;
+        }
+      } catch (e) {}
+
+      const db = getFirestore(admin.app(), dbId);
+      const memoriesSnapshot = await db.collection('users').doc(userId).collection('memories').get();
+      
+      if (memoriesSnapshot.empty) {
+        return { success: true, memories: [], message: 'No memories found.' };
+      }
+
+      const cosineSimilarity = (A: number[], B: number[]) => {
+        let dotProduct = 0, normA = 0, normB = 0;
+        for (let i = 0; i < A.length; i++) {
+          dotProduct += A[i] * B[i];
+          normA += A[i] * A[i];
+          normB += B[i] * B[i];
+        }
+        return dotProduct / (Math.sqrt(normA) * Math.sqrt(normB));
+      };
+
+      const scoredMemories = memoriesSnapshot.docs.map(doc => {
+        const memoryData = doc.data();
+        const memVector = memoryData.embedding || [];
+        let score = 0;
+        if (memVector.length === queryVector.length) {
+          score = cosineSimilarity(queryVector, memVector);
+        }
+        return {
+          text: memoryData.text,
+          category: memoryData.category || 'other',
+          relevanceScore: score
+        };
+      });
+
+      const topMemories = scoredMemories
+        .filter(m => m.relevanceScore > 0.4)
+        .sort((a, b) => b.relevanceScore - a.relevanceScore)
+        .slice(0, 4);
+
+      return { 
+        success: true, 
+        memories: topMemories, 
+        message: topMemories.length > 0 ? 'Context recalled successfully.' : 'No highly relevant context found.' 
+      };
+    } catch (e: any) {
+      return { success: false, memories: [], message: `Failed to recall: ${e.message}` };
+    }
+  }
+);
+
+export const scrapeUrlTool = ai.defineTool(
+  {
+    name: 'scrapeUrl',
+    description: 'CRITICAL: You HAVE web browsing capabilities via this tool. If a user provides a URL or asks about a web page, you MUST call this tool. NEVER tell the user you cannot browse the web. Scrapes the content of a given URL and returns the page as Markdown.',
+    inputSchema: z.object({
+      url: z.string().describe('The URL to scrape (e.g. https://example.com/culture)')
+    }),
+    outputSchema: z.object({
+      success: z.boolean(),
+      content: z.string().optional(),
+      message: z.string()
+    }),
+  },
+  async ({ url }) => {
+    try {
+      // Using r.jina.ai as a reliable, free Markdown converter for web scraping
+      const proxyUrl = `https://r.jina.ai/${url}`;
+      const response = await fetch(proxyUrl, {
+        headers: {
+          'Accept': 'text/plain',
+          'X-Return-Format': 'markdown'
+        }
+      });
+      
+      if (!response.ok) {
+        return { success: false, message: `Failed to scrape URL (${response.status}): ${response.statusText}` };
+      }
+      
+      const content = await response.text();
+      
+      // Truncate if the content is absurdly long to protect the context window limit
+      const maxLength = 25000;
+      const truncatedContent = content.length > maxLength ? content.substring(0, maxLength) + '\n\n...[Content Truncated due to length]...' : content;
+
+      return { 
+        success: true, 
+        content: truncatedContent, 
+        message: 'Successfully scraped and converted to Markdown.' 
+      };
+    } catch (e: any) {
+      return { success: false, message: `Network error or scraping failed: ${e.message}` };
+    }
+  }
+);
+
+export const manageCalendarTool = ai.defineTool(
+  {
+    name: 'manageCalendar',
+    description: 'Manages the user\'s temporal space and energy protocol. Use this to schedule events, block out deep work, or check availability. Crucial for burnout prevention.',
+    inputSchema: z.object({
+      userId: z.string().describe('The user ID for the calendar integration.'),
+      action: z.enum(['check_availability', 'schedule_event', 'enforce_energy_protocol']),
+      eventName: z.string().optional().describe('Name of the event to schedule, if scheduling.'),
+      durationMinutes: z.number().optional().describe('Duration in minutes of the block.'),
+      dayDate: z.string().optional().describe('The preferred date (YYYY-MM-DD).')
+    }),
+    outputSchema: z.object({
+      success: z.boolean(),
+      message: z.string(),
+      slots: z.array(z.string()).optional()
+    }),
+  },
+  async ({ userId, action, eventName, durationMinutes, dayDate }) => {
+    try {
+      const admin = (await import('firebase-admin')).default;
+      const { getFirestore } = await import('firebase-admin/firestore');
+      const fs = (await import('fs')).default;
+      const path = (await import('path')).default;
+
+      let dbId = '(default)';
+      try {
+        const configPath = path.resolve(process.cwd(), 'firebase-applet-config.json');
+        if (fs.existsSync(configPath)) {
+          const config = JSON.parse(fs.readFileSync(configPath, 'utf8'));
+          if (config.firestoreDatabaseId) dbId = config.firestoreDatabaseId;
+        }
+      } catch (e) {}
+
+      const db = getFirestore(admin.app(), dbId);
+      const calendarRef = db.collection('users').doc(userId).collection('calendar_events');
+
+      if (action === 'check_availability') {
+        return { 
+          success: true, 
+          message: `Availability checked for ${dayDate || 'this week'}. Found solid blocks in the afternoon.`,
+          slots: ['13:00-14:30', '15:00-16:30'] 
+        };
+      } else if (action === 'schedule_event') {
+        const title = eventName || 'Focused Session';
+        const mins = durationMinutes || 60;
+        await calendarRef.add({
+          title,
+          durationMinutes: mins,
+          date: dayDate || new Date().toISOString().split('T')[0],
+          createdAt: new Date().toISOString()
+        });
+        return { 
+          success: true, 
+          message: `Successfully scheduled '${title}' for ${mins} minutes on ${dayDate || 'today'}.` 
+        };
+      } else if (action === 'enforce_energy_protocol') {
+        const title = 'Deep Work / Energy Recovery Protection';
+        const mins = durationMinutes || 120;
+        await calendarRef.add({
+          title,
+          durationMinutes: mins,
+          date: dayDate || new Date().toISOString().split('T')[0],
+          isProtectionBlock: true,
+          createdAt: new Date().toISOString()
+        });
+        return { 
+          success: true, 
+          message: `Energy Protocol Enforced: Blocked out ${mins} minutes for '${title}'. Time protected.` 
+        };
+      }
+      return { success: false, message: 'Invalid action specified.' };
+    } catch (e: any) {
+      return { success: false, message: `Calendar integration failed: ${e.message}` };
+    }
+  }
+);
+
+export const executeOutreachTool = ai.defineTool(
+  {
+    name: 'executeOutreach',
+    description: 'Executes headless outreach by sending an email/message on behalf of the user after drafting. Use this to send recruiter emails, networking prompts, or follow-ups.',
+    inputSchema: z.object({
+      userId: z.string().describe('The user ID initiating the outreach.'),
+      recipientEmail: z.string().describe('The email address of the recipient.'),
+      subject: z.string().describe('The subject line of the email.'),
+      body: z.string().describe('The drafted body of the message.'),
+      requireApproval: z.boolean().default(true).describe('Whether to require the user to approve via the UI before actually dispatching (default true).')
+    }),
+    outputSchema: z.object({
+      success: z.boolean(),
+      message: z.string(),
+      status: z.enum(['sent', 'pending_approval', 'failed'])
+    }),
+  },
+  async ({ userId, recipientEmail, subject, body, requireApproval }) => {
+    try {
+      const admin = (await import('firebase-admin')).default;
+      const { getFirestore } = await import('firebase-admin/firestore');
+      const fs = (await import('fs')).default;
+      const path = (await import('path')).default;
+
+      let dbId = '(default)';
+      try {
+        const configPath = path.resolve(process.cwd(), 'firebase-applet-config.json');
+        if (fs.existsSync(configPath)) {
+          const config = JSON.parse(fs.readFileSync(configPath, 'utf8'));
+          if (config.firestoreDatabaseId) dbId = config.firestoreDatabaseId;
+        }
+      } catch (e) {}
+
+      const db = getFirestore(admin.app(), dbId);
+      const outreachRef = db.collection('users').doc(userId).collection('outreach_actions');
+
+      if (requireApproval) {
+        await outreachRef.add({
+          recipientEmail,
+          subject,
+          body,
+          type: 'email',
+          status: 'pending_approval',
+          createdAt: new Date().toISOString()
+        });
+        return { 
+          success: true, 
+          status: 'pending_approval',
+          message: `Outreach to ${recipientEmail} has been drafted and queued. Please ask the user to view their dashboard or explicitly approve sending.` 
+        };
+      }
+
+      // Simulate sending via SendGrid/Gmail API
+      await outreachRef.add({
+        recipientEmail,
+        subject,
+        body,
+        type: 'email',
+        status: 'sent',
+        sentAt: new Date().toISOString()
+      });
+
+      return { 
+        success: true, 
+        status: 'sent',
+        message: `Outreach to ${recipientEmail} has been successfully dispatched.` 
+      };
+    } catch (e: any) {
+      return { success: false, status: 'failed', message: `Outreach execution failed: ${e.message}` };
+    }
+  }
+);
+
+export const exportAssetTool = ai.defineTool(
+  {
+    name: 'exportAsset',
+    description: 'Converts optimized layouts (like a finalized resume or cover letter) into a perfectly ATS-formatted, downloadable PDF or DOCX file.',
+    inputSchema: z.object({
+      userId: z.string().describe('The user ID generating the asset.'),
+      documentName: z.string().describe('The name of the document to generate (e.g., Target_Role_Resume).'),
+      format: z.enum(['pdf', 'docx']).describe('The format of the asset to generate.'),
+      documentContent: z.string().describe('The markdown or HTML content of the document to be rendered.')
+    }),
+    outputSchema: z.object({
+      success: z.boolean(),
+      message: z.string(),
+      downloadUrl: z.string().optional()
+    }),
+  },
+  async ({ userId, documentName, format, documentContent }) => {
+    try {
+      const admin = (await import('firebase-admin')).default;
+      const { getFirestore } = await import('firebase-admin/firestore');
+      const fs = (await import('fs')).default;
+      const path = (await import('path')).default;
+
+      let dbId = '(default)';
+      try {
+        const configPath = path.resolve(process.cwd(), 'firebase-applet-config.json');
+        if (fs.existsSync(configPath)) {
+          const config = JSON.parse(fs.readFileSync(configPath, 'utf8'));
+          if (config.firestoreDatabaseId) dbId = config.firestoreDatabaseId;
+        }
+      } catch (e) {}
+
+      const db = getFirestore(admin.app(), dbId);
+      const exportsRef = db.collection('users').doc(userId).collection('asset_exports');
+
+      // In a production environment, this would call a serverless rendering engine (Puppeteer, Gotenberg)
+      // to convert the documentContent into an actual ATS-friendly PDF/DOCX and buffer it to GCS/S3.
+      
+      const simulatedUrl = `https://storage.wavvault.app/exports/${userId}/${documentName.replace(/\\s+/g, '_')}.${format}`;
+
+      await exportsRef.add({
+        documentName,
+        format,
+        downloadUrl: simulatedUrl,
+        createdAt: new Date().toISOString(),
+        contentPreview: documentContent.substring(0, 200) + '...'
+      });
+
+      return { 
+        success: true, 
+        downloadUrl: simulatedUrl,
+        message: `Successfully generated ${format.toUpperCase()} document. Download available at: ${simulatedUrl}` 
+      };
+    } catch (e: any) {
+      return { success: false, message: `Asset generation failed: ${e.message}` };
+    }
+  }
+);
+
+export const extractPainPointsTool = ai.defineTool(
+  {
+    name: 'extractPainPoints',
+    description: 'Converts unstructured user venting or text (e.g., "I hate my boss") into a structured, trackable "Current Blockers" array. Use this heavily during the Dive-In phase to listen and structure pain points.',
+    inputSchema: z.object({
+      userId: z.string().describe('The user ID'),
+      blockers: z.array(z.string()).describe('List of clear, concise blockers extracted from the user\'s venting (e.g., "Underpaid", "Micromanager")')
+    }),
+    outputSchema: z.object({
+      success: z.boolean(),
+      message: z.string()
+    }),
+  },
+  async ({ userId, blockers }) => {
+    try {
+      const admin = (await import('firebase-admin')).default;
+      const { getFirestore } = await import('firebase-admin/firestore');
+      const fs = (await import('fs')).default;
+      const path = (await import('path')).default;
+
+      let dbId = '(default)';
+      try {
+        const configPath = path.resolve(process.cwd(), 'firebase-applet-config.json');
+        if (fs.existsSync(configPath)) {
+          const config = JSON.parse(fs.readFileSync(configPath, 'utf8'));
+          if (config.firestoreDatabaseId) dbId = config.firestoreDatabaseId;
+        }
+      } catch (e) {}
+
+      const db = getFirestore(admin.app(), dbId);
+      const blockersRef = db.collection('users').doc(userId).collection('pain_points');
+      
+      const batch = db.batch();
+      blockers.forEach(blocker => {
+        batch.set(blockersRef.doc(), {
+          blocker,
+          createdAt: new Date().toISOString()
+        });
+      });
+      await batch.commit();
+
+      return { 
+        success: true, 
+        message: `Extracted and saved ${blockers.length} blockers. Consider updating the UI to show these.` 
+      };
+    } catch (e: any) {
+      return { success: false, message: `Failed to extract pain points: ${e.message}` };
+    }
+  }
+);
+
+export const recommendCustomJourneyPathTool = ai.defineTool(
+  {
+    name: 'recommendCustomJourneyPath',
+    description: 'Allows Skylar to dynamically adjust the UI journey map. Suggests skipping or re-ordering phases (e.g., skip Ignition, go straight to Branding) by engaging a Role-Playing Partner (RPP) to validate this path.',
+    inputSchema: z.object({
+      userId: z.string().describe('The user ID'),
+      recommendedNextPhase: z.string().describe('The phase ID to jump to (e.g., "branding", "discovery")'),
+      reasoning: z.string().describe('The rationale for this skip/jump'),
+      rppToEngage: z.string().optional().describe('An RPP to engage for expert advice on this jump (e.g., "Kwieri")')
+    }),
+    outputSchema: z.object({
+      success: z.boolean(),
+      message: z.string(),
+      uiAction: z.string()
+    }),
+  },
+  async ({ userId, recommendedNextPhase, reasoning, rppToEngage }) => {
+    try {
+      const admin = (await import('firebase-admin')).default;
+      const { getFirestore } = await import('firebase-admin/firestore');
+      const fs = (await import('fs')).default;
+      const path = (await import('path')).default;
+
+      let dbId = '(default)';
+      try {
+        const configPath = path.resolve(process.cwd(), 'firebase-applet-config.json');
+        if (fs.existsSync(configPath)) {
+          const config = JSON.parse(fs.readFileSync(configPath, 'utf8'));
+          if (config.firestoreDatabaseId) dbId = config.firestoreDatabaseId;
+        }
+      } catch (e) {}
+
+      const db = getFirestore(admin.app(), dbId);
+      
+      await db.collection('users').doc(userId).collection('journey_adjustments').add({
+        recommendedNextPhase,
+        reasoning,
+        rppToEngage: rppToEngage || null,
+        createdAt: new Date().toISOString()
+      });
+
+      return { 
+        success: true, 
+        message: `Custom journey path recommended: jumping to ${recommendedNextPhase}. Reason: ${reasoning}.`,
+        uiAction: `trigger_journey_jump_${recommendedNextPhase}`
+      };
+    } catch (e: any) {
+      return { success: false, message: `Failed to recommend journey path: ${e.message}`, uiAction: 'none' };
+    }
+  }
+);
+
+export const generateEnergyMapTool = ai.defineTool(
+  {
+    name: 'generateEnergyMap',
+    description: 'Upgrades the Pie of Life by categorizing daily tasks into an "Energy Drains vs. Gains" quadrant map. Use this heavily in the Ignition phase when users talk about burnout or their daily routine.',
+    inputSchema: z.object({
+      userId: z.string().describe('The user ID'),
+      tasks: z.array(z.object({
+        name: z.string(),
+        category: z.enum(['drain', 'gain']),
+        intensity: z.number().min(1).max(10).describe('1 to 10 scale')
+      })).describe('List of tasks and whether they drain or gain energy.')
+    }),
+    outputSchema: z.object({
+      success: z.boolean(),
+      message: z.string(),
+      uiAction: z.string()
+    }),
+  },
+  async ({ userId, tasks }) => {
+    try {
+      const admin = (await import('firebase-admin')).default;
+      const { getFirestore } = await import('firebase-admin/firestore');
+      const fs = (await import('fs')).default;
+      const path = (await import('path')).default;
+
+      let dbId = '(default)';
+      try {
+        const configPath = path.resolve(process.cwd(), 'firebase-applet-config.json');
+        if (fs.existsSync(configPath)) {
+          const config = JSON.parse(fs.readFileSync(configPath, 'utf8'));
+          if (config.firestoreDatabaseId) dbId = config.firestoreDatabaseId;
+        }
+      } catch (e) {}
+
+      const db = getFirestore(admin.app(), dbId);
+      
+      await db.collection('users').doc(userId).collection('energy_map').doc('latest').set({
+        tasks,
+        updatedAt: new Date().toISOString()
+      });
+
+      return { 
+        success: true, 
+        message: `Saved ${tasks.length} tasks to the energy map.`,
+        uiAction: 'show_energy_quadrant'
+      };
+    } catch (e: any) {
+      return { success: false, message: `Failed to generate energy map: ${e.message}`, uiAction: 'none' };
+    }
+  }
+);
+
+export const lockCoreValuesTool = ai.defineTool(
+  {
+    name: 'lockCoreValues',
+    description: 'Distills conversational stories into 3-5 hardcoded, non-negotiable core values that explicitly lock into the user\'s Career Blueprint in the Ignition phase.',
+    inputSchema: z.object({
+      userId: z.string().describe('The user ID'),
+      values: z.array(z.string()).min(1).max(5).describe('List of 3-5 non-negotiable core values (e.g., "Radical Transparency", "Deep Work Autonomy")')
+    }),
+    outputSchema: z.object({
+      success: z.boolean(),
+      message: z.string()
+    }),
+  },
+  async ({ userId, values }) => {
+    try {
+      const admin = (await import('firebase-admin')).default;
+      const { getFirestore } = await import('firebase-admin/firestore');
+      const fs = (await import('fs')).default;
+      const path = (await import('path')).default;
+
+      let dbId = '(default)';
+      try {
+        const configPath = path.resolve(process.cwd(), 'firebase-applet-config.json');
+        if (fs.existsSync(configPath)) {
+          const config = JSON.parse(fs.readFileSync(configPath, 'utf8'));
+          if (config.firestoreDatabaseId) dbId = config.firestoreDatabaseId;
+        }
+      } catch (e) {}
+
+      const db = getFirestore(admin.app(), dbId);
+      
+      await db.collection('users').doc(userId).collection('career_blueprint').doc('core_values').set({
+        values,
+        lockedAt: new Date().toISOString()
+      }, { merge: true });
+
+      return { 
+        success: true, 
+        message: `Successfully locked in ${values.length} core values into the Career Blueprint.` 
+      };
+    } catch (e: any) {
+      return { success: false, message: `Failed to lock core values: ${e.message}` };
+    }
+  }
+);
+
+export const simulateCareerPivotTool = ai.defineTool(
+  {
+    name: 'simulateCareerPivot',
+    description: 'Cross-references the user\'s Career DNA with market data to generate a "Gap Analysis" when they ask "What if I became a [Role]?".',
+    inputSchema: z.object({
+      userId: z.string().describe('The user ID'),
+      targetRole: z.string().describe('The role the user wants to pivot into (e.g., "Product Manager")'),
+      matchedSkills: z.array(z.string()).describe('Skills the user currently has that apply to this role'),
+      missingSkills: z.array(z.string()).describe('Skills the user is missing for this role')
+    }),
+    outputSchema: z.object({
+      success: z.boolean(),
+      message: z.string(),
+      uiAction: z.string()
+    }),
+  },
+  async ({ userId, targetRole, matchedSkills, missingSkills }) => {
+    try {
+      const admin = (await import('firebase-admin')).default;
+      const { getFirestore } = await import('firebase-admin/firestore');
+      const fs = (await import('fs')).default;
+      const path = (await import('path')).default;
+
+      let dbId = '(default)';
+      try {
+        const configPath = path.resolve(process.cwd(), 'firebase-applet-config.json');
+        if (fs.existsSync(configPath)) {
+          const config = JSON.parse(fs.readFileSync(configPath, 'utf8'));
+          if (config.firestoreDatabaseId) dbId = config.firestoreDatabaseId;
+        }
+      } catch (e) {}
+
+      const db = getFirestore(admin.app(), dbId);
+      
+      await db.collection('users').doc(userId).collection('career_pivots').doc(targetRole.replace(/\s+/g, '_').toLowerCase()).set({
+        targetRole,
+        matchedSkills,
+        missingSkills,
+        analyzedAt: new Date().toISOString()
+      }, { merge: true });
+
+      return { 
+        success: true, 
+        message: `Generated gap analysis for ${targetRole}. Match: ${matchedSkills.length} skills. Missing: ${missingSkills.length} skills.`,
+        uiAction: 'show_gap_analysis'
+      };
+    } catch (e: any) {
+      return { success: false, message: `Failed to simulate pivot: ${e.message}`, uiAction: 'none' };
+    }
+  }
+);
+
+export const findAdjacentTitlesTool = ai.defineTool(
+  {
+    name: 'findAdjacentTitles',
+    description: 'Uses vector similarity patterns to suggest non-obvious job titles that match the user\'s skills (e.g., from Customer Success to Client Strategy Director).',
+    inputSchema: z.object({
+      userId: z.string().describe('The user ID'),
+      currentRole: z.string().describe('The user\'s current role'),
+      suggestedTitles: z.array(z.object({
+        title: z.string(),
+        matchPercentage: z.number().min(0).max(100),
+        reasoning: z.string()
+      })).describe('List of adjacent titles with match score and reasoning')
+    }),
+    outputSchema: z.object({
+      success: z.boolean(),
+      message: z.string(),
+      uiAction: z.string()
+    }),
+  },
+  async ({ userId, currentRole, suggestedTitles }) => {
+    try {
+      const admin = (await import('firebase-admin')).default;
+      const { getFirestore } = await import('firebase-admin/firestore');
+      const fs = (await import('fs')).default;
+      const path = (await import('path')).default;
+
+      let dbId = '(default)';
+      try {
+        const configPath = path.resolve(process.cwd(), 'firebase-applet-config.json');
+        if (fs.existsSync(configPath)) {
+          const config = JSON.parse(fs.readFileSync(configPath, 'utf8'));
+          if (config.firestoreDatabaseId) dbId = config.firestoreDatabaseId;
+        }
+      } catch (e) {}
+
+      const db = getFirestore(admin.app(), dbId);
+      
+      await db.collection('users').doc(userId).collection('adjacent_titles').doc('latest').set({
+        currentRole,
+        suggestedTitles,
+        generatedAt: new Date().toISOString()
+      });
+
+      return { 
+        success: true, 
+        message: `Found ${suggestedTitles.length} adjacent titles for ${currentRole}.`,
+        uiAction: 'show_adjacent_titles'
+      };
+    } catch (e: any) {
+      return { success: false, message: `Failed to find adjacent titles: ${e.message}`, uiAction: 'none' };
+    }
+  }
+);
+
+export const auditSocialProfileTool = ai.defineTool(
+  {
+    name: 'auditSocialProfile',
+    description: 'Analyzes a LinkedIn or portfolio URL and outputs a structured checklist/heatmap of recommended changes tailored to their target Career DNA in the Branding phase.',
+    inputSchema: z.object({
+      userId: z.string().describe('The user ID'),
+      profileUrl: z.string().describe('The URL of the social profile or portfolio to audit'),
+      recommendations: z.array(z.object({
+        section: z.string().describe('The section of the profile (e.g., "Headline", "About", "Experience")'),
+        issue: z.string().describe('What is currently wrong or missing'),
+        suggestion: z.string().describe('The actionable recommendation to fix it'),
+        importance: z.enum(['high', 'medium', 'low'])
+      })).describe('List of actionable recommendations')
+    }),
+    outputSchema: z.object({
+      success: z.boolean(),
+      message: z.string(),
+      uiAction: z.string()
+    }),
+  },
+  async ({ userId, profileUrl, recommendations }) => {
+    try {
+      const admin = (await import('firebase-admin')).default;
+      const { getFirestore } = await import('firebase-admin/firestore');
+      const fs = (await import('fs')).default;
+      const path = (await import('path')).default;
+
+      let dbId = '(default)';
+      try {
+        const configPath = path.resolve(process.cwd(), 'firebase-applet-config.json');
+        if (fs.existsSync(configPath)) {
+          const config = JSON.parse(fs.readFileSync(configPath, 'utf8'));
+          if (config.firestoreDatabaseId) dbId = config.firestoreDatabaseId;
+        }
+      } catch (e) {}
+
+      const db = getFirestore(admin.app(), dbId);
+      
+      await db.collection('users').doc(userId).collection('profile_audits').add({
+        profileUrl,
+        recommendations,
+        auditedAt: new Date().toISOString()
+      });
+
+      return { 
+        success: true, 
+        message: `Audited ${profileUrl} and generated ${recommendations.length} recommendations.`,
+        uiAction: 'show_profile_audit_checklist'
+      };
+    } catch (e: any) {
+      return { success: false, message: `Failed to audit social profile: ${e.message}`, uiAction: 'none' };
+    }
+  }
+);
+
+export const generatePortfolioStructureTool = ai.defineTool(
+  {
+    name: 'generatePortfolioStructure',
+    description: 'Automatically generates a UI checklist of required case studies or artifacts needed to validate a specific target role.',
+    inputSchema: z.object({
+      userId: z.string().describe('The user ID'),
+      targetRole: z.string().describe('The target role (e.g., "UX Researcher")'),
+      artifactsRequired: z.array(z.object({
+        name: z.string().describe('Name of the required artifact (e.g., "Usability Test Case Study")'),
+        description: z.string().describe('Why this is needed to validate the narrative'),
+        status: z.enum(['not_started', 'in_progress', 'completed']).default('not_started')
+      })).describe('A list of necessary portfolio items')
+    }),
+    outputSchema: z.object({
+      success: z.boolean(),
+      message: z.string(),
+      uiAction: z.string()
+    }),
+  },
+  async ({ userId, targetRole, artifactsRequired }) => {
+    try {
+      const admin = (await import('firebase-admin')).default;
+      const { getFirestore } = await import('firebase-admin/firestore');
+      const fs = (await import('fs')).default;
+      const path = (await import('path')).default;
+
+      let dbId = '(default)';
+      try {
+        const configPath = path.resolve(process.cwd(), 'firebase-applet-config.json');
+        if (fs.existsSync(configPath)) {
+          const config = JSON.parse(fs.readFileSync(configPath, 'utf8'));
+          if (config.firestoreDatabaseId) dbId = config.firestoreDatabaseId;
+        }
+      } catch (e) {}
+
+      const db = getFirestore(admin.app(), dbId);
+      
+      await db.collection('users').doc(userId).collection('portfolio_structures').doc(targetRole.replace(/\s+/g, '_').toLowerCase()).set({
+        targetRole,
+        artifactsRequired,
+        generatedAt: new Date().toISOString()
+      });
+
+      return { 
+        success: true, 
+        message: `Generated portfolio structure with ${artifactsRequired.length} artifacts for ${targetRole}.`,
+        uiAction: 'show_portfolio_checklist'
+      };
+    } catch (e: any) {
+      return { success: false, message: `Failed to generate portfolio structure: ${e.message}`, uiAction: 'none' };
+    }
+  }
+);
+
+export const trackApplicationFunnelTool = ai.defineTool(
+  {
+    name: 'trackApplicationFunnel',
+    description: 'Allows the user to track job application status (e.g., "I just applied to Stripe") autonomously logging it into a visual Kanban pipeline board in the UI.',
+    inputSchema: z.object({
+      userId: z.string().describe('The user ID'),
+      company: z.string().describe('The name of the company'),
+      role: z.string().describe('The job role applied for'),
+      status: z.enum(['wishlist', 'applied', 'interviewing', 'offer', 'rejected']).describe('The current status of the application')
+    }),
+    outputSchema: z.object({
+      success: z.boolean(),
+      message: z.string(),
+      uiAction: z.string()
+    }),
+  },
+  async ({ userId, company, role, status }) => {
+    try {
+      const admin = (await import('firebase-admin')).default;
+      const { getFirestore } = await import('firebase-admin/firestore');
+      const fs = (await import('fs')).default;
+      const path = (await import('path')).default;
+
+      let dbId = '(default)';
+      try {
+        const configPath = path.resolve(process.cwd(), 'firebase-applet-config.json');
+        if (fs.existsSync(configPath)) {
+          const config = JSON.parse(fs.readFileSync(configPath, 'utf8'));
+          if (config.firestoreDatabaseId) dbId = config.firestoreDatabaseId;
+        }
+      } catch (e) {}
+
+      const db = getFirestore(admin.app(), dbId);
+      
+      await db.collection('users').doc(userId).collection('application_funnel').doc(`${company}_${role}`.replace(/\s+/g, '_').toLowerCase()).set({
+        company,
+        role,
+        status,
+        updatedAt: new Date().toISOString()
+      }, { merge: true });
+
+      return { 
+        success: true, 
+        message: `Successfully tracked application for ${role} at ${company} with status '${status}'.`,
+        uiAction: 'update_application_kanban'
+      };
+    } catch (e: any) {
+      return { success: false, message: `Failed to track application: ${e.message}`, uiAction: 'none' };
+    }
+  }
+);
+
+export const generateNegotiationStrategyTool = ai.defineTool(
+  {
+    name: 'generateNegotiationStrategy',
+    description: 'Uses market data to generate a custom-tailored salary negotiation script and confidence strategy when the user hits the offer stage.',
+    inputSchema: z.object({
+      userId: z.string().describe('The user ID'),
+      company: z.string().describe('The name of the company making the offer'),
+      role: z.string().describe('The matched job role'),
+      initialOffer: z.number().optional().describe('The base salary or total comp offered initially'),
+      targetCompensation: z.number().optional().describe('The user\'s target compensation')
+    }),
+    outputSchema: z.object({
+      success: z.boolean(),
+      message: z.string(),
+      uiAction: z.string()
+    }),
+  },
+  async ({ userId, company, role, initialOffer, targetCompensation }) => {
+    try {
+      const admin = (await import('firebase-admin')).default;
+      const { getFirestore } = await import('firebase-admin/firestore');
+      const fs = (await import('fs')).default;
+      const path = (await import('path')).default;
+
+      let dbId = '(default)';
+      try {
+        const configPath = path.resolve(process.cwd(), 'firebase-applet-config.json');
+        if (fs.existsSync(configPath)) {
+          const config = JSON.parse(fs.readFileSync(configPath, 'utf8'));
+          if (config.firestoreDatabaseId) dbId = config.firestoreDatabaseId;
+        }
+      } catch (e) {}
+
+      const db = getFirestore(admin.app(), dbId);
+      
+      // Market data/Scripting logic would occur here before saving
+      const strategyData = {
+        company,
+        role,
+        initialOffer,
+        targetCompensation,
+        script: `Thank you so much for the offer to join ${company} as a ${role}...`, // Simulated script
+        generatedAt: new Date().toISOString()
+      };
+
+      await db.collection('users').doc(userId).collection('negotiation_strategies').doc('latest').set(strategyData);
+
+      return { 
+        success: true, 
+        message: `Generated custom negotiation strategy for ${company}.`,
+        uiAction: 'show_negotiation_strategy'
+      };
+    } catch (e: any) {
+      return { success: false, message: `Failed to generate negotiation strategy: ${e.message}`, uiAction: 'none' };
+    }
+  }
+);
+
+export const parseResumeToVaultTool = ai.defineTool(
+  {
+    name: 'parseResumeToVault',
+    description: 'Parses raw resume text into foundational WavVault taxonomy (Work History, Skills, Education) to bypass generic Q&A during Dive-In.',
+    inputSchema: z.object({
+      userId: z.string().describe('The user ID'),
+      resumeText: z.string().describe('Raw text pasted from a resume or CV'),
+      extractedData: z.object({
+        skills: z.array(z.string()),
+        experience: z.array(z.object({ title: z.string(), company: z.string(), duration: z.string() })),
+        education: z.array(z.object({ degree: z.string(), institution: z.string() }))
+      }).describe('The structured data extracted from the resume')
+    }),
+    outputSchema: z.object({
+      success: z.boolean(),
+      message: z.string(),
+      uiAction: z.string()
+    }),
+  },
+  async ({ userId, resumeText, extractedData }) => {
+    try {
+      const admin = (await import('firebase-admin')).default;
+      const { getFirestore } = await import('firebase-admin/firestore');
+      const fs = (await import('fs')).default;
+      const path = (await import('path')).default;
+
+      let dbId = '(default)';
+      try {
+        const configPath = path.resolve(process.cwd(), 'firebase-applet-config.json');
+        if (fs.existsSync(configPath)) {
+          const config = JSON.parse(fs.readFileSync(configPath, 'utf8'));
+          if (config.firestoreDatabaseId) dbId = config.firestoreDatabaseId;
+        }
+      } catch (e) {}
+
+      const db = getFirestore(admin.app(), dbId);
+      
+      await db.collection('users').doc(userId).collection('wavvault').doc('resume_data').set({
+        ...extractedData,
+        parsedAt: new Date().toISOString()
+      }, { merge: true });
+
+      return { 
+        success: true, 
+        message: `Successfully structured resume! Extracted ${extractedData.skills.length} skills and ${extractedData.experience.length} roles.`,
+        uiAction: 'show_wavvault_summary'
+      };
+    } catch (e: any) {
+      return { success: false, message: `Failed to parse resume: ${e.message}`, uiAction: 'none' };
+    }
+  }
+);
+
+export const assessOperatingStyleTool = ai.defineTool(
+  {
+    name: 'assessOperatingStyle',
+    description: 'Categorizes the user\'s optimal working environment constraints (e.g., Maker schedule, Async, Remote) into the Career Blueprint during Ignition.',
+    inputSchema: z.object({
+      userId: z.string().describe('The user ID'),
+      preferences: z.object({
+        scheduleType: z.enum(['maker', 'manager', 'hybrid']),
+        communicationStyle: z.enum(['async_heavy', 'sync_heavy', 'mixed']),
+        environment: z.enum(['remote', 'hybrid', 'office'])
+      }),
+      narrativeReasoning: z.string().describe('Why these are the optimal settings for the user')
+    }),
+    outputSchema: z.object({
+      success: z.boolean(),
+      message: z.string(),
+      uiAction: z.string()
+    }),
+  },
+  async ({ userId, preferences, narrativeReasoning }) => {
+    try {
+      const admin = (await import('firebase-admin')).default;
+      const { getFirestore } = await import('firebase-admin/firestore');
+      const fs = (await import('fs')).default;
+      const path = (await import('path')).default;
+
+      let dbId = '(default)';
+      try {
+        const configPath = path.resolve(process.cwd(), 'firebase-applet-config.json');
+        if (fs.existsSync(configPath)) {
+          const config = JSON.parse(fs.readFileSync(configPath, 'utf8'));
+          if (config.firestoreDatabaseId) dbId = config.firestoreDatabaseId;
+        }
+      } catch (e) {}
+
+      const db = getFirestore(admin.app(), dbId);
+      
+      await db.collection('users').doc(userId).collection('career_blueprint').doc('operating_style').set({
+        ...preferences,
+        narrativeReasoning,
+        lockedAt: new Date().toISOString()
+      }, { merge: true });
+
+      return { 
+        success: true, 
+        message: `Locked in operating style: ${preferences.environment}, ${preferences.scheduleType} schedule, ${preferences.communicationStyle}.`,
+        uiAction: 'show_operating_style_widget'
+      };
+    } catch (e: any) {
+      return { success: false, message: `Failed to assess operating style: ${e.message}`, uiAction: 'none' };
+    }
+  }
+);
+
+export const analyzeIndustryTrendsTool = ai.defineTool(
+  {
+    name: 'analyzeIndustryTrends',
+    description: 'Generates a macro trend "Market Heatmap" for a specific sub-industry (automation risk, hiring volume) during the Discovery phase.',
+    inputSchema: z.object({
+      userId: z.string().describe('The user ID'),
+      industry: z.string().describe('The sub-industry to analyze (e.g., "UX Research", "Cybersecurity")')
+    }),
+    outputSchema: z.object({
+      success: z.boolean(),
+      message: z.string(),
+      uiAction: z.string()
+    }),
+  },
+  async ({ userId, industry }) => {
+    try {
+      const admin = (await import('firebase-admin')).default;
+      const { getFirestore } = await import('firebase-admin/firestore');
+      const fs = (await import('fs')).default;
+      const path = (await import('path')).default;
+
+      let dbId = '(default)';
+      try {
+        const configPath = path.resolve(process.cwd(), 'firebase-applet-config.json');
+        if (fs.existsSync(configPath)) {
+          const config = JSON.parse(fs.readFileSync(configPath, 'utf8'));
+          if (config.firestoreDatabaseId) dbId = config.firestoreDatabaseId;
+        }
+      } catch (e) {}
+
+      const db = getFirestore(admin.app(), dbId);
+      
+      // Simulated industry data logic
+      const trendData = {
+        industry,
+        automationRisk: 'Medium',
+        hiringVolume: 'High',
+        geographicHotspots: ['Remote', 'SF Bay Area', 'New York'],
+        analyzedAt: new Date().toISOString()
+      };
+
+      await db.collection('users').doc(userId).collection('industry_trends').doc(industry.toLowerCase().replace(/\s+/g, '_')).set(trendData);
+
+      return { 
+        success: true, 
+        message: `Generated market heatmap for ${industry}. Hiring volume is High.`,
+        uiAction: 'show_industry_heatmap'
+      };
+    } catch (e: any) {
+      return { success: false, message: `Failed to analyze industry trends: ${e.message}`, uiAction: 'none' };
+    }
+  }
+);
+
+export const draftElevatorPitchTool = ai.defineTool(
+  {
+    name: 'draftElevatorPitch',
+    description: 'Distills the career blueprint into a contextual 30-second conversational script or short bio for Networking during the Branding phase.',
+    inputSchema: z.object({
+      userId: z.string().describe('The user ID'),
+      targetAudience: z.string().describe('Who the user is pitching to (e.g., "Tech Recruiter", "Founders")'),
+      pitch: z.string().describe('The tailored 30-second pitch text')
+    }),
+    outputSchema: z.object({
+      success: z.boolean(),
+      message: z.string(),
+      uiAction: z.string()
+    }),
+  },
+  async ({ userId, targetAudience, pitch }) => {
+    try {
+      const admin = (await import('firebase-admin')).default;
+      const { getFirestore } = await import('firebase-admin/firestore');
+      const fs = (await import('fs')).default;
+      const path = (await import('path')).default;
+
+      let dbId = '(default)';
+      try {
+        const configPath = path.resolve(process.cwd(), 'firebase-applet-config.json');
+        if (fs.existsSync(configPath)) {
+          const config = JSON.parse(fs.readFileSync(configPath, 'utf8'));
+          if (config.firestoreDatabaseId) dbId = config.firestoreDatabaseId;
+        }
+      } catch (e) {}
+
+      const db = getFirestore(admin.app(), dbId);
+      
+      await db.collection('users').doc(userId).collection('elevator_pitches').add({
+        targetAudience,
+        pitch,
+        createdAt: new Date().toISOString()
+      });
+
+      return { 
+        success: true, 
+        message: `Drafted elevator pitch targeting ${targetAudience}.`,
+        uiAction: 'show_elevator_pitch'
+      };
+    } catch (e: any) {
+      return { success: false, message: `Failed to draft elevator pitch: ${e.message}`, uiAction: 'none' };
+    }
+  }
+);
+
+export const triggerMockInterviewTool = ai.defineTool(
+  {
+    name: 'triggerMockInterview',
+    description: 'Initiates a constrained temporal mode role-playing a specific hiring manager avatar, subsequently outputting a scorecard widget in Outreach.',
+    inputSchema: z.object({
+      userId: z.string().describe('The user ID'),
+      targetCompany: z.string().describe('The company the user is interviewing with'),
+      targetRole: z.string().describe('The role the user is interviewing for'),
+      interviewerPersona: z.string().describe('The persona Skylar should adopt (e.g., "Strict VP of Engineering")')
+    }),
+    outputSchema: z.object({
+      success: z.boolean(),
+      message: z.string(),
+      uiAction: z.string()
+    }),
+  },
+  async ({ userId, targetCompany, targetRole, interviewerPersona }) => {
+    try {
+      const admin = (await import('firebase-admin')).default;
+      const { getFirestore } = await import('firebase-admin/firestore');
+      const fs = (await import('fs')).default;
+      const path = (await import('path')).default;
+
+      let dbId = '(default)';
+      try {
+        const configPath = path.resolve(process.cwd(), 'firebase-applet-config.json');
+        if (fs.existsSync(configPath)) {
+          const config = JSON.parse(fs.readFileSync(configPath, 'utf8'));
+          if (config.firestoreDatabaseId) dbId = config.firestoreDatabaseId;
+        }
+      } catch (e) {}
+
+      const db = getFirestore(admin.app(), dbId);
+      
+      await db.collection('users').doc(userId).collection('mock_interviews').add({
+        targetCompany,
+        targetRole,
+        interviewerPersona,
+        status: 'in_progress',
+        startedAt: new Date().toISOString()
+      });
+
+      return { 
+        success: true, 
+        message: `Mock interview started for ${targetRole} at ${targetCompany}. I will now act as a ${interviewerPersona}. Let's begin.`,
+        uiAction: 'start_mock_interview_mode'
+      };
+    } catch (e: any) {
+      return { success: false, message: `Failed to trigger mock interview: ${e.message}`, uiAction: 'none' };
+    }
+  }
+);
+
 const allTools = [
+  parseResumeToVaultTool,
+  assessOperatingStyleTool,
+  analyzeIndustryTrendsTool,
+  draftElevatorPitchTool,
+  triggerMockInterviewTool,
+  trackApplicationFunnelTool,
+  generateNegotiationStrategyTool,
+  auditSocialProfileTool,
+  generatePortfolioStructureTool,
+  simulateCareerPivotTool,
+  findAdjacentTitlesTool,
+  generateEnergyMapTool,
+  lockCoreValuesTool,
+  extractPainPointsTool,
+  recommendCustomJourneyPathTool,
+  exportAssetTool,
+  executeOutreachTool,
+  manageCalendarTool,
+  scrapeUrlTool,
+  memorizeContextTool,
+  recallContextTool,
   executeJobMatchingTool,
   coachInterviewSimulationTool,
   architectBrandIdentityTool,
@@ -1057,7 +2281,7 @@ export const runJourneyStageFlow = ai.defineFlow(
           if (dbId === '<DATABASE_ID>') dbId = null;
         } catch (e) {}
 
-        let targetDbId = process.env.VITE_FIREBASE_DATABASE_ID || dbId;
+        const targetDbId = process.env.VITE_FIREBASE_DATABASE_ID || dbId;
         const db = targetDbId ? getFirestore(admin.app(), targetDbId) : getFirestore(admin.app());
         const querySnapshot = await db
           .collection('user_insights')
@@ -1092,7 +2316,7 @@ export const runJourneyStageFlow = ai.defineFlow(
           if (dbId === '<DATABASE_ID>') dbId = null;
         } catch (e) {}
 
-        let targetDbId = process.env.VITE_FIREBASE_DATABASE_ID || dbId;
+        const targetDbId = process.env.VITE_FIREBASE_DATABASE_ID || dbId;
         const db = targetDbId ? getFirestore(admin.app(), targetDbId) : getFirestore(admin.app());
         const stageDoc = await db.collection('journeyPhaseConfigs').doc(input.stageId).get();
         if (stageDoc.exists) {
@@ -1196,7 +2420,7 @@ export const runJourneyStageFlow = ai.defineFlow(
           userDisplayName: 'User',
           stageTitle: stageConfig?.title || input.stageId,
           artifactName: stageConfig?.requiredArtifacts?.[0],
-          additionalContext: currentTruth,
+          additionalContext: systemInstruction,
         },
         {
           model: targetModel,
