@@ -29,23 +29,38 @@ export default function DiveInPage() {
 
     setIsParsing(true);
     try {
-      let base64 = '';
-      const reader = new FileReader();
-      
-      const fileReadPromise = new Promise<void>((resolve, reject) => {
-        reader.onload = () => {
-          base64 = (reader.result as string).split(',')[1];
-          resolve();
-        };
-        reader.onerror = reject;
-      });
+      if (
+        file.type === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' ||
+        file.name.toLowerCase().endsWith('.docx')
+      ) {
+        const arrayBuffer = await file.arrayBuffer();
+        const mammothModule: any = await import('mammoth/mammoth.browser.js');
+        const mammoth = mammothModule.default || mammothModule;
+        const extractResult = await mammoth.extractRawText({ arrayBuffer });
+        const textContent = extractResult.value;
 
-      reader.readAsDataURL(file);
-      await fileReadPromise;
+        if (textContent) {
+          const result = await parseResume(textContent, 'text/plain');
+          if (result) setResumeData(result);
+        }
+      } else if (file.type === 'text/plain' || file.name.toLowerCase().endsWith('.txt')) {
+        const textContent = await file.text();
+        const result = await parseResume(textContent, 'text/plain');
+        if (result) setResumeData(result);
+      } else if (file.type === 'application/pdf' || file.name.toLowerCase().endsWith('.pdf')) {
+        // PDF or other
+        const reader = new FileReader();
+        const fileReadPromise = new Promise<string>((resolve, reject) => {
+          reader.onload = () => resolve((reader.result as string).split(',')[1]);
+          reader.onerror = reject;
+        });
+        reader.readAsDataURL(file);
+        const base64 = await fileReadPromise;
 
-      const result = await parseResume(base64, file.type);
-      if (result) {
-        setResumeData(result);
+        const result = await parseResume(base64, file.type);
+        if (result) {
+          setResumeData(result);
+        }
       }
     } catch (error) {
       console.error('Error parsing resume:', error);

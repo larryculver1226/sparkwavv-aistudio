@@ -141,9 +141,6 @@ export async function generateDiscoverySummary(userData: UserData) {
       config: {
         responseMimeType: 'application/json',
         maxOutputTokens: 16384,
-        thinkingConfig: {
-          thinkingLevel: ThinkingLevel.LOW,
-        },
         responseSchema: {
           type: Type.OBJECT,
           properties: {
@@ -213,9 +210,6 @@ export async function generateCinematicManifesto(userData: UserData) {
       config: {
         responseMimeType: 'application/json',
         maxOutputTokens: 16384,
-        thinkingConfig: {
-          thinkingLevel: ThinkingLevel.LOW,
-        },
         responseSchema: {
           type: Type.OBJECT,
           properties: {
@@ -262,28 +256,25 @@ export async function parseResume(fileData: string, mimeType: string) {
   try {
     const ai = getAI();
 
-    const contents: any[] = [];
+    const parts: any[] = [];
     if (mimeType === 'text/plain') {
-      contents.push({ text: `Resume Content:\n${fileData}\n\n${prompt}` });
+      parts.push({ text: `Resume Content:\n${fileData}\n\n${prompt}` });
     } else {
-      contents.push({
+      parts.push({
         inlineData: {
           data: fileData,
           mimeType: mimeType,
         },
       });
-      contents.push({ text: prompt });
+      parts.push({ text: prompt });
     }
 
     const response = await ai.models.generateContent({
       model: 'gemini-2.5-flash',
-      contents,
+      contents: { parts },
       config: {
         responseMimeType: 'application/json',
         maxOutputTokens: 16384,
-        thinkingConfig: {
-          thinkingLevel: ThinkingLevel.LOW,
-        },
         responseSchema: {
           type: Type.OBJECT,
           properties: {

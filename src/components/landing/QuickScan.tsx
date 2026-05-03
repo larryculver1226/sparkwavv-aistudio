@@ -35,9 +35,13 @@ export const QuickScan: React.FC<{ onDiveIn: () => void }> = ({ onDiveIn }) => {
     setParsing(true);
     setErrorMessage(null);
     try {
-      if (file.type === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document') {
+      if (
+        file.type === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' ||
+        file.name.toLowerCase().endsWith('.docx')
+      ) {
         const arrayBuffer = await file.arrayBuffer();
-        const mammoth = await import('mammoth');
+        const mammothModule: any = await import('mammoth/mammoth.browser.js');
+        const mammoth = mammothModule.default || mammothModule;
         const result = await mammoth.extractRawText({ arrayBuffer });
         const textContent = result.value;
 
@@ -51,7 +55,7 @@ export const QuickScan: React.FC<{ onDiveIn: () => void }> = ({ onDiveIn }) => {
         } else {
           setErrorMessage('The DOCX file appears to be empty.');
         }
-      } else if (file.type === 'text/plain') {
+      } else if (file.type === 'text/plain' || file.name.toLowerCase().endsWith('.txt')) {
         const textContent = await file.text();
         const parseResult = await parseResume(textContent, 'text/plain');
         if (parseResult) {
@@ -59,7 +63,7 @@ export const QuickScan: React.FC<{ onDiveIn: () => void }> = ({ onDiveIn }) => {
         } else {
           setErrorMessage("I couldn't analyze your Career DNA.");
         }
-      } else if (file.type === 'application/pdf') {
+      } else if (file.type === 'application/pdf' || file.name.toLowerCase().endsWith('.pdf')) {
         const reader = new FileReader();
         reader.onload = async (event) => {
           const base64 = (event.target?.result as string).split(',')[1];
