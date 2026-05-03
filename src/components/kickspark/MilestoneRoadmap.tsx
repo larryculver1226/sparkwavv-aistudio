@@ -17,8 +17,8 @@ export const MilestoneRoadmap: React.FC<MilestoneRoadmapProps> = ({
   validationGateMode,
   rppValidated,
 }) => {
-  const completedCount = milestones.filter((m) => m.completed).length;
-  const progress = (completedCount / milestones.length) * 100;
+  const completedCount = milestones.length > 0 ? milestones.filter((m) => m.completed).length : 0;
+  const progress = milestones.length > 0 ? (completedCount / milestones.length) * 100 : 0;
 
   // Logic for the Validation Gate (Week 4)
   const isLocked = (milestone: Milestone) => {

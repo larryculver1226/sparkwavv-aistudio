@@ -272,60 +272,59 @@ async function createDefaultDashboard(
     userId,
     sparkwavvId: sparkwavvId || null,
     tenantId: 'sparkwavv', // Default tenant
-    careerHappiness: 5,
-    strengths: [
-      { name: 'Empathetic Listener', value: 92 },
-      { name: 'Strategic Thinker', value: 85 },
-      { name: 'Continuous Learner', value: 78 },
-      { name: 'Collaborative Leader', value: 91 },
-    ],
+    careerHappiness: 0,
+    strengths: [],
     discoveryProgress: initialStage,
-    resumeStatus: 'Resume Process: Reviewing from last update',
-    careerProfileStatus: 'Career Profile: Updated 2 days ago',
-    jobMatches: [
-      { title: 'Senior UX Designer', company: 'TechFlow', matchScore: 94 },
-      { title: 'Product Strategist', company: 'SPARKWavv', matchScore: 88 },
-      { title: 'AI Experience Lead', company: 'FutureMind', matchScore: 82 },
-    ],
+    resumeStatus: 'Resume Process: Awaiting Upload',
+    careerProfileStatus: 'Career Profile: Awaiting Setup',
+    jobMatches: [],
     aiCompanion: {
       name: 'Skylar',
       status: 'Online',
       message: 'Ready to help you with your career journey!',
     },
-    effortTier: '3.5',
-    energyTrough: { start: '14:00', end: '16:00' },
+    effortTier: '3.5 Hours/Week',
+    energyTrough: null,
     financialExpenses: [],
     validationGateMode: 'soft-warning',
     rppValidated: false,
-    milestones: [
-      { id: 'commitment', label: '12-Week Commitment', completed: false, week: 1 },
-      { id: 'spark', label: 'Initial "Spark" Identification', completed: false, week: 2 },
-      { id: 'pie', label: 'Pie of Life Exercise', completed: false, week: 3 },
-      { id: 'perfect', label: 'Perfect Day & DNA Hypothesis', completed: false, week: 4 },
-      { id: 'vault', label: 'Attribute Vault (5 Core Attributes)', completed: false, week: 5 },
-      { id: 'validation', label: 'Five Stories RPP Validation', completed: false, week: 6 },
-      { id: 'journalist', label: 'Journalist Story Versions', completed: false, week: 7 },
-      { id: 'reflective', label: 'Reflective Story Versions', completed: false, week: 8 },
-      { id: 'mig', label: 'MIG Alignment Review', completed: false, week: 9 },
-      { id: 'outreach', label: 'Market Engagement Launch', completed: false, week: 10 },
-      { id: 'feedback', label: 'Feedback Integration', completed: false, week: 11 },
-      { id: 'finalization', label: 'DNA Finalization', completed: false, week: 12 },
-    ],
-    pieOfLife: [
-      { category: 'Work', current: 60, target: 40 },
-      { category: 'Family', current: 20, target: 30 },
-      { category: 'Health', current: 10, target: 20 },
-      { category: 'Spirit', current: 10, target: 10 },
-    ],
-    perfectDay: [
-      { time: '08:00', activity: 'Morning Routine', type: 'reboot' },
-      { time: '09:00', activity: 'Deep Work', type: 'work' },
-      { time: '12:00', activity: 'Lunch', type: 'meal' },
-      { time: '13:00', activity: 'Collaboration', type: 'work' },
-      { time: '15:00', activity: 'Energy Trough Reboot', type: 'reboot' },
-    ],
+    milestones: [],
+    pieOfLife: [],
+    perfectDay: [],
   };
   await saveDashboard(db, userId, defaultDashboard);
+
+  // Seed wavvault and kanban_state with explicit action items to push the user to act
+  const kanbanState = {
+    phaseId: initialStage,
+    updatedAt: new Date().toISOString(),
+    tasks: [
+      { id: 'kanban_effort_tier', title: 'Select Effort Tier', description: 'Choose your weekly time commitment for the SPARKWavv program.', status: 'todo', category: 'Commitment', priority: 'high', order: 1, required: true },
+      { id: 'kanban_pie', title: 'Pie of Life Exercise', description: 'Complete your Pie of Life assessment with Skylar to identify balance gaps.', status: 'todo', category: 'Exercise', priority: 'high', order: 2, required: true },
+      { id: 'kanban_perfect', title: 'Perfect Day Timeline', description: 'Map out your perfect energy timeline throughout the day.', status: 'todo', category: 'Exercise', priority: 'medium', order: 3, required: true },
+      { id: 'kanban_strengths', title: 'Identify Core Strengths', description: 'Work with Skylar to extract top strengths from your career stories.', status: 'todo', category: 'Discovery', priority: 'high', order: 4, required: true },
+      { id: 'kanban_career_sync', title: 'Sync Resume & Profiles', description: 'Upload recent achievements for Skylar review.', status: 'todo', category: 'Preparation', priority: 'low', order: 5, required: false }
+    ]
+  };
+  
+  // Create an empty wavvault if it doesn't already exist to ensure kanban is seeded correctly
+  const wavvaultRef = db.collection('users').doc(userId).collection('wavvault').doc('data');
+  const wavDoc = await wavvaultRef.get();
+  if (!wavDoc.exists) {
+    await wavvaultRef.set({
+       userId,
+       tenantId: 'sparkwavv',
+       createdAt: new Date().toISOString(),
+       updatedAt: new Date().toISOString(),
+       strengths: [],
+       pieOfLife: [],
+       perfectDay: []
+    });
+  }
+
+  const kanbanRef = db.collection('users').doc(userId).collection('wavvault').doc('kanban_state');
+  await kanbanRef.set(kanbanState);
+
   return defaultDashboard;
 }
 
@@ -4619,6 +4618,60 @@ async function startServer() {
       });
     } catch (error) {
       res.status(401).json({ error: 'Invalid token' });
+    }
+  });
+
+  app.post('/api/wavvault/dive-in-commitments', async (req, res) => {
+    const idToken = req.headers.authorization?.split('Bearer ')[1];
+    if (!idToken) return res.status(401).json({ error: 'Unauthorized' });
+
+    try {
+      const decodedToken = await sparkwavvAdmin.auth().verifyIdToken(idToken);
+      const { data } = req.body;
+      if (!data) return res.status(400).json({ error: 'Data is required' });
+
+      const db = getFirestoreDb();
+      if (!db) return res.status(503).json({ error: 'Firestore not initialized' });
+
+      const uid = decodedToken.uid;
+      
+      // Update dashboard
+      await db.collection('dashboards').doc(uid).set(data, { merge: true });
+
+      // Update wavvault fields
+      const wavUpdates: any = { updatedAt: new Date().toISOString() };
+      if (data.effortTier) wavUpdates.effortTier = data.effortTier;
+      if (data.pieOfLife && data.pieOfLife.length > 0) wavUpdates.pieOfLife = data.pieOfLife;
+      if (data.perfectDay && data.perfectDay.length > 0) wavUpdates.perfectDay = data.perfectDay;
+      if (data.strengths && data.strengths.length > 0) wavUpdates.strengths = data.strengths;
+      if (data.financialExpenses && data.financialExpenses.length > 0) wavUpdates.financialExpenses = data.financialExpenses;
+
+      await db.collection('users').doc(uid).collection('wavvault').doc('data').set(wavUpdates, { merge: true });
+
+      // Update kanban state
+      const kanbanRef = db.collection('users').doc(uid).collection('wavvault').doc('kanban_state');
+      const kanbanSnap = await kanbanRef.get();
+      if (kanbanSnap.exists) {
+        const kanbanState = kanbanSnap.data();
+        let updated = false;
+        const tasks = kanbanState?.tasks || [];
+        
+        tasks.forEach((task: any) => {
+          if (task.id === 'kanban_effort_tier' && data.effortTier) { task.status = 'completed'; updated = true; }
+          if (task.id === 'kanban_pie' && data.pieOfLife && data.pieOfLife.length > 0) { task.status = 'completed'; updated = true; }
+          if (task.id === 'kanban_perfect' && data.perfectDay && data.perfectDay.length > 0) { task.status = 'completed'; updated = true; }
+          if (task.id === 'kanban_strengths' && data.strengths && data.strengths.length > 0) { task.status = 'completed'; updated = true; }
+        });
+
+        if (updated) {
+          await kanbanRef.set({ tasks, updatedAt: new Date().toISOString() }, { merge: true });
+        }
+      }
+
+      res.json({ success: true });
+    } catch (error: any) {
+      console.error('Error saving Dive-In commitments:', error);
+      res.status(500).json({ error: error.message });
     }
   });
 

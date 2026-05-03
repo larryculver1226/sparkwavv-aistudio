@@ -107,7 +107,6 @@ export const configService = {
               : defaultData.allowedModalities || DEFAULT_MODALITIES,
             uiConfig: defaultData.uiConfig || { theme: 'dark', layout: 'split' }
           } as SkylarStageConfig;
-          await this.updateStageConfig(sId, config);
           stages[sId] = config;
         }
         journeyStagesCache = stages;
@@ -206,7 +205,6 @@ export const configService = {
             uiConfig: defaultData.uiConfig || { theme: 'dark', layout: 'split' }
           } as SkylarStageConfig;
           
-          await this.updateStageConfig(normalizedStageId, config);
           return config;
         }
         return null;

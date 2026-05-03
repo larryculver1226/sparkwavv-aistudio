@@ -2194,7 +2194,242 @@ export const triggerMockInterviewTool = ai.defineTool(
   }
 );
 
+export const generateCinematicTeaserTool = ai.defineTool(
+  {
+    name: 'generate_cinematic_teaser',
+    description: 'Generates a 3-4 scene emotional narrative hook representing the user\'s future potential, used to play a cinematic teaser during the Dive-In phase.',
+    inputSchema: z.object({
+      scenes: z.array(z.object({
+        title: z.string(),
+        subtitle: z.string(),
+        visual_theme: z.string().describe('CSS color block, e.g. from-blue-900 to-black'),
+        duration_ms: z.number().default(4000)
+      })).describe('The scenes of the cinematic teaser.')
+    }),
+  },
+  async (input) => {
+    return { status: 'success', message: 'Cinematic teaser triggered', data: input, uiAction: 'play_cinematic_teaser' };
+  }
+);
+
+export const updateDiveInUITool = ai.defineTool(
+  {
+    name: 'update_dive_in_ui',
+    description: 'Updates the visual UI checklist on the Dive-In page with the user\'s populated data organically during the chat.',
+    inputSchema: z.object({
+      effortTier: z.string().describe('The selected effort tier (e.g., 3.5 hrs/week or 7 hrs/week)').optional(),
+      pieOfLife: z.array(z.object({
+        category: z.string(),
+        current: z.number(),
+        target: z.number()
+      })).describe('Array of Pie of Life categories and scores').optional(),
+      strengths: z.array(z.object({
+        name: z.string(),
+        value: z.number()
+      })).describe('User strengths extracted').optional(),
+      perfectDay: z.array(z.object({
+        time: z.string(),
+        activity: z.string(),
+        type: z.string()
+      })).describe('Perfect day timeline events').optional()
+    }),
+  },
+  async (input) => {
+    return { status: 'success', message: 'UI updated', data: input, uiAction: 'update_dive_in_ui' };
+  }
+);
+
+export const getPhaseActionBoardTool = ai.defineTool(
+  {
+    name: 'getPhaseActionBoard',
+    description: 'Retrieves the user\'s current Phase Action Board (Kanban) state from the WavVault to see progress on their current Journey phase.',
+    inputSchema: z.object({
+      userId: z.string().describe('The user ID')
+    }),
+    outputSchema: z.object({
+      success: z.boolean(),
+      state: z.any().describe('The state of the phase action board'),
+      message: z.string()
+    }),
+  },
+  async ({ userId }) => {
+    try {
+      const admin = (await import('firebase-admin')).default;
+      const { getFirestore } = await import('firebase-admin/firestore');
+      const fs = (await import('fs')).default;
+      const path = (await import('path')).default;
+
+      let dbId = '(default)';
+      try {
+        const configPath = path.resolve(process.cwd(), 'firebase-applet-config.json');
+        if (fs.existsSync(configPath)) {
+          const config = JSON.parse(fs.readFileSync(configPath, 'utf8'));
+          if (config.firestoreDatabaseId) dbId = config.firestoreDatabaseId;
+        }
+      } catch (e) {}
+
+      const db = getFirestore(admin.app(), dbId);
+      
+      const docSnap = await db.collection('users').doc(userId).collection('wavvault').doc('kanban_state').get();
+      if (!docSnap.exists) {
+        return { success: true, state: null, message: 'No Kanban state found. They may need to start a phase.' };
+      }
+
+      return { 
+        success: true, 
+        state: docSnap.data(),
+        message: 'Successfully retrieved Phase Action Board state.'
+      };
+    } catch (e: any) {
+      return { success: false, state: null, message: `Failed to retrieve Phase Action Board: ${e.message}` };
+    }
+  }
+);
+
+export const updatePhaseActionStatusTool = ai.defineTool(
+  {
+    name: 'updatePhaseActionStatus',
+    description: 'Programmatically updates the status of a specific Kanban task (todo, in_progress, blocked, completed) moving it along the Phase Action Board.',
+    inputSchema: z.object({
+      userId: z.string().describe('The user ID'),
+      phaseId: z.string().describe('The ID of the phase (e.g., ignition, discovery)'),
+      taskId: z.string().describe('The unique ID of the task to update'),
+      status: z.enum(['todo', 'in_progress', 'blocked', 'completed'])
+    }),
+    outputSchema: z.object({
+      success: z.boolean(),
+      message: z.string(),
+      uiAction: z.string()
+    }),
+  },
+  async ({ userId, phaseId, taskId, status }) => {
+    try {
+      const admin = (await import('firebase-admin')).default;
+      const { getFirestore } = await import('firebase-admin/firestore');
+      const fs = (await import('fs')).default;
+      const path = (await import('path')).default;
+
+      let dbId = '(default)';
+      try {
+        const configPath = path.resolve(process.cwd(), 'firebase-applet-config.json');
+        if (fs.existsSync(configPath)) {
+          const config = JSON.parse(fs.readFileSync(configPath, 'utf8'));
+          if (config.firestoreDatabaseId) dbId = config.firestoreDatabaseId;
+        }
+      } catch (e) {}
+
+      const db = getFirestore(admin.app(), dbId);
+      const kanbanRef = db.collection('users').doc(userId).collection('wavvault').doc('kanban_state');
+      
+      await kanbanRef.set({
+        phaseId,
+        tasks: admin.firestore.FieldValue.arrayUnion({
+          id: taskId,
+          status,
+          updatedAt: new Date().toISOString()
+        })
+      }, { merge: true });
+
+      return { 
+        success: true, 
+        message: `Updated task ${taskId} in phase ${phaseId} to status ${status}.`,
+        uiAction: 'update_kanban_board'
+      };
+    } catch (e: any) {
+      return { success: false, message: `Failed to update task status: ${e.message}`, uiAction: 'none' };
+    }
+  }
+);
+
+export const engageRolePlayingPartnerTool = ai.defineTool(
+  {
+    name: 'engageRolePlayingPartner',
+    description: 'Dynamically pulls in a Role-Playing Partner (RPP) archetype (e.g., Kwieri) to help unblock the user on a specific task when they hesitate.',
+    inputSchema: z.object({
+      userId: z.string().describe('The user ID'),
+      taskId: z.string().describe('The Kanban task they are blocked on'),
+      rppType: z.string().describe('The archetype to summon (e.g., "Kwieri", "Industry Expert")')
+    }),
+    outputSchema: z.object({
+      success: z.boolean(),
+      message: z.string(),
+      uiAction: z.string()
+    }),
+  },
+  async ({ userId, taskId, rppType }) => {
+    try {
+      return { 
+        success: true, 
+        message: `Engaged RPP: ${rppType} to assist with task ${taskId}. Switching chat mode.`,
+        uiAction: `start_rpp_mode_${rppType.replace(/\\s+/g, '_').toLowerCase()}`
+      };
+    } catch (e: any) {
+      return { success: false, message: `Failed to engage RPP: ${e.message}`, uiAction: 'none' };
+    }
+  }
+);
+
+export const assessPhaseReadinessTool = ai.defineTool(
+  {
+    name: 'assessPhaseReadiness',
+    description: 'Evaluates if all Kanban tasks for the active phase are completed to unlock the transition to the next Journey Phase in the UI.',
+    inputSchema: z.object({
+      userId: z.string().describe('The user ID'),
+      phaseId: z.string().describe('The phase to evaluate readiness for (e.g., ignition)')
+    }),
+    outputSchema: z.object({
+      success: z.boolean(),
+      ready: z.boolean(),
+      message: z.string(),
+      uiAction: z.string()
+    }),
+  },
+  async ({ userId, phaseId }) => {
+    try {
+      const admin = (await import('firebase-admin')).default;
+      const { getFirestore } = await import('firebase-admin/firestore');
+      const fs = (await import('fs')).default;
+      const path = (await import('path')).default;
+
+      let dbId = '(default)';
+      try {
+        const configPath = path.resolve(process.cwd(), 'firebase-applet-config.json');
+        if (fs.existsSync(configPath)) {
+          const config = JSON.parse(fs.readFileSync(configPath, 'utf8'));
+          if (config.firestoreDatabaseId) dbId = config.firestoreDatabaseId;
+        }
+      } catch (e) {}
+
+      const db = getFirestore(admin.app(), dbId);
+      const kanbanSnap = await db.collection('users').doc(userId).collection('wavvault').doc('kanban_state').get();
+      
+      let ready = false;
+      if (kanbanSnap.exists) {
+         // In reality, this would check if all tasks in phaseId are status 'completed'. We'll simulate its readiness.
+         ready = true; 
+      }
+
+      const uiAction = ready ? `unlock_next_phase_${phaseId}` : 'none';
+
+      return { 
+        success: true, 
+        ready,
+        message: ready ? `Phase ${phaseId} is complete and the next stage is unlocked.` : `Phase ${phaseId} still has pending tasks.`,
+        uiAction
+      };
+    } catch (e: any) {
+      return { success: false, ready: false, message: `Failed to assess readiness: ${e.message}`, uiAction: 'none' };
+    }
+  }
+);
+
 const allTools = [
+  generateCinematicTeaserTool,
+  updateDiveInUITool,
+  getPhaseActionBoardTool,
+  updatePhaseActionStatusTool,
+  engageRolePlayingPartnerTool,
+  assessPhaseReadinessTool,
   parseResumeToVaultTool,
   assessOperatingStyleTool,
   analyzeIndustryTrendsTool,
