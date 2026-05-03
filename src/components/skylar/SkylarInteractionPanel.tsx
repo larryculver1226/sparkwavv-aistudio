@@ -193,6 +193,14 @@ export const SkylarInteractionPanel: React.FC<SkylarInteractionPanelProps> = ({
     setAttachments(prev => prev.filter((_, i) => i !== index));
   };
 
+  const isModalityAllowed = (modality: string) => {
+    if (!stageConfig?.allowedModalities) return false;
+    if (Array.isArray(stageConfig.allowedModalities)) {
+      return stageConfig.allowedModalities.includes(modality as any);
+    }
+    return !!(stageConfig.allowedModalities as any)[modality];
+  };
+
   const getThemeClasses = () => {
     if (!stageConfig) return 'border-white/10 bg-white/5';
     switch (stageConfig.uiConfig.theme) {
@@ -227,9 +235,9 @@ export const SkylarInteractionPanel: React.FC<SkylarInteractionPanelProps> = ({
         
         {/* Modality Indicators */}
         <div className="flex gap-2">
-          {stageConfig.allowedModalities.includes('audio') && <Mic className="w-4 h-4 text-white/30" />}
-          {stageConfig.allowedModalities.includes('image') && <ImageIcon className="w-4 h-4 text-white/30" />}
-          {stageConfig.allowedModalities.includes('video') && <Video className="w-4 h-4 text-white/30" />}
+          {isModalityAllowed('audio') && <Mic className="w-4 h-4 text-white/30" />}
+          {isModalityAllowed('image') && <ImageIcon className="w-4 h-4 text-white/30" />}
+          {isModalityAllowed('video') && <Video className="w-4 h-4 text-white/30" />}
         </div>
       </div>
 
@@ -326,7 +334,7 @@ export const SkylarInteractionPanel: React.FC<SkylarInteractionPanelProps> = ({
                 onChange={handleFileChange}
                 className="hidden"
                 multiple
-                accept={stageConfig.allowedModalities.includes('image') ? 'image/*,application/pdf,.doc,.docx' : 'application/pdf,.doc,.docx'}
+                accept={isModalityAllowed('image') ? 'image/*,application/pdf,.doc,.docx' : 'application/pdf,.doc,.docx'}
               />
               <button 
                 onClick={() => fileInputRef.current?.click()}
@@ -335,7 +343,7 @@ export const SkylarInteractionPanel: React.FC<SkylarInteractionPanelProps> = ({
                 <Paperclip className="w-5 h-5" />
               </button>
               
-              {stageConfig.allowedModalities.includes('audio') && (
+              {isModalityAllowed('audio') && (
                 <button 
                   onClick={() => isLive ? stopLiveSession() : startLiveSession(`You are Skylar, operating in the ${stageConfig.title} stage. ${stageConfig.systemPromptTemplate}`)}
                   disabled={isConnecting}

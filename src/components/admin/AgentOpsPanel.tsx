@@ -74,11 +74,26 @@ export const AgentOpsPanel: React.FC = () => {
     }));
   };
 
+  const isModalityAllowed = (modality: string) => {
+    const mods = configs[selectedStage]?.allowedModalities;
+    if (!mods) return false;
+    if (Array.isArray(mods)) return mods.includes(modality as any);
+    return !!(mods as any)[modality];
+  };
+
   const toggleModality = (modality: Modality) => {
     const current = configs[selectedStage].allowedModalities;
-    const updated = current.includes(modality)
-      ? current.filter(m => m !== modality)
-      : [...current, modality];
+    let updated;
+    if (Array.isArray(current)) {
+      updated = current.includes(modality)
+        ? current.filter(m => m !== modality)
+        : [...current, modality];
+    } else {
+      updated = {
+        ...(current as any),
+        [modality]: !(current as any)[modality]
+      };
+    }
     handleConfigChange('allowedModalities', updated);
   };
 
@@ -193,7 +208,7 @@ export const AgentOpsPanel: React.FC = () => {
                       key={mod}
                       onClick={() => toggleModality(mod)}
                       className={`px-4 py-2 rounded-lg border text-sm font-bold capitalize transition-all ${
-                        currentConfig.allowedModalities.includes(mod)
+                        isModalityAllowed(mod)
                           ? 'bg-neon-cyan/20 border-neon-cyan text-neon-cyan'
                           : 'bg-white/5 border-white/10 text-white/40 hover:bg-white/10'
                       }`}

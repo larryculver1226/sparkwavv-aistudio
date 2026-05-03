@@ -76,8 +76,14 @@ export const agentOpsService = {
    */
   async getConfig(stageId: string): Promise<JourneyStageDefinition> {
     try {
-      const docRef = doc(db, COLLECTION_NAME, stageId);
-      const docSnap = await getDoc(docRef);
+      let docRef = doc(db, COLLECTION_NAME, stageId);
+      let docSnap = await getDoc(docRef);
+
+      if (!docSnap.exists() && stageId !== stageId.toLowerCase()) {
+        const normalizedId = stageId.toLowerCase();
+        docRef = doc(db, COLLECTION_NAME, normalizedId);
+        docSnap = await getDoc(docRef);
+      }
 
       if (docSnap.exists()) {
         const data = docSnap.data();
@@ -86,11 +92,15 @@ export const agentOpsService = {
           title: data.title || data.stageTitle || docSnap.id
         } as JourneyStageDefinition;
       } else {
-        // Return null if not found
+        // Fallback to hardcoded default if it exists
+        const normalizedId = stageId.toLowerCase();
+        const fallback = (defaultJourneyStages as any)[normalizedId];
+        if (fallback) {
+          return fallback;
+        }
         throw new Error(`Journey Phase Config not found for ${stageId}`);
       }
     } catch (error) {
-      // throw error instead of falling back to default
       throw error;
     }
   },
