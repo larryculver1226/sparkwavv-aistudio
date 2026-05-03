@@ -270,7 +270,8 @@ service cloud.firestore {
         'jobMatches', 'aiCompanion', 'effortTier', 'energyTrough', 'financialExpenses', 
         'rppValidated', 'milestones', 'updatedAt', 'displayName', 'pieOfLife', 
         'perfectDay', 'alignmentMatrix', 'mentorNote', 'mentorNoteTimestamp', 
-        'validationPending', '_persistenceStatus', 'phaseProgress'
+        'validationPending', '_persistenceStatus', 'phaseProgress',
+        'validationStatus', 'pendingGateId'
       ];
       return hasRequiredFields(['userId', 'tenantId']) &&
              hasOnlyAllowedFields(allowedFields) &&
@@ -299,6 +300,8 @@ service cloud.firestore {
              (!('mentorNoteTimestamp' in data) || data.mentorNoteTimestamp is string || data.mentorNoteTimestamp is timestamp) &&
              (!('validationPending' in data) || data.validationPending is bool) &&
              (!('_persistenceStatus' in data) || (data._persistenceStatus is string && data._persistenceStatus.size() < 20)) &&
+             (!('validationStatus' in data) || (data.validationStatus is string && data.validationStatus.size() < 100)) &&
+             (!('pendingGateId' in data) || (data.pendingGateId is string && data.pendingGateId.size() < 100)) &&
              (!('updatedAt' in data) || (resource == null ? isRecent(data.updatedAt) : data.updatedAt == resource.data.updatedAt));
     }
 

@@ -51,7 +51,7 @@ export const WavvaultHighlights: React.FC<WavvaultHighlightsProps> = ({
         {recentArtifacts.length > 0 ? (
           recentArtifacts.map((artifact, i) => (
             <motion.div
-              key={artifact.id}
+              key={artifact.id || `artifact-${i}`}
               initial={{ opacity: 0, y: 10 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: i * 0.1 }}

@@ -82,9 +82,9 @@ export const ActionCenter: React.FC<ActionCenterProps> = ({ currentStage, onActi
               Required to Unlock Next Gate
             </h4>
             <div className="space-y-3">
-              {data.actions.map((action) => (
+              {data.actions.map((action, i) => (
                 <button
-                  key={action.id}
+                  key={action.id || `action-${i}`}
                   onClick={() => onActionClick(action.id)}
                   className="w-full flex items-center justify-between p-4 rounded-xl bg-white/5 border border-white/10 hover:bg-white/10 transition-all group"
                 >

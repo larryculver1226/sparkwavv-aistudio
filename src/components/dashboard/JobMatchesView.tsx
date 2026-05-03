@@ -78,7 +78,7 @@ export const JobMatchesView: React.FC<JobMatchesViewProps> = ({ onBack }) => {
           ) : (
             opportunities.map((job, i) => (
               <motion.div
-                key={job.id}
+                key={job.id || `job-${i}`}
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: i * 0.1 }}

@@ -244,9 +244,9 @@ export const SkylarInteractionPanel: React.FC<SkylarInteractionPanelProps> = ({
       {/* Chat Area */}
       <div className="flex-1 overflow-y-auto p-6 space-y-6 custom-scrollbar">
         <AnimatePresence>
-          {messages.map((msg) => (
+          {messages.map((msg, i) => (
             <motion.div
-              key={msg.id}
+              key={msg.id || `msg-${i}`}
               initial={{ opacity: 0, y: 10 }}
               animate={{ opacity: 1, y: 0 }}
               className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}
