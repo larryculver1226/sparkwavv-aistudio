@@ -135,6 +135,31 @@ export const configService = {
         } as SkylarStageConfig;
       });
 
+      // Merge missing stages from defaults so they are available without a manual seed
+      const module = await import('../config/defaultJourneyStages.json');
+      const defaultStages = module.default as Record<string, any>;
+      for (const [sId, defaultData] of Object.entries(defaultStages)) {
+        if (!stages[sId]) {
+          const config = {
+            stageId: sId,
+            stageTitle: defaultData.title || sId,
+            description: defaultData.description || '',
+            systemPromptTemplate: defaultData.systemPromptTemplate || '',
+            requiredArtifacts: defaultData.requiredArtifacts || [],
+            allowedModalities: Array.isArray(defaultData.allowedModalities) 
+              ? {
+                  text: defaultData.allowedModalities.includes('text'),
+                  audio: defaultData.allowedModalities.includes('audio'),
+                  image: defaultData.allowedModalities.includes('image'),
+                  video: defaultData.allowedModalities.includes('video'),
+                }
+              : defaultData.allowedModalities || DEFAULT_MODALITIES,
+            uiConfig: defaultData.uiConfig || { theme: 'dark', layout: 'split' }
+          } as SkylarStageConfig;
+          stages[sId] = config;
+        }
+      }
+
       journeyStagesCache = stages;
       return stages;
     } catch (error) {
@@ -183,7 +208,7 @@ export const configService = {
         
         return config;
       } else {
-        console.warn(`[Config Service] Journey stage "${normalizedStageId}" not found. Trying to fallback to default config...`);
+        console.info(`[Config Service] Journey stage "${normalizedStageId}" not found. Using default internal config.`);
         const module = await import('../config/defaultJourneyStages.json');
         const defaultStages = module.default as Record<string, any>;
         const defaultData = defaultStages[normalizedStageId] || defaultStages['dive-in'];

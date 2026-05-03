@@ -68,28 +68,29 @@ export const DynamicPhaseView: React.FC<DynamicPhaseViewProps> = ({
     if (skylarPanel) skylarPanel.scrollIntoView({ behavior: 'smooth' });
   };
 
-  const renderWidget = (widget: any) => {
+  const renderWidget = (widget: any, idx: number) => {
+    const key = widget.id || `widget-${widget.type}-${idx}`;
     switch (widget.type) {
       case 'ActionCenter':
-        return <ActionCenter key={widget.id} currentStage={currentStage} onActionClick={onActionClick} wavvaultData={wavvaultData} />;
+        return <ActionCenter key={key} currentStage={currentStage} onActionClick={onActionClick} wavvaultData={wavvaultData} />;
       case 'NeuralSynthesisEngine':
-        return <NeuralSynthesisEngine key={widget.id} userId={userId} currentStage={currentStage} />;
+        return <NeuralSynthesisEngine key={key} userId={userId} currentStage={currentStage} />;
       case 'ActivityFeed':
-        return <ActivityFeed key={widget.id} userId={userId} limitCount={widget.props?.limitCount || 5} onActivityClick={onActivityClick} />;
+        return <ActivityFeed key={key} userId={userId} limitCount={widget.props?.limitCount || 5} onActivityClick={onActivityClick} />;
       case 'SectorIntelligence':
         if (!profile?.specializedSector || profile.specializedSector === 'General') return null;
-        return <SectorIntelligence key={widget.id} sector={profile.specializedSector} userId={userId} />;
+        return <SectorIntelligence key={key} sector={profile.specializedSector} userId={userId} />;
       case 'WavvaultHighlights':
-        return <WavvaultHighlights key={widget.id} artifacts={artifacts} stage={stageConfig.title} isLocked={false} />;
+        return <WavvaultHighlights key={key} artifacts={artifacts} stage={stageConfig.title} isLocked={false} />;
       case 'StrengthsProfile':
-        return <StrengthsProfileWidget key={widget.id} profile={profile} onNavigate={onNavigate} />;
+        return <StrengthsProfileWidget key={key} profile={profile} onNavigate={onNavigate} />;
       case 'JobMatchesPreview':
-        return <JobMatchesPreviewWidget key={widget.id} data={data} onNavigate={onNavigate} />;
+        return <JobMatchesPreviewWidget key={key} data={data} onNavigate={onNavigate} />;
       case 'SynthesisLabEntry':
-        return <SynthesisLabEntryWidget key={widget.id} onNavigate={onNavigate} />;
+        return <SynthesisLabEntryWidget key={key} onNavigate={onNavigate} />;
       case 'CustomMarkdown':
         return (
-          <div key={widget.id} className="glass-panel p-8 rounded-[2rem] border border-white/5 bg-black/40 text-white/80 prose prose-invert">
+          <div key={key} className="glass-panel p-8 rounded-[2rem] border border-white/5 bg-black/40 text-white/80 prose prose-invert">
             {widget.props?.content || 'No content provided.'}
           </div>
         );
@@ -116,21 +117,21 @@ export const DynamicPhaseView: React.FC<DynamicPhaseViewProps> = ({
         />
 
         {/* Header Zone */}
-        {headerWidgets.map(renderWidget)}
+        {headerWidgets.map((w, i) => renderWidget(w, i))}
         
         {/* Main Content Area */}
         {sidebarWidgets.length > 0 ? (
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
             <div className="space-y-8">
-              {mainWidgets.map(renderWidget)}
+              {mainWidgets.map((w, i) => renderWidget(w, i))}
             </div>
             <div className="space-y-8">
-              {sidebarWidgets.map(renderWidget)}
+              {sidebarWidgets.map((w, i) => renderWidget(w, i))}
             </div>
           </div>
         ) : (
           <div className="space-y-8">
-            {mainWidgets.map(renderWidget)}
+            {mainWidgets.map((w, i) => renderWidget(w, i))}
           </div>
         )}
       </div>

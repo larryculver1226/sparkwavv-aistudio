@@ -971,9 +971,17 @@ class SkylarService {
 
   async saveWavvaultData(data: WavvaultData, isCommit: boolean = false): Promise<void> {
     try {
+      const idToken = await auth.currentUser?.getIdToken();
+      if (!idToken) {
+        console.warn('No auth token available for saveWavvaultData');
+        return;
+      }
       await fetch('/api/wavvault/user', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${idToken}`
+        },
         body: JSON.stringify({ ...data, isCommit }),
       });
     } catch (error) {
@@ -1005,7 +1013,16 @@ class SkylarService {
     userId: string
   ): Promise<{ valid: boolean; expectedHash: string; actualHash: string }> {
     try {
-      const response = await fetch(`/api/wavvault/verify?userId=${userId}`);
+      const idToken = await auth.currentUser?.getIdToken();
+      if (!idToken) {
+        console.warn('No auth token available for verifyWavvaultIntegrity');
+        return { valid: false, expectedHash: '', actualHash: '' };
+      }
+      const response = await fetch(`/api/wavvault/verify?userId=${userId}`, {
+        headers: {
+          'Authorization': `Bearer ${idToken}`
+        }
+      });
       if (response.ok) {
         return await response.json();
       }
@@ -1018,7 +1035,16 @@ class SkylarService {
 
   async getWavvaultData(userId: string): Promise<WavvaultData | null> {
     try {
-      const response = await fetch(`/api/wavvault/user?userId=${userId}`);
+      const idToken = await auth.currentUser?.getIdToken();
+      if (!idToken) {
+        console.warn('No auth token available for getWavvaultData');
+        return null;
+      }
+      const response = await fetch(`/api/wavvault/user?userId=${userId}`, {
+        headers: {
+          'Authorization': `Bearer ${idToken}`
+        }
+      });
       if (response.ok) {
         return await response.json();
       }
