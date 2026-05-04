@@ -146,7 +146,7 @@ export const HistoryView: React.FC<HistoryViewProps> = ({ userId }) => {
           ) : (
             filteredActivities.map((activity, index) => (
               <motion.div
-                key={activity.id}
+                key={activity.id || `activity-${index}`}
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: Math.min(index * 0.05, 0.5) }}

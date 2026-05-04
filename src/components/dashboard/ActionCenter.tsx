@@ -112,8 +112,8 @@ export const ActionCenter: React.FC<ActionCenterProps> = ({ currentStage, onActi
                 Identified Gaps
               </h4>
               <div className="space-y-3">
-                {data.gaps.map((gap) => (
-                  <div key={gap.id} className="p-4 rounded-xl bg-neon-magenta/5 border border-neon-magenta/20 flex items-start gap-3">
+                {data.gaps.map((gap, i) => (
+                  <div key={gap.id || `gap-${i}`} className="p-4 rounded-xl bg-neon-magenta/5 border border-neon-magenta/20 flex items-start gap-3">
                     <AlertCircle className="w-5 h-5 text-neon-magenta shrink-0 mt-0.5" />
                     <p className="text-sm text-white/70 leading-relaxed">{gap.label}</p>
                   </div>

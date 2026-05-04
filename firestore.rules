@@ -273,36 +273,36 @@ service cloud.firestore {
         'validationPending', '_persistenceStatus', 'phaseProgress',
         'validationStatus', 'pendingGateId'
       ];
-      return hasRequiredFields(['userId', 'tenantId']) &&
+      return hasRequiredFields(['userId']) &&
              hasOnlyAllowedFields(allowedFields) &&
              data.userId is string && data.userId.size() < 128 &&
-             data.tenantId is string && data.tenantId.size() < 64 &&
-             (!('sparkwavvId' in data) || (data.sparkwavvId is string && data.sparkwavvId.size() < 64)) &&
-             (!('careerHappiness' in data) || (data.careerHappiness is int && data.careerHappiness >= 0 && data.careerHappiness <= 100)) &&
-             (!('discoveryProgress' in data) || (data.discoveryProgress is string && data.discoveryProgress.size() < 100)) &&
-             (!('phaseProgress' in data) || data.phaseProgress is map) &&
-             (!('validationGateMode' in data) || (data.validationGateMode is string && data.validationGateMode.size() < 100)) &&
-             (!('strengths' in data) || (data.strengths is list && data.strengths.size() < 50)) &&
-             (!('resumeStatus' in data) || (data.resumeStatus is string && data.resumeStatus.size() < 500)) &&
-             (!('careerProfileStatus' in data) || (data.careerProfileStatus is string && data.careerProfileStatus.size() < 500)) &&
-             (!('jobMatches' in data) || (data.jobMatches is list && data.jobMatches.size() < 20)) &&
-             (!('aiCompanion' in data) || (data.aiCompanion is map)) &&
-             (!('effortTier' in data) || (data.effortTier is string && data.effortTier.size() < 20)) &&
-             (!('energyTrough' in data) || (data.energyTrough is map)) &&
-             (!('financialExpenses' in data) || (data.financialExpenses is list && data.financialExpenses.size() < 100)) &&
-             (!('rppValidated' in data) || (data.rppValidated is bool)) &&
-             (!('milestones' in data) || (data.milestones is list && data.milestones.size() < 50)) &&
-             (!('displayName' in data) || (data.displayName is string && data.displayName.size() < 100)) &&
-             (!('pieOfLife' in data) || data.pieOfLife is list) &&
-             (!('perfectDay' in data) || data.perfectDay is list) &&
-             (!('alignmentMatrix' in data) || data.alignmentMatrix is map) &&
-             (!('mentorNote' in data) || (data.mentorNote is string && data.mentorNote.size() < 5000)) &&
-             (!('mentorNoteTimestamp' in data) || data.mentorNoteTimestamp is string || data.mentorNoteTimestamp is timestamp) &&
-             (!('validationPending' in data) || data.validationPending is bool) &&
-             (!('_persistenceStatus' in data) || (data._persistenceStatus is string && data._persistenceStatus.size() < 20)) &&
-             (!('validationStatus' in data) || (data.validationStatus is string && data.validationStatus.size() < 100)) &&
-             (!('pendingGateId' in data) || (data.pendingGateId is string && data.pendingGateId.size() < 100)) &&
-             (!('updatedAt' in data) || (resource == null ? isRecent(data.updatedAt) : data.updatedAt == resource.data.updatedAt));
+             (!('tenantId' in data) || data.tenantId == null || (data.tenantId is string && data.tenantId.size() < 64)) &&
+             (!('sparkwavvId' in data) || data.sparkwavvId == null || (data.sparkwavvId is string && data.sparkwavvId.size() < 64)) &&
+             (!('careerHappiness' in data) || data.careerHappiness == null || (data.careerHappiness is int && data.careerHappiness >= 0 && data.careerHappiness <= 100)) &&
+             (!('discoveryProgress' in data) || data.discoveryProgress == null || (data.discoveryProgress is string && data.discoveryProgress.size() < 100)) &&
+             (!('phaseProgress' in data) || data.phaseProgress == null || data.phaseProgress is map) &&
+             (!('validationGateMode' in data) || data.validationGateMode == null || (data.validationGateMode is string && data.validationGateMode.size() < 100)) &&
+             (!('strengths' in data) || data.strengths == null || (data.strengths is list && data.strengths.size() < 50)) &&
+             (!('resumeStatus' in data) || data.resumeStatus == null || (data.resumeStatus is string && data.resumeStatus.size() < 500)) &&
+             (!('careerProfileStatus' in data) || data.careerProfileStatus == null || (data.careerProfileStatus is string && data.careerProfileStatus.size() < 500)) &&
+             (!('jobMatches' in data) || data.jobMatches == null || (data.jobMatches is list && data.jobMatches.size() < 20)) &&
+             (!('aiCompanion' in data) || data.aiCompanion == null || (data.aiCompanion is map)) &&
+             (!('effortTier' in data) || data.effortTier == null || (data.effortTier is string && data.effortTier.size() < 20)) &&
+             (!('energyTrough' in data) || data.energyTrough == null || (data.energyTrough is map)) &&
+             (!('financialExpenses' in data) || data.financialExpenses == null || (data.financialExpenses is list && data.financialExpenses.size() < 100)) &&
+             (!('rppValidated' in data) || data.rppValidated == null || (data.rppValidated is bool)) &&
+             (!('milestones' in data) || data.milestones == null || (data.milestones is list && data.milestones.size() < 50)) &&
+             (!('displayName' in data) || data.displayName == null || (data.displayName is string && data.displayName.size() < 100)) &&
+             (!('pieOfLife' in data) || data.pieOfLife == null || data.pieOfLife is list) &&
+             (!('perfectDay' in data) || data.perfectDay == null || data.perfectDay is list) &&
+             (!('alignmentMatrix' in data) || data.alignmentMatrix == null || data.alignmentMatrix is map) &&
+             (!('mentorNote' in data) || data.mentorNote == null || (data.mentorNote is string && data.mentorNote.size() < 5000)) &&
+             (!('mentorNoteTimestamp' in data) || data.mentorNoteTimestamp == null || data.mentorNoteTimestamp is string || data.mentorNoteTimestamp is timestamp) &&
+             (!('validationPending' in data) || data.validationPending == null || data.validationPending is bool) &&
+             (!('_persistenceStatus' in data) || data._persistenceStatus == null || (data._persistenceStatus is string && data._persistenceStatus.size() < 20)) &&
+             (!('validationStatus' in data) || data.validationStatus == null || (data.validationStatus is string && data.validationStatus.size() < 100)) &&
+             (!('pendingGateId' in data) || data.pendingGateId == null || (data.pendingGateId is string && data.pendingGateId.size() < 100)) &&
+             (!('updatedAt' in data) || data.updatedAt == null || (resource == null ? isRecent(data.updatedAt) : data.updatedAt == resource.data.updatedAt));
     }
 
     function isValidArtifact(data) {
@@ -347,26 +347,41 @@ service cloud.firestore {
         'updatedAt', 'graph', 'logs', 'journeyEvents', 'artifacts', 'lastSynthesis', 
         'isDiscoveryUnlocked', 'contentHash', 'previousHash', 'lastCommitHash', 'lastCommitTimestamp',
         'effortTier', 'energyManagement', 'rppPartners', 'twentyOneQuestions', 'perfectDay', 'prioritizationRankings',
-        'pieOfLife', 'extinguishers', 'accomplishmentLedger', 'fiveStories', 'attributeAssignments'
+        'pieOfLife', 'extinguishers', 'accomplishmentLedger', 'fiveStories', 'attributeAssignments',
+        'chatHistory', 'validationGates'
       ];
-      return hasRequiredFields(['userId', 'tenantId']) &&
+      return hasRequiredFields(['userId']) &&
              hasOnlyAllowedFields(allowedFields) &&
              data.userId is string && data.userId.size() < 128 &&
-             data.tenantId is string && data.tenantId.size() < 64 &&
-             (!('identity' in data) || (data.identity is string && data.identity.size() < 5000)) &&
-             (!('strengths' in data) || (data.strengths is list && data.strengths.size() < 50)) &&
-             (!('careerStories' in data) || (data.careerStories is list && data.careerStories.size() < 20)) &&
-             (!('graph' in data) || data.graph is map) &&
-             (!('logs' in data) || data.logs is list) &&
-             (!('journeyEvents' in data) || data.journeyEvents is list) &&
-             (!('artifacts' in data) || data.artifacts is list) &&
-             (!('lastSynthesis' in data) || (data.lastSynthesis is string && data.lastSynthesis.size() < 100)) &&
-             (!('isDiscoveryUnlocked' in data) || data.isDiscoveryUnlocked is bool) &&
-             (!('contentHash' in data) || (data.contentHash is string && data.contentHash.size() < 128)) &&
-             (!('previousHash' in data) || (data.previousHash is string && data.previousHash.size() < 128)) &&
-             (!('lastCommitHash' in data) || (data.lastCommitHash is string && data.lastCommitHash.size() < 128)) &&
-             (!('lastCommitTimestamp' in data) || isRecent(data.lastCommitTimestamp)) &&
-             (!('updatedAt' in data) || (resource == null ? isRecent(data.updatedAt) : data.updatedAt == resource.data.updatedAt));
+             (!('tenantId' in data) || data.tenantId == null || (data.tenantId is string && data.tenantId.size() < 64)) &&
+             (!('identity' in data) || data.identity == null || (data.identity is string && data.identity.size() < 5000)) &&
+             (!('strengths' in data) || data.strengths == null || (data.strengths is list && data.strengths.size() < 50)) &&
+             (!('careerStories' in data) || data.careerStories == null || (data.careerStories is list && data.careerStories.size() < 20)) &&
+             (!('graph' in data) || data.graph == null || data.graph is map) &&
+             (!('logs' in data) || data.logs == null || data.logs is list) &&
+             (!('journeyEvents' in data) || data.journeyEvents == null || data.journeyEvents is list) &&
+             (!('artifacts' in data) || data.artifacts == null || data.artifacts is list) &&
+             (!('lastSynthesis' in data) || data.lastSynthesis == null || (data.lastSynthesis is string && data.lastSynthesis.size() < 100)) &&
+             (!('isDiscoveryUnlocked' in data) || data.isDiscoveryUnlocked == null || data.isDiscoveryUnlocked is bool) &&
+             (!('contentHash' in data) || data.contentHash == null || (data.contentHash is string && data.contentHash.size() < 128)) &&
+             (!('previousHash' in data) || data.previousHash == null || (data.previousHash is string && data.previousHash.size() < 128)) &&
+             (!('lastCommitHash' in data) || data.lastCommitHash == null || (data.lastCommitHash is string && data.lastCommitHash.size() < 128)) &&
+             (!('lastCommitTimestamp' in data) || data.lastCommitTimestamp == null || isRecent(data.lastCommitTimestamp)) &&
+             (!('effortTier' in data) || data.effortTier == null || data.effortTier is string) &&
+             (!('energyManagement' in data) || data.energyManagement == null || data.energyManagement is map) &&
+             (!('rppPartners' in data) || data.rppPartners == null || data.rppPartners is list) &&
+             (!('twentyOneQuestions' in data) || data.twentyOneQuestions == null || data.twentyOneQuestions is list) &&
+             (!('perfectDay' in data) || data.perfectDay == null || data.perfectDay is list) &&
+             (!('prioritizationRankings' in data) || data.prioritizationRankings == null || data.prioritizationRankings is map) &&
+             (!('pieOfLife' in data) || data.pieOfLife == null || data.pieOfLife is list) &&
+             (!('extinguishers' in data) || data.extinguishers == null || data.extinguishers is map) &&
+             (!('accomplishmentLedger' in data) || data.accomplishmentLedger == null || data.accomplishmentLedger is list) &&
+             (!('fiveStories' in data) || data.fiveStories == null || data.fiveStories is list) &&
+             (!('attributeAssignments' in data) || data.attributeAssignments == null || data.attributeAssignments is map) &&
+             (!('chatHistory' in data) || data.chatHistory == null || data.chatHistory is list) &&
+             (!('validationGates' in data) || data.validationGates == null || data.validationGates is map) &&
+             (!('embedding' in data) || data.embedding == null || data.embedding is list) &&
+             (!('updatedAt' in data) || data.updatedAt == null || (resource == null ? isRecent(data.updatedAt) : data.updatedAt == resource.data.updatedAt));
     }
 
     function isValidSystemLog(data) {

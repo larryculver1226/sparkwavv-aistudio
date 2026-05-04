@@ -428,6 +428,71 @@ export const UserDashboard: React.FC<{ userId: string; isAdmin?: boolean }> = ({
   }, [status, profile, userId, navigate]);
 
   useEffect(() => {
+    const seedInitialDNA = async () => {
+      if (!user || !profile) return;
+
+      const initialInsights: Partial<UserInsight>[] = [
+        {
+          type: 'primary_goal',
+          content: profile.careerStageRole || 'Defining career trajectory',
+          status: 'confirmed',
+        },
+      ];
+
+      try {
+        const idToken = await user.getIdToken();
+        for (const insight of initialInsights) {
+          await fetch('/api/user-insights', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              Authorization: `Bearer ${idToken}`,
+            },
+            body: JSON.stringify({
+              userId,
+              ...insight,
+            }),
+          });
+        }
+        await fetchInsights();
+      } catch (err) {
+        console.error('Error seeding initial DNA:', err);
+      }
+    };
+
+    const fetchInsights = async () => {
+      if (!user) return;
+      try {
+        const idToken = await user.getIdToken();
+        const response = await fetch(`/api/user-insights?userId=${userId}`, {
+          headers: { Authorization: `Bearer ${idToken}` },
+        });
+        if (response.ok) {
+          const insightsData = await response.json();
+          setInsights(insightsData);
+
+          // Check for new insights since last visit
+          const lastCount = parseInt(localStorage.getItem(`last_insight_count_${userId}`) || '0');
+          if (insightsData.length > lastCount && lastCount > 0) {
+            const newlySynthesized = insightsData.slice(0, insightsData.length - lastCount);
+            setNewInsights(newlySynthesized);
+            setShowSynthesisNarrative(true);
+          }
+          localStorage.setItem(`last_insight_count_${userId}`, insightsData.length.toString());
+
+          // Seed initial DNA if no insights exist
+          if (insightsData.length === 0 && profile) {
+            if (!sessionStorage.getItem(`seeded_dna_${userId}`)) {
+              sessionStorage.setItem(`seeded_dna_${userId}`, 'true');
+              seedInitialDNA();
+            }
+          }
+        }
+      } catch (err) {
+        console.error('Error fetching insights:', err);
+      }
+    };
+
     const fetchData = async () => {
       if (!user) return;
 
@@ -472,78 +537,6 @@ export const UserDashboard: React.FC<{ userId: string; isAdmin?: boolean }> = ({
       fetchInsights();
     }
   }, [userId, user, status]);
-
-  const fetchInsights = async () => {
-    if (!user) return;
-    try {
-      const idToken = await user.getIdToken();
-      const response = await fetch(`/api/user-insights?userId=${userId}`, {
-        headers: { Authorization: `Bearer ${idToken}` },
-      });
-      if (response.ok) {
-        const insightsData = await response.json();
-        setInsights(insightsData);
-
-        // Check for new insights since last visit
-        const lastCount = parseInt(localStorage.getItem(`last_insight_count_${userId}`) || '0');
-        if (insightsData.length > lastCount && lastCount > 0) {
-          const newlySynthesized = insightsData.slice(0, insightsData.length - lastCount);
-          setNewInsights(newlySynthesized);
-          setShowSynthesisNarrative(true);
-        }
-        localStorage.setItem(`last_insight_count_${userId}`, insightsData.length.toString());
-
-        // Seed initial DNA if no insights exist
-        if (insightsData.length === 0 && profile) {
-          if (!sessionStorage.getItem(`seeded_dna_${userId}`)) {
-            sessionStorage.setItem(`seeded_dna_${userId}`, 'true');
-            seedInitialDNA();
-          }
-        }
-      }
-    } catch (err) {
-      console.error('Error fetching insights:', err);
-    }
-  };
-
-  const seedInitialDNA = async () => {
-    if (!user || !profile) return;
-
-    const initialInsights: Partial<UserInsight>[] = [
-      {
-        type: 'primary_goal',
-        content: profile.careerStageRole || 'Defining career trajectory',
-        status: 'confirmed',
-        evidence: 'Initial profile setup',
-        tags: ['initial-dna', 'career-stage'],
-      },
-      {
-        type: 'strength',
-        content: profile.brandDNAAttributes?.join(', ') || 'General professional strengths',
-        status: 'confirmed',
-        evidence: 'Initial profile setup',
-        tags: ['initial-dna', 'strengths'],
-      },
-    ];
-
-    try {
-      const idToken = await user.getIdToken();
-      for (const insight of initialInsights) {
-        await fetch('/api/user-insights', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            Authorization: `Bearer ${idToken}`,
-          },
-          body: JSON.stringify({ insight: { ...insight, userId } }),
-        });
-      }
-      // Refresh insights after seeding
-      fetchInsights();
-    } catch (err) {
-      console.error('Error seeding initial DNA:', err);
-    }
-  };
 
   const toggleTransparency = () => {
     const newMode = transparencyMode === 'under-the-hood' ? 'full' : 'under-the-hood';
@@ -1147,9 +1140,9 @@ export const UserDashboard: React.FC<{ userId: string; isAdmin?: boolean }> = ({
                           </h3>
                         </div>
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                          {suggestions.map((suggestion) => (
+                          {suggestions.map((suggestion, i) => (
                             <div
-                              key={suggestion.id}
+                              key={suggestion.id || `suggestion-${i}`}
                               className="p-6 bg-amber-400/5 border border-amber-400/20 rounded-2xl flex flex-col justify-between"
                             >
                               <div>
@@ -1433,8 +1426,8 @@ export const UserDashboard: React.FC<{ userId: string; isAdmin?: boolean }> = ({
               <h3 className="text-2xl font-display font-bold text-white">Active Partners</h3>
             </div>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {activePartners.map((partner) => (
-                <div key={partner.id} className="p-6 bg-white/5 border border-white/10 rounded-2xl">
+              {activePartners.map((partner, i) => (
+                <div key={partner.id || `partner-${i}`} className="p-6 bg-white/5 border border-white/10 rounded-2xl">
                   <div className="flex items-center gap-4 mb-6">
                     <div className="w-12 h-12 bg-black/40 rounded-xl flex items-center justify-center border border-white/5 overflow-hidden">
                       {partner.logoUrl ? (

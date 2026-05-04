@@ -99,7 +99,7 @@ export const RequiredActions: React.FC<RequiredActionsProps> = ({
       <div className="space-y-3">
         {actions.map((action, i) => (
           <motion.button
-            key={action.id}
+            key={action.id || `action-${i}`}
             initial={{ opacity: 0, x: -20 }}
             animate={{ opacity: 1, x: 0 }}
             transition={{ delay: i * 0.1 }}
