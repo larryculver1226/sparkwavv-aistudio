@@ -660,36 +660,25 @@ class SkylarService {
   }
 
   async generateSpeech(text: string, persona: SkylarPersona): Promise<string> {
-    const ai = getAI();
-    const voiceName = PERSONA_CONFIG[persona].voice || 'Kore';
-
-    const response = await ai.models.generateContent({
-      model: 'gemini-3.1-flash-tts-preview',
-      contents: [{ parts: [{ text }] }],
-      config: {
-        responseModalities: [Modality.AUDIO],
-        speechConfig: {
-          voiceConfig: {
-            prebuiltVoiceConfig: { voiceName },
-          },
+    try {
+      const response = await fetch('/api/skylar/tts', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
         },
-      },
-    });
-
-    const inlineData = response.candidates?.[0]?.content?.parts?.[0]?.inlineData;
-    if (!inlineData || !inlineData.data || inlineData.data.length === 0) {
-      console.warn('generateSpeech: No valid inlineData.data found in response');
-      return '';
-    }
-
-    const base64Audio = inlineData.data;
-    const mimeType = (inlineData.mimeType || 'audio/pcm').toLowerCase();
-    
-    console.log(`[skylarService] generateSpeech parsed mimeType: ${mimeType}, length: ${base64Audio.length}`);
-
-    if (mimeType.includes('pcm') || mimeType.includes('l16')) {
-      try {
-        // Decode base64 PCM data to a Uint8Array
+        body: JSON.stringify({ text, persona }),
+      });
+      
+      if (!response.ok) {
+        console.error('Failed to generate speech');
+        return '';
+      }
+      
+      const data = await response.json();
+      const base64Audio = data.data;
+      const mimeType = (data.mimeType || 'audio/pcm').toLowerCase();
+      
+      if (mimeType.includes('pcm') || mimeType.includes('l16')) {
         const binaryString = window.atob(base64Audio);
         const len = binaryString.length;
         if (len === 0) return '';
@@ -699,50 +688,41 @@ class SkylarService {
           pcmBytes[i] = binaryString.charCodeAt(i) & 0xff;
         }
       
-      // Create WAV header for 24000Hz, 1 channel, 16-bit PCM
-      // Gemini TTS usually outputs 24kHz PCM.
-      const sampleRate = 24000;
-      const numChannels = 1;
-      const bitsPerSample = 16;
-      const byteRate = (sampleRate * numChannels * bitsPerSample) / 8;
-      const blockAlign = (numChannels * bitsPerSample) / 8;
-      
-      const buffer = new ArrayBuffer(44 + pcmBytes.length);
-      const view = new DataView(buffer);
-      
-      // RIFF chunk descriptor
-      view.setUint32(0, 0x52494646, false); // "RIFF"
-      view.setUint32(4, 36 + pcmBytes.length, true);
-      view.setUint32(8, 0x57415645, false); // "WAVE"
-      
-      // fmt sub-chunk
-      view.setUint32(12, 0x666d7420, false); // "fmt "
-      view.setUint32(16, 16, true); // Subchunk1Size (16 for PCM)
-      view.setUint16(20, 1, true); // AudioFormat (1 for PCM)
-      view.setUint16(22, numChannels, true);
-      view.setUint32(24, sampleRate, true);
-      view.setUint32(28, byteRate, true);
-      view.setUint16(32, blockAlign, true);
-      view.setUint16(34, bitsPerSample, true);
-      
-      // data sub-chunk
-      view.setUint32(36, 0x64617461, false); // "data"
-      view.setUint32(40, pcmBytes.length, true);
-      
-      // Write PCM data
-      const out = new Uint8Array(buffer, 44);
-      out.set(pcmBytes);
-      
-      // Convert WAV to object URL for immediate playback without base64 length errors
-      const blob = new Blob([buffer], { type: 'audio/wav' });
-      return URL.createObjectURL(blob);
-      } catch (err) {
-        console.error('Error generating WAV blob:', err);
-        return '';
+        const sampleRate = 24000;
+        const numChannels = 1;
+        const bitsPerSample = 16;
+        const byteRate = (sampleRate * numChannels * bitsPerSample) / 8;
+        const blockAlign = (numChannels * bitsPerSample) / 8;
+        
+        const buffer = new ArrayBuffer(44 + pcmBytes.length);
+        const view = new DataView(buffer);
+        
+        view.setUint32(0, 0x52494646, false); // "RIFF"
+        view.setUint32(4, 36 + pcmBytes.length, true);
+        view.setUint32(8, 0x57415645, false); // "WAVE"
+        view.setUint32(12, 0x666d7420, false); // "fmt "
+        view.setUint32(16, 16, true);
+        view.setUint16(20, 1, true);
+        view.setUint16(22, numChannels, true);
+        view.setUint32(24, sampleRate, true);
+        view.setUint32(28, byteRate, true);
+        view.setUint16(32, blockAlign, true);
+        view.setUint16(34, bitsPerSample, true);
+        view.setUint32(36, 0x64617461, false); // "data"
+        view.setUint32(40, pcmBytes.length, true);
+        
+        const out = new Uint8Array(buffer, 44);
+        out.set(pcmBytes);
+        
+        const blob = new Blob([buffer], { type: 'audio/wav' });
+        return URL.createObjectURL(blob);
       }
-    }
 
-    return `data:${mimeType};base64,${base64Audio}`;
+      return `data:${mimeType};base64,${base64Audio}`;
+    } catch (err) {
+      console.error('Error generating WAV blob:', err);
+      return '';
+    }
   }
 
   // Vertex AI Agentic Chat - Migrated to Genkit
@@ -1061,40 +1041,23 @@ class SkylarService {
     referencePhoto?: string,
     modelId: string = 'gemini-2.5-flash-image'
   ): Promise<string> {
-    const ai = getAI();
-    const insights = await this.fetchConfirmedInsights(userId);
-    const dnaContext = insights.map((i) => `${i.type}: ${i.content}`).join(', ');
-
-    const prompt = `
-      Generate a cinematic brand portrait for a professional with the following DNA: ${dnaContext}.
-      The style should be: ${style}.
-      The image should convey authority, innovation, and strategic depth.
-      ${referencePhoto ? 'Use the provided reference photo to maintain the likeness of the person.' : ''}
-    `;
-
-    const parts: any[] = [{ text: prompt }];
-    if (referencePhoto) {
-      parts.push({
-        inlineData: {
-          mimeType: 'image/jpeg',
-          data: referencePhoto.split(',')[1], // Assuming base64 data URL
+    const token = await auth.currentUser?.getIdToken();
+    try {
+      const response = await fetch('/api/skylar/generate-portrait', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { 'Authorization': `Bearer ${token}` } : {})
         },
+        body: JSON.stringify({ userId, style, referencePhoto, modelId }),
       });
+      if (!response.ok) throw new Error('Failed to generate portrait');
+      const data = await response.json();
+      return data.imageUrl;
+    } catch (e) {
+      console.error('Error in generateBrandPortrait:', e);
+      throw e;
     }
-
-    const response = await ai.models.generateContent({
-      model: modelId,
-      contents: { parts },
-    });
-
-    if (response.candidates?.[0]?.content?.parts) {
-      for (const part of response.candidates[0].content.parts) {
-        if (part.inlineData) {
-          return `data:image/png;base64,${part.inlineData.data}`;
-        }
-      }
-    }
-    throw new Error('Failed to generate image');
   }
 
   async generateTargetedSequence(
@@ -1424,72 +1387,26 @@ class SkylarService {
   }
 
   async connectLive(config: any, callbacks: any) {
-    const ai = getAI();
-    return ai.live.connect({
-      model: 'gemini-2.5-flash-native-audio-preview-12-2025',
-      config,
-      callbacks,
-    });
+    throw new Error('Live Interview Simulator is temporarily disabled for security (API Key protection).');
   }
 
   async analyzeJobUrl(userId: string, url: string): Promise<TargetOpportunity> {
-    const ai = getAI();
-    const insights = await this.fetchConfirmedInsights(userId);
-    const dnaContext = insights.map((i) => `${i.type}: ${i.content}`).join(', ');
-
-    const prompt = `
-      Analyze the job description at the following URL: ${url}
-      
-      User's Professional DNA: ${dnaContext}
-      
-      Your goal is to extract "Market Intelligence" for this specific role and evaluate its resonance with the user's DNA.
-      
-      Return ONLY a JSON object matching the TargetOpportunity interface:
-      {
-        "company": "string",
-        "role": "string",
-        "url": "${url}",
-        "summary": "A concise, strategic summary of the role and its significance.",
-        "marketIntelligence": {
-          "demand": "high|medium|low",
-          "salaryRange": "string (optional)",
-          "keySkills": ["string"],
-          "trends": ["string"]
+    const token = await auth.currentUser?.getIdToken();
+    try {
+      const response = await fetch('/api/skylar/analyze-job', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { 'Authorization': `Bearer ${token}` } : {})
         },
-        "dnaResonance": {
-          "score": number (0-100),
-          "matchingAttributes": ["string"],
-          "gapAnalysis": "A brief analysis of where the user's DNA aligns or has gaps with the role."
-        },
-        "outreachStrategy": {
-          "primaryAngle": "The strategic angle for outreach (e.g., 'Innovation-led', 'Operational Excellence').",
-          "suggestedContacts": ["string (titles or names if found)"],
-          "nextSteps": ["string"]
-        },
-        "status": "analyzed",
-        "createdAt": "${new Date().toISOString()}",
-        "updatedAt": "${new Date().toISOString()}"
-      }
-    `;
-
-    const response = await ai.models.generateContent({
-      model: 'gemini-2.5-flash',
-      contents: [{ parts: [{ text: prompt }] }],
-      config: {
-        tools: [{ urlContext: {} }],
-        responseMimeType: 'application/json',
-        maxOutputTokens: 16384,
-        thinkingConfig: {
-          thinkingLevel: ThinkingLevel.LOW,
-        },
-      },
-    });
-
-    const result = JSON.parse(response.text || '{}');
-    result.userId = userId;
-    result.id = `opp_${Date.now()}`;
-
-    return result as TargetOpportunity;
+        body: JSON.stringify({ userId, url }),
+      });
+      if (!response.ok) throw new Error('Failed to analyze job url');
+      return await response.json();
+    } catch (e) {
+      console.error('Error in analyzeJobUrl:', e);
+      throw e;
+    }
   }
 
   async saveTargetOpportunity(

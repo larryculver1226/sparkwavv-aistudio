@@ -3750,6 +3750,170 @@ async function startServer() {
     );
 
     app.post(
+      '/api/skylar/tts',
+      async (req, res) => {
+        try {
+          const { text, persona } = req.body;
+          const { skylar } = await import('./src/services/skylarService.js');
+          const { getGeminiApiKey } = await import('./src/services/aiConfig.js');
+          const { GoogleGenAI, Modality } = await import('@google/genai');
+          const { PERSONA_CONFIG } = await import('./src/services/skylarService.js');
+          
+          const ai = new GoogleGenAI({ apiKey: getGeminiApiKey() });
+          const voiceName = PERSONA_CONFIG[persona]?.voice || 'Kore';
+
+          const response = await ai.models.generateContent({
+            model: 'gemini-3.1-flash-tts-preview',
+            contents: [{ parts: [{ text }] }],
+            config: {
+              responseModalities: [Modality.AUDIO],
+              speechConfig: {
+                voiceConfig: {
+                  prebuiltVoiceConfig: { voiceName },
+                },
+              },
+            },
+          });
+          const inlineData = response.candidates?.[0]?.content?.parts?.[0]?.inlineData;
+          if (!inlineData || !inlineData.data) throw new Error('No audio data returned');
+          
+          res.json({
+            data: inlineData.data,
+            mimeType: inlineData.mimeType,
+          });
+        } catch (error: any) {
+          console.error('Error in /api/skylar/tts:', error);
+          res.status(500).json({ error: error.message });
+        }
+      }
+    );
+
+    app.post(
+      '/api/skylar/generate-portrait',
+      requireRole([ROLES.USER, ROLES.ADMIN]),
+      async (req, res) => {
+        try {
+          const { userId, style, referencePhoto, modelId } = req.body;
+          const { skylar } = await import('./src/services/skylarService.js');
+          const { getGeminiApiKey } = await import('./src/services/aiConfig.js');
+          const { GoogleGenAI } = await import('@google/genai');
+
+          const ai = new GoogleGenAI({ apiKey: getGeminiApiKey() });
+          
+          const insights = await skylar.fetchConfirmedInsights(userId);
+          const dnaContext = insights.map((i: any) => `${i.type}: ${i.content}`).join(', ');
+
+          const prompt = `
+            Generate a cinematic brand portrait for a professional with the following DNA: ${dnaContext}.
+            The style should be: ${style}.
+            The image should convey authority, innovation, and strategic depth.
+            ${referencePhoto ? 'Use the provided reference photo to maintain the likeness of the person.' : ''}
+          `;
+
+          const parts: any[] = [{ text: prompt }];
+          if (referencePhoto) {
+            parts.push({
+              inlineData: {
+                mimeType: 'image/jpeg',
+                data: referencePhoto.split(',')[1],
+              },
+            });
+          }
+
+          const response = await ai.models.generateContent({
+            model: modelId || 'gemini-2.5-flash-image',
+            contents: { parts },
+          });
+
+          if (response.candidates?.[0]?.content?.parts) {
+            for (const part of response.candidates[0].content.parts) {
+              if (part.inlineData) {
+                return res.json({ imageUrl: `data:image/png;base64,${part.inlineData.data}` });
+              }
+            }
+          }
+          throw new Error('Failed to generate image');
+        } catch (error: any) {
+          console.error('Error in /api/skylar/generate-portrait:', error);
+          res.status(500).json({ error: error.message });
+        }
+      }
+    );
+
+    app.post(
+      '/api/skylar/analyze-job',
+      requireRole([ROLES.USER, ROLES.ADMIN]),
+      async (req, res) => {
+        try {
+          const { userId, url } = req.body;
+          const { skylar } = await import('./src/services/skylarService.js');
+          const { getGeminiApiKey } = await import('./src/services/aiConfig.js');
+          const { GoogleGenAI, ThinkingLevel } = await import('@google/genai');
+
+          const ai = new GoogleGenAI({ apiKey: getGeminiApiKey() });
+          const insights = await skylar.fetchConfirmedInsights(userId);
+          const dnaContext = insights.map((i: any) => `${i.type}: ${i.content}`).join(', ');
+
+          const prompt = \`
+            Analyze the job description at the following URL: \${url}
+            
+            User's Professional DNA: \${dnaContext}
+            
+            Your goal is to extract "Market Intelligence" for this specific role and evaluate its resonance with the user's DNA.
+            
+            Return ONLY a JSON object matching the TargetOpportunity interface:
+            {
+              "company": "string",
+              "role": "string",
+              "url": "\${url}",
+              "summary": "A concise, strategic summary of the role and its significance.",
+              "marketIntelligence": {
+                "demand": "high|medium|low",
+                "salaryRange": "string (optional)",
+                "keySkills": ["string"],
+                "trends": ["string"]
+              },
+              "dnaResonance": {
+                "score": number (0-100),
+                "matchingAttributes": ["string"],
+                "gapAnalysis": "A brief analysis of where the user's DNA aligns or has gaps with the role."
+              },
+              "outreachStrategy": {
+                "primaryAngle": "The strategic angle for outreach (e.g., 'Innovation-led', 'Operational Excellence').",
+                "suggestedContacts": ["string (titles or names if found)"],
+                "nextSteps": ["string"]
+              },
+              "status": "analyzed",
+              "createdAt": "\${new Date().toISOString()}",
+              "updatedAt": "\${new Date().toISOString()}"
+            }
+          \`;
+
+          const response = await ai.models.generateContent({
+            model: 'gemini-2.5-flash',
+            contents: [{ parts: [{ text: prompt }] }],
+            config: {
+              tools: [{ urlContext: {} }] as Array<any>,
+              responseMimeType: 'application/json',
+              maxOutputTokens: 16384,
+              thinkingConfig: {
+                thinkingLevel: ThinkingLevel.LOW,
+              },
+            },
+          });
+
+          const result = JSON.parse(response.text || '{}');
+          result.userId = userId;
+          result.id = \`opp_\${Date.now()}\`;
+          res.json(result);
+        } catch (error: any) {
+          console.error('Error in /api/skylar/analyze-job:', error);
+          res.status(500).json({ error: error.message });
+        }
+      }
+    );
+
+    app.post(
       '/api/skylar/gate-review',
       requireRole([ROLES.USER, ROLES.ADMIN]),
       async (req, res) => {

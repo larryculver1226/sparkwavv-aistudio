@@ -16,11 +16,8 @@ export const getGeminiApiKey = () => {
   }
 
   const keys: { name: string; value: any }[] = [
-    { name: 'process.env.VITE_GEMINI_API_KEY', value: serverEnv.VITE_GEMINI_API_KEY },
-    { name: 'import.meta.env.VITE_GEMINI_API_KEY', value: clientEnv.VITE_GEMINI_API_KEY },
     { name: 'process.env.GEMINI_API_KEY', value: serverEnv.GEMINI_API_KEY },
     { name: 'process.env.API_KEY', value: serverEnv.API_KEY },
-    { name: 'import.meta.env.GEMINI_API_KEY', value: clientEnv.GEMINI_API_KEY },
   ];
 
   console.log(`[AIConfig] Checking ${keys.length} potential locations for Gemini API key...`);

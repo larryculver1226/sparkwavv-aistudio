@@ -71,6 +71,50 @@ import {
   BRAND_DNA_ATTRIBUTES,
 } from '../constants';
 
+const ADMIN_NAV_GROUPS = [
+  {
+    title: 'Dashboard',
+    items: [
+      { id: 'overview', label: 'Overview', icon: LayoutDashboard, roles: [ROLES.SUPER_ADMIN, ROLES.ADMIN, ROLES.EDITOR, ROLES.VIEWER] },
+    ]
+  },
+  {
+    title: 'Agent & AI Operations',
+    items: [
+      { id: 'agent-ops', label: 'Agent Ops', icon: Brain, roles: [ROLES.SUPER_ADMIN, ROLES.ADMIN] },
+      { id: 'skylar-config', label: 'Skylar Config', icon: Sparkles, roles: [ROLES.SUPER_ADMIN, ROLES.ADMIN] },
+      { id: 'vertex', label: 'Vertex AI', icon: Brain, roles: [ROLES.SUPER_ADMIN, ROLES.ADMIN] },
+    ]
+  },
+  {
+    title: 'User & Identity Management',
+    items: [
+      { id: 'users', label: 'Staff Management', icon: Users, roles: [ROLES.SUPER_ADMIN, ROLES.ADMIN] },
+      { id: 'identity', label: 'Identity Management', icon: UserCog, roles: [ROLES.SUPER_ADMIN, ROLES.ADMIN] },
+      { id: 'reconciliation', label: 'Identity Reconciliation', icon: Fingerprint, roles: [ROLES.SUPER_ADMIN, ROLES.ADMIN] },
+    ]
+  },
+  {
+    title: 'Content & Compliance',
+    items: [
+      { id: 'validation', label: 'Validation Gates', icon: ShieldCheck, roles: [ROLES.SUPER_ADMIN, ROLES.ADMIN] },
+      { id: 'user-feedback', label: 'User Feedback', icon: Activity, roles: [ROLES.SUPER_ADMIN, ROLES.ADMIN, ROLES.OPERATOR] },
+    ]
+  },
+  {
+    title: 'System & Infrastructure',
+    items: [
+      { id: 'system-status', label: 'System Status', icon: Activity, roles: [ROLES.SUPER_ADMIN, ROLES.ADMIN] },
+      { id: 'security', label: 'Security', icon: ShieldCheck, roles: [ROLES.SUPER_ADMIN, ROLES.ADMIN] },
+      { id: 'cloud', label: 'Cloud Resources', icon: Cloud, roles: [ROLES.SUPER_ADMIN, ROLES.ADMIN] },
+      { id: 'logs', label: 'System Logs', icon: Activity, roles: [ROLES.SUPER_ADMIN, ROLES.ADMIN] },
+      { id: 'diagnostics', label: 'Diagnostics', icon: ShieldCheck, roles: [ROLES.SUPER_ADMIN, ROLES.ADMIN] },
+      { id: 'system-tests', label: 'System Tests', icon: ShieldCheck, roles: [ROLES.SUPER_ADMIN] },
+      { id: 'firebase-setup', label: 'Firebase Setup', icon: Database, roles: [ROLES.SUPER_ADMIN, ROLES.ADMIN] },
+    ]
+  }
+];
+
 interface AdminStats {
   resources: {
     cpuUsage: number;
@@ -1030,130 +1074,46 @@ export const AdminDashboard: React.FC<{ onLogout: () => void }> = ({ onLogout })
                   </div>
                 </div>
 
-                <nav className="space-y-2">
-                  {[
-                    {
-                      id: 'overview',
-                      label: 'Overview',
-                      icon: LayoutDashboard,
-                      roles: [ROLES.SUPER_ADMIN, ROLES.ADMIN, ROLES.EDITOR, ROLES.VIEWER],
-                    },
-                    {
-                      id: 'users',
-                      label: 'Staff Management',
-                      icon: Users,
-                      roles: [ROLES.SUPER_ADMIN, ROLES.ADMIN],
-                    },
-                    {
-                      id: 'identity',
-                      label: 'Identity Management',
-                      icon: UserCog,
-                      roles: [ROLES.SUPER_ADMIN, ROLES.ADMIN],
-                    },
-                    {
-                      id: 'cloud',
-                      label: 'Cloud Resources',
-                      icon: Cloud,
-                      roles: [ROLES.SUPER_ADMIN, ROLES.ADMIN],
-                    },
-                    {
-                      id: 'security',
-                      label: 'Security',
-                      icon: ShieldCheck,
-                      roles: [ROLES.SUPER_ADMIN, ROLES.ADMIN],
-                    },
-                    {
-                      id: 'vertex',
-                      label: 'Vertex AI',
-                      icon: Brain,
-                      roles: [ROLES.SUPER_ADMIN, ROLES.ADMIN],
-                    },
-                    {
-                      id: 'agent-ops',
-                      label: 'Agent Ops',
-                      icon: Brain,
-                      roles: [ROLES.SUPER_ADMIN, ROLES.ADMIN],
-                    },
-                    {
-                      id: 'validation',
-                      label: 'Validation Gates',
-                      icon: ShieldCheck,
-                      roles: [ROLES.SUPER_ADMIN, ROLES.ADMIN],
-                    },
-                    {
-                      id: 'reconciliation',
-                      label: 'Identity Reconciliation',
-                      icon: Fingerprint,
-                      roles: [ROLES.SUPER_ADMIN, ROLES.ADMIN],
-                    },
-                    {
-                      id: 'system-status',
-                      label: 'System Status',
-                      icon: Activity,
-                      roles: [ROLES.SUPER_ADMIN, ROLES.ADMIN],
-                    },
-                    {
-                      id: 'logs',
-                      label: 'System Logs',
-                      icon: Activity,
-                      roles: [ROLES.SUPER_ADMIN, ROLES.ADMIN],
-                    },
-                    {
-                      id: 'diagnostics',
-                      label: 'Diagnostics',
-                      icon: ShieldCheck,
-                      roles: [ROLES.SUPER_ADMIN, ROLES.ADMIN],
-                    },
-                    {
-                      id: 'system-tests',
-                      label: 'System Tests',
-                      icon: ShieldCheck,
-                      roles: [ROLES.SUPER_ADMIN],
-                    },
-                    {
-                      id: 'user-feedback',
-                      label: 'User Feedback',
-                      icon: Activity,
-                      roles: [ROLES.SUPER_ADMIN, ROLES.ADMIN, ROLES.OPERATOR],
-                    },
-                    {
-                      id: 'firebase-setup',
-                      label: 'Firebase Setup',
-                      icon: Database,
-                      roles: [ROLES.SUPER_ADMIN, ROLES.ADMIN],
-                    },
-                    {
-                      id: 'skylar-config',
-                      label: 'Skylar Config',
-                      icon: Sparkles,
-                      roles: [ROLES.SUPER_ADMIN, ROLES.ADMIN],
-                    },
-                  ]
-                    .filter((item) => item.roles.includes(adminRole as any))
-                    .map((item) => (
-                      <button
-                        key={item.id}
-                        onClick={() => {
-                          setActiveTab(item.id);
-                          setMobileMenuOpen(false);
-                        }}
-                        className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all ${
-                          activeTab === item.id
-                            ? 'bg-neon-cyan/10 text-neon-cyan border border-neon-cyan/20'
-                            : 'text-white/40 hover:text-white hover:bg-white/5'
-                        }`}
-                      >
-                        <item.icon className="w-5 h-5" />
-                        <span className="font-medium">{item.label}</span>
-                      </button>
-                    ))}
-                  <button
-                    onClick={() => navigate('/operations')}
-                    className="w-full flex items-center gap-3 px-4 py-3 rounded-xl text-neon-lime hover:bg-neon-lime/10 transition-all border border-transparent hover:border-neon-lime/20"
-                  >
-                    <ArrowUpRight className="w-5 h-5" />
-                    <span className="font-medium">Operations Center</span>
-                  </button>
+                <nav className="space-y-6 overflow-y-auto pb-8 custom-scrollbar">
+                  {ADMIN_NAV_GROUPS.map((group, groupIdx) => {
+                    const visibleItems = group.items.filter((item) => item.roles.includes(adminRole as any));
+                    if (visibleItems.length === 0) return null;
+                    return (
+                      <div key={groupIdx} className="space-y-2">
+                        {group.title && (
+                          <div className="px-4 text-[10px] font-bold uppercase tracking-widest text-white/40 mb-2">
+                            {group.title}
+                          </div>
+                        )}
+                        {visibleItems.map((item) => (
+                          <button
+                            key={item.id}
+                            onClick={() => {
+                              setActiveTab(item.id);
+                              setMobileMenuOpen(false);
+                            }}
+                            className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all ${
+                              activeTab === item.id
+                                ? 'bg-neon-cyan/10 text-neon-cyan border border-neon-cyan/20'
+                                : 'text-white/40 hover:text-white hover:bg-white/5'
+                            }`}
+                          >
+                            <item.icon className="w-5 h-5" />
+                            <span className="font-medium">{item.label}</span>
+                          </button>
+                        ))}
+                      </div>
+                    );
+                  })}
+                  <div className="pt-4 border-t border-white/10">
+                    <button
+                      onClick={() => navigate('/operations')}
+                      className="w-full flex items-center gap-3 px-4 py-3 rounded-xl text-neon-lime hover:bg-neon-lime/10 transition-all border border-transparent hover:border-neon-lime/20"
+                    >
+                      <ArrowUpRight className="w-5 h-5" />
+                      <span className="font-medium">Operations Center</span>
+                    </button>
+                  </div>
                 </nav>
               </div>
 
@@ -1172,8 +1132,8 @@ export const AdminDashboard: React.FC<{ onLogout: () => void }> = ({ onLogout })
       </AnimatePresence>
 
       {/* Sidebar */}
-      <aside className="fixed left-0 top-0 h-full w-64 bg-black border-r border-white/5 z-50 hidden lg:block">
-        <div className="p-8">
+      <aside className="fixed left-0 top-0 h-full w-64 bg-black border-r border-white/5 z-50 hidden lg:flex flex-col">
+        <div className="p-8 pb-0">
           <div className="flex items-center gap-3 mb-12">
             <div className="w-10 h-10 rounded-xl bg-neon-cyan/10 border border-neon-cyan/20 flex items-center justify-center">
               <ShieldCheck className="w-6 h-6 text-neon-cyan" />
@@ -1186,131 +1146,47 @@ export const AdminDashboard: React.FC<{ onLogout: () => void }> = ({ onLogout })
             </div>
           </div>
 
-          <nav className="space-y-2">
-            {[
-              {
-                id: 'overview',
-                label: 'Overview',
-                icon: LayoutDashboard,
-                roles: [ROLES.SUPER_ADMIN, ROLES.ADMIN, ROLES.EDITOR, ROLES.VIEWER],
-              },
-              {
-                id: 'users',
-                label: 'Staff Management',
-                icon: Users,
-                roles: [ROLES.SUPER_ADMIN, ROLES.ADMIN],
-              },
-              {
-                id: 'identity',
-                label: 'Identity Management',
-                icon: UserCog,
-                roles: [ROLES.SUPER_ADMIN, ROLES.ADMIN],
-              },
-              {
-                id: 'cloud',
-                label: 'Cloud Resources',
-                icon: Cloud,
-                roles: [ROLES.SUPER_ADMIN, ROLES.ADMIN],
-              },
-              {
-                id: 'security',
-                label: 'Security',
-                icon: ShieldCheck,
-                roles: [ROLES.SUPER_ADMIN, ROLES.ADMIN],
-              },
-              {
-                id: 'vertex',
-                label: 'Vertex AI',
-                icon: Brain,
-                roles: [ROLES.SUPER_ADMIN, ROLES.ADMIN],
-              },
-              {
-                id: 'agent-ops',
-                label: 'Agent Ops',
-                icon: Brain,
-                roles: [ROLES.SUPER_ADMIN, ROLES.ADMIN],
-              },
-              {
-                id: 'validation',
-                label: 'Validation Gates',
-                icon: ShieldCheck,
-                roles: [ROLES.SUPER_ADMIN, ROLES.ADMIN],
-              },
-              {
-                id: 'reconciliation',
-                label: 'Identity Reconciliation',
-                icon: Fingerprint,
-                roles: [ROLES.SUPER_ADMIN, ROLES.ADMIN],
-              },
-              {
-                id: 'system-status',
-                label: 'System Status',
-                icon: Activity,
-                roles: [ROLES.SUPER_ADMIN, ROLES.ADMIN],
-              },
-              {
-                id: 'logs',
-                label: 'System Logs',
-                icon: Activity,
-                roles: [ROLES.SUPER_ADMIN, ROLES.ADMIN],
-              },
-              {
-                id: 'diagnostics',
-                label: 'Diagnostics',
-                icon: ShieldCheck,
-                roles: [ROLES.SUPER_ADMIN, ROLES.ADMIN],
-              },
-              {
-                id: 'system-tests',
-                label: 'System Tests',
-                icon: ShieldCheck,
-                roles: [ROLES.SUPER_ADMIN],
-              },
-              {
-                id: 'user-feedback',
-                label: 'User Feedback',
-                icon: Activity,
-                roles: [ROLES.SUPER_ADMIN, ROLES.ADMIN, ROLES.OPERATOR],
-              },
-              {
-                id: 'firebase-setup',
-                label: 'Firebase Setup',
-                icon: Database,
-                roles: [ROLES.SUPER_ADMIN, ROLES.ADMIN],
-              },
-              {
-                id: 'skylar-config',
-                label: 'Skylar Config',
-                icon: Sparkles,
-                roles: [ROLES.SUPER_ADMIN, ROLES.ADMIN],
-              },
-            ]
-              .filter((item) => item.roles.includes(adminRole as any))
-              .map((item) => (
-                <button
-                  key={item.id}
-                  onClick={() => setActiveTab(item.id)}
-                  className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all ${
-                    activeTab === item.id
-                      ? 'bg-neon-cyan/10 text-neon-cyan border border-neon-cyan/20'
-                      : 'text-white/40 hover:text-white hover:bg-white/5'
-                  }`}
-                >
-                  <item.icon className="w-5 h-5" />
-                  <span className="font-medium">{item.label}</span>
-                </button>
-              ))}
-            <button
-              onClick={() => navigate('/operations')}
-              className="w-full flex items-center gap-3 px-4 py-3 rounded-xl text-neon-lime hover:bg-neon-lime/10 transition-all border border-transparent hover:border-neon-lime/20"
-            >
-              <ArrowUpRight className="w-5 h-5" />
-              <span className="font-medium">Operations Center</span>
-            </button>
+          <nav className="space-y-6 overflow-y-auto max-h-[calc(100vh-250px)] pb-8 custom-scrollbar">
+            {ADMIN_NAV_GROUPS.map((group, groupIdx) => {
+              const visibleItems = group.items.filter((item) => item.roles.includes(adminRole as any));
+              if (visibleItems.length === 0) return null;
+              return (
+                <div key={groupIdx} className="space-y-2">
+                  {group.title && (
+                    <div className="px-4 text-[10px] font-bold uppercase tracking-widest text-white/40 mb-2">
+                      {group.title}
+                    </div>
+                  )}
+                  {visibleItems.map((item) => (
+                    <button
+                      key={item.id}
+                      onClick={() => setActiveTab(item.id)}
+                      className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all ${
+                        activeTab === item.id
+                          ? 'bg-neon-cyan/10 text-neon-cyan border border-neon-cyan/20'
+                          : 'text-white/40 hover:text-white hover:bg-white/5'
+                      }`}
+                    >
+                      <item.icon className="w-5 h-5" />
+                      <span className="font-medium">{item.label}</span>
+                    </button>
+                  ))}
+                </div>
+              );
+            })}
+            <div className="pt-4 border-t border-white/10">
+              <button
+                onClick={() => navigate('/operations')}
+                className="w-full flex items-center gap-3 px-4 py-3 rounded-xl text-neon-lime hover:bg-neon-lime/10 transition-all border border-transparent hover:border-neon-lime/20"
+              >
+                <ArrowUpRight className="w-5 h-5" />
+                <span className="font-medium">Operations Center</span>
+              </button>
+            </div>
           </nav>
         </div>
 
-        <div className="absolute bottom-0 left-0 w-full p-8">
+        <div className="p-8 mt-auto border-t border-white/5 bg-black">
           <button
             onClick={handleLogout}
             className="w-full flex items-center gap-3 px-4 py-3 rounded-xl text-neon-magenta hover:bg-neon-magenta/10 transition-all"

@@ -88,10 +88,6 @@ export const config = {
     'VITE_FIREBASE_DATABASE_ID', 
     'firestoreDatabaseId'
   ),
-  viteGeminiApiKey: getEnvVar(
-    typeof import.meta !== 'undefined' && import.meta.env ? import.meta.env.VITE_GEMINI_API_KEY : undefined, 
-    'VITE_GEMINI_API_KEY'
-  ),
 
   // Server (Backend) Configs
   nodeEnv: getEnvVar(undefined, 'NODE_ENV'),
@@ -133,7 +129,7 @@ export const validateConfig = () => {
     // but the minimal absolute requirement for initializing the SDK is projectId and apiKey
   } else {
     // Backend required variables
-    if (!config.geminiApiKey && !config.viteGeminiApiKey) missing.push('GEMINI_API_KEY');
+    if (!config.geminiApiKey) missing.push('GEMINI_API_KEY');
     if (!config.sessionSecret) missing.push('SESSION_SECRET');
   }
 

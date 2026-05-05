@@ -25,7 +25,6 @@ export const config = {
       acc[`process.env.${key}`] = JSON.stringify(process.env[key]);
       return acc;
     }, {}),
-    'process.env.GEMINI_API_KEY': JSON.stringify(process.env.GEMINI_API_KEY || ''),
     // some react packages expect `global`
     'global': 'window'
   },
