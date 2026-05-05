@@ -1,51 +1,25 @@
 export const getGeminiApiKey = () => {
   // Check process.env (Server-side)
-  let serverEnv: any = {};
+  // In the browser, process.env will be undefined or restricted to non-sensitive keys.
+  let env: any = {};
   try {
-    serverEnv = process.env || {};
+    env = typeof process !== 'undefined' ? process.env : {};
   } catch (e) {
-    // process.env might not be available in some environments
+    // process.env might not be available
   }
 
-  // Check import.meta.env (Client-side/Vite)
-  let clientEnv: any = {};
-  try {
-    clientEnv = (import.meta as any).env || {};
-  } catch (e) {
-    // import.meta.env might not be available
-  }
+  const key = env.GEMINI_API_KEY || env.API_KEY;
 
-  const keys: { name: string; value: any }[] = [
-    { name: 'process.env.GEMINI_API_KEY', value: serverEnv.GEMINI_API_KEY },
-    { name: 'process.env.API_KEY', value: serverEnv.API_KEY },
-  ];
-
-  console.log(`[AIConfig] Checking ${keys.length} potential locations for Gemini API key...`);
-  console.log(`[AIConfig] Available process.env keys: ${Object.keys(serverEnv).join(', ')}`);
-  console.log(`[AIConfig] Available import.meta.env keys: ${Object.keys(clientEnv).join(', ')}`);
-
-  for (const { name, value } of keys) {
-    if (value && typeof value === 'string') {
-      const trimmed = value.trim().replace(/^["']|["']$/g, '');
-      if (trimmed && trimmed.startsWith('AIza')) {
-        const masked = `${trimmed.substring(0, 4)}...${trimmed.substring(trimmed.length - 4)}`;
-        console.log(
-          `[AIConfig] SUCCESS: Found valid key in ${name}: ${masked} (length: ${trimmed.length})`
-        );
-        // Force set the standard environment variable so Genkit and @google/genai can implicitly use it
-        // even if not explicitly passed during instantiation correctly.
-        if (typeof process !== 'undefined' && process.env && !process.env.GEMINI_API_KEY) {
-          process.env.GEMINI_API_KEY = trimmed;
-        }
-        return trimmed;
-      } else if (trimmed) {
-        console.warn(
-          `[AIConfig] WARNING: Found value in ${name} but it doesn't start with AIza: ${trimmed.substring(0, 10)}...`
-        );
-      }
+  if (key && typeof key === 'string') {
+    const trimmed = key.trim().replace(/^["']|["']$/g, '');
+    if (trimmed && trimmed.startsWith('AIza')) {
+      return trimmed;
     }
   }
 
-  console.error('[AIConfig] ERROR: No valid Gemini API key found in any environment variable.');
+  // Do not log the missing key error in the browser to avoid revealing implementation details
+  if (typeof window === 'undefined') {
+    console.error('[AIConfig] ERROR: No valid Gemini API key found in server environment.');
+  }
   return '';
 };

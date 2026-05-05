@@ -14,9 +14,13 @@ import {
   Info,
   SearchCode,
   Copy,
-  Check
+  Check,
+  ShieldCheck,
+  ShieldAlert,
+  HelpCircle
 } from 'lucide-react';
 import { getGeminiApiKey } from '../../services/aiConfig';
+import { probeFirebaseKeyForGeminiAccess, ProbeResult } from '../../utils/securityProbes';
 
 interface SystemStatus {
   firebase: {
@@ -56,6 +60,9 @@ export const SystemStatusPanel: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [scanning, setScanning] = useState(false);
   const [copied, setCopied] = useState(false);
+  const [probeResult, setProbeResult] = useState<ProbeResult | null>(null);
+  const [mapsProbeResult, setMapsProbeResult] = useState<ProbeResult | null>(null);
+  const [probing, setProbing] = useState(false);
 
   const fetchStatus = async () => {
     setLoading(true);
@@ -93,8 +100,29 @@ export const SystemStatusPanel: React.FC = () => {
     setTimeout(() => setCopied(false), 2000);
   };
 
+  const runProbe = async () => {
+    setProbing(true);
+    try {
+      // Probe Firebase Key (Client-side probe)
+      const fbResult = await probeFirebaseKeyForGeminiAccess();
+      setProbeResult(fbResult);
+
+      // Probe Maps Key (Backend-side probe)
+      const mapsResp = await fetch('/api/admin/probe-maps-key');
+      if (mapsResp.ok) {
+        const mapsData = await mapsResp.json();
+        setMapsProbeResult(mapsData);
+      }
+    } catch (error) {
+      console.error('Probe failed:', error);
+    } finally {
+      setProbing(false);
+    }
+  };
+
   useEffect(() => {
     fetchStatus();
+    runProbe();
   }, []);
 
   if (loading) {
@@ -183,6 +211,95 @@ export const SystemStatusPanel: React.FC = () => {
           <StatusItem label="Finance EP" value={status.vertex.financeEndpointId} />
           <StatusItem label="Tech EP" value={status.vertex.techEndpointId} />
         </StatusCard>
+      </div>
+
+      {/* Security Probes / Vulnerability Check */}
+      <div className={`border rounded-2xl p-6 transition-all ${
+        (probeResult?.isVulnerable || mapsProbeResult?.isVulnerable)
+          ? 'bg-red-500/5 border-red-500/20' 
+          : (probeResult?.status === 'secure' && mapsProbeResult?.status === 'secure')
+            ? 'bg-green-500/5 border-green-500/20'
+            : 'bg-white/5 border-white/10'
+      }`}>
+        <div className="flex items-center justify-between mb-6">
+          <div className="flex items-center gap-3">
+            <div className={`p-2 rounded-lg ${
+              (probeResult?.isVulnerable || mapsProbeResult?.isVulnerable) ? 'bg-red-500/10 text-red-400' : 'bg-green-500/10 text-green-400'
+            }`}>
+              {(probeResult?.isVulnerable || mapsProbeResult?.isVulnerable) ? <ShieldAlert className="w-5 h-5" /> : <ShieldCheck className="w-5 h-5" />}
+            </div>
+            <div>
+              <h3 className="font-bold text-white">Vulnerability Assessment</h3>
+              <p className="text-[10px] text-white/40 uppercase tracking-widest font-display font-bold">March 2026 Disclosure Check</p>
+            </div>
+          </div>
+          <button
+            onClick={runProbe}
+            disabled={probing}
+            className="flex items-center gap-2 px-3 py-1.5 bg-white/5 hover:bg-white/10 text-white text-[10px] font-bold rounded-lg transition-all"
+          >
+            {probing ? <RefreshCw className="w-3 h-3 animate-spin" /> : <RefreshCw className="w-3 h-3" />}
+            Rescan Keys
+          </button>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+          {/* Key Checklist */}
+          <div className="space-y-4">
+            <h4 className="text-xs font-bold text-white/40 uppercase tracking-widest">Monitored Keys</h4>
+            
+            {/* Firebase Key */}
+            <div className="p-4 bg-black/40 rounded-xl border border-white/5">
+              <div className="flex items-start gap-3">
+                <div className={`mt-1 p-1 rounded-full ${probeResult?.isVulnerable ? 'bg-red-500/20 text-red-500' : probeResult?.status === 'secure' ? 'bg-green-500/20 text-green-500' : 'bg-white/10 text-white/20'}`}>
+                  {probeResult?.isVulnerable ? <AlertTriangle className="w-4 h-4" /> : <CheckCircle2 className="w-4 h-4" />}
+                </div>
+                <div className="space-y-1">
+                  <p className="text-[10px] font-bold text-white/40 uppercase tracking-widest">Firebase Web Key</p>
+                  <p className={`text-sm font-bold ${probeResult?.isVulnerable ? 'text-red-400' : probeResult?.status === 'secure' ? 'text-green-400' : 'text-white/20'}`}>
+                    {probeResult?.isVulnerable ? 'OVER-PRIVILEGED' : probeResult?.status === 'secure' ? 'Properly Restricted' : 'Scanning...'}
+                  </p>
+                  <p className="text-[10px] font-mono text-white/30 truncate">AIzaSyC3RR...d8dU</p>
+                </div>
+              </div>
+            </div>
+
+            {/* Maps Key */}
+            <div className="p-4 bg-black/40 rounded-xl border border-white/5">
+              <div className="flex items-start gap-3">
+                <div className={`mt-1 p-1 rounded-full ${mapsProbeResult?.isVulnerable ? 'bg-red-500/20 text-red-500' : mapsProbeResult?.status === 'secure' ? 'bg-green-500/20 text-green-500' : 'bg-white/10 text-white/20'}`}>
+                  {mapsProbeResult?.isVulnerable ? <AlertTriangle className="w-4 h-4" /> : <CheckCircle2 className="w-4 h-4" />}
+                </div>
+                <div className="space-y-1">
+                  <p className="text-[10px] font-bold text-white/40 uppercase tracking-widest">Google Maps API Key</p>
+                  <p className={`text-sm font-bold ${mapsProbeResult?.isVulnerable ? 'text-red-400' : mapsProbeResult?.status === 'secure' ? 'text-green-400' : 'text-white/20'}`}>
+                    {mapsProbeResult?.isVulnerable ? 'OVER-PRIVILEGED' : mapsProbeResult?.status === 'secure' ? 'Properly Restricted' : mapsProbeResult?.status === 'missing' ? 'Not Configured' : 'Scanning...'}
+                  </p>
+                  <p className="text-[10px] font-mono text-white/30 truncate">GOOGLE_MAPS_API_KEY</p>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div className="space-y-4">
+            <div className="flex items-center gap-2">
+              <HelpCircle className="w-4 h-4 text-white/20" />
+              <h4 className="text-xs font-bold text-white/40 uppercase tracking-widest">Vulnerability Details</h4>
+            </div>
+            <p className="text-xs text-white/40 leading-relaxed">
+              Following the March 2026 disclosure, Google Cloud API keys (Maps, Firebase, etc.) were retroactively granted Gemini access. 
+              This probe attempts a <strong>limited token-count operation</strong> via the Generative Language API using your keys.
+            </p>
+            <div className="p-3 bg-white/5 rounded-lg border border-white/5">
+              <p className="text-[10px] text-white/60 leading-relaxed italic">
+                {mapsProbeResult?.message || probeResult?.message || "All keys are checked for the 'Gemini Probe' response. If any key returns a 200 OK, it means it can be used to drain your GenAI quota."}
+              </p>
+            </div>
+            <a href="https://www.upguard.com/news/google-data-breach-2026-03-01" target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 text-[10px] text-neon-cyan hover:underline font-bold uppercase tracking-widest">
+              Read Disclosure <ExternalLink className="w-3 h-3" />
+            </a>
+          </div>
+        </div>
       </div>
 
       {/* Configuration Guide / Call to Action */}

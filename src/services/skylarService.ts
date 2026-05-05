@@ -1,4 +1,4 @@
-import { GoogleGenAI, Modality, Type, FunctionDeclaration, ThinkingLevel } from '@google/genai';
+import { Modality, Type, FunctionDeclaration, ThinkingLevel } from '@google/genai';
 import { getGeminiApiKey } from './aiConfig';
 import { genkitTracer } from './agentOpsService';
 import { KnowledgeGraph, WavvaultData, TargetOpportunity } from '../types/wavvault';
@@ -34,31 +34,6 @@ export const GATING_CRITERIA: Record<string, string[]> = {
     'Targeted outreach sequence developed',
     'Interview readiness confirmed',
   ],
-};
-
-// Lazy initialization of Gemini
-let aiInstance: GoogleGenAI | null = null;
-
-const getAI = () => {
-  if (!aiInstance) {
-    const apiKey = getGeminiApiKey();
-    if (!apiKey) {
-      console.error('SkylarService: GEMINI_API_KEY is missing.');
-      throw new Error(
-        'GEMINI_API_KEY is not configured in the environment variables. Please check your AI Studio settings.'
-      );
-    } else {
-      const maskedKey =
-        apiKey.length > 8
-          ? `${apiKey.substring(0, 4)}...${apiKey.substring(apiKey.length - 4)}`
-          : '****';
-      console.log(
-        `SkylarService: Initializing GoogleGenAI with key: ${maskedKey} (length: ${apiKey.length})`
-      );
-    }
-    aiInstance = new GoogleGenAI({ apiKey });
-  }
-  return aiInstance;
 };
 
 const LOBKOWICZ_PROMPT = `
@@ -534,116 +509,6 @@ class SkylarService {
   getSystemPromptForPhase(phase: string, user?: any): string {
     const config = this.getStageConfig(phase);
     return this.buildContextualPrompt(user || { displayName: 'User' }, config);
-  }
-
-  async orchestrateAgent(
-    message: string,
-    history: ChatMessage[] = [],
-    wavvaultContext?: any,
-    userId?: string
-  ): Promise<{ text: string; toolCallsExecuted?: any[] }> {
-    const ai = getAI();
-    
-    const phase = wavvaultContext?.journeyStage || 'Dive-In';
-    const systemInstruction = this.getSystemPromptForPhase(phase) + `\n\nContext from Wavvault: ${JSON.stringify(wavvaultContext || {})}`;
-
-    const chat = ai.chats.create({
-      model: 'gemini-2.5-flash',
-      config: {
-        systemInstruction,
-        tools: skylarTools,
-        temperature: 0.7,
-      },
-      history: history.map((msg) => ({
-        role: msg.role,
-        parts: msg.parts,
-      })),
-    });
-
-    try {
-      let response = await chat.sendMessage({ message });
-      const toolCallsExecuted = [];
-      
-      while (response.functionCalls && response.functionCalls.length > 0) {
-        const functionResponses = [];
-        
-        for (const call of response.functionCalls) {
-          console.log(`[Skylar Orchestrator] Executing tool: ${call.name}`, call.args);
-          toolCallsExecuted.push({ name: call.name, args: call.args });
-          
-          let result: any = { success: true };
-          
-          if (call.name === 'save_dive_in_commitments') {
-            console.log('Saving dive-in commitments for user:', userId, call.args);
-            result = { success: true, message: 'Commitments saved successfully.' };
-          } else if (call.name === 'save_ignition_exercises') {
-            console.log('Saving ignition exercises for user:', userId, call.args);
-            result = { success: true, message: 'Ignition exercises saved successfully.' };
-          } else if (call.name === 'save_career_dna_hypothesis') {
-            console.log('Saving career DNA hypothesis for user:', userId, call.args);
-            result = { success: true, message: 'Career DNA hypothesis saved successfully.' };
-          } else if (call.name === 'update_journey_stage') {
-            console.log('Updating journey stage for user:', userId, call.args);
-            result = { success: true, message: `Journey stage updated to ${call.args.newStage}.` };
-          } else {
-             result = { success: false, error: 'Tool not implemented locally yet.' };
-          }
-          
-          functionResponses.push({
-            functionResponse: {
-              id: call.id,
-              name: call.name,
-              response: result
-            }
-          });
-        }
-        
-        response = await chat.sendMessage(functionResponses as any);
-      }
-
-      return { 
-        text: response.text || "I'm sorry, I couldn't process that.",
-        toolCallsExecuted
-      };
-    } catch (error) {
-      console.error('Error in orchestrateAgent:', error);
-      throw error;
-    }
-  }
-
-  async generateResponse(
-    persona: SkylarPersona,
-    message: string,
-    history: ChatMessage[] = [],
-    wavvaultContext?: any,
-    userId?: string
-  ): Promise<string> {
-    const ai = getAI();
-    const config = PERSONA_CONFIG[persona];
-
-    let currentTruth = '';
-    if (userId) {
-      const insights = await this.fetchConfirmedInsights(userId);
-      if (insights.length > 0) {
-        currentTruth = `\n\nConfirmed Professional DNA (Current Truth):\n${insights.map((i) => `- [${i.type.toUpperCase()}] ${i.content}`).join('\n')}`;
-      }
-    }
-
-    const systemInstruction = `${config.instruction}\n\nContext from Wavvault: ${JSON.stringify(wavvaultContext || {})}${currentTruth}\n\nRemember interactions from previous journeys if relevant.`;
-
-    const chat = ai.chats.create({
-      model: 'gemini-2.5-flash',
-      config: {
-        systemInstruction,
-      },
-      history: history.map((msg) => ({
-        role: msg.role,
-        parts: msg.parts,
-      })),
-    });
-
-    const response = await chat.sendMessage({ message });
-    return response.text || "I'm sorry, I couldn't process that.";
   }
 
   async fetchConfirmedInsights(userId: string) {

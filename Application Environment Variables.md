@@ -15,7 +15,6 @@ This document serves as a master reference for all environment variables used ac
 | `VITE_FIREBASE_APP_ID` | The specific App ID registered within Firebase. | `1:56128254195:web:e29d9b0be2a00844060786` |
 | `VITE_FIREBASE_MEASUREMENT_ID` | Google Analytics measurement ID (optional). | *[Empty/Not Set]* |
 | `VITE_FIREBASE_DATABASE_ID` | The database ID for Firestore operations. | `ai-studio-1a3eb665-2cd9-4e84-a599-413bb4ee52e0` |
-| `VITE_GEMINI_API_KEY` | Public access key for Gemini API (if calling directly from the browser; ideally keep empty and funnel through backend). | *[To be securely provided]* |
 
 ## Server-Side Variables (Backend/Node.js)
 *These variables dictate backend security and integration behavior. They are never exposed to the browser.*

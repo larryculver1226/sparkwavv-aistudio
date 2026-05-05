@@ -15,3 +15,10 @@ env-status.json
 users-v2-last-response.json
 synthetic-training-data.jsonl
 *.jsonl
+
+# Security: Ignore service accounts and private keys
+*firebase-adminsdk*.json
+*service-account*.json
+*credentials*.json
+*.p12
+*.pem

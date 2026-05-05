@@ -43,7 +43,11 @@ export const configService = {
         console.warn('skylar_global document not found in metadata collection.');
         return null;
       }
-    } catch (error) {
+    } catch (error: any) {
+      if (error?.message?.includes('offline') || error?.message?.includes('permission-denied') || error?.code === 'unavailable') {
+        console.warn('[Config Service] Firestore read failed for skylar_global. Using default fallback.');
+        return null;
+      }
       handleFirestoreError(error, OperationType.GET, 'metadata/skylar_global');
       throw error;
     }
@@ -66,8 +70,13 @@ export const configService = {
           callback(null);
         }
       },
-      (error) => {
-        handleFirestoreError(error, OperationType.GET, 'metadata/skylar_global');
+      (error: any) => {
+        if (error?.message?.includes('offline') || error?.message?.includes('permission-denied') || error?.code === 'unavailable') {
+          console.warn('[Config Service] Firestore subscription failed for skylar_global. Using default fallback.');
+          callback(null);
+        } else {
+          handleFirestoreError(error, OperationType.GET, 'metadata/skylar_global');
+        }
       }
     );
   },
@@ -86,37 +95,12 @@ export const configService = {
       const snapshot = await getDocs(stagesRef);
       
       if (snapshot.empty) {
-        console.info('[Config Service] No journey stages found. Seeding from default JSON...');
-        const module = await import('../config/defaultJourneyStages.json');
-        const defaultStages = module.default as Record<string, any>;
-        const stages: Record<string, SkylarStageConfig> = {};
-        for (const [sId, defaultData] of Object.entries(defaultStages)) {
-          const config = {
-            stageId: sId,
-            stageTitle: defaultData.title || sId,
-            description: defaultData.description || '',
-            systemPromptTemplate: defaultData.systemPromptTemplate || '',
-            requiredArtifacts: defaultData.requiredArtifacts || [],
-            allowedModalities: Array.isArray(defaultData.allowedModalities) 
-              ? {
-                  text: defaultData.allowedModalities.includes('text'),
-                  audio: defaultData.allowedModalities.includes('audio'),
-                  image: defaultData.allowedModalities.includes('image'),
-                  video: defaultData.allowedModalities.includes('video'),
-                }
-              : defaultData.allowedModalities || DEFAULT_MODALITIES,
-            uiConfig: defaultData.uiConfig || { theme: 'dark', layout: 'split' }
-          } as SkylarStageConfig;
-          stages[sId] = config;
-        }
-        journeyStagesCache = stages;
-        return stages;
+        throw new Error('Empty snapshot, handling via fallback');
       }
 
       const stages: Record<string, SkylarStageConfig> = {};
       snapshot.forEach((doc) => {
         const data = doc.data();
-        // Map JourneyStageDefinition to SkylarStageConfig if needed
         stages[doc.id] = {
           stageId: doc.id,
           stageTitle: data.title || data.stageTitle || doc.id,
@@ -140,7 +124,7 @@ export const configService = {
       const defaultStages = module.default as Record<string, any>;
       for (const [sId, defaultData] of Object.entries(defaultStages)) {
         if (!stages[sId]) {
-          const config = {
+          stages[sId] = {
             stageId: sId,
             stageTitle: defaultData.title || sId,
             description: defaultData.description || '',
@@ -156,15 +140,41 @@ export const configService = {
               : defaultData.allowedModalities || DEFAULT_MODALITIES,
             uiConfig: defaultData.uiConfig || { theme: 'dark', layout: 'split' }
           } as SkylarStageConfig;
-          stages[sId] = config;
         }
       }
 
       journeyStagesCache = stages;
       return stages;
-    } catch (error) {
-      handleFirestoreError(error, OperationType.LIST, 'journeyPhaseConfigs');
-      throw error;
+    } catch (error: any) {
+      if (error?.message?.includes('offline') || error?.message?.includes('permission-denied') || error?.message?.includes('Empty snapshot') || error?.code === 'unavailable') {
+        console.warn('[Config Service] Failed to load journey stages from DB. Falling back to default JSON.');
+        const module = await import('../config/defaultJourneyStages.json');
+        const defaultStages = module.default as Record<string, any>;
+        const stages: Record<string, SkylarStageConfig> = {};
+        for (const [sId, defaultData] of Object.entries(defaultStages)) {
+          stages[sId] = {
+            stageId: sId,
+            stageTitle: defaultData.title || sId,
+            description: defaultData.description || '',
+            systemPromptTemplate: defaultData.systemPromptTemplate || '',
+            requiredArtifacts: defaultData.requiredArtifacts || [],
+            allowedModalities: Array.isArray(defaultData.allowedModalities) 
+              ? {
+                  text: defaultData.allowedModalities.includes('text'),
+                  audio: defaultData.allowedModalities.includes('audio'),
+                  image: defaultData.allowedModalities.includes('image'),
+                  video: defaultData.allowedModalities.includes('video'),
+                }
+              : defaultData.allowedModalities || DEFAULT_MODALITIES,
+            uiConfig: defaultData.uiConfig || { theme: 'dark', layout: 'split' }
+          } as SkylarStageConfig;
+        }
+        journeyStagesCache = stages;
+        return stages;
+      } else {
+        handleFirestoreError(error, OperationType.LIST, 'journeyPhaseConfigs');
+        throw error;
+      }
     }
   },
 
@@ -207,37 +217,42 @@ export const configService = {
         journeyStagesCache[normalizedStageId] = config;
         
         return config;
-      } else {
-        console.info(`[Config Service] Journey stage "${normalizedStageId}" not found. Using default internal config.`);
-        const module = await import('../config/defaultJourneyStages.json');
-        const defaultStages = module.default as Record<string, any>;
-        const defaultData = defaultStages[normalizedStageId] || defaultStages['dive-in'];
-        if (defaultData) {
-          const config = {
-            stageId: normalizedStageId,
-            stageTitle: defaultData.title || normalizedStageId,
-            description: defaultData.description || '',
-            systemPromptTemplate: defaultData.systemPromptTemplate || '',
-            requiredArtifacts: defaultData.requiredArtifacts || [],
-            allowedModalities: Array.isArray(defaultData.allowedModalities) 
-              ? {
-                  text: defaultData.allowedModalities.includes('text'),
-                  audio: defaultData.allowedModalities.includes('audio'),
-                  image: defaultData.allowedModalities.includes('image'),
-                  video: defaultData.allowedModalities.includes('video'),
-                }
-              : defaultData.allowedModalities || DEFAULT_MODALITIES,
-            uiConfig: defaultData.uiConfig || { theme: 'dark', layout: 'split' }
-          } as SkylarStageConfig;
-          
-          return config;
-        }
-        return null;
       }
-    } catch (error) {
-      handleFirestoreError(error, OperationType.GET, `journeyPhaseConfigs/${normalizedStageId}`);
-      throw error;
+    } catch (error: any) {
+      if (error?.message?.includes('offline') || error?.message?.includes('permission-denied') || error?.code === 'unavailable') {
+        console.warn(`[Config Service] Firestore read failed for "${normalizedStageId}". Falling back to default internal config.`);
+      } else {
+        handleFirestoreError(error, OperationType.GET, `journeyPhaseConfigs/${normalizedStageId}`);
+        throw error;
+      }
     }
+
+    // Fallback logic for missing document or offline/permission error
+    console.info(`[Config Service] Using default internal config for "${normalizedStageId}".`);
+    const module = await import('../config/defaultJourneyStages.json');
+    const defaultStages = module.default as Record<string, any>;
+    const defaultData = defaultStages[normalizedStageId] || defaultStages['dive-in'];
+    if (defaultData) {
+      const config = {
+        stageId: normalizedStageId,
+        stageTitle: defaultData.title || normalizedStageId,
+        description: defaultData.description || '',
+        systemPromptTemplate: defaultData.systemPromptTemplate || '',
+        requiredArtifacts: defaultData.requiredArtifacts || [],
+        allowedModalities: Array.isArray(defaultData.allowedModalities) 
+          ? {
+              text: defaultData.allowedModalities.includes('text'),
+              audio: defaultData.allowedModalities.includes('audio'),
+              image: defaultData.allowedModalities.includes('image'),
+              video: defaultData.allowedModalities.includes('video'),
+            }
+          : defaultData.allowedModalities || DEFAULT_MODALITIES,
+        uiConfig: defaultData.uiConfig || { theme: 'dark', layout: 'split' }
+      } as SkylarStageConfig;
+      
+      return config;
+    }
+    return null;
   },
 
   /**

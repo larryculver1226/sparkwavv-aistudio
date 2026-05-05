@@ -100,7 +100,14 @@ export const agentOpsService = {
         }
         throw new Error(`Journey Phase Config not found for ${stageId}`);
       }
-    } catch (error) {
+    } catch (error: any) {
+      if (error?.message?.includes('offline') || error?.message?.includes('permission-denied') || error?.code === 'unavailable') {
+        const normalizedId = stageId.toLowerCase();
+        const fallback = (defaultJourneyStages as any)[normalizedId];
+        if (fallback) {
+          return fallback;
+        }
+      }
       throw error;
     }
   },

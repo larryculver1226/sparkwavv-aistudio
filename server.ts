@@ -615,11 +615,7 @@ try {
         // Final normalization for raw literal \n
         processedKey = processedKey.replace(/\\n/g, '\n');
 
-        const keySnippet =
-          processedKey.substring(0, 30) + '...' + processedKey.substring(processedKey.length - 30);
-        console.log(
-          `[AUTH] Private key length: ${processedKey.length}, starts/ends: ${keySnippet.replace(/\n/g, '\\n')}`
-        );
+        console.log(`[AUTH] Successfully processed private key structure.`);
 
         options.credential = admin.credential.cert({
           projectId,
@@ -3854,10 +3850,10 @@ async function startServer() {
           const insights = await skylar.fetchConfirmedInsights(userId);
           const dnaContext = insights.map((i: any) => `${i.type}: ${i.content}`).join(', ');
 
-          const prompt = \`
-            Analyze the job description at the following URL: \${url}
+          const prompt = `
+            Analyze the job description at the following URL: ${url}
             
-            User's Professional DNA: \${dnaContext}
+            User's Professional DNA: ${dnaContext}
             
             Your goal is to extract "Market Intelligence" for this specific role and evaluate its resonance with the user's DNA.
             
@@ -3865,7 +3861,7 @@ async function startServer() {
             {
               "company": "string",
               "role": "string",
-              "url": "\${url}",
+              "url": "${url}",
               "summary": "A concise, strategic summary of the role and its significance.",
               "marketIntelligence": {
                 "demand": "high|medium|low",
@@ -3884,10 +3880,10 @@ async function startServer() {
                 "nextSteps": ["string"]
               },
               "status": "analyzed",
-              "createdAt": "\${new Date().toISOString()}",
-              "updatedAt": "\${new Date().toISOString()}"
+              "createdAt": "${new Date().toISOString()}",
+              "updatedAt": "${new Date().toISOString()}"
             }
-          \`;
+          `;
 
           const response = await ai.models.generateContent({
             model: 'gemini-2.5-flash',
@@ -3904,7 +3900,7 @@ async function startServer() {
 
           const result = JSON.parse(response.text || '{}');
           result.userId = userId;
-          result.id = \`opp_\${Date.now()}\`;
+          result.id = `opp_${Date.now()}`;
           res.json(result);
         } catch (error: any) {
           console.error('Error in /api/skylar/analyze-job:', error);
@@ -5736,6 +5732,45 @@ async function startServer() {
     }
   });
 
+  app.get('/api/admin/probe-maps-key', async (req, res) => {
+    const apiKey = process.env.GOOGLE_MAPS_API_KEY;
+    if (!apiKey) {
+      return res.json({ status: 'missing', message: 'GOOGLE_MAPS_API_KEY not found in environment.' });
+    }
+
+    const probeModel = 'gemini-1.5-flash';
+    const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${probeModel}:countTokens?key=${apiKey}`;
+
+    try {
+      const response = await fetch(endpoint, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          contents: [{ parts: [{ text: 'Security Probe' }] }]
+        }),
+      });
+
+      if (response.ok) {
+        return res.json({ 
+          status: 'vulnerable', 
+          isVulnerable: true, 
+          message: 'Maps API key has Gemini access. This key is OVER-PRIVILEGED.' 
+        });
+      } else {
+        const data = await response.json().catch(() => ({}));
+        return res.json({ 
+          status: 'secure', 
+          isVulnerable: false, 
+          message: `Maps key restricted correctly. (${data.error?.message || response.statusText})` 
+        });
+      }
+    } catch (error: any) {
+      return res.status(500).json({ status: 'error', message: error.message });
+    }
+  });
+
   // API 404 catch-all
   app.all('/api/*', (req, res) => {
     console.log(`[API] 404 - ${req.method} ${req.url}`);
@@ -5759,7 +5794,6 @@ async function startServer() {
         MODE: process.env.NODE_ENV || 'development',
         DEV: process.env.NODE_ENV !== 'production',
         PROD: process.env.NODE_ENV === 'production',
-        GEMINI_API_KEY: process.env.GEMINI_API_KEY || '',
       };
 
       // Add all VITE_ prefixed variables
