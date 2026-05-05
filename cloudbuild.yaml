@@ -16,6 +16,11 @@ steps:
       - 'VERTEX_AI_SEARCH_ENGINE_ID'
       - 'VERTEX_AI_VECTOR_SEARCH_INDEX_ID'
 
+  # Track 133: Secret Scanning (Gitleaks)
+  - name: 'zricethezav/gitleaks:latest'
+    entrypoint: 'gitleaks'
+    args: ['detect', '--source=.', '--verbose', '--redact']
+
   # Step 2: Build the Docker image with Vite build arguments
   - name: 'gcr.io/cloud-builders/docker'
     args:
@@ -34,6 +39,20 @@ steps:
   # Step 3: Push the image to Google Container Registry
   - name: 'gcr.io/cloud-builders/docker'
     args: ['push', 'gcr.io/$PROJECT_ID/sparkwavv-prod:$COMMIT_SHA']
+
+  # Track 133: Container Vulnerability Scan
+  - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
+    entrypoint: 'bash'
+    args:
+      - '-c'
+      - |
+        gcloud artifacts docker images scan gcr.io/$PROJECT_ID/sparkwavv-prod:$COMMIT_SHA --format="json" > scan_results.json
+    allow_failure: true
+
+  # Track 133: Security Gate Enforcement
+  - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
+    entrypoint: 'bash'
+    args: ['scripts/security-gate.sh', 'CRITICAL']
 
   # Step 4: Deploy to Cloud Run
   - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'

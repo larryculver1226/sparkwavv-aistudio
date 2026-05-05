@@ -2,7 +2,7 @@ import firebaseConfig from '../../firebase-applet-config.json';
 
 export interface ProbeResult {
   isVulnerable: boolean;
-  status: 'secure' | 'vulnerable' | 'error';
+  status: 'secure' | 'vulnerable' | 'error' | 'missing';
   message: string;
 }
 

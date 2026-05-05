@@ -23,6 +23,7 @@ To enable full enterprise intelligence, the following environment variables must
 ### 2. Vertex AI (Enterprise Intelligence)
 - `VERTEX_AI_PROJECT_ID`: Your Google Cloud Project ID (defaults to Firebase Project ID if omitted).
 - `VERTEX_AI_LOCATION`: The region for Vertex AI services (e.g., `us-central1` or `global`).
+- `VERTEX_AI_MODEL_ARMOR_POLICY`: The resource name of the Model Armor security policy (e.g., `projects/PROJECT_ID/locations/LOCATION/templates/POLICY_ID`).
 - `VERTEX_AI_SEARCH_ENGINE_ID`: The ID of your Vertex AI Search Engine for the Wavvault.
 - `VERTEX_AI_SEARCH_DATA_STORE_ID`: The ID of the associated Data Store.
 - `VERTEX_AI_MEDLM_MODEL_ID`: The specific MedLM model ID for healthcare intelligence (e.g., `medlm-medium`).

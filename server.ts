@@ -64,6 +64,8 @@ import { vertexService } from './backend/services/vertexService.js';
 import { initializeMcpClient } from './backend/services/mcpBridge.js';
 import { methodologyGenerator } from './src/utils/methodologyGenerator.js';
 import { DocumentServiceClient } from '@google-cloud/discoveryengine';
+import { sccService } from './backend/services/sccService';
+import { artifactAnalysisService } from './backend/services/artifactAnalysisService';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -955,8 +957,12 @@ async function startServer() {
   };
 
   // System Status Endpoint
-  app.get('/api/admin/system-status', (req, res) => {
+  app.get('/api/admin/system-status', async (req, res) => {
     const geminiKey = getGeminiApiKey();
+    const sccSummary = await sccService.getFindingSummary();
+    const sccStatus = await sccService.getStatus();
+    const vulnerabilities = await artifactAnalysisService.getVulnerabilities();
+
     res.json({
       firebase: {
         admin: isFirebaseAdminConfigured,
@@ -979,6 +985,11 @@ async function startServer() {
         financeEndpointId: process.env.VERTEX_AI_FINANCE_ENDPOINT_ID || null,
         techEndpointId: process.env.VERTEX_AI_TECH_ENDPOINT_ID || null,
         medlmModelId: process.env.VERTEX_AI_MEDLM_MODEL_ID || null,
+      },
+      security: {
+        scc: sccStatus,
+        findings: sccSummary,
+        vulnerabilities,
       },
     });
   });

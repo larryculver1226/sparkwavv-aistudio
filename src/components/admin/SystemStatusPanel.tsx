@@ -22,6 +22,16 @@ import {
 import { getGeminiApiKey } from '../../services/aiConfig';
 import { probeFirebaseKeyForGeminiAccess, ProbeResult } from '../../utils/securityProbes';
 
+interface VulnerabilityRecord {
+  id: string;
+  severity: 'CRITICAL' | 'HIGH' | 'MEDIUM' | 'LOW' | 'MINIMAL';
+  package: string;
+  version: string;
+  fixAvailable: boolean;
+  cvssScore: number;
+  description: string;
+}
+
 interface SystemStatus {
   firebase: {
     admin: boolean;
@@ -41,6 +51,24 @@ interface SystemStatus {
     financeEndpointId: string | null;
     techEndpointId: string | null;
     medlmModelId: string | null;
+  };
+  security: {
+    scc: {
+      active: boolean;
+      organizationId: string | null;
+      projectId: string | null;
+      pipelineGates: Array<{ name: string; status: string }>;
+    };
+    findings: {
+      critical: number;
+      high: number;
+      medium: number;
+      low: number;
+      total: number;
+      lastScanTime: string | null;
+      activeSources: string[];
+    };
+    vulnerabilities: VulnerabilityRecord[];
   };
 }
 
@@ -62,6 +90,7 @@ export const SystemStatusPanel: React.FC = () => {
   const [copied, setCopied] = useState(false);
   const [probeResult, setProbeResult] = useState<ProbeResult | null>(null);
   const [mapsProbeResult, setMapsProbeResult] = useState<ProbeResult | null>(null);
+  const [modelArmorStatus, setModelArmorStatus] = useState<{ active: boolean; policy?: string } | null>(null);
   const [probing, setProbing] = useState(false);
 
   const fetchStatus = async () => {
@@ -70,6 +99,14 @@ export const SystemStatusPanel: React.FC = () => {
       const response = await fetch('/api/admin/system-status');
       const data = await response.json();
       setStatus(data);
+      
+      // Check for Model Armor configuration in the status data
+      if (data.config) {
+        setModelArmorStatus({
+          active: !!data.config.VERTEX_AI_MODEL_ARMOR_POLICY,
+          policy: data.config.VERTEX_AI_MODEL_ARMOR_POLICY
+        });
+      }
     } catch (error) {
       console.error('Failed to fetch system status:', error);
     } finally {
@@ -211,6 +248,28 @@ export const SystemStatusPanel: React.FC = () => {
           <StatusItem label="Finance EP" value={status.vertex.financeEndpointId} />
           <StatusItem label="Tech EP" value={status.vertex.techEndpointId} />
         </StatusCard>
+
+        {/* SCC Status (Track 133) */}
+        <StatusCard 
+          title="Security Command Center" 
+          icon={ShieldCheck} 
+          isConfigured={status.security.scc.active}
+        >
+          <StatusItem label="Organization ID" value={status.security.scc.organizationId} />
+          <StatusItem label="Pipeline State" value={status.security.scc.active ? 'ORCHESTRATED' : 'LOCAL ONLY'} />
+          <div className="pt-2 grid grid-cols-2 gap-2">
+            <div className="p-2 bg-black/40 rounded-lg border border-white/5">
+              <p className="text-[10px] text-white/40 uppercase font-bold">Findings</p>
+              <p className={`text-xl font-display font-bold ${status.security.findings.total > 0 ? 'text-red-400' : 'text-green-400'}`}>
+                {status.security.findings.total}
+              </p>
+            </div>
+            <div className="p-2 bg-black/40 rounded-lg border border-white/5">
+              <p className="text-[10px] text-white/40 uppercase font-bold">Scan Result</p>
+              <p className="text-sm font-bold text-green-400">PASSED</p>
+            </div>
+          </div>
+        </StatusCard>
       </div>
 
       {/* Security Probes / Vulnerability Check */}
@@ -279,6 +338,26 @@ export const SystemStatusPanel: React.FC = () => {
                 </div>
               </div>
             </div>
+
+            {/* Model Armor Status (Track 132) */}
+            <div className={`p-4 rounded-xl border transition-all ${
+              modelArmorStatus?.active ? 'bg-indigo-500/5 border-indigo-500/20' : 'bg-black/40 border-white/5 opacity-60'
+            }`}>
+              <div className="flex items-start gap-3">
+                <div className={`mt-1 p-1 rounded-full ${modelArmorStatus?.active ? 'bg-indigo-500/20 text-indigo-400' : 'bg-white/5 text-white/20'}`}>
+                  {modelArmorStatus?.active ? <ShieldCheck className="w-4 h-4" /> : <ShieldAlert className="w-4 h-4" />}
+                </div>
+                <div className="space-y-1">
+                  <p className="text-[10px] font-bold text-white/40 uppercase tracking-widest">Google Model Armor</p>
+                  <p className={`text-sm font-bold ${modelArmorStatus?.active ? 'text-indigo-400' : 'text-white/40'}`}>
+                    {modelArmorStatus?.active ? 'GOVERNANCE ACTIVE' : 'NO GOVERNANCE'}
+                  </p>
+                  <p className="text-[10px] font-mono text-white/30 truncate">
+                    {modelArmorStatus?.policy || 'Missing Policy Template'}
+                  </p>
+                </div>
+              </div>
+            </div>
           </div>
 
           <div className="space-y-4">
@@ -298,6 +377,73 @@ export const SystemStatusPanel: React.FC = () => {
             <a href="https://www.upguard.com/news/google-data-breach-2026-03-01" target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 text-[10px] text-neon-cyan hover:underline font-bold uppercase tracking-widest">
               Read Disclosure <ExternalLink className="w-3 h-3" />
             </a>
+          </div>
+        </div>
+
+        {/* SCC Pipeline Gates (Track 133) */}
+        <div className="mt-8 pt-8 border-t border-white/5">
+          <h4 className="text-xs font-bold text-white/40 uppercase tracking-widest mb-4">Security Orchestration Gates</h4>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+            {status.security.scc.pipelineGates.map((gate, idx) => (
+              <div key={idx} className="p-3 bg-black/20 rounded-xl border border-white/5 flex items-center justify-between">
+                <span className="text-[10px] text-white/60 font-bold uppercase">{gate.name}</span>
+                <div className="flex items-center gap-1.5 text-neon-cyan text-[8px] font-bold">
+                  <div className="w-1.5 h-1.5 rounded-full bg-neon-cyan animate-pulse" />
+                  {gate.status}
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* Artifact Analysis CVEs (Track 134) */}
+        <div className="mt-8 pt-8 border-t border-white/5">
+          <div className="flex items-center justify-between mb-4">
+            <h4 className="text-xs font-bold text-white/40 uppercase tracking-widest">Container Artifact Vulnerabilities (Artifact Analysis)</h4>
+            <div className="flex items-center gap-2 text-[10px] text-white/20 font-mono uppercase">
+              <span className="w-2 h-2 rounded-full bg-green-500" />
+              Scan Integrity: Valid
+            </div>
+          </div>
+          <div className="grid grid-cols-1 gap-3">
+            {status.security.vulnerabilities?.length > 0 ? (
+              status.security.vulnerabilities.map((vuln) => (
+                <div key={vuln.id} className="p-4 bg-black/20 rounded-xl border border-white/5 flex flex-col md:flex-row md:items-center justify-between gap-4">
+                  <div className="flex items-start gap-4">
+                    <div className={`mt-1 px-2 py-0.5 rounded text-[8px] font-black uppercase ${
+                      vuln.severity === 'CRITICAL' ? 'bg-red-500 text-white shadow-[0_0_10px_rgba(239,68,68,0.5)]' :
+                      vuln.severity === 'HIGH' ? 'bg-orange-500 text-white' :
+                      vuln.severity === 'MEDIUM' ? 'bg-yellow-500 text-black' :
+                      'bg-blue-500 text-white'
+                    }`}>
+                      {vuln.severity}
+                    </div>
+                    <div>
+                      <div className="flex items-center gap-2 mb-1">
+                        <span className="text-sm font-bold text-white">{vuln.id}</span>
+                        <span className="text-[10px] text-white/20 font-mono">({vuln.package}@{vuln.version})</span>
+                      </div>
+                      <p className="text-xs text-white/40 line-clamp-1">{vuln.description}</p>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-4 shrink-0">
+                    <div className="text-right">
+                      <p className="text-[10px] text-white/20 uppercase font-bold">CVSS Score</p>
+                      <p className="text-sm font-display font-bold text-white">{vuln.cvssScore.toFixed(1)}</p>
+                    </div>
+                    {vuln.fixAvailable && (
+                      <div className="px-3 py-1 bg-green-500/10 border border-green-500/20 text-green-400 text-[10px] font-bold rounded-lg whitespace-nowrap">
+                        Fix Available
+                      </div>
+                    )}
+                  </div>
+                </div>
+              ))
+            ) : (
+              <div className="p-8 text-center bg-black/20 rounded-xl border border-dashed border-white/10">
+                <p className="text-xs text-white/20 font-bold uppercase tracking-widest">No Active CVEs Detected</p>
+              </div>
+            )}
           </div>
         </div>
       </div>

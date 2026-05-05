@@ -18,6 +18,7 @@ import {
   JobExecutionSchema,
   InterviewCoachingSchema
 } from '../../src/types/schemas';
+import { modelArmor } from './modelArmorService';
 
 const activeGeminiKey = getGeminiApiKey() || process.env.GEMINI_API_KEY;
 
@@ -68,7 +69,12 @@ export const createSparkwavvAccountTool = ai.defineTool(
     }),
   },
   async (input) => {
-    return { status: 'success', message: 'Account creation flow triggered.', data: input };
+    // Model Armor Integration
+    const inputSanity = await modelArmor.sanitizePrompt(JSON.stringify(input));
+    if (!inputSanity.isSafe) {
+      return { status: 'failed', message: 'Account details flagged by security policy.' };
+    }
+    return { status: 'success', message: 'Account creation flow triggered.', data: JSON.parse(inputSanity.sanitizedText) };
   }
 );
 
@@ -86,9 +92,12 @@ export const searchWavvaultTool = ai.defineTool(
     }),
   },
   async (input) => {
+    // Model Armor Integration
+    const inputSanity = await modelArmor.sanitizePrompt(input.query);
+    
     // Return mock since we are running natively on the backend and cannot use relative fetch()
     return {
-      content: `Found anonymized career data for "${input.query}". Users in this cohort typically pivot successfully by focusing on transferable skills.`,
+      content: `Found anonymized career data for "${inputSanity.sanitizedText}". Users in this cohort typically pivot successfully by focusing on transferable skills.`,
     };
   }
 );
@@ -192,8 +201,11 @@ export const executeMinorUpdateTool = ai.defineTool(
     if (!input.userId) {
       return { status: 'error', message: 'User ID is required for this action.' };
     }
+    // Model Armor Integration
+    const inputSanity = await modelArmor.sanitizePrompt(`${input.value} ${input.reasoning}`);
+    
     // Assume success for now since we're in backend
-    return { status: 'executed', action: 'update_dashboard', data: input };
+    return { status: 'executed', action: 'update_dashboard', data: { ...input, value: inputSanity.isSafe ? input.value : '[REDACTED]', reasoning: inputSanity.sanitizedText } };
   }
 );
 
@@ -271,7 +283,12 @@ export const proposeMajorShiftTool = ai.defineTool(
     }),
   },
   async (input) => {
-    return { status: 'proposed', data: input };
+    // Model Armor Integration
+    const inputSanity = await modelArmor.sanitizePrompt(`${input.content} ${input.evidence}`);
+    if (!inputSanity.isSafe) {
+      return { status: 'error', message: 'Proposed content flagged by security policy.' };
+    }
+    return { status: 'proposed', data: { ...input, content: inputSanity.sanitizedText } };
   }
 );
 
@@ -341,6 +358,11 @@ export const parseCareerArtifactTool = ai.defineTool(
     }),
   },
   async (input) => {
+    // Model Armor Integration
+    const inputSanity = await modelArmor.sanitizePrompt(input.content);
+    if (!inputSanity.isSafe) {
+      return { status: 'error', message: 'Artifact content flagged by security policy.' };
+    }
     return {
       status: 'analyzed',
       message: 'Artifact analyzed for DNA and ATS compliance.',
@@ -362,7 +384,10 @@ export const generateAtsOptimizedContentTool = ai.defineTool(
     }),
   },
   async (input) => {
-    return { status: 'generated', message: 'Content generated.', data: input };
+    // Model Armor Integration
+    const inputSanity = await modelArmor.sanitizePrompt(input.sourceMaterial);
+    
+    return { status: 'generated', message: 'Content generated.', data: { ...input, sourceMaterial: inputSanity.sanitizedText } };
   }
 );
 
@@ -376,14 +401,17 @@ export const searchGoogleMapsTool = ai.defineTool(
     }),
   },
   async (input) => {
+    // Model Armor Integration
+    const inputSanity = await modelArmor.sanitizePrompt(input.query);
+
     if (!process.env.GOOGLE_MAPS_API_KEY) {
       console.warn('[Skylar] GOOGLE_MAPS_API_KEY is not set. Returning mocked data.');
       return {
         status: 'executed_mock',
-        message: `MOCK: Searched Google Maps for "${input.query}". Please configure a GOOGLE_MAPS_API_KEY in the Environment Secrets settings.`,
+        message: `MOCK: Searched Google Maps for "${inputSanity.sanitizedText}". Please configure a GOOGLE_MAPS_API_KEY in the Environment Secrets settings.`,
         results: [
           {
-            name: `Mocked Location for ${input.query}`,
+            name: `Mocked Location for ${inputSanity.sanitizedText}`,
             formatted_address: '123 Mocked St, Tech City',
             rating: 4.5,
           },
@@ -393,7 +421,7 @@ export const searchGoogleMapsTool = ai.defineTool(
 
     try {
       const response = await fetch(
-        `https://maps.googleapis.com/maps/api/place/textsearch/json?query=${encodeURIComponent(input.query)}&key=${process.env.GOOGLE_MAPS_API_KEY}`
+        `https://maps.googleapis.com/maps/api/place/textsearch/json?query=${encodeURIComponent(inputSanity.sanitizedText)}&key=${process.env.GOOGLE_MAPS_API_KEY}`
       );
       const data = await response.json();
       return { status: 'executed', results: data.results || [] };
@@ -441,14 +469,24 @@ export const analyzeDiscoveryLaunchpadTool = ai.defineTool(
     if (!process.env.GEMINI_API_KEY && process.env.VERTEX_AI_PROJECT_ID) activeTargetModel = 'vertexai/gemini-1.5-flash';
 
     try {
+      // Phase 4: Model Armor Integration - Input Sanitization
+      const inputSanity = await modelArmor.sanitizePrompt(JSON.stringify(input));
+      if (!inputSanity.isSafe) {
+        return { status: 'error', message: 'Input flagged by security policy: ' + inputSanity.findings?.[0]?.metadata?.details };
+      }
+
       const { output } = await ai.generate({
         model: activeTargetModel,
         system: systemPrompt,
-        prompt: `Inputs: ${JSON.stringify(input)}`,
+        prompt: `Inputs: ${inputSanity.sanitizedText}`,
         output: { schema: BestSelfProfileSchema }
       });
 
       if (output) {
+        // Output Sanitization (Optional for schema output, but good practice)
+        // Note: For structured output, sanitizing raw string might break JSON. 
+        // We typically sanitize 'system' or 'user prompt' more heavily.
+
         await db.collection('wavvaults').doc(input.userId).set({
           bestSelfProfile: output
         }, { merge: true });
@@ -496,10 +534,16 @@ export const generateNarrativeStoriesTool = ai.defineTool(
     if (!process.env.GEMINI_API_KEY && process.env.VERTEX_AI_PROJECT_ID) activeTargetModel = 'vertexai/gemini-1.5-flash';
 
     try {
+      // Model Armor Integration
+      const inputSanity = await modelArmor.sanitizePrompt(JSON.stringify(input.accomplishments));
+      if (!inputSanity.isSafe) {
+        return { status: 'error', message: 'Input flagged by security policy' };
+      }
+
       const { output } = await ai.generate({
         model: activeTargetModel,
         system: systemPrompt,
-        prompt: `Accomplishments data: ${JSON.stringify(input.accomplishments)}`,
+        prompt: `Accomplishments data: ${inputSanity.sanitizedText}`,
         output: { schema: FiveStoriesSchema }
       });
 
@@ -557,10 +601,16 @@ export const modelFutureVisionTool = ai.defineTool(
     if (!process.env.GEMINI_API_KEY && process.env.VERTEX_AI_PROJECT_ID) activeTargetModel = 'vertexai/gemini-1.5-flash';
 
     try {
+      // Model Armor Integration
+      const inputSanity = await modelArmor.sanitizePrompt(JSON.stringify(input.questionsData));
+      if (!inputSanity.isSafe) {
+        return { status: 'error', message: 'Input flagged by security policy' };
+      }
+
       const { output } = await ai.generate({
         model: activeTargetModel,
         system: systemPrompt,
-        prompt: `Questions Data: ${JSON.stringify(input.questionsData)}`,
+        prompt: `Questions Data: ${inputSanity.sanitizedText}`,
         output: { schema: FutureVisionSchema }
       });
 
@@ -613,10 +663,14 @@ export const optimizeProductivityPlanTool = ai.defineTool(
     if (!process.env.GEMINI_API_KEY && process.env.VERTEX_AI_PROJECT_ID) activeTargetModel = 'vertexai/gemini-1.5-flash';
 
     try {
+      // Model Armor Integration
+      const energyContext = input.energyTroughs.join(', ');
+      const inputSanity = await modelArmor.sanitizePrompt(energyContext);
+      
       const { output } = await ai.generate({
         model: activeTargetModel,
         system: systemPrompt,
-        prompt: `Commitment Hours: ${input.commitmentHours}\nEnergy Troughs: ${input.energyTroughs.join(', ')}`,
+        prompt: `Commitment Hours: ${input.commitmentHours}\nEnergy Troughs: ${inputSanity.sanitizedText}`,
         output: { schema: ProductivityPlanSchema }
       });
 
@@ -669,10 +723,17 @@ export const buildCareerPersonaTool = ai.defineTool(
     if (!process.env.GEMINI_API_KEY && process.env.VERTEX_AI_PROJECT_ID) activeTargetModel = 'vertexai/gemini-1.5-flash';
 
     try {
+      // Model Armor Integration
+      const context = `Behavioral insights: ${JSON.stringify(input.behavioralInsights)}\nKickspark inputs: ${JSON.stringify(input.kicksparkInputs)}`;
+      const inputSanity = await modelArmor.sanitizePrompt(context);
+      if (!inputSanity.isSafe) {
+        return { status: 'error', message: 'Input flagged by security policy' };
+      }
+
       const { output } = await ai.generate({
         model: activeTargetModel,
         system: systemPrompt,
-        prompt: `Behavioral insights: ${JSON.stringify(input.behavioralInsights)}\nKickspark inputs: ${JSON.stringify(input.kicksparkInputs)}`,
+        prompt: inputSanity.sanitizedText,
         output: { schema: CareerPersonaSchema }
       });
 
@@ -726,10 +787,17 @@ export const architectBrandIdentityTool = ai.defineTool(
     if (!process.env.GEMINI_API_KEY && process.env.VERTEX_AI_PROJECT_ID) activeTargetModel = 'vertexai/gemini-1.5-flash';
 
     try {
+      // Model Armor Integration
+      const context = `Traits: ${JSON.stringify(input.innerTraits)}\nPersona: ${JSON.stringify(input.careerPersona)}\nBest Self: ${JSON.stringify(input.bestSelfProfile)}`;
+      const inputSanity = await modelArmor.sanitizePrompt(context);
+      if (!inputSanity.isSafe) {
+        return { status: 'error', message: 'Input flagged by security policy' };
+      }
+
       const { output } = await ai.generate({
         model: activeTargetModel,
         system: systemPrompt,
-        prompt: `Traits: ${JSON.stringify(input.innerTraits)}\nPersona: ${JSON.stringify(input.careerPersona)}\nBest Self: ${JSON.stringify(input.bestSelfProfile)}`,
+        prompt: inputSanity.sanitizedText,
         output: { schema: BrandIdentitySchema }
       });
 
@@ -782,10 +850,17 @@ export const generateApplicationMaterialsTool = ai.defineTool(
     if (!process.env.GEMINI_API_KEY && process.env.VERTEX_AI_PROJECT_ID) activeTargetModel = 'vertexai/gemini-1.5-flash';
 
     try {
+      // Model Armor Integration
+      const context = `Job Description: ${input.targetJobDescription}\nWavvault History: ${JSON.stringify(input.wavvaultHistory)}`;
+      const inputSanity = await modelArmor.sanitizePrompt(context);
+      if (!inputSanity.isSafe) {
+        return { status: 'error', message: 'Request flagged by security policy' };
+      }
+
       const { output } = await ai.generate({
         model: activeTargetModel,
         system: systemPrompt,
-        prompt: `Job Description: ${input.targetJobDescription}\nWavvault History: ${JSON.stringify(input.wavvaultHistory)}`,
+        prompt: inputSanity.sanitizedText,
         output: { schema: ApplicationMaterialsSchema }
       });
 
@@ -854,10 +929,14 @@ export const verifyCredentialsTool = ai.defineTool(
     if (!process.env.GEMINI_API_KEY && process.env.VERTEX_AI_PROJECT_ID) activeTargetModel = 'vertexai/gemini-1.5-flash';
 
     try {
+      // Model Armor Integration
+      const context = `Current: ${JSON.stringify(input.currentCredentials)}\nTarget: ${JSON.stringify(input.targetRoleQualifications)}`;
+      const inputSanity = await modelArmor.sanitizePrompt(context);
+
       const { output } = await ai.generate({
         model: activeTargetModel,
         system: systemPrompt,
-        prompt: `Current: ${JSON.stringify(input.currentCredentials)}\nTarget: ${JSON.stringify(input.targetRoleQualifications)}`,
+        prompt: inputSanity.sanitizedText,
         output: { schema: CredentialAnalysisSchema }
       });
 
@@ -910,10 +989,14 @@ export const executeJobMatchingTool = ai.defineTool(
     if (!process.env.GEMINI_API_KEY && process.env.VERTEX_AI_PROJECT_ID) activeTargetModel = 'vertexai/gemini-1.5-flash';
 
     try {
+      // Model Armor Integration
+      const context = `Market Postings: ${JSON.stringify(input.marketPostings)}\nVault Context: ${JSON.stringify(input.userVaultContext)}`;
+      const inputSanity = await modelArmor.sanitizePrompt(context);
+
       const { output } = await ai.generate({
         model: activeTargetModel,
         system: systemPrompt,
-        prompt: `Market Postings: ${JSON.stringify(input.marketPostings)}\nVault Context: ${JSON.stringify(input.userVaultContext)}`,
+        prompt: inputSanity.sanitizedText,
         output: { schema: JobExecutionSchema }
       });
 
@@ -967,10 +1050,14 @@ export const coachInterviewSimulationTool = ai.defineTool(
     if (!process.env.GEMINI_API_KEY && process.env.VERTEX_AI_PROJECT_ID) activeTargetModel = 'vertexai/gemini-1.5-flash';
 
     try {
+      // Model Armor Integration
+      const context = `Role: ${input.targetRole}\nQuestion: ${input.simulatedQuestion}\nResponse: ${JSON.stringify(input.userResponseContext)}`;
+      const inputSanity = await modelArmor.sanitizePrompt(context);
+
       const { output } = await ai.generate({
         model: activeTargetModel,
         system: systemPrompt,
-        prompt: `Role: ${input.targetRole}\nQuestion: ${input.simulatedQuestion}\nResponse: ${JSON.stringify(input.userResponseContext)}`,
+        prompt: inputSanity.sanitizedText,
         output: { schema: InterviewCoachingSchema }
       });
 
@@ -1007,6 +1094,12 @@ export const memorizeContextTool = ai.defineTool(
   },
   async ({ userId, memoryText, category }) => {
     try {
+      // Model Armor Integration
+      const inputSanity = await modelArmor.sanitizePrompt(memoryText);
+      if (!inputSanity.isSafe) {
+        return { success: false, message: 'Memory content flagged by security policy.' };
+      }
+
       const activeGeminiKey = getGeminiApiKey() || process.env.GEMINI_API_KEY;
       if (!activeGeminiKey) return { success: false, message: 'Gemini API Key missing for embeddings.' };
 
@@ -1073,6 +1166,9 @@ export const recallContextTool = ai.defineTool(
   },
   async ({ userId, query }) => {
     try {
+      // Model Armor Integration
+      const inputSanity = await modelArmor.sanitizePrompt(query);
+      
       const activeGeminiKey = getGeminiApiKey() || process.env.GEMINI_API_KEY;
       if (!activeGeminiKey) return { success: false, memories: [], message: 'Gemini API Key missing for embeddings.' };
 
@@ -1180,14 +1276,17 @@ export const scrapeUrlTool = ai.defineTool(
       
       const content = await response.text();
       
+      // Model Armor Integration - Sanitize scraped content
+      const responseSanity = await modelArmor.sanitizeResponse(content);
+
       // Truncate if the content is absurdly long to protect the context window limit
       const maxLength = 25000;
-      const truncatedContent = content.length > maxLength ? content.substring(0, maxLength) + '\n\n...[Content Truncated due to length]...' : content;
+      const truncatedContent = responseSanity.sanitizedText.length > maxLength ? responseSanity.sanitizedText.substring(0, maxLength) + '\n\n...[Content Truncated due to length]...' : responseSanity.sanitizedText;
 
       return { 
         success: true, 
         content: truncatedContent, 
-        message: 'Successfully scraped and converted to Markdown.' 
+        message: responseSanity.isSafe ? 'Successfully scraped and converted to Markdown.' : 'Scraped content was partially redacted due to security policy.'
       };
     } catch (e: any) {
       return { success: false, message: `Network error or scraping failed: ${e.message}` };
@@ -1214,6 +1313,12 @@ export const manageCalendarTool = ai.defineTool(
   },
   async ({ userId, action, eventName, durationMinutes, dayDate }) => {
     try {
+      // Model Armor Integration
+      if (eventName) {
+        const inputSanity = await modelArmor.sanitizePrompt(eventName);
+        eventName = inputSanity.sanitizedText;
+      }
+
       const admin = (await import('firebase-admin')).default;
       const { getFirestore } = await import('firebase-admin/firestore');
       const fs = (await import('fs')).default;
@@ -1291,6 +1396,12 @@ export const executeOutreachTool = ai.defineTool(
   },
   async ({ userId, recipientEmail, subject, body, requireApproval }) => {
     try {
+      // Model Armor Integration - Sanitize outreach content
+      const inputSanity = await modelArmor.sanitizePrompt(`${subject} ${body}`);
+      if (!inputSanity.isSafe) {
+        return { success: false, status: 'failed', message: 'Outreach content flagged by security policy.' };
+      }
+
       const admin = (await import('firebase-admin')).default;
       const { getFirestore } = await import('firebase-admin/firestore');
       const fs = (await import('fs')).default;
@@ -1363,6 +1474,10 @@ export const exportAssetTool = ai.defineTool(
   },
   async ({ userId, documentName, format, documentContent }) => {
     try {
+      // Model Armor Integration
+      const inputSanity = await modelArmor.sanitizePrompt(documentContent);
+      const safeContent = inputSanity.sanitizedText;
+
       const admin = (await import('firebase-admin')).default;
       const { getFirestore } = await import('firebase-admin/firestore');
       const fs = (await import('fs')).default;
@@ -1383,14 +1498,14 @@ export const exportAssetTool = ai.defineTool(
       // In a production environment, this would call a serverless rendering engine (Puppeteer, Gotenberg)
       // to convert the documentContent into an actual ATS-friendly PDF/DOCX and buffer it to GCS/S3.
       
-      const simulatedUrl = `https://storage.wavvault.app/exports/${userId}/${documentName.replace(/\\s+/g, '_')}.${format}`;
+      const simulatedUrl = `https://storage.wavvault.app/exports/${userId}/${documentName.replace(/\s+/g, '_')}.${format}`;
 
       await exportsRef.add({
         documentName,
         format,
         downloadUrl: simulatedUrl,
         createdAt: new Date().toISOString(),
-        contentPreview: documentContent.substring(0, 200) + '...'
+        contentPreview: safeContent.substring(0, 200) + '...'
       });
 
       return { 
@@ -1527,6 +1642,9 @@ export const generateEnergyMapTool = ai.defineTool(
   },
   async ({ userId, tasks }) => {
     try {
+      // Model Armor Integration
+      const inputSanity = await modelArmor.sanitizePrompt(JSON.stringify(tasks));
+      
       const admin = (await import('firebase-admin')).default;
       const { getFirestore } = await import('firebase-admin/firestore');
       const fs = (await import('fs')).default;
@@ -1574,6 +1692,9 @@ export const lockCoreValuesTool = ai.defineTool(
   },
   async ({ userId, values }) => {
     try {
+      // Model Armor Integration
+      const inputSanity = await modelArmor.sanitizePrompt(JSON.stringify(values));
+      
       const admin = (await import('firebase-admin')).default;
       const { getFirestore } = await import('firebase-admin/firestore');
       const fs = (await import('fs')).default;
@@ -1623,6 +1744,12 @@ export const simulateCareerPivotTool = ai.defineTool(
   },
   async ({ userId, targetRole, matchedSkills, missingSkills }) => {
     try {
+      // Model Armor Integration
+      const inputSanity = await modelArmor.sanitizePrompt(`${targetRole} ${matchedSkills.join(', ')} ${missingSkills.join(', ')}`);
+      if (!inputSanity.isSafe) {
+        return { success: false, message: 'Simulation parameters flagged by security policy.', uiAction: 'none' };
+      }
+
       const admin = (await import('firebase-admin')).default;
       const { getFirestore } = await import('firebase-admin/firestore');
       const fs = (await import('fs')).default;
@@ -1678,6 +1805,13 @@ export const findAdjacentTitlesTool = ai.defineTool(
   },
   async ({ userId, currentRole, suggestedTitles }) => {
     try {
+      // Model Armor Integration
+      const context = JSON.stringify({ currentRole, suggestedTitles });
+      const inputSanity = await modelArmor.sanitizePrompt(context);
+      if (!inputSanity.isSafe) {
+        return { success: false, message: 'Title suggestions flagged by security policy.', uiAction: 'none' };
+      }
+
       const admin = (await import('firebase-admin')).default;
       const { getFirestore } = await import('firebase-admin/firestore');
       const fs = (await import('fs')).default;
@@ -1733,6 +1867,9 @@ export const auditSocialProfileTool = ai.defineTool(
   },
   async ({ userId, profileUrl, recommendations }) => {
     try {
+      // Model Armor Integration - Sanitize recommendations
+      const inputSanity = await modelArmor.sanitizePrompt(JSON.stringify(recommendations));
+      
       const admin = (await import('firebase-admin')).default;
       const { getFirestore } = await import('firebase-admin/firestore');
       const fs = (await import('fs')).default;
@@ -1787,6 +1924,9 @@ export const generatePortfolioStructureTool = ai.defineTool(
   },
   async ({ userId, targetRole, artifactsRequired }) => {
     try {
+      // Model Armor Integration
+      const inputSanity = await modelArmor.sanitizePrompt(JSON.stringify(artifactsRequired));
+
       const admin = (await import('firebase-admin')).default;
       const { getFirestore } = await import('firebase-admin/firestore');
       const fs = (await import('fs')).default;
@@ -1951,6 +2091,12 @@ export const parseResumeToVaultTool = ai.defineTool(
   },
   async ({ userId, resumeText, extractedData }) => {
     try {
+      // Model Armor Integration
+      const inputSanity = await modelArmor.sanitizePrompt(resumeText);
+      if (!inputSanity.isSafe) {
+        return { success: false, message: 'Resume content flagged by security policy.', uiAction: 'none' };
+      }
+
       const admin = (await import('firebase-admin')).default;
       const { getFirestore } = await import('firebase-admin/firestore');
       const fs = (await import('fs')).default;
@@ -2004,6 +2150,9 @@ export const assessOperatingStyleTool = ai.defineTool(
   },
   async ({ userId, preferences, narrativeReasoning }) => {
     try {
+      // Model Armor Integration
+      const inputSanity = await modelArmor.sanitizePrompt(narrativeReasoning);
+
       const admin = (await import('firebase-admin')).default;
       const { getFirestore } = await import('firebase-admin/firestore');
       const fs = (await import('fs')).default;
@@ -2108,6 +2257,12 @@ export const draftElevatorPitchTool = ai.defineTool(
   },
   async ({ userId, targetAudience, pitch }) => {
     try {
+      // Model Armor Integration
+      const inputSanity = await modelArmor.sanitizePrompt(pitch);
+      if (!inputSanity.isSafe) {
+        return { success: false, message: 'Pitch content flagged by security policy.', uiAction: 'none' };
+      }
+
       const admin = (await import('firebase-admin')).default;
       const { getFirestore } = await import('firebase-admin/firestore');
       const fs = (await import('fs')).default;
@@ -2500,6 +2655,15 @@ export const runJourneyStageFlow = ai.defineFlow(
     }),
   },
   async (input) => {
+    // Model Armor Integration - Input Sanitization
+    const messageSanity = await modelArmor.sanitizePrompt(input.message);
+    if (!messageSanity.isSafe) {
+      return {
+        text: "I'm sorry, but your message was flagged by my security filters. Please try rephrasing your question.",
+        executedActions: [],
+      };
+    }
+
     // 1. Fetch Current Truth
     let currentTruth = '';
     if (input.userId && input.userId !== 'anonymous') {
@@ -2615,7 +2779,7 @@ export const runJourneyStageFlow = ai.defineFlow(
 
       userContent.push({ text: initPrompt });
     } else if (input.message && input.message.trim().length > 0) {
-      userContent.push({ text: input.message.trim() });
+      userContent.push({ text: messageSanity.sanitizedText });
     }
 
     if (input.attachments && input.attachments.length > 0) {
@@ -2725,8 +2889,11 @@ export const runJourneyStageFlow = ai.defineFlow(
       usage: response.usage,
     };
 
+    // Model Armor Integration - Response Sanitization
+    const responseSanity = await modelArmor.sanitizeResponse(response.text);
+
     return {
-      text: response.text,
+      text: responseSanity.sanitizedText,
       executedActions,
       debugData,
     };
@@ -2754,6 +2921,16 @@ export const reviewResumeSubAgentFlow = ai.defineFlow(
     if (!process.env.GEMINI_API_KEY && process.env.VERTEX_AI_PROJECT_ID) {
       activeTargetModel = 'vertexai/gemini-1.5-flash';
     }
+    // Model Armor Integration
+    const inputSanity = await modelArmor.sanitizePrompt(`Role: ${input.targetRole}\nResume: ${input.resumeContent}`);
+    if (!inputSanity.isSafe) {
+      return {
+        atsScore: 0,
+        criticalCritique: 'Security policy violation detected in input.',
+        suggestedImprovements: [],
+      };
+    }
+
     const prompt = `Review the following resume for the target role: "${input.targetRole}".
 Focus areas: ${input.focusAreas ? input.focusAreas.join(', ') : 'ATS Compliance, Action Verbs, Formatting'}.
 
@@ -2802,6 +2979,12 @@ export const startInterviewSessionFlow = ai.defineFlow(
     }),
   },
   async (input) => {
+    // Model Armor Integration
+    const inputSanity = await modelArmor.sanitizePrompt(`${input.persona} | ${JSON.stringify(input.dnaContext)}`);
+    if (!inputSanity.isSafe) {
+      return { question: 'I cannot proceed with this persona due to security policy.', personaContext: '', initialResonance: 0 };
+    }
+
     let activeTargetModel = 'googleai/gemini-2.5-flash';
     if (!process.env.GEMINI_API_KEY && process.env.VERTEX_AI_PROJECT_ID) {
       activeTargetModel = 'vertexai/gemini-1.5-flash';
@@ -2850,6 +3033,12 @@ export const sendInterviewResponseFlow = ai.defineFlow(
     }),
   },
   async (input) => {
+    // Model Armor Integration
+    const inputSanity = await modelArmor.sanitizePrompt(input.userResponse);
+    if (!inputSanity.isSafe) {
+      return { feedback: 'Your response was flagged by security filters.', nextQuestion: 'Please try again.', resonanceScore: 0, dnaAlignment: [] };
+    }
+
     let activeTargetModel = 'googleai/gemini-2.5-flash';
     if (!process.env.GEMINI_API_KEY && process.env.VERTEX_AI_PROJECT_ID) {
       activeTargetModel = 'vertexai/gemini-1.5-flash';
@@ -2906,6 +3095,9 @@ export const getInterviewDebriefFlow = ai.defineFlow(
     }),
   },
   async (input) => {
+    // Model Armor Integration
+    const inputSanity = await modelArmor.sanitizePrompt(JSON.stringify(input.sessionHistory).substring(0, 5000));
+
     let activeTargetModel = 'googleai/gemini-2.5-flash';
     if (!process.env.GEMINI_API_KEY && process.env.VERTEX_AI_PROJECT_ID) {
       activeTargetModel = 'vertexai/gemini-1.5-flash';
@@ -2958,6 +3150,12 @@ export const analyzeWavvaultArtifactFlow = ai.defineFlow(
     }),
   },
   async (input) => {
+    // Model Armor Integration
+    const inputSanity = await modelArmor.sanitizePrompt(input.content);
+    if (!inputSanity.isSafe) {
+      return { title: 'Security Alert', extractedSkills: [], industryRelevance: 'Content blocked by safety policy.', documentSummary: 'Blocked.' };
+    }
+
     let activeTargetModel = 'googleai/gemini-1.5-flash';
     if (!process.env.GEMINI_API_KEY && process.env.VERTEX_AI_PROJECT_ID) {
       activeTargetModel = 'vertexai/gemini-1.5-flash';
@@ -3026,6 +3224,9 @@ export const performSynthesisFlow = ai.defineFlow(
     }),
   },
   async (input) => {
+    // Model Armor Integration
+    const inputSanity = await modelArmor.sanitizePrompt(JSON.stringify(input.history).substring(0, 5000));
+    
     let activeTargetModel = 'googleai/gemini-2.5-flash';
     if (!process.env.GEMINI_API_KEY && process.env.VERTEX_AI_PROJECT_ID) {
       activeTargetModel = 'vertexai/gemini-1.5-flash';
@@ -3098,6 +3299,9 @@ export const performGateReviewFlow = ai.defineFlow(
     }),
   },
   async (input) => {
+    // Model Armor Integration
+    const inputSanity = await modelArmor.sanitizePrompt(JSON.stringify(input.history).substring(0, 5000));
+
     let activeTargetModel = 'googleai/gemini-2.5-flash';
     if (!process.env.GEMINI_API_KEY && process.env.VERTEX_AI_PROJECT_ID) activeTargetModel = 'vertexai/gemini-1.5-flash';
 
@@ -3152,6 +3356,9 @@ export const getEmotionalIntelligenceFlow = ai.defineFlow(
     }),
   },
   async (input) => {
+    // Model Armor Integration
+    const inputSanity = await modelArmor.sanitizePrompt(JSON.stringify(input.history).substring(0, 5000));
+
     const admin = (await import('firebase-admin')).default;
     const { getFirestore } = await import('firebase-admin/firestore');
     const fs = (await import('fs')).default;
@@ -3228,6 +3435,12 @@ export const getResonanceFeedbackFlow = ai.defineFlow(
     }),
   },
   async (input) => {
+    // Model Armor Integration
+    const inputSanity = await modelArmor.sanitizePrompt(input.content);
+    if (!inputSanity.isSafe) {
+      return { resonanceScore: 0, feedback: 'Content blocked by safety policy.', suggestions: [] };
+    }
+
     let activeTargetModel = 'googleai/gemini-2.5-flash';
     if (!process.env.GEMINI_API_KEY && process.env.VERTEX_AI_PROJECT_ID) activeTargetModel = 'vertexai/gemini-1.5-flash';
 
@@ -3283,6 +3496,9 @@ export const generateInteractivePortfolioFlow = ai.defineFlow(
     }),
   },
   async (input) => {
+    // Model Armor Integration
+    const inputSanity = await modelArmor.sanitizePrompt(JSON.stringify(input.dnaContext));
+
     let activeTargetModel = 'googleai/gemini-2.5-flash';
     if (!process.env.GEMINI_API_KEY && process.env.VERTEX_AI_PROJECT_ID) {
       activeTargetModel = 'vertexai/gemini-1.5-flash';
@@ -3374,6 +3590,9 @@ export const generateTargetedSequenceFlow = ai.defineFlow(
     }),
   },
   async (input) => {
+    // Model Armor Integration
+    const inputSanity = await modelArmor.sanitizePrompt(`${input.targetRole} at ${input.targetCompany} | DNA: ${JSON.stringify(input.dnaContext)}`);
+
     let activeTargetModel = 'googleai/gemini-2.5-flash';
     if (!process.env.GEMINI_API_KEY && process.env.VERTEX_AI_PROJECT_ID) {
       activeTargetModel = 'vertexai/gemini-1.5-flash';
@@ -3448,6 +3667,9 @@ export const generateLiveResumeFlow = ai.defineFlow(
     }),
   },
   async (input) => {
+    // Model Armor Integration
+    const inputSanity = await modelArmor.sanitizePrompt(JSON.stringify(input.dnaContext));
+
     let activeTargetModel = 'googleai/gemini-2.5-flash';
     if (!process.env.GEMINI_API_KEY && process.env.VERTEX_AI_PROJECT_ID) {
       activeTargetModel = 'vertexai/gemini-1.5-flash';

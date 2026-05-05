@@ -1,5 +1,6 @@
 import { GoogleGenAI, Type, ThinkingLevel } from '@google/genai';
 import { getGeminiApiKey } from '../../src/services/aiConfig';
+import { modelArmor } from './modelArmorService';
 
 // Lazy initialization of Gemini
 let aiInstance: GoogleGenAI | null = null;
@@ -66,9 +67,12 @@ export async function generateBrandImage(
   mimeType?: string,
   size: '512px' | '1K' | '2K' | '4K' = '1K'
 ) {
+  // Model Armor Integration
+  const inputSanity = await modelArmor.sanitizePrompt(prompt);
+  
   const ai = getAI();
 
-  const parts: any[] = [{ text: prompt }];
+  const parts: any[] = [{ text: inputSanity.sanitizedText }];
   if (base64Image && mimeType) {
     parts.push({
       inlineData: {
@@ -106,23 +110,15 @@ export async function generateBrandImage(
 }
 
 export async function generateDiscoverySummary(userData: UserData) {
+  // Model Armor Integration - Sanitize user data context
+  const context = JSON.stringify(userData);
+  const inputSanity = await modelArmor.sanitizePrompt(context);
+
   const prompt = `
     Act as a high-end career branding strategist for SPARKWavv. 
     Analyze the following user data and generate a "Discovery Summary".
     
-    User Data:
-    - Name: ${userData.onboarding.name}
-    - Email: ${userData.onboarding.email}
-    - Industry: ${userData.onboarding.industry}
-    - Current Role/Background: ${userData.onboarding.role}
-    - Bio: ${userData.onboarding.bio}
-    - Accomplishments: ${userData.accomplishments.map((a) => `${a.title}: ${a.description}`).join('; ')}
-    - Perfect Day: ${userData.environment.perfectDay}
-    - Extinguishers (Deal-breakers): ${userData.environment.extinguishers.join(', ')}
-    - Passions/Energizers: ${userData.passions.energizers.join(', ')}
-    - Best-When Conditions: ${userData.passions.bestWhen}
-    - Brand Attributes: ${userData.attributes.join(', ')}
-    - Career Tagline: ${userData.tagline}
+    User Context: ${inputSanity.sanitizedText}
 
     Output a JSON object with:
     1. brandPortrait: A cinematic 2-sentence description of their unique value.
@@ -182,17 +178,15 @@ export async function generateDiscoverySummary(userData: UserData) {
 }
 
 export async function generateCinematicManifesto(userData: UserData) {
+  // Model Armor Integration
+  const context = JSON.stringify(userData);
+  const inputSanity = await modelArmor.sanitizePrompt(context);
+
   const prompt = `
     Act as a cinematic brand storyteller for SPARKWavv. 
     Based on the following user data, synthesize their "Cinematic Brand Manifesto".
     
-    User Data:
-    - Name: ${userData.onboarding.name}
-    - Industry: ${userData.onboarding.industry}
-    - Bio: ${userData.onboarding.bio}
-    - Accomplishments: ${userData.accomplishments.map((a) => `${a.title}: ${a.description}`).join('; ')}
-    - Brand Attributes: ${userData.attributes.join(', ')}
-    - Career Tagline: ${userData.tagline}
+    User Context: ${inputSanity.sanitizedText}
 
     Generate 3 "Brand Pillars". Each pillar must have:
     1. quote: A powerful, personalized quote that encapsulates a core aspect of their professional identity.
@@ -258,7 +252,9 @@ export async function parseResume(fileData: string, mimeType: string) {
 
     const parts: any[] = [];
     if (mimeType === 'text/plain') {
-      parts.push({ text: `Resume Content:\n${fileData}\n\n${prompt}` });
+      // Model Armor Integration for raw text
+      const inputSanity = await modelArmor.sanitizePrompt(fileData);
+      parts.push({ text: `Resume Content:\n${inputSanity.sanitizedText}\n\n${prompt}` });
     } else {
       parts.push({
         inlineData: {

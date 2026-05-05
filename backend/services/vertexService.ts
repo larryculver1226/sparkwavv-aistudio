@@ -4,6 +4,7 @@ import { Storage } from '@google-cloud/storage';
 import { IndexServiceClient, IndexEndpointServiceClient, MatchServiceClient, GenAiTuningServiceClient, helpers } from '@google-cloud/aiplatform';
 import fs from 'fs';
 import path from 'path';
+import { modelArmor } from './modelArmorService';
 
 const PROJECT_ID = process.env.VERTEX_AI_PROJECT_ID || process.env.FIREBASE_PROJECT_ID;
 const LOCATION = process.env.VERTEX_AI_LOCATION || 'us-central1';
@@ -222,6 +223,9 @@ export class VertexService {
   async getHealthcareInsight(prompt: string, context?: string): Promise<string | null> {
     const modelId = process.env.VERTEX_AI_MEDLM_MODEL_ID || 'medlm-medium@latest';
     const ai = getVertexAI();
+
+    // Model Armor Integration
+    const inputSanity = await modelArmor.sanitizePrompt(prompt);
     
     // Enhanced Healthcare Prompt with Lobkowicz Methodology
     const enhancedPrompt = `
@@ -229,7 +233,7 @@ export class VertexService {
       Your goal is to provide career strategic advice for healthcare professionals using the Philip Lobkowicz methodology.
       
       Context: ${context || 'General healthcare career strategy'}
-      User Question: ${prompt}
+      User Question: ${inputSanity.sanitizedText}
       
       Instructions:
       1. Use clinical and healthcare administrative precision.
@@ -242,7 +246,13 @@ export class VertexService {
       const generativeModel = ai.getGenerativeModel({ model: modelId });
       const result = await generativeModel.generateContent(enhancedPrompt);
       const response = await result.response;
-      return response.candidates?.[0]?.content?.parts?.[0]?.text || null;
+      const textResponse = response.candidates?.[0]?.content?.parts?.[0]?.text || null;
+      
+      if (textResponse) {
+        const outputSanity = await modelArmor.sanitizeResponse(textResponse);
+        return outputSanity.sanitizedText;
+      }
+      return null;
     } catch (error: any) {
       console.warn('[VERTEX MEDLM ERROR] Falling back to Gemini Pro:', error.message || error);
       try {
@@ -271,12 +281,15 @@ export class VertexService {
       model: modelPath,
     });
 
+    // Model Armor Integration
+    const inputSanity = await modelArmor.sanitizePrompt(prompt);
+
     const enhancedPrompt = `
       You are Skylar's Finance Intelligence module.
       Provide strategic career advice for finance professionals (Investment Banking, Fintech, Corporate Finance, etc.) using the Philip Lobkowicz methodology.
       
       Context: ${context || 'General finance career strategy'}
-      User Question: ${prompt}
+      User Question: ${inputSanity.sanitizedText}
       
       Instructions:
       1. Use financial industry precision (e.g., deal flow, regulatory environment, quantitative analysis).
@@ -288,7 +301,13 @@ export class VertexService {
     try {
       const result = await generativeModel.generateContent(enhancedPrompt);
       const response = await result.response;
-      return response.candidates?.[0]?.content?.parts?.[0]?.text || null;
+      const textResponse = response.candidates?.[0]?.content?.parts?.[0]?.text || null;
+
+      if (textResponse) {
+        const outputSanity = await modelArmor.sanitizeResponse(textResponse);
+        return outputSanity.sanitizedText;
+      }
+      return null;
     } catch (error: any) {
       console.error('[VERTEX FINANCE ERROR]', error.message || error);
       return null;
@@ -309,12 +328,15 @@ export class VertexService {
       model: modelPath,
     });
 
+    // Model Armor Integration
+    const inputSanity = await modelArmor.sanitizePrompt(prompt);
+
     const enhancedPrompt = `
       You are Skylar's Tech Intelligence module.
       Provide strategic career advice for tech professionals (Software Engineering, Product Management, AI/ML, etc.) using the Philip Lobkowicz methodology.
       
       Context: ${context || 'General tech career strategy'}
-      User Question: ${prompt}
+      User Question: ${inputSanity.sanitizedText}
       
       Instructions:
       1. Use tech industry precision (e.g., stack alignment, product lifecycle, disruptive innovation).
@@ -326,7 +348,13 @@ export class VertexService {
     try {
       const result = await generativeModel.generateContent(enhancedPrompt);
       const response = await result.response;
-      return response.candidates?.[0]?.content?.parts?.[0]?.text || null;
+      const textResponse = response.candidates?.[0]?.content?.parts?.[0]?.text || null;
+
+      if (textResponse) {
+        const outputSanity = await modelArmor.sanitizeResponse(textResponse);
+        return outputSanity.sanitizedText;
+      }
+      return null;
     } catch (error: any) {
       console.error('[VERTEX TECH ERROR]', error.message || error);
       return null;
@@ -434,6 +462,9 @@ export class VertexService {
       model: modelPath,
     });
 
+    // Model Armor Integration
+    const inputSanity = await modelArmor.sanitizePrompt(prompt);
+
     const systemInstruction = `
       You are Skylar, but you are operating with the Philip Lobkowicz Strategic Coaching Methodology.
       Your tone is professional, strategic, and "tough love." 
@@ -444,11 +475,17 @@ export class VertexService {
 
     try {
       const result = await generativeModel.generateContent({
-        contents: [{ role: 'user', parts: [{ text: prompt }] }],
+        contents: [{ role: 'user', parts: [{ text: inputSanity.sanitizedText }] }],
         systemInstruction: { role: 'system', parts: [{ text: systemInstruction }] },
       });
       const response = await result.response;
-      return response.candidates?.[0]?.content?.parts?.[0]?.text || null;
+      const textResponse = response.candidates?.[0]?.content?.parts?.[0]?.text || null;
+
+      if (textResponse) {
+        const outputSanity = await modelArmor.sanitizeResponse(textResponse);
+        return outputSanity.sanitizedText;
+      }
+      return null;
     } catch (error: any) {
       console.error('[VERTEX LOBKOWICZ ERROR]', error.message || error);
       return null;
