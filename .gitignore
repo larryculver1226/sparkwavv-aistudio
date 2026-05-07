@@ -16,6 +16,10 @@ users-v2-last-response.json
 synthetic-training-data.jsonl
 *.jsonl
 
+# Security: Ignore documentation containing secrets
+Application Environment Variables.md
+API_KEYS.md
+
 # Security: Ignore service accounts and private keys
 *firebase-adminsdk*.json
 *service-account*.json

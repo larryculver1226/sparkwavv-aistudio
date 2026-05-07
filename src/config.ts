@@ -136,8 +136,9 @@ export const validateConfig = () => {
   // Additional backend validation could be added here
   
   if (missing.length > 0) {
-    const errorMsg = `CRITICAL CONFIGURATION ERROR: The following required environment variables are missing or invalid: ${missing.join(', ')}. Please update your .env file or environment settings immediately.`;
-    console.error(errorMsg);
-    throw new Error(errorMsg);
+    const errorMsg = `[CONFIGURATION WARNING] The following environment variables are missing or invalid: ${missing.join(', ')}. The application may function in a degraded state. Please update your AI Studio Secrets Vault or .env file with valid values.`;
+    console.warn(errorMsg);
+    // We no longer throw here to allow the app to boot and show a "Missing Configuration" state if needed.
+    // throw new Error(errorMsg);
   }
 };

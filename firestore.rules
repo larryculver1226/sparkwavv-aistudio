@@ -348,7 +348,9 @@ service cloud.firestore {
         'isDiscoveryUnlocked', 'contentHash', 'previousHash', 'lastCommitHash', 'lastCommitTimestamp',
         'effortTier', 'energyManagement', 'rppPartners', 'twentyOneQuestions', 'perfectDay', 'prioritizationRankings',
         'pieOfLife', 'extinguishers', 'accomplishmentLedger', 'fiveStories', 'attributeAssignments',
-        'chatHistory', 'validationGates'
+        'chatHistory', 'validationGates', 'bestSelfProfile', 'futureVision', 'productivityPlan',
+        'careerPersona', 'brandIdentity', 'credentialAnalysis', 'matchedOpportunities', 'interviewSessions',
+        'synthesizedAssets'
       ];
       return hasRequiredFields(['userId']) &&
              hasOnlyAllowedFields(allowedFields) &&
@@ -370,16 +372,25 @@ service cloud.firestore {
              (!('effortTier' in data) || data.effortTier == null || data.effortTier is string) &&
              (!('energyManagement' in data) || data.energyManagement == null || data.energyManagement is map) &&
              (!('rppPartners' in data) || data.rppPartners == null || data.rppPartners is list) &&
-             (!('twentyOneQuestions' in data) || data.twentyOneQuestions == null || data.twentyOneQuestions is list) &&
-             (!('perfectDay' in data) || data.perfectDay == null || data.perfectDay is list) &&
+             (!('twentyOneQuestions' in data) || data.twentyOneQuestions == null || data.twentyOneQuestions is map) &&
+             (!('perfectDay' in data) || data.perfectDay == null || (data.perfectDay is string || data.perfectDay is list)) &&
              (!('prioritizationRankings' in data) || data.prioritizationRankings == null || data.prioritizationRankings is map) &&
-             (!('pieOfLife' in data) || data.pieOfLife == null || data.pieOfLife is list) &&
-             (!('extinguishers' in data) || data.extinguishers == null || data.extinguishers is map) &&
+             (!('pieOfLife' in data) || data.pieOfLife == null || (data.pieOfLife is map || data.pieOfLife is list)) &&
+             (!('extinguishers' in data) || data.extinguishers == null || (data.extinguishers is map || data.extinguishers is list)) &&
              (!('accomplishmentLedger' in data) || data.accomplishmentLedger == null || data.accomplishmentLedger is list) &&
              (!('fiveStories' in data) || data.fiveStories == null || data.fiveStories is list) &&
              (!('attributeAssignments' in data) || data.attributeAssignments == null || data.attributeAssignments is map) &&
              (!('chatHistory' in data) || data.chatHistory == null || data.chatHistory is list) &&
              (!('validationGates' in data) || data.validationGates == null || data.validationGates is map) &&
+             (!('bestSelfProfile' in data) || data.bestSelfProfile == null || data.bestSelfProfile is map) &&
+             (!('futureVision' in data) || data.futureVision == null || data.futureVision is map) &&
+             (!('productivityPlan' in data) || data.productivityPlan == null || data.productivityPlan is map) &&
+             (!('careerPersona' in data) || data.careerPersona == null || data.careerPersona is map) &&
+             (!('brandIdentity' in data) || data.brandIdentity == null || data.brandIdentity is map) &&
+             (!('credentialAnalysis' in data) || data.credentialAnalysis == null || data.credentialAnalysis is map) &&
+             (!('matchedOpportunities' in data) || data.matchedOpportunities == null || data.matchedOpportunities is list) &&
+             (!('interviewSessions' in data) || data.interviewSessions == null || data.interviewSessions is list) &&
+             (!('synthesizedAssets' in data) || data.synthesizedAssets == null || data.synthesizedAssets is list) &&
              (!('embedding' in data) || data.embedding == null || data.embedding is list) &&
              (!('updatedAt' in data) || data.updatedAt == null || (resource == null ? isRecent(data.updatedAt) : data.updatedAt == resource.data.updatedAt));
     }

@@ -1,4 +1,5 @@
-import { ContainerAnalysisClient } from '@google-cloud/containeranalysis';
+import containeranalysis from '@google-cloud/containeranalysis';
+const { ContainerAnalysisClient } = containeranalysis;
 
 const PROJECT_ID = process.env.VERTEX_AI_PROJECT_ID || process.env.FIREBASE_PROJECT_ID;
 

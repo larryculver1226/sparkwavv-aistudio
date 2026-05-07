@@ -487,7 +487,7 @@ export const analyzeDiscoveryLaunchpadTool = ai.defineTool(
         // Note: For structured output, sanitizing raw string might break JSON. 
         // We typically sanitize 'system' or 'user prompt' more heavily.
 
-        await db.collection('wavvaults').doc(input.userId).set({
+        await db.collection('wavvault').doc(input.userId).set({
           bestSelfProfile: output
         }, { merge: true });
         return { status: 'success', data: output };
@@ -548,7 +548,7 @@ export const generateNarrativeStoriesTool = ai.defineTool(
       });
 
       if (output) {
-        await db.collection('wavvaults').doc(input.userId).set({
+        await db.collection('wavvault').doc(input.userId).set({
           fiveStories: output.narratives.map(n => ({
             id: `story-${Date.now()}-${Math.random().toString(36).substr(2, 5)}`,
             accomplishmentId: n.accomplishmentId,
@@ -615,7 +615,7 @@ export const modelFutureVisionTool = ai.defineTool(
       });
 
       if (output) {
-        await db.collection('wavvaults').doc(input.userId).set({
+        await db.collection('wavvault').doc(input.userId).set({
           futureVision: output
         }, { merge: true });
         return { status: 'success', data: output };
@@ -675,7 +675,7 @@ export const optimizeProductivityPlanTool = ai.defineTool(
       });
 
       if (output) {
-        await db.collection('wavvaults').doc(input.userId).set({
+        await db.collection('wavvault').doc(input.userId).set({
           productivityPlan: output
         }, { merge: true });
         return { status: 'success', data: output };
@@ -738,7 +738,7 @@ export const buildCareerPersonaTool = ai.defineTool(
       });
 
       if (output) {
-        await db.collection('wavvaults').doc(input.userId).set({
+        await db.collection('wavvault').doc(input.userId).set({
           careerPersona: output
         }, { merge: true });
         return { status: 'success', data: output };
@@ -802,7 +802,7 @@ export const architectBrandIdentityTool = ai.defineTool(
       });
 
       if (output) {
-        await db.collection('wavvaults').doc(input.userId).set({
+        await db.collection('wavvault').doc(input.userId).set({
           brandIdentity: output
         }, { merge: true });
         return { status: 'success', data: output };
@@ -881,7 +881,7 @@ export const generateApplicationMaterialsTool = ai.defineTool(
           content: { text: output.coverLetter }
         };
 
-        await db.collection('wavvaults').doc(input.userId).update({
+        await db.collection('wavvault').doc(input.userId).update({
           synthesizedAssets: FieldValue.arrayUnion(resumeAsset, clAsset)
         });
         return { status: 'success', data: output };
@@ -941,7 +941,7 @@ export const verifyCredentialsTool = ai.defineTool(
       });
 
       if (output) {
-        await db.collection('wavvaults').doc(input.userId).set({
+        await db.collection('wavvault').doc(input.userId).set({
           credentialAnalysis: output
         }, { merge: true });
         return { status: 'success', data: output };
@@ -1001,7 +1001,7 @@ export const executeJobMatchingTool = ai.defineTool(
       });
 
       if (output && output.opportunities && output.opportunities.length > 0) {
-        await db.collection('wavvaults').doc(input.userId).update({
+        await db.collection('wavvault').doc(input.userId).update({
           matchedOpportunities: FieldValue.arrayUnion(...output.opportunities)
         });
         return { status: 'success', data: output };
@@ -1066,7 +1066,7 @@ export const coachInterviewSimulationTool = ai.defineTool(
           ...output,
           timestamp: new Date().toISOString()
         };
-        await db.collection('wavvaults').doc(input.userId).update({
+        await db.collection('wavvault').doc(input.userId).update({
           interviewSessions: FieldValue.arrayUnion(sessionData)
         });
         return { status: 'success', data: output };
@@ -3380,7 +3380,7 @@ export const getEmotionalIntelligenceFlow = ai.defineFlow(
 
     if (input.userId) {
       try {
-        const wDoc = await db.collection('wavvaults').doc(input.userId).get();
+        const wDoc = await db.collection('wavvault').doc(input.userId).get();
         if (wDoc.exists) wavvaultDoc = wDoc.data();
         const uDoc = await db.collection('users').doc(input.userId).get();
         if (uDoc.exists) userDoc = uDoc.data();

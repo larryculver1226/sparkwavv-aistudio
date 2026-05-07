@@ -1,4 +1,5 @@
-import { SecurityCenterClient } from '@google-cloud/security-center';
+import securitycenter from '@google-cloud/security-center';
+const { SecurityCenterClient } = securitycenter;
 
 const PROJECT_ID = process.env.VERTEX_AI_PROJECT_ID || process.env.FIREBASE_PROJECT_ID;
 const ORGANIZATION_ID = process.env.GOOGLE_CLOUD_SCC_ORGANIZATION_ID;

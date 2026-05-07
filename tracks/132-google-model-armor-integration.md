@@ -14,7 +14,7 @@
 ## 2. Technical Implementation Plan
 
 ### Phase 1: Research & Discovery
-- [ ] Confirm Model Armor API surface within the `@google-cloud/aiplatform` SDK.
+- [x] Confirm Model Armor API surface within the `@google-cloud/aiplatform` SDK.
 - [ ] Identify the high-risk "Interaction Points" where user input is passed directly to LLMs (e.g., Skylar Chat, Ignition Interview, Outreach Personalization).
 
 ### Phase 2: Infrastructure & Configuration

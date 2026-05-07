@@ -63,7 +63,8 @@ import { getGeminiApiKey } from './src/services/aiConfig.js';
 import { vertexService } from './backend/services/vertexService.js';
 import { initializeMcpClient } from './backend/services/mcpBridge.js';
 import { methodologyGenerator } from './src/utils/methodologyGenerator.js';
-import { DocumentServiceClient } from '@google-cloud/discoveryengine';
+import discoveryengine from '@google-cloud/discoveryengine';
+const { DocumentServiceClient } = discoveryengine;
 import { sccService } from './backend/services/sccService';
 import { artifactAnalysisService } from './backend/services/artifactAnalysisService';
 
@@ -1045,7 +1046,7 @@ async function startServer() {
             console.log(`[AUTH] User ${email} not found, creating...`);
             userRecord = await sparkwavvAdmin.auth().createUser({
               email: email,
-              password: 'Be58qq95123!!!!!!',
+              password: process.env.ADMIN_INITIAL_PASSWORD || 'PLACEHOLDER_CHANGE_ME_1',
               emailVerified: true,
               displayName: 'Larry Culver',
             });
@@ -1077,8 +1078,8 @@ async function startServer() {
 
         console.log(`[AUTH] User ${email} promoted to SUPER_ADMIN with custom claims.`);
 
-        // Always ensure password is set to the one provided for consistency
-        const newPassword = 'Be58qq95123!!!!!!';
+        // Always ensure password is set to the environment variable for consistency
+        const newPassword = process.env.ADMIN_INITIAL_PASSWORD || 'PLACEHOLDER_CHANGE_ME_1';
         await sparkwavvAdmin.auth().updateUser(uid, {
           password: newPassword,
         });
@@ -1123,7 +1124,7 @@ async function startServer() {
             // Create user if not exists
             markUser = await sparkwavvAdmin.auth().createUser({
               email: markEmail,
-              password: 'PartnerPassword123!', // Temporary
+              password: process.env.PARTNER_INITIAL_PASSWORD || 'PLACEHOLDER_CHANGE_ME_2', // Secure fallback
               displayName: 'Mark Workman',
             });
           }
@@ -2527,7 +2528,7 @@ async function startServer() {
 
     app.post('/api/admin/promote', async (req, res) => {
       const { idToken, password } = req.body;
-      if (password !== (process.env.ADMIN_PASSWORD || 'sparkwavv-admin-secure-2026')) {
+      if (password !== (process.env.ADMIN_PASSWORD)) {
         return res.status(401).json({ error: 'Invalid password' });
       }
       try {
@@ -4610,7 +4611,7 @@ async function startServer() {
       let wavvaultDoc = null;
       let userDoc = null;
       if (db) {
-        const wDoc = await db.collection('wavvaults').doc(userId as string).get();
+        const wDoc = await db.collection('wavvault').doc(userId as string).get();
         if (wDoc.exists) wavvaultDoc = wDoc.data();
         const uDoc = await db.collection('users').doc(userId as string).get();
         if (uDoc.exists) userDoc = uDoc.data();
@@ -5500,7 +5501,7 @@ async function startServer() {
 
   app.post('/api/admin/login', (req, res) => {
     const { password } = req.body;
-    const adminPassword = process.env.ADMIN_PASSWORD || 'sparkwavv-admin-secure-2026';
+    const adminPassword = process.env.ADMIN_PASSWORD;
 
     if (password === adminPassword) {
       (req.session as any).isAdmin = true;

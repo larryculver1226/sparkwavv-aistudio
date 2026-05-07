@@ -13,42 +13,13 @@ const firebaseApiKey = config.firebaseApiKey || firebaseConfig.apiKey;
 const firebaseProjectId = config.firebaseProjectId || firebaseConfig.projectId;
 const isFirebasePlaceholder = (val?: string) => !val || val.includes('PLACEHOLDER');
 
-// We also check the config file via dynamic import later, but for the initial screen
-// we check the environment variables which are the primary source of truth in AI Studio.
+// We log the warning but proceed with rendering to enable "Degraded Mode"
 if (isFirebasePlaceholder(firebaseProjectId) || isFirebasePlaceholder(firebaseApiKey)) {
-  createRoot(document.getElementById('root')!).render(
-    <div className="min-h-screen bg-black flex items-center justify-center p-4">
-      <div className="max-w-2xl w-full bg-white/5 border border-white/10 rounded-2xl p-10 text-center backdrop-blur-xl space-y-8">
-        <div className="space-y-4">
-          <h1 className="text-3xl font-bold text-white">Application Configuration Missing</h1>
-          <p className="text-white/60">
-            Please configure your Firebase environment variables in the AI Studio Settings to enable
-            core services:
-          </p>
-        </div>
+  console.warn('⚠️ [Main] Configuration Missing: Proceeding in Degraded Mode. core services will be disabled.');
+}
 
-        <div className="p-6 bg-white/5 rounded-xl border border-white/10 text-left">
-          <h2 className="text-lg font-bold text-neon-lime mb-4">Firebase (Database & Identity)</h2>
-          <ul className="text-xs text-white/40 space-y-2 font-mono">
-            <li>• VITE_FIREBASE_API_KEY: {firebaseApiKey ? '✅' : '❌'}</li>
-            <li>
-              • VITE_FIREBASE_PROJECT_ID: {!isFirebasePlaceholder(firebaseProjectId) ? '✅' : '❌'}
-            </li>
-          </ul>
-        </div>
-
-        <div className="p-4 bg-neon-cyan/10 rounded-xl border border-neon-cyan/20">
-          <p className="text-xs text-neon-cyan italic leading-relaxed">
-            Once configured, the application will be able to handle secure authentication and
-            real-time data persistence via Google Identity Platform.
-          </p>
-        </div>
-      </div>
-    </div>
-  );
-} else {
-  // Run connection test
-  const testFirestore = async () => {
+// Run connection test logic
+const testFirestore = async () => {
     try {
       const { db, dbDefault, auth, isFirebaseConfigured } = await import('./lib/firebase');
       const { doc, getDocFromServer } = await import('firebase/firestore');
@@ -155,4 +126,3 @@ if (isFirebasePlaceholder(firebaseProjectId) || isFirebasePlaceholder(firebaseAp
       </StrictMode>
     );
   });
-}

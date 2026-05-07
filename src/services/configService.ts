@@ -1,5 +1,5 @@
 import { doc, getDoc, collection, getDocs, onSnapshot, setDoc } from 'firebase/firestore';
-import { db } from '../lib/firebase';
+import { db, isFirebaseConfigured } from '../lib/firebase';
 import { SkylarGlobalConfig, SkylarStageConfig, DEFAULT_MODALITIES } from '../types/skylar-config';
 import { handleFirestoreError, OperationType } from '../lib/firestore-errors';
 
@@ -12,6 +12,11 @@ export const configService = {
    * Updates the global Skylar configuration in Firestore.
    */
   async updateGlobalConfig(config: SkylarGlobalConfig): Promise<void> {
+    if (!isFirebaseConfigured) {
+      console.warn('[Config Service] updateGlobalConfig skipped: Firebase not configured.');
+      globalConfigCache = config;
+      return;
+    }
     try {
       const docRef = doc(db, 'metadata', 'skylar_global');
       await setDoc(docRef, config, { merge: true });
@@ -29,6 +34,11 @@ export const configService = {
   async getSkylarGlobalConfig(forceRefresh = false): Promise<SkylarGlobalConfig | null> {
     if (!forceRefresh && globalConfigCache) {
       return globalConfigCache;
+    }
+
+    if (!isFirebaseConfigured) {
+      console.info('[Config Service] Using default global config (Firebase not configured).');
+      return null;
     }
 
     try {
@@ -57,6 +67,10 @@ export const configService = {
    * Subscribes to the global Skylar configuration in Firestore.
    */
   subscribeToSkylarGlobalConfig(callback: (config: SkylarGlobalConfig | null) => void): () => void {
+    if (!isFirebaseConfigured) {
+      callback(null);
+      return () => {};
+    }
     const docRef = doc(db, 'metadata', 'skylar_global');
     return onSnapshot(
       docRef,
@@ -88,6 +102,10 @@ export const configService = {
   async getJourneyStages(forceRefresh = false): Promise<Record<string, SkylarStageConfig>> {
     if (!forceRefresh && journeyStagesCache) {
       return journeyStagesCache;
+    }
+
+    if (!isFirebaseConfigured) {
+      return this.fallbackToDefaultStages();
     }
 
     try {
@@ -187,6 +205,10 @@ export const configService = {
       return journeyStagesCache[normalizedStageId];
     }
 
+    if (!isFirebaseConfigured) {
+      return this.fallbackToSingleDefaultStage(normalizedStageId);
+    }
+
     try {
       const docRef = doc(db, 'journeyPhaseConfigs', normalizedStageId);
       const docSnap = await getDoc(docRef);
@@ -259,6 +281,10 @@ export const configService = {
    * Updates a specific journey stage configuration in Firestore.
    */
   async updateStageConfig(stageId: string, config: SkylarStageConfig): Promise<void> {
+    if (!isFirebaseConfigured) {
+      console.warn(`[Config Service] updateStageConfig skipped for ${stageId}: Firebase not configured.`);
+      return;
+    }
     try {
       const docRef = doc(db, 'journeyPhaseConfigs', stageId);
       // Save the exact format we use internally, so fields like widgets aren't lost
@@ -283,6 +309,64 @@ export const configService = {
       handleFirestoreError(error, OperationType.UPDATE, `journeyPhaseConfigs/${stageId}`);
       throw error;
     }
+  },
+
+  /**
+   * Internal helper to load default stages when Firebase is offline/not configured.
+   */
+  async fallbackToDefaultStages(): Promise<Record<string, SkylarStageConfig>> {
+    console.info('[Config Service] Loading default journey stages from internal manifest.');
+    const module = await import('../config/defaultJourneyStages.json');
+    const defaultStages = module.default as Record<string, any>;
+    const stages: Record<string, SkylarStageConfig> = {};
+    for (const [sId, defaultData] of Object.entries(defaultStages)) {
+      stages[sId] = {
+        stageId: sId,
+        stageTitle: defaultData.title || sId,
+        description: defaultData.description || '',
+        systemPromptTemplate: defaultData.systemPromptTemplate || '',
+        requiredArtifacts: defaultData.requiredArtifacts || [],
+        allowedModalities: Array.isArray(defaultData.allowedModalities) 
+          ? {
+              text: defaultData.allowedModalities.includes('text'),
+              audio: defaultData.allowedModalities.includes('audio'),
+              image: defaultData.allowedModalities.includes('image'),
+              video: defaultData.allowedModalities.includes('video'),
+            }
+          : defaultData.allowedModalities || DEFAULT_MODALITIES,
+        uiConfig: defaultData.uiConfig || { theme: 'dark', layout: 'split' }
+      } as SkylarStageConfig;
+    }
+    journeyStagesCache = stages;
+    return stages;
+  },
+
+  async fallbackToSingleDefaultStage(normalizedStageId: string): Promise<SkylarStageConfig | null> {
+    console.info(`[Config Service] Loading fallback for "${normalizedStageId}" from internal manifest.`);
+    const module = await import('../config/defaultJourneyStages.json');
+    const defaultStages = module.default as Record<string, any>;
+    const defaultData = defaultStages[normalizedStageId] || defaultStages['dive-in'];
+    if (defaultData) {
+      const config = {
+        stageId: normalizedStageId,
+        stageTitle: defaultData.title || normalizedStageId,
+        description: defaultData.description || '',
+        systemPromptTemplate: defaultData.systemPromptTemplate || '',
+        requiredArtifacts: defaultData.requiredArtifacts || [],
+        allowedModalities: Array.isArray(defaultData.allowedModalities) 
+          ? {
+              text: defaultData.allowedModalities.includes('text'),
+              audio: defaultData.allowedModalities.includes('audio'),
+              image: defaultData.allowedModalities.includes('image'),
+              video: defaultData.allowedModalities.includes('video'),
+            }
+          : defaultData.allowedModalities || DEFAULT_MODALITIES,
+        uiConfig: defaultData.uiConfig || { theme: 'dark', layout: 'split' }
+      } as SkylarStageConfig;
+      
+      return config;
+    }
+    return null;
   },
 
   /**

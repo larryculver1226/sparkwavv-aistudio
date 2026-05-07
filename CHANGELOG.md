@@ -3,7 +3,14 @@
 All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
+### Fixed
+- **ESM Compatibility Fix**: Resolved a deployment issue where `@google-cloud/*` packages failed to load named exports in Node.js ESM mode. Updated all Google Cloud SDK imports (aiplatform, discoveryengine, storage, vertexai, containeranalysis, security-center) to use default imports and destructuring.
+- **Model Armor Migration**: Updated `ModelArmorService` to import `ModelArmorClient` from the unified `@google-cloud/aiplatform` SDK.
+
 ### Added
+- **Track 136 (Data Migration)**: Initiated the production data migration plan. Provided a specific normalization script (`scripts/migrate/normalizeWavvault.ts`) to handle the transition from the legacy `wavvaults` collection to the new singular `wavvault` collection in Firestore.
+- **Track 135 (Wavvault Standardization)**: Standardized all Firestore collection names to `wavvault` (singular) across `genkitService.ts`, `server.ts`, and `firebase-blueprint.json`. Fully aligned `User` and `Wavvault` schemas between TypeScript interfaces, the database manifest, and `firestore.rules`, ensuring all sub-agent output fields are correctly validated and typed.
+- **Security Hardening**: Updated `.gitignore` to exclude `Application Environment Variables.md` and `API_KEYS.md` to prevent sensitive credentials from being committed to version control.
 - **Track 134 (Artifact Analysis & CVE Exposure)**: Initiated integration with Google Cloud Artifact Analysis. implementing a real-time CVE monitoring dashboard within the Admin console to track container vulnerabilities and severity levels.
 - **Track 133 (SCC Integration & Security Pipeline)**: Initiated the implementation of a "Security Pipeline" in Google Cloud Build. Developed a plan to integrate Secret Scanning (Gitleaks), Dependency Auditing (npm audit), and On-demand Container Vulnerability Scanning (Container Analysis) to feed into Security Command Center.
 - **Track 132 (Google Model Armor Integration)**: Completed the implementation of a comprehensive safety and governance layer using Google Cloud Model Armor. 

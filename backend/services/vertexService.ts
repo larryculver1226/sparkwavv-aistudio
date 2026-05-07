@@ -1,7 +1,11 @@
-import { SearchServiceClient } from '@google-cloud/discoveryengine';
-import { VertexAI } from '@google-cloud/vertexai';
-import { Storage } from '@google-cloud/storage';
-import { IndexServiceClient, IndexEndpointServiceClient, MatchServiceClient, GenAiTuningServiceClient, helpers } from '@google-cloud/aiplatform';
+import discoveryengine from '@google-cloud/discoveryengine';
+const { SearchServiceClient } = discoveryengine;
+import vertexai from '@google-cloud/vertexai';
+const { VertexAI } = vertexai;
+import storagePkg from '@google-cloud/storage';
+const { Storage } = storagePkg;
+import aiplatform from '@google-cloud/aiplatform';
+const { IndexServiceClient, IndexEndpointServiceClient, MatchServiceClient, GenAiTuningServiceClient, helpers } = aiplatform;
 import fs from 'fs';
 import path from 'path';
 import { modelArmor } from './modelArmorService';

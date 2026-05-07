@@ -12,6 +12,7 @@ export type JourneyStage = 'Dive-In' | 'Ignition' | 'Discovery' | 'Branding' | '
 
 export interface UserProfile {
   uid: string;
+  sparkwavvId?: string;
   email: string;
   displayName?: string;
   photoURL?: string;
@@ -32,6 +33,21 @@ export interface UserProfile {
   voiceMode?: boolean;
   specializedSector?: 'Healthcare' | 'Legal' | 'Cybersecurity' | 'Finance' | 'General';
   updatedAt?: any;
+  createdAt?: any;
+  firstName?: string;
+  lastName?: string;
+  companyOrg?: string;
+  phone?: string;
+  programTrack?: string;
+  lifecycleStage?: string;
+  outcomesAttributes?: string;
+  feedbackQuote?: string;
+  userId?: string; // Often redundant with uid but in rules
+  userData?: any;
+  currentStep?: string;
+  summary?: string;
+  emailVerified?: boolean;
+  ignitionCompletedAt?: any;
   ignitionExercises?: {
     pieOfLife: {
       career: number;

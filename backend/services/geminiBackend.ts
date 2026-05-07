@@ -9,10 +9,9 @@ const getAI = () => {
   if (!aiInstance) {
     const apiKey = getGeminiApiKey();
     if (!apiKey) {
-      console.error('GeminiBackend: GEMINI_API_KEY is missing.');
-      throw new Error(
-        'GEMINI_API_KEY is not configured in the environment variables. Please check your AI Studio settings.'
-      );
+      console.warn('[GeminiBackend] WARNING: GEMINI_API_KEY is not configured in the environment. AI features will fail gracefully.');
+      // We don't initialize aiInstance, so subsequent calls will check again or fail gracefully
+      return null as any; 
     } else {
       const maskedKey =
         apiKey.length > 8

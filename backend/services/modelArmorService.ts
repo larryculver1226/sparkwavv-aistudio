@@ -1,4 +1,6 @@
-import { ModelArmorClient } from '@google-cloud/aiplatform';
+import aiplatform from '@google-cloud/aiplatform';
+
+const { ModelArmorClient } = aiplatform;
 
 /**
  * ModelArmorService
@@ -19,7 +21,7 @@ export class ModelArmorService {
     if (this.project && this.location) {
       try {
         this.client = new ModelArmorClient({
-          apiEndpoint: `${this.location}-aiplatform.googleapis.com`,
+          apiEndpoint: `${this.location}-modelarmor.googleapis.com`,
         });
       } catch (error) {
         console.error('[ModelArmor] Failed to initialize client:', error);

@@ -10,7 +10,7 @@ import {
   updateProfile as firebaseUpdateProfile,
   sendEmailVerification,
 } from 'firebase/auth';
-import { auth, setTenantId } from '../lib/firebase';
+import { auth, setTenantId, isFirebaseConfigured } from '../lib/firebase';
 import { authService } from '../services/authService';
 import { userService } from '../services/userService';
 import { UserProfile } from '../types/user';
@@ -219,6 +219,11 @@ export function IdentityProvider({ children }: { children: React.ReactNode }) {
     if (urlTenant) {
       setTenantId(urlTenant);
       setLocalTenantId(urlTenant);
+    }
+
+    if (!isFirebaseConfigured) {
+      setStatus('unauthenticated');
+      return;
     }
 
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {

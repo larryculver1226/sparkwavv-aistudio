@@ -66,47 +66,52 @@ if (config.apiKey) {
   console.warn('🛡️ [Firebase] API Key is MISSING!');
 }
 
-const sparkwavvApp = getApps().length === 0 ? initializeApp(config) : getApp();
-export const auth = getAuth(sparkwavvApp);
+let sparkwavvApp: any;
+let authInstance: any;
+let dbInstance: any;
+let dbDefaultInstance: any;
+let storageInstance: any;
 
-// Database 1: Sparkwavv (User Data)
-const rawDatabaseId = getViteEnv('VITE_FIREBASE_DATABASE_ID') || firebaseConfig.firestoreDatabaseId;
-const databaseId =
-  rawDatabaseId && !rawDatabaseId.startsWith('PLACEHOLDER') ? rawDatabaseId : '(default)';
-console.log('🛡️ [Firebase] Using Firestore Database ID:', databaseId);
-
-// Force long polling to bypass potential WebSocket issues in some environments
-const firestoreSettings = {
-  experimentalForceLongPolling: true,
-};
-
-export const db = initializeFirestore(sparkwavvApp, firestoreSettings, databaseId);
-
-// Only initialize dbDefault if it's different from db
-export const dbDefault =
-  databaseId === '(default)'
-    ? db
-    : initializeFirestore(sparkwavvApp, firestoreSettings, '(default)');
-
-// Admin Database (Project 1, Database 2)
-// In some environments, 'admindb' might not exist, so we fallback to the default database
-let adminDbInstance;
 try {
-  adminDbInstance = initializeFirestore(
-    sparkwavvApp,
-    {
-      experimentalForceLongPolling: true,
-    },
-    'admindb'
-  );
+  // We initialize even with placeholders to get valid SDK instances 
+  // that won't crash when passed to firebase/auth or firebase/firestore functions.
+  sparkwavvApp = getApps().length === 0 ? initializeApp(config) : getApp();
+  authInstance = getAuth(sparkwavvApp);
+  storageInstance = getStorage(sparkwavvApp);
+  
+  const rawDatabaseId = getViteEnv('VITE_FIREBASE_DATABASE_ID') || firebaseConfig.firestoreDatabaseId;
+  const databaseId = rawDatabaseId && !rawDatabaseId.startsWith('PLACEHOLDER') ? rawDatabaseId : '(default)';
+  const firestoreSettings = { experimentalForceLongPolling: true };
+  
+  dbInstance = initializeFirestore(sparkwavvApp, firestoreSettings, databaseId);
+  dbDefaultInstance = databaseId === '(default)' ? dbInstance : initializeFirestore(sparkwavvApp, firestoreSettings, '(default)');
 } catch (e) {
-  console.warn('🛡️ [Firebase] Could not initialize admindb, falling back to default database');
-  adminDbInstance = db;
+  console.error('🛡️ [Firebase] Boot Critical Failure:', e);
+  // Last resort safe stubs
+  sparkwavvApp = { options: {}, name: '[SANATIZED]' } as any;
+  authInstance = {
+    onAuthStateChanged: (cb: any) => {
+      cb(null);
+      return () => {};
+    },
+    signOut: () => Promise.resolve(),
+    currentUser: null,
+  } as any;
+  dbInstance = { 
+    app: sparkwavvApp,
+    type: 'firestore',
+    toJSON: () => ({})
+  } as any;
+  dbDefaultInstance = dbInstance;
+  storageInstance = {} as any;
 }
-export const adminDb = adminDbInstance;
-export const adminAuth = auth; // Same auth instance for single project
 
-export const storage = getStorage(sparkwavvApp);
+export const auth = authInstance;
+export const db = dbInstance;
+export const dbDefault = dbDefaultInstance;
+export const storage = storageInstance;
+export const adminDb = dbInstance; // Fallback to main db in sanitized mode
+export const adminAuth = authInstance;
 
 export const googleProvider = new GoogleAuthProvider();
 
@@ -119,5 +124,5 @@ export const setTenantId = (tenantId: string | null) => {
   console.log(`🛡️ [Firebase] Tenant ID set to: ${tenantId}`);
 };
 
-export const isFirebaseConfigured = !!config.apiKey && !config.apiKey.startsWith('PLACEHOLDER');
+export const isFirebaseConfigured = !!config.apiKey && (typeof config.apiKey === 'string') && !config.apiKey.startsWith('PLACEHOLDER');
 export const isAdminFirebaseConfigured = isFirebaseConfigured; // In single project mode, if one is configured, both are
