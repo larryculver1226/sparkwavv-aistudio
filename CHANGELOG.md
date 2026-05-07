@@ -13,6 +13,8 @@ All notable changes to this project will be documented in this file.
     - Secure `list` queries enforced via `resource.data` checks instead of client-side delegation.
     - Domain-specific validation helpers for `Users`, `Wavvault`, `Dashboards`, and `Artifacts`.
     - PII protection for user profile data.
+    - **Fix (Track 136)**: Resolved "Missing or insufficient permissions" for `journeyPhaseConfigs` and other blueprint-defined collections by adding explicit rule blocks.
+    - **Fix (Track 136)**: Corrected `isAuthenticated()` typo to `isSignedIn()` in `partner_access` rules.
 - **Linter Integration**: Installed `@firebase/eslint-plugin-security-rules` and integrated it into `eslint.config.js` to ensure ongoing rules security.
 - **UI Cleanup**: Removed the "Sanitized Mode Active" banner from the home page for a cleaner presentation, while maintaining the underlying Firebase conditional logic in the services layer.
 - **ESM Compatibility Fix**: Resolved a deployment issue where `@google-cloud/*` packages failed to load named exports in Node.js ESM mode. Updated all Google Cloud SDK imports (aiplatform, discoveryengine, storage, vertexai, containeranalysis, security-center) to use wildcard imports (`import * as pkg`) and destructuring to ensure robust compatibility with both ESM and CJS.

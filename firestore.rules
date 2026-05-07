@@ -214,11 +214,64 @@ service cloud.firestore {
       allow create: if isSignedIn();
     }
     
-    match /partner_access/{accessId} {
-      allow read: if isAuthenticated() && (isOwner(resource.data.userUid) || isCoachOf(resource.data.tenantId) || isAdmin());
-      allow create: if isAuthenticated() && (isOwner(request.resource.data.userUid) || isAdmin());
+    match /journeyPhaseConfigs/{stageId} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
+    match /partner_suggestions/{suggestionId} {
+      allow get: if isSignedIn() && (isOwner(resource.data.userId) || isOwner(resource.data.partnerUid) || isAdmin());
+      allow list: if isSignedIn() && (resource.data.userId == request.auth.uid || resource.data.partnerUid == request.auth.uid || isAdmin());
+      allow create: if isSignedIn();
+      allow update: if isSignedIn() && (isOwner(resource.data.userId) || isOwner(resource.data.partnerUid) || isAdmin());
+    }
+
+    match /partner_applications/{applicationId} {
+      allow get: if isSignedIn() && (request.auth.token.email == resource.data.contactEmail || isAdmin());
+      allow create: if true;
       allow update: if isAdmin();
-      allow delete: if isAuthenticated() && (isOwner(resource.data.userUid) || isAdmin());
+    }
+
+    match /user_insights/{insightId} {
+      allow get: if isOwner(resource.data.userId) || isAdmin() || isPartnerOf(resource.data.userId);
+      allow list: if isVerified() && (resource.data.userId == request.auth.uid || isAdmin());
+      allow write: if isAdmin();
+    }
+
+    match /user_assets/{assetId} {
+      allow get: if isOwner(resource.data.userId) || isAdmin() || isPartnerOf(resource.data.userId);
+      allow list: if isVerified() && (resource.data.userId == request.auth.uid || isAdmin());
+      allow write: if isAdmin();
+    }
+
+    match /wavvault_events/{eventId} {
+      allow get: if isOwner(resource.data.userId) || isAdmin();
+      allow list: if isVerified() && (resource.data.userId == request.auth.uid || isAdmin());
+      allow create: if isVerified() && isOwner(incoming().userId);
+    }
+
+    match /wavvault_artifacts/{artifactId} {
+      allow get: if isOwner(resource.data.userId) || isAdmin() || isPartnerOf(resource.data.userId);
+      allow list: if isVerified() && (resource.data.userId == request.auth.uid || isAdmin());
+      allow create: if isVerified() && isOwner(incoming().userId);
+      allow update: if isAdmin();
+    }
+
+    match /flagged_content/{contentId} {
+      allow read: if isAdmin();
+      allow create: if isSignedIn();
+    }
+
+    match /storage_metrics/{metricId} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
+    match /partner_access/{accessId} {
+      allow read: if isSignedIn() && (isOwner(resource.data.userUid) || isCoachOf(resource.data.tenantId) || isAdmin());
+      allow create: if isSignedIn() && (isOwner(incoming().userUid) || isAdmin());
+      allow update: if isAdmin();
+      allow delete: if isSignedIn() && (isOwner(resource.data.userUid) || isAdmin());
     }
   }
 }
