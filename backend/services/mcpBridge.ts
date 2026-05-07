@@ -28,7 +28,8 @@ export async function initializeMcpClient() {
   try {
     const transport = new StdioClientTransport({
       command: "npx",
-      args: ["tsx", "scripts/mcp-server/index.ts"]
+      args: ["tsx", "scripts/mcp-server/index.ts"],
+      env: { ...process.env } as any
     });
 
     mcpClient = new Client({

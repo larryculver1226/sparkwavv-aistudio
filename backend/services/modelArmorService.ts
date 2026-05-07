@@ -1,10 +1,7 @@
-import * as aiplatform from '@google-cloud/aiplatform';
-const { ModelArmorClient } = aiplatform;
+import { ModelArmorClient } from '@google-cloud/modelarmor';
 
 /**
  * ModelArmorService
- * Provides a security and governance layer for all Generative AI interactions.
- * Checks for prompt injection, jailbreaking, PII, and unsafe content.
  */
 export class ModelArmorService {
   private client: ModelArmorClient | null = null;

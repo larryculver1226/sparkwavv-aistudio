@@ -19,8 +19,135 @@ import {
   InterviewCoachingSchema
 } from '../../src/types/schemas';
 import { modelArmor } from './modelArmorService';
+import { fileURLToPath } from 'url';
+import path from 'path';
+import { mcpRegistry } from './mcpRegistryClient';
+import { zodToJsonSchema } from 'zod-to-json-schema';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
+let cachedFirestore: any = null;
+
+/**
+ * Robustly initializes or retrieves a Firestore instance with the correct database ID.
+ */
+async function getFirestoreInstance() {
+  if (cachedFirestore) return cachedFirestore;
+  
+  try {
+    const admin = (await import('firebase-admin')).default;
+    const { getFirestore } = await import('firebase-admin/firestore');
+    const fs = await import('fs');
+    
+    let dbId: string | null = null;
+    let projectId: string | null = null;
+    const pathsToTry = [
+      path.resolve(process.cwd(), 'firebase-applet-config.json'),
+      path.join(process.cwd(), 'firebase-applet-config.json'),
+      path.resolve(__dirname, '../../firebase-applet-config.json')
+    ];
+    
+    for (const configPath of pathsToTry) {
+       if (fs.existsSync(configPath)) {
+         try {
+           const config = JSON.parse(fs.readFileSync(configPath, 'utf8'));
+           dbId = config.firestoreDatabaseId;
+           projectId = config.projectId;
+           if (dbId && !dbId.includes('<')) break;
+           dbId = null;
+         } catch (e) {}
+       }
+    }
+    
+    let targetDbId = process.env.VITE_FIREBASE_DATABASE_ID || dbId;
+    const targetProjectId = process.env.VITE_FIREBASE_PROJECT_ID || projectId;
+
+    if (targetDbId) {
+      targetDbId = targetDbId.trim().replace(/^["']|["']$/g, '');
+      if (targetDbId === 'default') {
+        targetDbId = '(default)';
+      }
+    }
+
+    const appName = targetProjectId ? `sparkwavv-${targetProjectId.replace(/[^a-zA-Z0-9]/g, '-')}` : 'sparkwavv-default';
+    let app;
+    
+    // Check if the target project matches the default app to reuse credentials/context
+    const defaultApp = admin.apps.find(a => a?.name === '[DEFAULT]');
+    const defaultProjId = defaultApp?.options?.projectId;
+
+    if (defaultApp && (!targetProjectId || targetProjectId === defaultProjId)) {
+      console.log(`[GenkitService] Reusing default Firebase app for project: ${targetProjectId || defaultProjId}`);
+      app = defaultApp;
+    } else {
+      try {
+        if (admin.apps.map(a => a?.name).includes(appName)) {
+          app = admin.app(appName);
+        } else {
+          app = admin.initializeApp({
+            projectId: targetProjectId || undefined
+          }, appName);
+        }
+      } catch (appErr) {
+        console.warn(`[GenkitService] Failed to init named app ${appName}, falling back to default app.`);
+        app = admin.apps.length > 0 ? admin.app() : admin.initializeApp();
+      }
+    }
+    
+    let firestore = (targetDbId && targetDbId !== '(default)') 
+      ? getFirestore(app, targetDbId) 
+      : getFirestore(app);
+
+    // Track 142 Resilience: Check if the custom DB exists and is accessible. 
+    // If it fails with 5 NOT_FOUND or 7 PERMISSION_DENIED, fallback to (default)
+    if (targetDbId && targetDbId !== '(default)') {
+      try {
+        console.log(`[GenkitService] Health checking database: ${targetDbId} in project: ${targetProjectId || 'ADC'}`);
+        // Very fast check - just try to peek at a collection
+        await firestore.collection('_health_check').limit(1).get();
+      } catch (checkError: any) {
+        const errorMsg = checkError.message || String(checkError);
+        const errorCode = checkError.code;
+        
+        // Code 5: NOT_FOUND, Code 7: PERMISSION_DENIED
+        if (errorMsg.includes('NOT_FOUND') || errorCode === 5 || errorCode === 7 || errorMsg.includes('PERMISSION_DENIED') || errorMsg.includes('not found')) {
+          console.error(`[GenkitService] Configured DB ID "${targetDbId}" failed health check (Code: ${errorCode}). Falling back to (default) database.`);
+          
+          // Try to get (default) database from the same app
+          try {
+            firestore = getFirestore(app);
+            await firestore.collection('_health_check').limit(1).get();
+          } catch (defaultCheckErr) {
+            console.warn(`[GenkitService] (default) database fetch also failed on named app. Falling back to global default app/db.`);
+            // Final fallback: Use the default app if it exists, or initialize it
+            const defaultApp = admin.apps.find(a => a?.name === '[DEFAULT]') || (admin.apps.length > 0 ? admin.app() : admin.initializeApp());
+            firestore = getFirestore(defaultApp);
+          }
+        } else {
+          console.warn(`[GenkitService] Non-fatal health check issue for ${targetDbId}:`, errorMsg);
+        }
+      }
+    }
+    
+    if (typeof process !== 'undefined') {
+        // console.log(`[GenkitService] Firestore instance initialized with Project: ${targetProjectId || 'ADC'}`);
+    }
+    
+    cachedFirestore = firestore;
+    return cachedFirestore;
+  } catch (e) {
+    console.error('[GenkitService] getFirestoreInstance failed:', e);
+    throw e;
+  }
+}
 
 const activeGeminiKey = getGeminiApiKey() || process.env.GEMINI_API_KEY;
+if (activeGeminiKey) {
+  console.log(`[GenkitService] Initializing with Gemini API Key (masked): ${activeGeminiKey.substring(0, 4)}...${activeGeminiKey.substring(activeGeminiKey.length - 4)}`);
+} else {
+  console.warn('[GenkitService] No Gemini API Key found in module-level initialization.');
+}
 
 // Only initialize Vertex AI if a robust project ID is provided.
 // Explicitly ignore internal AI Studio placeholder 'gen-lang-client' projects
@@ -28,11 +155,17 @@ const vertexProjectId = process.env.VERTEX_AI_PROJECT_ID;
 const isVertexAvailable =
   vertexProjectId && vertexProjectId.trim() !== '' && !vertexProjectId.includes('gen-lang-client');
 
+if (vertexProjectId && !isVertexAvailable) {
+  console.info(`[GenkitService] Vertex AI is disabled because project ID "${vertexProjectId}" is identified as an AI Studio managed project.`);
+}
+
 const targetModel = activeGeminiKey
-  ? 'googleai/gemini-2.0-flash'
+  ? 'googleai/gemini-1.5-flash'
   : isVertexAvailable
-    ? 'vertexai/gemini-2.0-flash'
-    : 'googleai/gemini-2.0-flash';
+    ? 'vertexai/gemini-1.5-flash'
+    : 'googleai/gemini-1.5-flash'; // Fallback to 1.5 if nothing else matches
+
+console.log(`[GenkitService] Default target model set to: ${targetModel} (Vertex Available: ${isVertexAvailable})`);
 
 const vertexConfig: any = {
   location: process.env.VERTEX_AI_LOCATION || 'us-central1',
@@ -114,21 +247,7 @@ export const fetchWavvaultDataTool = ai.defineTool(
   },
   async (input) => {
     try {
-      const admin = (await import('firebase-admin')).default;
-      const { getFirestore } = await import('firebase-admin/firestore');
-      const fs = (await import('fs')).default;
-      const path = (await import('path')).default;
-      
-      let dbId = null;
-      try {
-        const configPath = path.resolve(process.cwd(), 'firebase-applet-config.json');
-        const config = JSON.parse(fs.readFileSync(configPath, 'utf8'));
-        dbId = config.firestoreDatabaseId;
-        if (dbId === '<DATABASE_ID>') dbId = null;
-      } catch (e) {}
-
-      const targetDbId = process.env.VITE_FIREBASE_DATABASE_ID || dbId;
-      const db = targetDbId ? getFirestore(admin.app(), targetDbId) : getFirestore(admin.app());
+      const db = await getFirestoreInstance();
 
       if (input.dataType === 'dashboard') {
         const doc = await db.collection('dashboards').doc(input.userId).get();
@@ -444,20 +563,7 @@ export const analyzeDiscoveryLaunchpadTool = ai.defineTool(
     }),
   },
   async (input) => {
-    const admin = (await import('firebase-admin')).default;
-    const { getFirestore } = await import('firebase-admin/firestore');
-    const fs = (await import('fs')).default;
-    const path = (await import('path')).default;
-
-    let dbId = '(default)';
-    try {
-      const configPath = path.resolve(process.cwd(), 'firebase-applet-config.json');
-      if (fs.existsSync(configPath)) {
-        const config = JSON.parse(fs.readFileSync(configPath, 'utf8'));
-        dbId = config.firestoreDatabaseId || '(default)';
-      }
-    } catch (e) {}
-    const db = getFirestore(admin.app(), dbId);
+    const db = await getFirestoreInstance();
 
     let systemPrompt = "You are the Discovery Launchpad Analyzer. Synthesize the provided user inputs into an aspirational Best Self Profile mapped strictly to the required schema structure.";
     try {
@@ -465,8 +571,8 @@ export const analyzeDiscoveryLaunchpadTool = ai.defineTool(
       if (doc.exists && doc.data()?.systemPrompt) systemPrompt = doc.data()!.systemPrompt;
     } catch (e) {}
 
-    let activeTargetModel = 'googleai/gemini-2.0-flash';
-    if (!process.env.GEMINI_API_KEY && process.env.VERTEX_AI_PROJECT_ID) activeTargetModel = 'vertexai/gemini-2.0-flash';
+    let activeTargetModel = 'googleai/gemini-1.5-flash';
+    if (!process.env.GEMINI_API_KEY && process.env.VERTEX_AI_PROJECT_ID) activeTargetModel = 'vertexai/gemini-1.5-flash';
 
     try {
       // Phase 4: Model Armor Integration - Input Sanitization
@@ -475,21 +581,30 @@ export const analyzeDiscoveryLaunchpadTool = ai.defineTool(
         return { status: 'error', message: 'Input flagged by security policy: ' + inputSanity.findings?.[0]?.metadata?.details };
       }
 
-      const { output } = await ai.generate({
-        model: activeTargetModel,
-        system: systemPrompt,
-        prompt: `Inputs: ${inputSanity.sanitizedText}`,
-        output: { schema: BestSelfProfileSchema }
+      console.log(`[GenkitService] Routing analyze_discovery_launchpad through MCP Model Registry...`);
+      const result = await mcpRegistry.generateContent({
+        role: "Discovery Launchpad Analyzer",
+        prompt: `Guidelines: ${systemPrompt}\n\nUser Data: ${inputSanity.sanitizedText}`,
+        responseSchema: JSON.stringify(zodToJsonSchema(BestSelfProfileSchema))
       });
 
-      if (output) {
-        // Output Sanitization (Optional for schema output, but good practice)
-        // Note: For structured output, sanitizing raw string might break JSON. 
-        // We typically sanitize 'system' or 'user prompt' more heavily.
+      if (result.text) {
+        // Parse the structured output from the registry
+        let output;
+        try {
+          // Clean up potential markdown blocks if the AI included them despite schema instructions
+          const jsonText = result.text.replace(/```json\n?|\n?```/g, '').trim();
+          output = JSON.parse(jsonText);
+        } catch (parseError) {
+          console.error('[GenkitService] Schema parse error:', parseError, result.text);
+          return { status: 'error', message: 'Failed to parse structured output from AI.' };
+        }
 
         await db.collection('wavvault').doc(input.userId).set({
           bestSelfProfile: output
         }, { merge: true });
+        
+        console.log(`[GenkitService] Successfully synthesized profile via ${result.model} (Status: ${result.status})`);
         return { status: 'success', data: output };
       }
       return { status: 'error', message: 'Failed to generate best self profile schema' };
@@ -509,20 +624,7 @@ export const generateNarrativeStoriesTool = ai.defineTool(
     }),
   },
   async (input) => {
-    const admin = (await import('firebase-admin')).default;
-    const { getFirestore } = await import('firebase-admin/firestore');
-    const fs = (await import('fs')).default;
-    const path = (await import('path')).default;
-
-    let dbId = '(default)';
-    try {
-      const configPath = path.resolve(process.cwd(), 'firebase-applet-config.json');
-      if (fs.existsSync(configPath)) {
-        const config = JSON.parse(fs.readFileSync(configPath, 'utf8'));
-        dbId = config.firestoreDatabaseId || '(default)';
-      }
-    } catch (e) {}
-    const db = getFirestore(admin.app(), dbId);
+    const db = await getFirestoreInstance();
 
     let systemPrompt = "You are the Narrative Journalist Sub-Agent. Transform raw accomplishments into highly structured, high-impact narratives with both an objective 'Journalist' version and an internal 'Reflective' emotional version.";
     try {
@@ -530,8 +632,8 @@ export const generateNarrativeStoriesTool = ai.defineTool(
       if (doc.exists && doc.data()?.systemPrompt) systemPrompt = doc.data()!.systemPrompt;
     } catch (e) {}
 
-    let activeTargetModel = 'googleai/gemini-2.0-flash';
-    if (!process.env.GEMINI_API_KEY && process.env.VERTEX_AI_PROJECT_ID) activeTargetModel = 'vertexai/gemini-2.0-flash';
+    let activeTargetModel = 'googleai/gemini-1.5-flash';
+    if (!process.env.GEMINI_API_KEY && process.env.VERTEX_AI_PROJECT_ID) activeTargetModel = 'vertexai/gemini-1.5-flash';
 
     try {
       // Model Armor Integration
@@ -540,16 +642,25 @@ export const generateNarrativeStoriesTool = ai.defineTool(
         return { status: 'error', message: 'Input flagged by security policy' };
       }
 
-      const { output } = await ai.generate({
-        model: activeTargetModel,
-        system: systemPrompt,
-        prompt: `Accomplishments data: ${inputSanity.sanitizedText}`,
-        output: { schema: FiveStoriesSchema }
+      console.log(`[GenkitService] Routing generate_narrative_stories through MCP Model Registry...`);
+      const result = await mcpRegistry.generateContent({
+        role: "Narrative Journalist Sub-Agent",
+        prompt: `System: ${systemPrompt}\n\nAccomplishments data: ${inputSanity.sanitizedText}`,
+        responseSchema: JSON.stringify(zodToJsonSchema(FiveStoriesSchema))
       });
 
-      if (output) {
+      if (result.text) {
+        let output;
+        try {
+          const jsonText = result.text.replace(/```json\n?|\n?```/g, '').trim();
+          output = JSON.parse(jsonText);
+        } catch (parseError) {
+          console.error('[GenkitService] Schema parse error in narratives:', parseError, result.text);
+          return { status: 'error', message: 'Failed to parse structured output from AI.' };
+        }
+
         await db.collection('wavvault').doc(input.userId).set({
-          fiveStories: output.narratives.map(n => ({
+          fiveStories: output.narratives.map((n: any) => ({
             id: `story-${Date.now()}-${Math.random().toString(36).substr(2, 5)}`,
             accomplishmentId: n.accomplishmentId,
             styleAJournalist: n.journalistVersion,
@@ -557,6 +668,8 @@ export const generateNarrativeStoriesTool = ai.defineTool(
             isHeroicDeed: false
           }))
         }, { merge: true });
+        
+        console.log(`[GenkitService] Successfully generated narratives via ${result.model} (Status: ${result.status})`);
         return { status: 'success', data: output };
       }
       return { status: 'error', message: 'Failed to generate five stories schema' };
@@ -576,20 +689,7 @@ export const modelFutureVisionTool = ai.defineTool(
     }),
   },
   async (input) => {
-    const admin = (await import('firebase-admin')).default;
-    const { getFirestore } = await import('firebase-admin/firestore');
-    const fs = (await import('fs')).default;
-    const path = (await import('path')).default;
-
-    let dbId = '(default)';
-    try {
-      const configPath = path.resolve(process.cwd(), 'firebase-applet-config.json');
-      if (fs.existsSync(configPath)) {
-        const config = JSON.parse(fs.readFileSync(configPath, 'utf8'));
-        dbId = config.firestoreDatabaseId || '(default)';
-      }
-    } catch (e) {}
-    const db = getFirestore(admin.app(), dbId);
+    const db = await getFirestoreInstance();
 
     let systemPrompt = "You are the Future Visioning & Lifestyle Modeler Sub-Agent. Analyze 21-Question answers and synthesize a 'Perfect Day' schedule alongside a prioritized decision matrix.";
     try {
@@ -597,8 +697,8 @@ export const modelFutureVisionTool = ai.defineTool(
       if (doc.exists && doc.data()?.systemPrompt) systemPrompt = doc.data()!.systemPrompt;
     } catch (e) {}
 
-    let activeTargetModel = 'googleai/gemini-2.0-flash';
-    if (!process.env.GEMINI_API_KEY && process.env.VERTEX_AI_PROJECT_ID) activeTargetModel = 'vertexai/gemini-2.0-flash';
+    let activeTargetModel = 'googleai/gemini-1.5-flash';
+    if (!process.env.GEMINI_API_KEY && process.env.VERTEX_AI_PROJECT_ID) activeTargetModel = 'vertexai/gemini-1.5-flash';
 
     try {
       // Model Armor Integration
@@ -607,17 +707,28 @@ export const modelFutureVisionTool = ai.defineTool(
         return { status: 'error', message: 'Input flagged by security policy' };
       }
 
-      const { output } = await ai.generate({
-        model: activeTargetModel,
-        system: systemPrompt,
-        prompt: `Questions Data: ${inputSanity.sanitizedText}`,
-        output: { schema: FutureVisionSchema }
+      console.log(`[GenkitService] Routing model_future_vision through MCP Model Registry...`);
+      const result = await mcpRegistry.generateContent({
+        role: "Future Visioning & Lifestyle Modeler Sub-Agent",
+        prompt: `System: ${systemPrompt}\n\nQuestions Data: ${inputSanity.sanitizedText}`,
+        responseSchema: JSON.stringify(zodToJsonSchema(FutureVisionSchema))
       });
 
-      if (output) {
+      if (result.text) {
+        let output;
+        try {
+          const jsonText = result.text.replace(/```json\n?|\n?```/g, '').trim();
+          output = JSON.parse(jsonText);
+        } catch (parseError) {
+          console.error('[GenkitService] Schema parse error in future vision:', parseError, result.text);
+          return { status: 'error', message: 'Failed to parse structured output from AI.' };
+        }
+
         await db.collection('wavvault').doc(input.userId).set({
           futureVision: output
         }, { merge: true });
+        
+        console.log(`[GenkitService] Successfully generated vision via ${result.model} (Status: ${result.status})`);
         return { status: 'success', data: output };
       }
       return { status: 'error', message: 'Failed to generate future vision model' };
@@ -638,20 +749,7 @@ export const optimizeProductivityPlanTool = ai.defineTool(
     }),
   },
   async (input) => {
-    const admin = (await import('firebase-admin')).default;
-    const { getFirestore } = await import('firebase-admin/firestore');
-    const fs = (await import('fs')).default;
-    const path = (await import('path')).default;
-
-    let dbId = '(default)';
-    try {
-      const configPath = path.resolve(process.cwd(), 'firebase-applet-config.json');
-      if (fs.existsSync(configPath)) {
-        const config = JSON.parse(fs.readFileSync(configPath, 'utf8'));
-        dbId = config.firestoreDatabaseId || '(default)';
-      }
-    } catch (e) {}
-    const db = getFirestore(admin.app(), dbId);
+    const db = await getFirestoreInstance();
 
     let systemPrompt = "You are the Energy & Productivity Optimizer Sub-Agent (Hybrid Drill Master/Guru). Base your strategy on the Pareto Principle (80/20) and insert the right reboot blocks at the right times to mitigate energy drain.";
     try {
@@ -659,25 +757,36 @@ export const optimizeProductivityPlanTool = ai.defineTool(
       if (doc.exists && doc.data()?.systemPrompt) systemPrompt = doc.data()!.systemPrompt;
     } catch (e) {}
 
-    let activeTargetModel = 'googleai/gemini-2.0-flash';
-    if (!process.env.GEMINI_API_KEY && process.env.VERTEX_AI_PROJECT_ID) activeTargetModel = 'vertexai/gemini-2.0-flash';
+    let activeTargetModel = 'googleai/gemini-1.5-flash';
+    if (!process.env.GEMINI_API_KEY && process.env.VERTEX_AI_PROJECT_ID) activeTargetModel = 'vertexai/gemini-1.5-flash';
 
     try {
       // Model Armor Integration
       const energyContext = input.energyTroughs.join(', ');
       const inputSanity = await modelArmor.sanitizePrompt(energyContext);
       
-      const { output } = await ai.generate({
-        model: activeTargetModel,
-        system: systemPrompt,
-        prompt: `Commitment Hours: ${input.commitmentHours}\nEnergy Troughs: ${inputSanity.sanitizedText}`,
-        output: { schema: ProductivityPlanSchema }
+      console.log(`[GenkitService] Routing optimize_productivity_plan through MCP Model Registry...`);
+      const result = await mcpRegistry.generateContent({
+        role: "Energy & Productivity Optimizer Sub-Agent",
+        prompt: `System: ${systemPrompt}\n\nCommitment Hours: ${input.commitmentHours}\nEnergy Troughs: ${inputSanity.sanitizedText}`,
+        responseSchema: JSON.stringify(zodToJsonSchema(ProductivityPlanSchema))
       });
 
-      if (output) {
+      if (result.text) {
+        let output;
+        try {
+          const jsonText = result.text.replace(/```json\n?|\n?```/g, '').trim();
+          output = JSON.parse(jsonText);
+        } catch (parseError) {
+          console.error('[GenkitService] Schema parse error in productivity plan:', parseError, result.text);
+          return { status: 'error', message: 'Failed to parse structured output from AI.' };
+        }
+
         await db.collection('wavvault').doc(input.userId).set({
           productivityPlan: output
         }, { merge: true });
+        
+        console.log(`[GenkitService] Successfully generated plan via ${result.model} (Status: ${result.status})`);
         return { status: 'success', data: output };
       }
       return { status: 'error', message: 'Failed to generate productivity plan schema' };
@@ -698,20 +807,7 @@ export const buildCareerPersonaTool = ai.defineTool(
     }),
   },
   async (input) => {
-    const admin = (await import('firebase-admin')).default;
-    const { getFirestore } = await import('firebase-admin/firestore');
-    const fs = (await import('fs')).default;
-    const path = (await import('path')).default;
-
-    let dbId = '(default)';
-    try {
-      const configPath = path.resolve(process.cwd(), 'firebase-applet-config.json');
-      if (fs.existsSync(configPath)) {
-        const config = JSON.parse(fs.readFileSync(configPath, 'utf8'));
-        dbId = config.firestoreDatabaseId || '(default)';
-      }
-    } catch (e) {}
-    const db = getFirestore(admin.app(), dbId);
+    const db = await getFirestoreInstance();
 
     let systemPrompt = "You are the AI Career Diagnostics & Persona Builder Sub-Agent. Analyze the cognitive and behavioral attributes provided to define a precise Strengths Portrait and actionable Career Blueprint.";
     try {
@@ -719,8 +815,8 @@ export const buildCareerPersonaTool = ai.defineTool(
       if (doc.exists && doc.data()?.systemPrompt) systemPrompt = doc.data()!.systemPrompt;
     } catch (e) {}
 
-    let activeTargetModel = 'googleai/gemini-2.0-flash';
-    if (!process.env.GEMINI_API_KEY && process.env.VERTEX_AI_PROJECT_ID) activeTargetModel = 'vertexai/gemini-2.0-flash';
+    let activeTargetModel = 'googleai/gemini-1.5-flash';
+    if (!process.env.GEMINI_API_KEY && process.env.VERTEX_AI_PROJECT_ID) activeTargetModel = 'vertexai/gemini-1.5-flash';
 
     try {
       // Model Armor Integration
@@ -730,17 +826,28 @@ export const buildCareerPersonaTool = ai.defineTool(
         return { status: 'error', message: 'Input flagged by security policy' };
       }
 
-      const { output } = await ai.generate({
-        model: activeTargetModel,
-        system: systemPrompt,
-        prompt: inputSanity.sanitizedText,
-        output: { schema: CareerPersonaSchema }
+      console.log(`[GenkitService] Routing build_career_persona through MCP Model Registry...`);
+      const result = await mcpRegistry.generateContent({
+        role: "AI Career Diagnostics & Persona Builder Sub-Agent",
+        prompt: `System: ${systemPrompt}\n\nContext: ${inputSanity.sanitizedText}`,
+        responseSchema: JSON.stringify(zodToJsonSchema(CareerPersonaSchema))
       });
 
-      if (output) {
+      if (result.text) {
+        let output;
+        try {
+          const jsonText = result.text.replace(/```json\n?|\n?```/g, '').trim();
+          output = JSON.parse(jsonText);
+        } catch (parseError) {
+          console.error('[GenkitService] Schema parse error in career persona:', parseError, result.text);
+          return { status: 'error', message: 'Failed to parse structured output from AI.' };
+        }
+
         await db.collection('wavvault').doc(input.userId).set({
           careerPersona: output
         }, { merge: true });
+        
+        console.log(`[GenkitService] Successfully built persona via ${result.model} (Status: ${result.status})`);
         return { status: 'success', data: output };
       }
       return { status: 'error', message: 'Failed to generate career persona schema' };
@@ -762,20 +869,7 @@ export const architectBrandIdentityTool = ai.defineTool(
     }),
   },
   async (input) => {
-    const admin = (await import('firebase-admin')).default;
-    const { getFirestore } = await import('firebase-admin/firestore');
-    const fs = (await import('fs')).default;
-    const path = (await import('path')).default;
-
-    let dbId = '(default)';
-    try {
-      const configPath = path.resolve(process.cwd(), 'firebase-applet-config.json');
-      if (fs.existsSync(configPath)) {
-        const config = JSON.parse(fs.readFileSync(configPath, 'utf8'));
-        dbId = config.firestoreDatabaseId || '(default)';
-      }
-    } catch (e) {}
-    const db = getFirestore(admin.app(), dbId);
+    const db = await getFirestoreInstance();
 
     let systemPrompt = "You are the Personal Brand Architect. Translate the user's inner traits, career persona, and best self profile into a high-impact professional brand identity.";
     try {
@@ -783,8 +877,8 @@ export const architectBrandIdentityTool = ai.defineTool(
       if (doc.exists && doc.data()?.systemPrompt) systemPrompt = doc.data()!.systemPrompt;
     } catch (e) {}
 
-    let activeTargetModel = 'googleai/gemini-2.0-flash';
-    if (!process.env.GEMINI_API_KEY && process.env.VERTEX_AI_PROJECT_ID) activeTargetModel = 'vertexai/gemini-2.0-flash';
+    let activeTargetModel = 'googleai/gemini-1.5-flash';
+    if (!process.env.GEMINI_API_KEY && process.env.VERTEX_AI_PROJECT_ID) activeTargetModel = 'vertexai/gemini-1.5-flash';
 
     try {
       // Model Armor Integration
@@ -794,17 +888,28 @@ export const architectBrandIdentityTool = ai.defineTool(
         return { status: 'error', message: 'Input flagged by security policy' };
       }
 
-      const { output } = await ai.generate({
-        model: activeTargetModel,
-        system: systemPrompt,
-        prompt: inputSanity.sanitizedText,
-        output: { schema: BrandIdentitySchema }
+      console.log(`[GenkitService] Routing architect_brand_identity through MCP Model Registry...`);
+      const result = await mcpRegistry.generateContent({
+        role: "Personal Brand Architect",
+        prompt: `System: ${systemPrompt}\n\nContext: ${inputSanity.sanitizedText}`,
+        responseSchema: JSON.stringify(zodToJsonSchema(BrandIdentitySchema))
       });
 
-      if (output) {
+      if (result.text) {
+        let output;
+        try {
+          const jsonText = result.text.replace(/```json\n?|\n?```/g, '').trim();
+          output = JSON.parse(jsonText);
+        } catch (parseError) {
+          console.error('[GenkitService] Schema parse error in brand identity:', parseError, result.text);
+          return { status: 'error', message: 'Failed to parse structured output from AI.' };
+        }
+
         await db.collection('wavvault').doc(input.userId).set({
           brandIdentity: output
         }, { merge: true });
+        
+        console.log(`[GenkitService] Successfully architected brand via ${result.model} (Status: ${result.status})`);
         return { status: 'success', data: output };
       }
       return { status: 'error', message: 'Failed to generate brand identity schema' };
@@ -825,20 +930,8 @@ export const generateApplicationMaterialsTool = ai.defineTool(
     }),
   },
   async (input) => {
-    const admin = (await import('firebase-admin')).default;
-    const { getFirestore, FieldValue } = await import('firebase-admin/firestore');
-    const fs = (await import('fs')).default;
-    const path = (await import('path')).default;
-
-    let dbId = '(default)';
-    try {
-      const configPath = path.resolve(process.cwd(), 'firebase-applet-config.json');
-      if (fs.existsSync(configPath)) {
-        const config = JSON.parse(fs.readFileSync(configPath, 'utf8'));
-        dbId = config.firestoreDatabaseId || '(default)';
-      }
-    } catch (e) {}
-    const db = getFirestore(admin.app(), dbId);
+    const db = await getFirestoreInstance();
+    const { FieldValue } = await import('firebase-admin/firestore');
 
     let systemPrompt = "You are the AI Resume & Cover Letter Generator. Analyze the provided Wavvault history and Target Job Description to output a highly-tailored, ATS-compliant resume and a passionate cover letter.";
     try {
@@ -846,7 +939,7 @@ export const generateApplicationMaterialsTool = ai.defineTool(
       if (doc.exists && doc.data()?.systemPrompt) systemPrompt = doc.data()!.systemPrompt;
     } catch (e) {}
 
-    let activeTargetModel = 'googleai/gemini-2.0-flash';
+    let activeTargetModel = 'googleai/gemini-1.5-flash';
     if (!process.env.GEMINI_API_KEY && process.env.VERTEX_AI_PROJECT_ID) activeTargetModel = 'vertexai/gemini-1.5-flash';
 
     try {
@@ -857,14 +950,23 @@ export const generateApplicationMaterialsTool = ai.defineTool(
         return { status: 'error', message: 'Request flagged by security policy' };
       }
 
-      const { output } = await ai.generate({
-        model: activeTargetModel,
-        system: systemPrompt,
-        prompt: inputSanity.sanitizedText,
-        output: { schema: ApplicationMaterialsSchema }
+      console.log(`[GenkitService] Routing generate_application_materials through MCP Model Registry...`);
+      const result = await mcpRegistry.generateContent({
+        role: "AI Resume & Cover Letter Generator",
+        prompt: `System: ${systemPrompt}\n\nTargetting: ${inputSanity.sanitizedText}`,
+        responseSchema: JSON.stringify(zodToJsonSchema(ApplicationMaterialsSchema))
       });
 
-      if (output) {
+      if (result.text) {
+        let output;
+        try {
+          const jsonText = result.text.replace(/```json\n?|\n?```/g, '').trim();
+          output = JSON.parse(jsonText);
+        } catch (parseError) {
+          console.error('[GenkitService] Schema parse error in materials:', parseError, result.text);
+          return { status: 'error', message: 'Failed to parse structured output from AI.' };
+        }
+
         // Appending outputs as new synthesized assets
         const resumeAsset = {
           id: `resume-${Date.now()}-${Math.random().toString(36).substr(2, 5)}`,
@@ -884,6 +986,8 @@ export const generateApplicationMaterialsTool = ai.defineTool(
         await db.collection('wavvault').doc(input.userId).update({
           synthesizedAssets: FieldValue.arrayUnion(resumeAsset, clAsset)
         });
+        
+        console.log(`[GenkitService] Successfully generated materials via ${result.model} (Status: ${result.status})`);
         return { status: 'success', data: output };
       }
       return { status: 'error', message: 'Failed to generate application materials schema' };
@@ -904,20 +1008,7 @@ export const verifyCredentialsTool = ai.defineTool(
     }),
   },
   async (input) => {
-    const admin = (await import('firebase-admin')).default;
-    const { getFirestore } = await import('firebase-admin/firestore');
-    const fs = (await import('fs')).default;
-    const path = (await import('path')).default;
-
-    let dbId = '(default)';
-    try {
-      const configPath = path.resolve(process.cwd(), 'firebase-applet-config.json');
-      if (fs.existsSync(configPath)) {
-        const config = JSON.parse(fs.readFileSync(configPath, 'utf8'));
-        dbId = config.firestoreDatabaseId || '(default)';
-      }
-    } catch (e) {}
-    const db = getFirestore(admin.app(), dbId);
+    const db = await getFirestoreInstance();
 
     let systemPrompt = "You are the Smart Credential Verifier. Instantly analyze the user's credentials against the target role's requirements to identify gaps and recommend targeted courses/experiments.";
     try {
@@ -925,7 +1016,7 @@ export const verifyCredentialsTool = ai.defineTool(
       if (doc.exists && doc.data()?.systemPrompt) systemPrompt = doc.data()!.systemPrompt;
     } catch (e) {}
 
-    let activeTargetModel = 'googleai/gemini-2.0-flash';
+    let activeTargetModel = 'googleai/gemini-1.5-flash';
     if (!process.env.GEMINI_API_KEY && process.env.VERTEX_AI_PROJECT_ID) activeTargetModel = 'vertexai/gemini-1.5-flash';
 
     try {
@@ -933,17 +1024,28 @@ export const verifyCredentialsTool = ai.defineTool(
       const context = `Current: ${JSON.stringify(input.currentCredentials)}\nTarget: ${JSON.stringify(input.targetRoleQualifications)}`;
       const inputSanity = await modelArmor.sanitizePrompt(context);
 
-      const { output } = await ai.generate({
-        model: activeTargetModel,
-        system: systemPrompt,
-        prompt: inputSanity.sanitizedText,
-        output: { schema: CredentialAnalysisSchema }
+      console.log(`[GenkitService] Routing verify_credentials through MCP Model Registry...`);
+      const result = await mcpRegistry.generateContent({
+        role: "Smart Credential Verifier",
+        prompt: `System: ${systemPrompt}\n\nContext: ${inputSanity.sanitizedText}`,
+        responseSchema: JSON.stringify(zodToJsonSchema(CredentialAnalysisSchema))
       });
 
-      if (output) {
+      if (result.text) {
+        let output;
+        try {
+          const jsonText = result.text.replace(/```json\n?|\n?```/g, '').trim();
+          output = JSON.parse(jsonText);
+        } catch (parseError) {
+          console.error('[GenkitService] Schema parse error in credentials:', parseError, result.text);
+          return { status: 'error', message: 'Failed to parse structured output from AI.' };
+        }
+
         await db.collection('wavvault').doc(input.userId).set({
           credentialAnalysis: output
         }, { merge: true });
+        
+        console.log(`[GenkitService] Successfully verified credentials via ${result.model} (Status: ${result.status})`);
         return { status: 'success', data: output };
       }
       return { status: 'error', message: 'Failed to generate credential analysis schema' };
@@ -964,20 +1066,8 @@ export const executeJobMatchingTool = ai.defineTool(
     }),
   },
   async (input) => {
-    const admin = (await import('firebase-admin')).default;
-    const { getFirestore, FieldValue } = await import('firebase-admin/firestore');
-    const fs = (await import('fs')).default;
-    const path = (await import('path')).default;
-
-    let dbId = '(default)';
-    try {
-      const configPath = path.resolve(process.cwd(), 'firebase-applet-config.json');
-      if (fs.existsSync(configPath)) {
-        const config = JSON.parse(fs.readFileSync(configPath, 'utf8'));
-        dbId = config.firestoreDatabaseId || '(default)';
-      }
-    } catch (e) {}
-    const db = getFirestore(admin.app(), dbId);
+    const db = await getFirestoreInstance();
+    const { FieldValue } = await import('firebase-admin/firestore');
 
     let systemPrompt = "You are the Job Matching & Application Execution Engine. Proactively match users with roles, draft introductions, schedule timelines, and flag 'Wrong Job Risks' based on the user's Extinguishers.";
     try {
@@ -985,7 +1075,7 @@ export const executeJobMatchingTool = ai.defineTool(
       if (doc.exists && doc.data()?.systemPrompt) systemPrompt = doc.data()!.systemPrompt;
     } catch (e) {}
 
-    let activeTargetModel = 'googleai/gemini-2.0-flash';
+    let activeTargetModel = 'googleai/gemini-1.5-flash';
     if (!process.env.GEMINI_API_KEY && process.env.VERTEX_AI_PROJECT_ID) activeTargetModel = 'vertexai/gemini-1.5-flash';
 
     try {
@@ -1025,20 +1115,8 @@ export const coachInterviewSimulationTool = ai.defineTool(
     }),
   },
   async (input) => {
-    const admin = (await import('firebase-admin')).default;
-    const { getFirestore, FieldValue } = await import('firebase-admin/firestore');
-    const fs = (await import('fs')).default;
-    const path = (await import('path')).default;
-
-    let dbId = '(default)';
-    try {
-      const configPath = path.resolve(process.cwd(), 'firebase-applet-config.json');
-      if (fs.existsSync(configPath)) {
-        const config = JSON.parse(fs.readFileSync(configPath, 'utf8'));
-        dbId = config.firestoreDatabaseId || '(default)';
-      }
-    } catch (e) {}
-    const db = getFirestore(admin.app(), dbId);
+    const db = await getFirestoreInstance();
+    const { FieldValue } = await import('firebase-admin/firestore');
 
     let systemPrompt = "You are the AI Job Interview Simulator & Coach, an emotion-aware AI providing real-time caching on tone, posture, delivery, and structure. Analyze the response, rate it, and provide the next simulated question.";
     try {
@@ -1046,7 +1124,7 @@ export const coachInterviewSimulationTool = ai.defineTool(
       if (doc.exists && doc.data()?.systemPrompt) systemPrompt = doc.data()!.systemPrompt;
     } catch (e) {}
 
-    let activeTargetModel = 'googleai/gemini-2.0-flash';
+    let activeTargetModel = 'googleai/gemini-1.5-flash';
     if (!process.env.GEMINI_API_KEY && process.env.VERTEX_AI_PROJECT_ID) activeTargetModel = 'vertexai/gemini-1.5-flash';
 
     try {
@@ -1116,21 +1194,7 @@ export const memorizeContextTool = ai.defineTool(
       const embeddingValues = data.embedding?.values;
       if (!embeddingValues) return { success: false, message: 'Failed to generate embedding.' };
 
-      const admin = (await import('firebase-admin')).default;
-      const { getFirestore } = await import('firebase-admin/firestore');
-      const fs = (await import('fs')).default;
-      const path = (await import('path')).default;
-
-      let dbId = '(default)';
-      try {
-        const configPath = path.resolve(process.cwd(), 'firebase-applet-config.json');
-        if (fs.existsSync(configPath)) {
-          const config = JSON.parse(fs.readFileSync(configPath, 'utf8'));
-          if (config.firestoreDatabaseId) dbId = config.firestoreDatabaseId;
-        }
-      } catch (e) {}
-
-      const db = getFirestore(admin.app(), dbId);
+      const db = await getFirestoreInstance();
       
       await db.collection('users').doc(userId).collection('memories').add({
         text: memoryText,
@@ -1185,21 +1249,7 @@ export const recallContextTool = ai.defineTool(
       const queryVector = data.embedding?.values;
       if (!queryVector) return { success: false, memories: [], message: 'Failed to generate embedding for query.' };
 
-      const admin = (await import('firebase-admin')).default;
-      const { getFirestore } = await import('firebase-admin/firestore');
-      const fs = (await import('fs')).default;
-      const path = (await import('path')).default;
-
-      let dbId = '(default)';
-      try {
-        const configPath = path.resolve(process.cwd(), 'firebase-applet-config.json');
-        if (fs.existsSync(configPath)) {
-          const config = JSON.parse(fs.readFileSync(configPath, 'utf8'));
-          if (config.firestoreDatabaseId) dbId = config.firestoreDatabaseId;
-        }
-      } catch (e) {}
-
-      const db = getFirestore(admin.app(), dbId);
+      const db = await getFirestoreInstance();
       const memoriesSnapshot = await db.collection('users').doc(userId).collection('memories').get();
       
       if (memoriesSnapshot.empty) {
@@ -1319,21 +1369,7 @@ export const manageCalendarTool = ai.defineTool(
         eventName = inputSanity.sanitizedText;
       }
 
-      const admin = (await import('firebase-admin')).default;
-      const { getFirestore } = await import('firebase-admin/firestore');
-      const fs = (await import('fs')).default;
-      const path = (await import('path')).default;
-
-      let dbId = '(default)';
-      try {
-        const configPath = path.resolve(process.cwd(), 'firebase-applet-config.json');
-        if (fs.existsSync(configPath)) {
-          const config = JSON.parse(fs.readFileSync(configPath, 'utf8'));
-          if (config.firestoreDatabaseId) dbId = config.firestoreDatabaseId;
-        }
-      } catch (e) {}
-
-      const db = getFirestore(admin.app(), dbId);
+      const db = await getFirestoreInstance();
       const calendarRef = db.collection('users').doc(userId).collection('calendar_events');
 
       if (action === 'check_availability') {
@@ -1402,21 +1438,7 @@ export const executeOutreachTool = ai.defineTool(
         return { success: false, status: 'failed', message: 'Outreach content flagged by security policy.' };
       }
 
-      const admin = (await import('firebase-admin')).default;
-      const { getFirestore } = await import('firebase-admin/firestore');
-      const fs = (await import('fs')).default;
-      const path = (await import('path')).default;
-
-      let dbId = '(default)';
-      try {
-        const configPath = path.resolve(process.cwd(), 'firebase-applet-config.json');
-        if (fs.existsSync(configPath)) {
-          const config = JSON.parse(fs.readFileSync(configPath, 'utf8'));
-          if (config.firestoreDatabaseId) dbId = config.firestoreDatabaseId;
-        }
-      } catch (e) {}
-
-      const db = getFirestore(admin.app(), dbId);
+      const db = await getFirestoreInstance();
       const outreachRef = db.collection('users').doc(userId).collection('outreach_actions');
 
       if (requireApproval) {
@@ -1478,21 +1500,7 @@ export const exportAssetTool = ai.defineTool(
       const inputSanity = await modelArmor.sanitizePrompt(documentContent);
       const safeContent = inputSanity.sanitizedText;
 
-      const admin = (await import('firebase-admin')).default;
-      const { getFirestore } = await import('firebase-admin/firestore');
-      const fs = (await import('fs')).default;
-      const path = (await import('path')).default;
-
-      let dbId = '(default)';
-      try {
-        const configPath = path.resolve(process.cwd(), 'firebase-applet-config.json');
-        if (fs.existsSync(configPath)) {
-          const config = JSON.parse(fs.readFileSync(configPath, 'utf8'));
-          if (config.firestoreDatabaseId) dbId = config.firestoreDatabaseId;
-        }
-      } catch (e) {}
-
-      const db = getFirestore(admin.app(), dbId);
+      const db = await getFirestoreInstance();
       const exportsRef = db.collection('users').doc(userId).collection('asset_exports');
 
       // In a production environment, this would call a serverless rendering engine (Puppeteer, Gotenberg)
@@ -1534,21 +1542,7 @@ export const extractPainPointsTool = ai.defineTool(
   },
   async ({ userId, blockers }) => {
     try {
-      const admin = (await import('firebase-admin')).default;
-      const { getFirestore } = await import('firebase-admin/firestore');
-      const fs = (await import('fs')).default;
-      const path = (await import('path')).default;
-
-      let dbId = '(default)';
-      try {
-        const configPath = path.resolve(process.cwd(), 'firebase-applet-config.json');
-        if (fs.existsSync(configPath)) {
-          const config = JSON.parse(fs.readFileSync(configPath, 'utf8'));
-          if (config.firestoreDatabaseId) dbId = config.firestoreDatabaseId;
-        }
-      } catch (e) {}
-
-      const db = getFirestore(admin.app(), dbId);
+      const db = await getFirestoreInstance();
       const blockersRef = db.collection('users').doc(userId).collection('pain_points');
       
       const batch = db.batch();
@@ -1588,21 +1582,7 @@ export const recommendCustomJourneyPathTool = ai.defineTool(
   },
   async ({ userId, recommendedNextPhase, reasoning, rppToEngage }) => {
     try {
-      const admin = (await import('firebase-admin')).default;
-      const { getFirestore } = await import('firebase-admin/firestore');
-      const fs = (await import('fs')).default;
-      const path = (await import('path')).default;
-
-      let dbId = '(default)';
-      try {
-        const configPath = path.resolve(process.cwd(), 'firebase-applet-config.json');
-        if (fs.existsSync(configPath)) {
-          const config = JSON.parse(fs.readFileSync(configPath, 'utf8'));
-          if (config.firestoreDatabaseId) dbId = config.firestoreDatabaseId;
-        }
-      } catch (e) {}
-
-      const db = getFirestore(admin.app(), dbId);
+      const db = await getFirestoreInstance();
       
       await db.collection('users').doc(userId).collection('journey_adjustments').add({
         recommendedNextPhase,
@@ -1645,21 +1625,7 @@ export const generateEnergyMapTool = ai.defineTool(
       // Model Armor Integration
       const inputSanity = await modelArmor.sanitizePrompt(JSON.stringify(tasks));
       
-      const admin = (await import('firebase-admin')).default;
-      const { getFirestore } = await import('firebase-admin/firestore');
-      const fs = (await import('fs')).default;
-      const path = (await import('path')).default;
-
-      let dbId = '(default)';
-      try {
-        const configPath = path.resolve(process.cwd(), 'firebase-applet-config.json');
-        if (fs.existsSync(configPath)) {
-          const config = JSON.parse(fs.readFileSync(configPath, 'utf8'));
-          if (config.firestoreDatabaseId) dbId = config.firestoreDatabaseId;
-        }
-      } catch (e) {}
-
-      const db = getFirestore(admin.app(), dbId);
+      const db = await getFirestoreInstance();
       
       await db.collection('users').doc(userId).collection('energy_map').doc('latest').set({
         tasks,
@@ -1695,21 +1661,7 @@ export const lockCoreValuesTool = ai.defineTool(
       // Model Armor Integration
       const inputSanity = await modelArmor.sanitizePrompt(JSON.stringify(values));
       
-      const admin = (await import('firebase-admin')).default;
-      const { getFirestore } = await import('firebase-admin/firestore');
-      const fs = (await import('fs')).default;
-      const path = (await import('path')).default;
-
-      let dbId = '(default)';
-      try {
-        const configPath = path.resolve(process.cwd(), 'firebase-applet-config.json');
-        if (fs.existsSync(configPath)) {
-          const config = JSON.parse(fs.readFileSync(configPath, 'utf8'));
-          if (config.firestoreDatabaseId) dbId = config.firestoreDatabaseId;
-        }
-      } catch (e) {}
-
-      const db = getFirestore(admin.app(), dbId);
+      const db = await getFirestoreInstance();
       
       await db.collection('users').doc(userId).collection('career_blueprint').doc('core_values').set({
         values,
@@ -1750,21 +1702,7 @@ export const simulateCareerPivotTool = ai.defineTool(
         return { success: false, message: 'Simulation parameters flagged by security policy.', uiAction: 'none' };
       }
 
-      const admin = (await import('firebase-admin')).default;
-      const { getFirestore } = await import('firebase-admin/firestore');
-      const fs = (await import('fs')).default;
-      const path = (await import('path')).default;
-
-      let dbId = '(default)';
-      try {
-        const configPath = path.resolve(process.cwd(), 'firebase-applet-config.json');
-        if (fs.existsSync(configPath)) {
-          const config = JSON.parse(fs.readFileSync(configPath, 'utf8'));
-          if (config.firestoreDatabaseId) dbId = config.firestoreDatabaseId;
-        }
-      } catch (e) {}
-
-      const db = getFirestore(admin.app(), dbId);
+      const db = await getFirestoreInstance();
       
       await db.collection('users').doc(userId).collection('career_pivots').doc(targetRole.replace(/\s+/g, '_').toLowerCase()).set({
         targetRole,
@@ -1812,21 +1750,7 @@ export const findAdjacentTitlesTool = ai.defineTool(
         return { success: false, message: 'Title suggestions flagged by security policy.', uiAction: 'none' };
       }
 
-      const admin = (await import('firebase-admin')).default;
-      const { getFirestore } = await import('firebase-admin/firestore');
-      const fs = (await import('fs')).default;
-      const path = (await import('path')).default;
-
-      let dbId = '(default)';
-      try {
-        const configPath = path.resolve(process.cwd(), 'firebase-applet-config.json');
-        if (fs.existsSync(configPath)) {
-          const config = JSON.parse(fs.readFileSync(configPath, 'utf8'));
-          if (config.firestoreDatabaseId) dbId = config.firestoreDatabaseId;
-        }
-      } catch (e) {}
-
-      const db = getFirestore(admin.app(), dbId);
+      const db = await getFirestoreInstance();
       
       await db.collection('users').doc(userId).collection('adjacent_titles').doc('latest').set({
         currentRole,
@@ -1870,21 +1794,7 @@ export const auditSocialProfileTool = ai.defineTool(
       // Model Armor Integration - Sanitize recommendations
       const inputSanity = await modelArmor.sanitizePrompt(JSON.stringify(recommendations));
       
-      const admin = (await import('firebase-admin')).default;
-      const { getFirestore } = await import('firebase-admin/firestore');
-      const fs = (await import('fs')).default;
-      const path = (await import('path')).default;
-
-      let dbId = '(default)';
-      try {
-        const configPath = path.resolve(process.cwd(), 'firebase-applet-config.json');
-        if (fs.existsSync(configPath)) {
-          const config = JSON.parse(fs.readFileSync(configPath, 'utf8'));
-          if (config.firestoreDatabaseId) dbId = config.firestoreDatabaseId;
-        }
-      } catch (e) {}
-
-      const db = getFirestore(admin.app(), dbId);
+      const db = await getFirestoreInstance();
       
       await db.collection('users').doc(userId).collection('profile_audits').add({
         profileUrl,
@@ -1927,21 +1837,7 @@ export const generatePortfolioStructureTool = ai.defineTool(
       // Model Armor Integration
       const inputSanity = await modelArmor.sanitizePrompt(JSON.stringify(artifactsRequired));
 
-      const admin = (await import('firebase-admin')).default;
-      const { getFirestore } = await import('firebase-admin/firestore');
-      const fs = (await import('fs')).default;
-      const path = (await import('path')).default;
-
-      let dbId = '(default)';
-      try {
-        const configPath = path.resolve(process.cwd(), 'firebase-applet-config.json');
-        if (fs.existsSync(configPath)) {
-          const config = JSON.parse(fs.readFileSync(configPath, 'utf8'));
-          if (config.firestoreDatabaseId) dbId = config.firestoreDatabaseId;
-        }
-      } catch (e) {}
-
-      const db = getFirestore(admin.app(), dbId);
+      const db = await getFirestoreInstance();
       
       await db.collection('users').doc(userId).collection('portfolio_structures').doc(targetRole.replace(/\s+/g, '_').toLowerCase()).set({
         targetRole,
@@ -1978,21 +1874,7 @@ export const trackApplicationFunnelTool = ai.defineTool(
   },
   async ({ userId, company, role, status }) => {
     try {
-      const admin = (await import('firebase-admin')).default;
-      const { getFirestore } = await import('firebase-admin/firestore');
-      const fs = (await import('fs')).default;
-      const path = (await import('path')).default;
-
-      let dbId = '(default)';
-      try {
-        const configPath = path.resolve(process.cwd(), 'firebase-applet-config.json');
-        if (fs.existsSync(configPath)) {
-          const config = JSON.parse(fs.readFileSync(configPath, 'utf8'));
-          if (config.firestoreDatabaseId) dbId = config.firestoreDatabaseId;
-        }
-      } catch (e) {}
-
-      const db = getFirestore(admin.app(), dbId);
+      const db = await getFirestoreInstance();
       
       await db.collection('users').doc(userId).collection('application_funnel').doc(`${company}_${role}`.replace(/\s+/g, '_').toLowerCase()).set({
         company,
@@ -2031,21 +1913,7 @@ export const generateNegotiationStrategyTool = ai.defineTool(
   },
   async ({ userId, company, role, initialOffer, targetCompensation }) => {
     try {
-      const admin = (await import('firebase-admin')).default;
-      const { getFirestore } = await import('firebase-admin/firestore');
-      const fs = (await import('fs')).default;
-      const path = (await import('path')).default;
-
-      let dbId = '(default)';
-      try {
-        const configPath = path.resolve(process.cwd(), 'firebase-applet-config.json');
-        if (fs.existsSync(configPath)) {
-          const config = JSON.parse(fs.readFileSync(configPath, 'utf8'));
-          if (config.firestoreDatabaseId) dbId = config.firestoreDatabaseId;
-        }
-      } catch (e) {}
-
-      const db = getFirestore(admin.app(), dbId);
+      const db = await getFirestoreInstance();
       
       // Market data/Scripting logic would occur here before saving
       const strategyData = {
@@ -2097,21 +1965,7 @@ export const parseResumeToVaultTool = ai.defineTool(
         return { success: false, message: 'Resume content flagged by security policy.', uiAction: 'none' };
       }
 
-      const admin = (await import('firebase-admin')).default;
-      const { getFirestore } = await import('firebase-admin/firestore');
-      const fs = (await import('fs')).default;
-      const path = (await import('path')).default;
-
-      let dbId = '(default)';
-      try {
-        const configPath = path.resolve(process.cwd(), 'firebase-applet-config.json');
-        if (fs.existsSync(configPath)) {
-          const config = JSON.parse(fs.readFileSync(configPath, 'utf8'));
-          if (config.firestoreDatabaseId) dbId = config.firestoreDatabaseId;
-        }
-      } catch (e) {}
-
-      const db = getFirestore(admin.app(), dbId);
+      const db = await getFirestoreInstance();
       
       await db.collection('users').doc(userId).collection('wavvault').doc('resume_data').set({
         ...extractedData,
@@ -2153,21 +2007,7 @@ export const assessOperatingStyleTool = ai.defineTool(
       // Model Armor Integration
       const inputSanity = await modelArmor.sanitizePrompt(narrativeReasoning);
 
-      const admin = (await import('firebase-admin')).default;
-      const { getFirestore } = await import('firebase-admin/firestore');
-      const fs = (await import('fs')).default;
-      const path = (await import('path')).default;
-
-      let dbId = '(default)';
-      try {
-        const configPath = path.resolve(process.cwd(), 'firebase-applet-config.json');
-        if (fs.existsSync(configPath)) {
-          const config = JSON.parse(fs.readFileSync(configPath, 'utf8'));
-          if (config.firestoreDatabaseId) dbId = config.firestoreDatabaseId;
-        }
-      } catch (e) {}
-
-      const db = getFirestore(admin.app(), dbId);
+      const db = await getFirestoreInstance();
       
       await db.collection('users').doc(userId).collection('career_blueprint').doc('operating_style').set({
         ...preferences,
@@ -2202,21 +2042,7 @@ export const analyzeIndustryTrendsTool = ai.defineTool(
   },
   async ({ userId, industry }) => {
     try {
-      const admin = (await import('firebase-admin')).default;
-      const { getFirestore } = await import('firebase-admin/firestore');
-      const fs = (await import('fs')).default;
-      const path = (await import('path')).default;
-
-      let dbId = '(default)';
-      try {
-        const configPath = path.resolve(process.cwd(), 'firebase-applet-config.json');
-        if (fs.existsSync(configPath)) {
-          const config = JSON.parse(fs.readFileSync(configPath, 'utf8'));
-          if (config.firestoreDatabaseId) dbId = config.firestoreDatabaseId;
-        }
-      } catch (e) {}
-
-      const db = getFirestore(admin.app(), dbId);
+      const db = await getFirestoreInstance();
       
       // Simulated industry data logic
       const trendData = {
@@ -2263,21 +2089,7 @@ export const draftElevatorPitchTool = ai.defineTool(
         return { success: false, message: 'Pitch content flagged by security policy.', uiAction: 'none' };
       }
 
-      const admin = (await import('firebase-admin')).default;
-      const { getFirestore } = await import('firebase-admin/firestore');
-      const fs = (await import('fs')).default;
-      const path = (await import('path')).default;
-
-      let dbId = '(default)';
-      try {
-        const configPath = path.resolve(process.cwd(), 'firebase-applet-config.json');
-        if (fs.existsSync(configPath)) {
-          const config = JSON.parse(fs.readFileSync(configPath, 'utf8'));
-          if (config.firestoreDatabaseId) dbId = config.firestoreDatabaseId;
-        }
-      } catch (e) {}
-
-      const db = getFirestore(admin.app(), dbId);
+      const db = await getFirestoreInstance();
       
       await db.collection('users').doc(userId).collection('elevator_pitches').add({
         targetAudience,
@@ -2314,21 +2126,7 @@ export const triggerMockInterviewTool = ai.defineTool(
   },
   async ({ userId, targetCompany, targetRole, interviewerPersona }) => {
     try {
-      const admin = (await import('firebase-admin')).default;
-      const { getFirestore } = await import('firebase-admin/firestore');
-      const fs = (await import('fs')).default;
-      const path = (await import('path')).default;
-
-      let dbId = '(default)';
-      try {
-        const configPath = path.resolve(process.cwd(), 'firebase-applet-config.json');
-        if (fs.existsSync(configPath)) {
-          const config = JSON.parse(fs.readFileSync(configPath, 'utf8'));
-          if (config.firestoreDatabaseId) dbId = config.firestoreDatabaseId;
-        }
-      } catch (e) {}
-
-      const db = getFirestore(admin.app(), dbId);
+      const db = await getFirestoreInstance();
       
       await db.collection('users').doc(userId).collection('mock_interviews').add({
         targetCompany,
@@ -2409,21 +2207,7 @@ export const getPhaseActionBoardTool = ai.defineTool(
   },
   async ({ userId }) => {
     try {
-      const admin = (await import('firebase-admin')).default;
-      const { getFirestore } = await import('firebase-admin/firestore');
-      const fs = (await import('fs')).default;
-      const path = (await import('path')).default;
-
-      let dbId = '(default)';
-      try {
-        const configPath = path.resolve(process.cwd(), 'firebase-applet-config.json');
-        if (fs.existsSync(configPath)) {
-          const config = JSON.parse(fs.readFileSync(configPath, 'utf8'));
-          if (config.firestoreDatabaseId) dbId = config.firestoreDatabaseId;
-        }
-      } catch (e) {}
-
-      const db = getFirestore(admin.app(), dbId);
+      const db = await getFirestoreInstance();
       
       const docSnap = await db.collection('users').doc(userId).collection('wavvault').doc('kanban_state').get();
       if (!docSnap.exists) {
@@ -2459,21 +2243,7 @@ export const updatePhaseActionStatusTool = ai.defineTool(
   },
   async ({ userId, phaseId, taskId, status }) => {
     try {
-      const admin = (await import('firebase-admin')).default;
-      const { getFirestore } = await import('firebase-admin/firestore');
-      const fs = (await import('fs')).default;
-      const path = (await import('path')).default;
-
-      let dbId = '(default)';
-      try {
-        const configPath = path.resolve(process.cwd(), 'firebase-applet-config.json');
-        if (fs.existsSync(configPath)) {
-          const config = JSON.parse(fs.readFileSync(configPath, 'utf8'));
-          if (config.firestoreDatabaseId) dbId = config.firestoreDatabaseId;
-        }
-      } catch (e) {}
-
-      const db = getFirestore(admin.app(), dbId);
+      const db = await getFirestoreInstance();
       const kanbanRef = db.collection('users').doc(userId).collection('wavvault').doc('kanban_state');
       
       await kanbanRef.set({
@@ -2541,21 +2311,7 @@ export const assessPhaseReadinessTool = ai.defineTool(
   },
   async ({ userId, phaseId }) => {
     try {
-      const admin = (await import('firebase-admin')).default;
-      const { getFirestore } = await import('firebase-admin/firestore');
-      const fs = (await import('fs')).default;
-      const path = (await import('path')).default;
-
-      let dbId = '(default)';
-      try {
-        const configPath = path.resolve(process.cwd(), 'firebase-applet-config.json');
-        if (fs.existsSync(configPath)) {
-          const config = JSON.parse(fs.readFileSync(configPath, 'utf8'));
-          if (config.firestoreDatabaseId) dbId = config.firestoreDatabaseId;
-        }
-      } catch (e) {}
-
-      const db = getFirestore(admin.app(), dbId);
+      const db = await getFirestoreInstance();
       const kanbanSnap = await db.collection('users').doc(userId).collection('wavvault').doc('kanban_state').get();
       
       let ready = false;
@@ -2668,21 +2424,10 @@ export const runJourneyStageFlow = ai.defineFlow(
     let currentTruth = '';
     if (input.userId && input.userId !== 'anonymous') {
       try {
-        const admin = (await import('firebase-admin')).default;
-        const { getFirestore } = await import('firebase-admin/firestore');
-        const fs = (await import('fs')).default;
-        const path = (await import('path')).default;
-        let dbId = null;
-        try {
-          const configPath = path.resolve(process.cwd(), 'firebase-applet-config.json');
-          const config = JSON.parse(fs.readFileSync(configPath, 'utf8'));
-          dbId = config.firestoreDatabaseId;
-          if (dbId === '<DATABASE_ID>') dbId = null;
-        } catch (e) {}
-
-        const targetDbId = process.env.VITE_FIREBASE_DATABASE_ID || dbId;
-        const db = targetDbId ? getFirestore(admin.app(), targetDbId) : getFirestore(admin.app());
-        const querySnapshot = await db
+      const db = await getFirestoreInstance();
+      const { FieldValue } = await import('firebase-admin/firestore');
+      
+      const querySnapshot = await db
           .collection('user_insights')
           .where('userId', '==', input.userId)
           .where('status', '==', 'confirmed')
@@ -2703,29 +2448,36 @@ export const runJourneyStageFlow = ai.defineFlow(
 
     if (!stageConfig && input.stageId) {
       try {
-        const admin = (await import('firebase-admin')).default;
-        const { getFirestore } = await import('firebase-admin/firestore');
-        const fs = (await import('fs')).default;
-        const path = (await import('path')).default;
-        let dbId = null;
+        const db = await getFirestoreInstance();
+        
         try {
-          const configPath = path.resolve(process.cwd(), 'firebase-applet-config.json');
-          const config = JSON.parse(fs.readFileSync(configPath, 'utf8'));
-          dbId = config.firestoreDatabaseId;
-          if (dbId === '<DATABASE_ID>') dbId = null;
-        } catch (e) {}
-
-        const targetDbId = process.env.VITE_FIREBASE_DATABASE_ID || dbId;
-        const db = targetDbId ? getFirestore(admin.app(), targetDbId) : getFirestore(admin.app());
-        const stageDoc = await db.collection('journeyPhaseConfigs').doc(input.stageId).get();
-        if (stageDoc.exists) {
-          stageConfig = stageDoc.data();
-        } else {
-          const defaultStages = defaultJourneyStages as any;
-          stageConfig = defaultStages[input.stageId] || defaultStages['dive-in'];
+          const stageDoc = await db.collection('journeyPhaseConfigs').doc(input.stageId).get();
+          if (stageDoc.exists) {
+            stageConfig = stageDoc.data();
+          } else {
+            console.warn(`[GenkitService] Journey stage configuration not found in Firestore for ID: ${input.stageId}. Falling back to defaults.`);
+            const defaultStages = defaultJourneyStages as any;
+            stageConfig = defaultStages[input.stageId] || defaultStages['dive-in'];
+          }
+        } catch (innerError: any) {
+          console.error(`[GenkitService] Failed collection fetch 'journeyPhaseConfigs' (Stage: ${input.stageId}):`, innerError.message || innerError);
+          
+          if (innerError.message?.includes('NOT_FOUND') || innerError.code === 5 || innerError.code === 7 || innerError.message?.includes('PERMISSION_DENIED')) {
+             console.log('[GenkitService] Attempting emergency fallback to (default) database for configs (Permission or Not Found)...');
+             const fallbackDb = (await import('firebase-admin/firestore')).getFirestore(); 
+             const fallbackDoc = await fallbackDb.collection('journeyPhaseConfigs').doc(input.stageId).get();
+             if (fallbackDoc.exists) {
+                stageConfig = fallbackDoc.data();
+                console.log('[GenkitService] Emergency fallback successful.');
+             } else {
+                throw innerError;
+             }
+          } else {
+            throw innerError;
+          }
         }
-      } catch (e) {
-        console.error('Failed to fetch journeyPhaseConfigs', e);
+      } catch (e: any) {
+        console.error(`[GenkitService] Fatal access error for stage config (Stage: ${input.stageId}):`, e.message || e);
         const defaultStages = defaultJourneyStages as any;
         stageConfig = defaultStages[input.stageId] || defaultStages['dive-in'];
       }
@@ -2831,24 +2583,54 @@ export const runJourneyStageFlow = ai.defineFlow(
         }
       );
     } catch (error) {
-      // Gracefully handle invalid API keys by catching the specific error string
+      // Gracefully handle invalid API keys by catching specific error strings from Google AI and Genkit
       const errorString = error instanceof Error ? error.message : String(error);
       let activeTargetModel = targetModel;
 
-      if (errorString.includes('API_KEY_INVALID') || errorString.includes('API key not valid')) {
+      if (
+        errorString.includes('API_KEY_INVALID') || 
+        errorString.includes('API key not valid') ||
+        errorString.includes('API_KEY_MISSING') ||
+        errorString.includes('API key is required') ||
+        errorString.includes('Please pass in the API key') ||
+        errorString.includes('expired') ||
+        errorString.includes('renew') ||
+        errorString.includes('NOT_FOUND') ||
+        errorString.includes('no longer available') ||
+        errorString.includes('PERMISSION_DENIED') ||
+        errorString.includes('400')
+      ) {
         if (!isVertexAvailable) {
           console.warn(
-            '[Skylar] The provided Gemini API Key is invalid or missing, and Vertex AI is not configured. Returning graceful fallback message to user.'
+            `[Skylar] Gemini API error detected (${errorString}). Attempting emergency fallback via MCP Model Registry...`
           );
-          return {
-            text: "I'm having trouble connecting to my central systems because the Gemini API Key currently provided appears to be invalid or missing. Please check your project settings and ensure you have supplied a valid Gemini API Key.",
-            executedActions: [],
-          };
+          
+          try {
+            const mcpResult = await mcpRegistry.generateContent({
+              role: "Skylar Assistant (Strategic Resilience Mode)",
+              prompt: userContent.map(c => c.text || JSON.stringify(c)).join('\n'),
+              messages: formattedHistory.map(m => ({
+                role: m.role === 'user' ? 'user' : 'model',
+                parts: m.content.map(c => ({ text: c.text || JSON.stringify(c) }))
+              }))
+            });
+
+            return {
+              text: mcpResult.text,
+              executedActions: [],
+            };
+          } catch (mcpError) {
+            console.error('[Skylar] Emergency MCP Fallback also failed:', mcpError);
+            return {
+              text: "I'm currently experiencing connectivity issues with my primary intelligence systems. This is often caused by an expired or invalid API key in the project settings. Please refresh your Gemini API Key in AI Studio to restore full functionality.",
+              executedActions: [],
+            };
+          }
         } else {
           console.warn(
-            '[Skylar] Invalid Gemini API Key detected but Vertex AI is configured. Falling back to Vertex AI.'
+            `[Skylar] Invalid Gemini API Key detected (${errorString}). Falling back to Vertex AI.`
           );
-          activeTargetModel = 'vertexai/gemini-2.0-flash';
+          activeTargetModel = 'vertexai/gemini-1.5-flash';
         }
       }
 
@@ -2917,7 +2699,7 @@ export const reviewResumeSubAgentFlow = ai.defineFlow(
     }),
   },
   async (input) => {
-    let activeTargetModel = 'googleai/gemini-2.0-flash';
+    let activeTargetModel = 'googleai/gemini-1.5-flash';
     if (!process.env.GEMINI_API_KEY && process.env.VERTEX_AI_PROJECT_ID) {
       activeTargetModel = 'vertexai/gemini-1.5-flash';
     }
@@ -2985,7 +2767,7 @@ export const startInterviewSessionFlow = ai.defineFlow(
       return { question: 'I cannot proceed with this persona due to security policy.', personaContext: '', initialResonance: 0 };
     }
 
-    let activeTargetModel = 'googleai/gemini-2.0-flash';
+    let activeTargetModel = 'googleai/gemini-1.5-flash';
     if (!process.env.GEMINI_API_KEY && process.env.VERTEX_AI_PROJECT_ID) {
       activeTargetModel = 'vertexai/gemini-1.5-flash';
     }
@@ -3039,7 +2821,7 @@ export const sendInterviewResponseFlow = ai.defineFlow(
       return { feedback: 'Your response was flagged by security filters.', nextQuestion: 'Please try again.', resonanceScore: 0, dnaAlignment: [] };
     }
 
-    let activeTargetModel = 'googleai/gemini-2.0-flash';
+    let activeTargetModel = 'googleai/gemini-1.5-flash';
     if (!process.env.GEMINI_API_KEY && process.env.VERTEX_AI_PROJECT_ID) {
       activeTargetModel = 'vertexai/gemini-1.5-flash';
     }
@@ -3098,7 +2880,7 @@ export const getInterviewDebriefFlow = ai.defineFlow(
     // Model Armor Integration
     const inputSanity = await modelArmor.sanitizePrompt(JSON.stringify(input.sessionHistory).substring(0, 5000));
 
-    let activeTargetModel = 'googleai/gemini-2.0-flash';
+    let activeTargetModel = 'googleai/gemini-1.5-flash';
     if (!process.env.GEMINI_API_KEY && process.env.VERTEX_AI_PROJECT_ID) {
       activeTargetModel = 'vertexai/gemini-1.5-flash';
     }
@@ -3156,7 +2938,7 @@ export const analyzeWavvaultArtifactFlow = ai.defineFlow(
       return { title: 'Security Alert', extractedSkills: [], industryRelevance: 'Content blocked by safety policy.', documentSummary: 'Blocked.' };
     }
 
-    let activeTargetModel = 'googleai/gemini-2.0-flash';
+    let activeTargetModel = 'googleai/gemini-1.5-flash';
     if (!process.env.GEMINI_API_KEY && process.env.VERTEX_AI_PROJECT_ID) {
       activeTargetModel = 'vertexai/gemini-1.5-flash';
     }
@@ -3227,7 +3009,7 @@ export const performSynthesisFlow = ai.defineFlow(
     // Model Armor Integration
     const inputSanity = await modelArmor.sanitizePrompt(JSON.stringify(input.history).substring(0, 5000));
     
-    let activeTargetModel = 'googleai/gemini-2.0-flash';
+    let activeTargetModel = 'googleai/gemini-1.5-flash';
     if (!process.env.GEMINI_API_KEY && process.env.VERTEX_AI_PROJECT_ID) {
       activeTargetModel = 'vertexai/gemini-1.5-flash';
     }
@@ -3302,7 +3084,7 @@ export const performGateReviewFlow = ai.defineFlow(
     // Model Armor Integration
     const inputSanity = await modelArmor.sanitizePrompt(JSON.stringify(input.history).substring(0, 5000));
 
-    let activeTargetModel = 'googleai/gemini-2.0-flash';
+    let activeTargetModel = 'googleai/gemini-1.5-flash';
     if (!process.env.GEMINI_API_KEY && process.env.VERTEX_AI_PROJECT_ID) activeTargetModel = 'vertexai/gemini-1.5-flash';
 
     const dnaContent = input.dnaContext ? JSON.stringify(input.dnaContext) : '';
@@ -3359,21 +3141,7 @@ export const getEmotionalIntelligenceFlow = ai.defineFlow(
     // Model Armor Integration
     const inputSanity = await modelArmor.sanitizePrompt(JSON.stringify(input.history).substring(0, 5000));
 
-    const admin = (await import('firebase-admin')).default;
-    const { getFirestore } = await import('firebase-admin/firestore');
-    const fs = (await import('fs')).default;
-    const path = (await import('path')).default;
-
-    let dbId = '(default)';
-    try {
-      const configPath = path.resolve(process.cwd(), 'firebase-applet-config.json');
-      if (fs.existsSync(configPath)) {
-        const config = JSON.parse(fs.readFileSync(configPath, 'utf8'));
-        dbId = config.firestoreDatabaseId || '(default)';
-      }
-    } catch (e) {}
-    
-    const db = getFirestore(admin.app(), dbId);
+    const db = await getFirestoreInstance();
 
     let wavvaultDoc = null;
     let userDoc = null;
@@ -3389,7 +3157,7 @@ export const getEmotionalIntelligenceFlow = ai.defineFlow(
       }
     }
 
-    let activeTargetModel = 'googleai/gemini-2.0-flash';
+    let activeTargetModel = 'googleai/gemini-1.5-flash';
     if (!process.env.GEMINI_API_KEY && process.env.VERTEX_AI_PROJECT_ID) activeTargetModel = 'vertexai/gemini-1.5-flash';
 
     const prompt = `Analyze the user's emotional state, sentiment and motivation based on their specific WavVault profile, current Journey Stage, and recent chat history.
@@ -3441,7 +3209,7 @@ export const getResonanceFeedbackFlow = ai.defineFlow(
       return { resonanceScore: 0, feedback: 'Content blocked by safety policy.', suggestions: [] };
     }
 
-    let activeTargetModel = 'googleai/gemini-2.0-flash';
+    let activeTargetModel = 'googleai/gemini-1.5-flash';
     if (!process.env.GEMINI_API_KEY && process.env.VERTEX_AI_PROJECT_ID) activeTargetModel = 'vertexai/gemini-1.5-flash';
 
     const dnaContent = input.dnaContext ? JSON.stringify(input.dnaContext) : '';
@@ -3499,7 +3267,7 @@ export const generateInteractivePortfolioFlow = ai.defineFlow(
     // Model Armor Integration
     const inputSanity = await modelArmor.sanitizePrompt(JSON.stringify(input.dnaContext));
 
-    let activeTargetModel = 'googleai/gemini-2.0-flash';
+    let activeTargetModel = 'googleai/gemini-1.5-flash';
     if (!process.env.GEMINI_API_KEY && process.env.VERTEX_AI_PROJECT_ID) {
       activeTargetModel = 'vertexai/gemini-1.5-flash';
     }
@@ -3593,7 +3361,7 @@ export const generateTargetedSequenceFlow = ai.defineFlow(
     // Model Armor Integration
     const inputSanity = await modelArmor.sanitizePrompt(`${input.targetRole} at ${input.targetCompany} | DNA: ${JSON.stringify(input.dnaContext)}`);
 
-    let activeTargetModel = 'googleai/gemini-2.0-flash';
+    let activeTargetModel = 'googleai/gemini-1.5-flash';
     if (!process.env.GEMINI_API_KEY && process.env.VERTEX_AI_PROJECT_ID) {
       activeTargetModel = 'vertexai/gemini-1.5-flash';
     }
@@ -3670,7 +3438,7 @@ export const generateLiveResumeFlow = ai.defineFlow(
     // Model Armor Integration
     const inputSanity = await modelArmor.sanitizePrompt(JSON.stringify(input.dnaContext));
 
-    let activeTargetModel = 'googleai/gemini-2.0-flash';
+    let activeTargetModel = 'googleai/gemini-1.5-flash';
     if (!process.env.GEMINI_API_KEY && process.env.VERTEX_AI_PROJECT_ID) {
       activeTargetModel = 'vertexai/gemini-1.5-flash';
     }

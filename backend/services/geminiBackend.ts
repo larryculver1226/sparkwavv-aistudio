@@ -1,6 +1,7 @@
 import { GoogleGenAI, Type, ThinkingLevel } from '@google/genai';
 import { getGeminiApiKey } from '../../src/services/aiConfig';
 import { modelArmor } from './modelArmorService';
+import { mcpRegistry } from './mcpRegistryClient';
 
 // Lazy initialization of Gemini
 let aiInstance: GoogleGenAI | null = null;
@@ -60,6 +61,19 @@ export interface UserData {
   brandImage?: string;
 }
 
+/**
+ * Helper to clean and parse JSON from AI response
+ */
+function safeJsonParse(text: string) {
+  try {
+    const jsonText = text.replace(/```json\n?|\n?```/g, '').trim();
+    return JSON.parse(jsonText);
+  } catch (e) {
+    console.error('[GeminiBackend] JSON Parse Error:', e, text);
+    return null;
+  }
+}
+
 export async function generateBrandImage(
   prompt: string,
   base64Image?: string,
@@ -69,40 +83,32 @@ export async function generateBrandImage(
   // Model Armor Integration
   const inputSanity = await modelArmor.sanitizePrompt(prompt);
   
-  const ai = getAI();
-
-  const parts: any[] = [{ text: inputSanity.sanitizedText }];
+  const attachments: any[] = [];
   if (base64Image && mimeType) {
-    parts.push({
-      inlineData: {
-        data: base64Image,
-        mimeType: mimeType,
-      },
+    attachments.push({
+      data: base64Image,
+      mimeType: mimeType,
     });
   }
 
   try {
-    const response = await ai.models.generateContent({
-      model: 'gemini-2.0-flash',
-      contents: { parts },
-      config: {
-        imageConfig: {
-          aspectRatio: '1:1',
-          imageSize: size,
-        },
-      },
+    console.log(`[GeminiBackend] Routing generateBrandImage through MCP Model Registry...`);
+    const result = await mcpRegistry.generateContent({
+      role: "Visual Brand Designer",
+      prompt: `Create a cinematic visual for: ${inputSanity.sanitizedText}. Output purely the image.`,
+      attachments
     });
 
-    for (const part of response.candidates?.[0]?.content?.parts || []) {
-      if (part.inlineData) {
-        return `data:image/png;base64,${part.inlineData.data}`;
-      }
+    if (result.attachments && result.attachments.length > 0) {
+      const img = result.attachments[0];
+      return `data:${img.mimeType || 'image/png'};base64,${img.data}`;
     }
     return null;
   } catch (error: any) {
     console.error('Error generating image:', error);
-    if (error.message?.includes('Requested entity was not found')) {
-      throw new Error('API_KEY_RESET');
+    const errStr = error.message || String(error);
+    if (errStr.includes('Requested entity was not found') || errStr.includes('API_KEY_INVALID') || errStr.includes('expired')) {
+      throw new Error('API_KEY_RESET_REQUIRED');
     }
     throw error;
   }
@@ -118,60 +124,54 @@ export async function generateDiscoverySummary(userData: UserData) {
     Analyze the following user data and generate a "Discovery Summary".
     
     User Context: ${inputSanity.sanitizedText}
-
-    Output a JSON object with:
-    1. brandPortrait: A cinematic 2-sentence description of their unique value.
-    2. strengths: Top 3 core strengths derived from stories.
-    3. careerClusters: 2-3 aligned career direction clusters (e.g., "Creative Strategy in Fintech").
-    4. nextExperiments: 3-5 concrete projects or courses to test their brand.
-    5. nextSteps: 3-4 actionable next steps with a title, description, and action label (e.g., "Update LinkedIn", "Network in Fintech").
-    6. skillsCloud: A list of 10-15 key skills derived from their profile.
   `;
 
-  try {
-    const ai = getAI();
-    const response = await ai.models.generateContent({
-      model: 'gemini-2.0-flash',
-      contents: prompt,
-      config: {
-        responseMimeType: 'application/json',
-        maxOutputTokens: 16384,
-        responseSchema: {
-          type: Type.OBJECT,
+  const schema = {
+    type: "object",
+    properties: {
+      brandPortrait: { type: "string" },
+      strengths: { type: "array", items: { type: "string" } },
+      careerClusters: { type: "array", items: { type: "string" } },
+      nextExperiments: { type: "array", items: { type: "string" } },
+      nextSteps: {
+        type: "array",
+        items: {
+          type: "object",
           properties: {
-            brandPortrait: { type: Type.STRING },
-            strengths: { type: Type.ARRAY, items: { type: Type.STRING } },
-            careerClusters: { type: Type.ARRAY, items: { type: Type.STRING } },
-            nextExperiments: { type: Type.ARRAY, items: { type: Type.STRING } },
-            nextSteps: {
-              type: Type.ARRAY,
-              items: {
-                type: Type.OBJECT,
-                properties: {
-                  title: { type: Type.STRING },
-                  description: { type: Type.STRING },
-                  actionLabel: { type: Type.STRING },
-                },
-                required: ['title', 'description', 'actionLabel'],
-              },
-            },
-            skillsCloud: { type: Type.ARRAY, items: { type: Type.STRING } },
+            title: { type: "string" },
+            description: { type: "string" },
+            actionLabel: { type: "string" },
           },
-          required: [
-            'brandPortrait',
-            'strengths',
-            'careerClusters',
-            'nextExperiments',
-            'nextSteps',
-            'skillsCloud',
-          ],
+          required: ['title', 'description', 'actionLabel'],
         },
       },
+      skillsCloud: { type: "array", items: { type: "string" } },
+    },
+    required: [
+      'brandPortrait',
+      'strengths',
+      'careerClusters',
+      'nextExperiments',
+      'nextSteps',
+      'skillsCloud',
+    ],
+  };
+
+  try {
+    console.log(`[GeminiBackend] Routing generateDiscoverySummary through MCP Model Registry...`);
+    const result = await mcpRegistry.generateContent({
+      role: "Strategic Career Branding Strategist",
+      prompt,
+      responseSchema: JSON.stringify(schema)
     });
 
-    return JSON.parse(response.text || '{}');
-  } catch (error) {
+    return safeJsonParse(result.text) || {};
+  } catch (error: any) {
     console.error('Error generating summary:', error);
+    const errStr = error.message || String(error);
+    if (errStr.includes('API_KEY_INVALID') || errStr.includes('expired')) {
+       return { error: 'API_KEY_EXPIRED', message: 'Please renew your Gemini API Key.' };
+    }
     return null;
   }
 }
@@ -187,119 +187,106 @@ export async function generateCinematicManifesto(userData: UserData) {
     
     User Context: ${inputSanity.sanitizedText}
 
-    Generate 3 "Brand Pillars". Each pillar must have:
-    1. quote: A powerful, personalized quote that encapsulates a core aspect of their professional identity.
-    2. tagline: A short, strategic tagline (3-5 words).
-    3. visualPrompt: A detailed prompt for generating a unique, abstract, high-end cinematic visual that represents this pillar. Focus on textures, lighting, and abstract concepts (e.g., "Liquid gold flowing through obsidian cracks, representing resilience and value").
-
-    Output a JSON object with an array of 3 pillars.
+    Generate 3 "Brand Pillars".
   `;
 
-  try {
-    const ai = getAI();
-    const response = await ai.models.generateContent({
-      model: 'gemini-2.0-flash',
-      contents: prompt,
-      config: {
-        responseMimeType: 'application/json',
-        maxOutputTokens: 16384,
-        responseSchema: {
-          type: Type.OBJECT,
+  const schema = {
+    type: "object",
+    properties: {
+      pillars: {
+        type: "array",
+        items: {
+          type: "object",
           properties: {
-            pillars: {
-              type: Type.ARRAY,
-              items: {
-                type: Type.OBJECT,
-                properties: {
-                  quote: { type: Type.STRING },
-                  tagline: { type: Type.STRING },
-                  visualPrompt: { type: Type.STRING },
-                },
-                required: ['quote', 'tagline', 'visualPrompt'],
-              },
-            },
+            quote: { type: "string" },
+            tagline: { type: "string" },
+            visualPrompt: { type: "string" },
           },
-          required: ['pillars'],
+          required: ['quote', 'tagline', 'visualPrompt'],
         },
       },
+    },
+    required: ['pillars'],
+  };
+
+  try {
+    console.log(`[GeminiBackend] Routing generateCinematicManifesto through MCP Model Registry...`);
+    const result = await mcpRegistry.generateContent({
+      role: "Cinematic Brand Storyteller",
+      prompt,
+      responseSchema: JSON.stringify(schema)
     });
 
-    return JSON.parse(response.text || '{}');
-  } catch (error) {
+    return safeJsonParse(result.text) || {};
+  } catch (error: any) {
     console.error('Error generating cinematic manifesto:', error);
+    const errStr = error.message || String(error);
+    if (errStr.includes('API_KEY_INVALID') || errStr.includes('expired')) {
+       return { error: 'API_KEY_EXPIRED', message: 'Please renew your Gemini API Key.' };
+    }
     return null;
   }
 }
 
 export async function parseResume(fileData: string, mimeType: string) {
   const prompt = `
-    Extract the following information from this resume to help build a career brand:
-    1. Full Name
-    2. Email (if found)
-    3. Industry (select the best fit from: Aerospace, Automotive, Construction, Defense, Education, Energy, Finance, Government, Healthcare, Hospitality, Legal, Logistics, Manufacturing, Media & Entertainment, Real Estate, Retail, Skilled Trades, Technology, Transportation)
-    4. Current or most recent professional role
-    5. A brief, professional bio (2-3 sentences) based on their experience.
-    4. Top 3 notable projects or accomplishments (each with a short title and 1-2 sentence description).
-    5. A list of 5-8 key professional skills or "energizers".
-    6. 3-5 professional attributes or archetypes (e.g., Creator, Strategist, Catalyst).
-
-    Output as JSON.
+    Extract information from this resume to build a career brand profile.
   `;
 
-  try {
-    const ai = getAI();
-
-    const parts: any[] = [];
-    if (mimeType === 'text/plain') {
-      // Model Armor Integration for raw text
-      const inputSanity = await modelArmor.sanitizePrompt(fileData);
-      parts.push({ text: `Resume Content:\n${inputSanity.sanitizedText}\n\n${prompt}` });
-    } else {
-      parts.push({
-        inlineData: {
-          data: fileData,
-          mimeType: mimeType,
-        },
-      });
-      parts.push({ text: prompt });
-    }
-
-    const response = await ai.models.generateContent({
-      model: 'gemini-2.0-flash',
-      contents: { parts },
-      config: {
-        responseMimeType: 'application/json',
-        maxOutputTokens: 16384,
-        responseSchema: {
-          type: Type.OBJECT,
+  const schema = {
+    type: "object",
+    properties: {
+      name: { type: "string" },
+      email: { type: "string" },
+      industry: { type: "string" },
+      role: { type: "string" },
+      bio: { type: "string" },
+      accomplishments: {
+        type: "array",
+        items: {
+          type: "object",
           properties: {
-            name: { type: Type.STRING },
-            email: { type: Type.STRING },
-            industry: { type: Type.STRING },
-            role: { type: Type.STRING },
-            bio: { type: Type.STRING },
-            accomplishments: {
-              type: Type.ARRAY,
-              items: {
-                type: Type.OBJECT,
-                properties: {
-                  title: { type: Type.STRING },
-                  description: { type: Type.STRING },
-                },
-                required: ['title', 'description'],
-              },
-            },
-            skills: { type: Type.ARRAY, items: { type: Type.STRING } },
-            attributes: { type: Type.ARRAY, items: { type: Type.STRING } },
+            title: { type: "string" },
+            description: { type: "string" },
           },
-          required: ['name', 'role', 'bio', 'accomplishments', 'skills', 'attributes', 'industry'],
+          required: ['title', 'description'],
         },
       },
+      skills: { type: "array", items: { type: "string" } },
+      attributes: { type: "array", items: { type: "string" } },
+    },
+    required: ['name', 'role', 'bio', 'accomplishments', 'skills', 'attributes', 'industry'],
+  };
+
+  try {
+    const attachments: any[] = [];
+    let customPrompt = prompt;
+
+    if (mimeType === 'text/plain') {
+      const inputSanity = await modelArmor.sanitizePrompt(fileData);
+      customPrompt = `Resume Content:\n${inputSanity.sanitizedText}\n\n${prompt}`;
+    } else {
+      attachments.push({
+        data: fileData,
+        mimeType: mimeType,
+      });
+    }
+
+    console.log(`[GeminiBackend] Routing parseResume through MCP Model Registry...`);
+    const result = await mcpRegistry.generateContent({
+      role: "Expert Talent Acquisition & Resume Parser",
+      prompt: customPrompt,
+      attachments,
+      responseSchema: JSON.stringify(schema)
     });
 
-    return JSON.parse(response.text || '{}');
-  } catch (error) {
+    return safeJsonParse(result.text) || {};
+  } catch (error: any) {
     console.error('Error parsing resume:', error);
+    const errStr = error.message || String(error);
+    if (errStr.includes('API_KEY_INVALID') || errStr.includes('expired')) {
+       return { error: 'API_KEY_EXPIRED', message: 'Please renew your Gemini API Key.' };
+    }
     return null;
   }
 }
@@ -309,40 +296,28 @@ export async function generateHomeBenefits(count: number = 5) {
     Generate ${count} short, punchy benefit statements for SPARKWavv and its AI assistant, Skylar.
     These statements will be used in a scrolling ticker on the home page.
     Each statement should be a "hook" followed by a benefit, separated by a colon.
-    Example: "Skylar: Your high-fidelity intelligence partner."
-    
-    Focus on:
-    - Decoding professional DNA
-    - Identifying hidden patterns in careers
-    - Finding high-value market opportunities
-    - Amplifying human potential
-    - Dynamic asset generation (Wavvault)
-    
-    Output a JSON object with a "benefits" array of strings.
   `;
 
-  try {
-    const ai = getAI();
-    const response = await ai.models.generateContent({
-      model: 'gemini-2.0-flash',
-      contents: prompt,
-      config: {
-        responseMimeType: 'application/json',
-        maxOutputTokens: 1000,
-        responseSchema: {
-          type: Type.OBJECT,
-          properties: {
-            benefits: {
-              type: Type.ARRAY,
-              items: { type: Type.STRING }
-            }
-          },
-          required: ['benefits']
-        }
+  const schema = {
+    type: "object",
+    properties: {
+      benefits: {
+        type: "array",
+        items: { type: "string" }
       }
+    },
+    required: ['benefits']
+  };
+
+  try {
+    console.log(`[GeminiBackend] Routing generateHomeBenefits through MCP Model Registry...`);
+    const result = await mcpRegistry.generateContent({
+      role: "Marketing Benefit Synchronizer",
+      prompt,
+      responseSchema: JSON.stringify(schema)
     });
 
-    const data = JSON.parse(response.text || '{"benefits": []}');
+    const data = safeJsonParse(result.text) || { benefits: [] };
     return data.benefits as string[];
   } catch (error) {
     console.error('Error generating home benefits:', error);

@@ -3,7 +3,29 @@
 All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
+### Added
+- **Track 144 (Skylar Guest Security)**: Implemented a multi-layered security and resilience strategy for unauthenticated Skylar users.
+    - **Rate Limiting**: Integrated `express-rate-limit` and `express-slow-down` on the `/api/skylar/chat-journey` endpoint.
+    - **Stricter Quotas**: Implemented a 20-request per 15-minute window for guests with progressive speed-throttling after 5 requests.
+    - **Stage Restrictions**: Restricted unauthenticated usage to the "Dive-In" stage, preventing guest access to sensitive career branding and outreach flows.
+    - **Hardenened Diagnostics**: Enhanced `skylarService.ts` and `server.ts` with detailed logging for non-JSON responses to pinpoint 413 Payload Too Large and other proxy-level interruptions.
+    - **JSON Consistency**: Ensured the backend always returns valid JSON even during fatal errors to prevent "network or proxy" UI errors.
+- **Track 143 (Multimodal Resilience)**: Successfully migrated Vision (Resume Parsing) and Image Generation tools to the MCP Model Registry.
+    - **API Key Continuity**: Implemented automatic rotation and placeholder filtering for `GEMINI_API_KEY` and `API_KEY`. Fixed MCP environment inheritance and stabilized the Gemini API payload structure (resolved `Unknown name "role"` 400 errors).
+    - **Firestore Stability**: Resolved `5 NOT_FOUND` and `7 PERMISSION_DENIED` errors by implementing Firebase App reuse, stabilizing `(default)` ID translation, and adding safety whitespace stripping for DB configuration.
+
 ### Fixed
+- **Network Errors**: Resolved the "network or proxy restriction" UI error by providing specific feedback for backend startup, payload size limits, and authentication redirects.
+- **AI Exposure**: Closed the vulnerability of unrestricted AI usage by anonymous users through the new rate-limiting and stage-gate enforcement.
+
+### Fixed
+- **ESM Compatibility**: Resolved `ReferenceError: __dirname is not defined` in `genkitService.ts` by implementing standard ES Module path derivation.
+- **AI Error Handling**: Hardened error catching for "API key expired" and "invalid key" scenarios in `genkitService.ts` and `geminiBackend.ts` with clearer user guidance for renewal.
+- **Track 140 (API & Database Robustness)**: 
+    - Resolved `API_KEY_HTTP_REFERRER_BLOCKED` (403) errors by improving key selection logic in `aiConfig.ts` to skip referer-restricted Firebase API keys on the server.
+    - Fixed Firestore `5 NOT_FOUND` errors by implementing a robust `getFirestoreInstance()` helper in `genkitService.ts` that correctly detects the `firestoreDatabaseId` from `firebase-applet-config.json` and ensures proper Admin SDK initialization.
+    - Consolidated highly redundant Firestore initialization blocks across 35+ tools and flows in `genkitService.ts`, significantly improving maintainability and reducing the binary size.
+    - Reverted default models to `gemini-1.5-flash` for maximum stability and compatibility across different project tiers.
 - **Firebase Provisioning**: Successfully provisioned Firebase (Firestore and Auth) in the `us-west1` region.
 - **Security Hardening**: Implemented "Fortress" level Firestore Security Rules following the Eight Pillars:
     - Default-deny catch-all at the top.

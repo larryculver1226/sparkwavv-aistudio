@@ -1,0 +1,22 @@
+{
+  "name": "mcp-model-registry",
+  "version": "1.0.0",
+  "description": "Sparkwavv Model Abstraction Layer & Fallback Gateway",
+  "main": "index.ts",
+  "type": "module",
+  "scripts": {
+    "start": "node --loader ts-node/esm index.ts",
+    "dev": "tsx index.ts"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.1.0",
+    "@google/generative-ai": "^0.21.0",
+    "dotenv": "^16.4.5"
+  },
+  "devDependencies": {
+    "@types/node": "^20.11.0",
+    "ts-node": "^10.9.2",
+    "typescript": "^5.3.3",
+    "tsx": "^4.7.1"
+  }
+}

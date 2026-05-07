@@ -643,10 +643,13 @@ class SkylarService {
           } catch (e) {}
         } else {
           const text = await response.text();
+          console.error('[Skylar] Network Error Body:', text.substring(0, 500));
           if (text.includes('Starting Server...</title>')) {
             errorMsg = 'The backend server is currently starting up. Please wait a few seconds and try again.';
           } else if (text.includes('Cookie check')) {
             errorMsg = 'Please authenticate in a new window or enable cookies for this preview to continue.';
+          } else if (text.includes('413') || text.toLowerCase().includes('payload too large')) {
+            errorMsg = 'The request payload is too large. Please try a shorter message or a smaller file.';
           } else {
              errorMsg = 'Skylar response was obstructed by a network or proxy restriction.';
           }
@@ -657,8 +660,8 @@ class SkylarService {
       const contentType = response.headers.get('content-type');
       if (!contentType || !contentType.includes('application/json')) {
         const text = await response.text();
-        console.error('[Skylar] Non-JSON response received:', text.substring(0, 200));
-        throw new Error('Skylar response was obstructed by a network or proxy restriction.');
+        console.error('[Skylar] Non-JSON success response received:', text.substring(0, 500));
+        throw new Error(`Skylar response format was invalid (${contentType || 'no content type'}). This may be due to a proxy or network restriction.`);
       }
 
       const result = await response.json();

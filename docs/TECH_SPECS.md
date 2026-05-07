@@ -9,7 +9,9 @@
 ## Architecture
 - Client-side SPA (Single Page Application) by default.
 - Firebase for backend services (Auth, Firestore) if configured.
-- **Local MCP Server**: A Model Context Protocol server (`scripts/mcp-server`) running via stdio to expose project history (Tracks, Changelog, Tech Specs) to local AI coding assistants (e.g., Cursor, Cline).
+- **Local MCP Server**: 
+  - **Ops Registry**: A Model Context Protocol server (`scripts/mcp-server`) running via stdio to expose project history (Tracks, Changelog, Tech Specs) to local AI coding assistants (e.g., Cursor, Cline).
+  - **Model Registry (Track 141)**: A Model Abstraction Layer (`scripts/mcp-model-registry`) that handles smart model fallback (Gemini 2.0 -> 1.5) and resolves API key referer issues.
 
 ## Configuration Guide (Track 051)
 

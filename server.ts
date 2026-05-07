@@ -28,6 +28,8 @@ import express from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
 import session from 'express-session';
+import { rateLimit } from 'express-rate-limit';
+import speedLimit from 'express-slow-down';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { v4 as uuidv4 } from 'uuid';
@@ -549,12 +551,18 @@ try {
     isFirebaseAdminConfigured = true;
 
     // Database 1: Sparkwavv (User Data)
-    const databaseId =
+    let databaseId =
       process.env.VITE_FIREBASE_DATABASE_ID ||
       (isPlaceholder(firebaseAppletConfig.firestoreDatabaseId)
         ? null
         : firebaseAppletConfig.firestoreDatabaseId);
-    sparkwavvDb = databaseId
+    
+    if (databaseId) {
+      databaseId = databaseId.trim().replace(/^["']|["']$/g, '');
+      if (databaseId === 'default') databaseId = '(default)';
+    }
+
+    sparkwavvDb = (databaseId && databaseId !== '(default)')
       ? getFirestore(sparkwavvAdmin, databaseId)
       : getFirestore(sparkwavvAdmin);
     db = sparkwavvDb;
@@ -632,12 +640,18 @@ try {
       isFirebaseAdminConfigured = true;
 
       // Database 1: Sparkwavv (User Data)
-      const databaseId =
+      let databaseId =
         process.env.VITE_FIREBASE_DATABASE_ID ||
         (isPlaceholder(firebaseAppletConfig.firestoreDatabaseId)
           ? null
           : firebaseAppletConfig.firestoreDatabaseId);
-      sparkwavvDb = databaseId
+
+      if (databaseId) {
+        databaseId = databaseId.trim().replace(/^["']|["']$/g, '');
+        if (databaseId === 'default') databaseId = '(default)';
+      }
+
+      sparkwavvDb = (databaseId && databaseId !== '(default)')
         ? getFirestore(sparkwavvAdmin, databaseId)
         : getFirestore(sparkwavvAdmin);
       db = sparkwavvDb;
@@ -748,6 +762,36 @@ async function startServer() {
   app.get('/favicon.ico', (req, res) => res.status(204).end());
 
   app.use(express.json({ limit: '50mb' }));
+
+  // Security: Gast Rate Limiting to prevent AI abuse
+  const guestRateLimiter = rateLimit({
+    windowMs: 15 * 60 * 1000, // 15 minutes
+    max: 20, // limit each guest IP to 20 requests per 15 mins
+    message: { error: 'Guest quota exceeded. Please log in for unlimited access.' },
+    standardHeaders: true,
+    legacyHeaders: false,
+    skip: (req) => {
+      const user = (req as any).user;
+      // If user exists and is NOT a guest, skip the limiter
+      return user && user.role !== ROLES.GUEST;
+    },
+    keyGenerator: (req) => {
+      // Use standard ip detection, handling potential IPv6 wrapping
+      const ip = (req.headers['x-forwarded-for'] as string) || req.ip || 'anonymous';
+      return ip.split(',')[0].trim().replace(/^::ffff:/, '');
+    },
+  });
+
+  const guestSpeedLimiter = speedLimit({
+    windowMs: 15 * 60 * 1000,
+    delayAfter: 5, // slow down after 5 requests
+    delayMs: (hits) => (hits - 5) * 500,
+    skip: (req) => {
+      const user = (req as any).user;
+      return user && user.role !== ROLES.GUEST;
+    },
+  });
+
   app.use(
     session({
       secret: process.env.SESSION_SECRET,
@@ -3607,6 +3651,8 @@ async function startServer() {
         ROLES.AGENT,
         ROLES.GUEST,
       ]),
+      guestSpeedLimiter,
+      guestRateLimiter,
       async (req, res) => {
         try {
           // Guarantee that process.env.GEMINI_API_KEY is populated before Genkit parses the request internally.
@@ -3616,6 +3662,12 @@ async function startServer() {
           const { userId, stageId, message, history, attachments, stageConfig, missingArtifacts } =
             req.body;
           let authenticatedUser = (req as any).user;
+
+          // Guest Restriction: Only allowed to chat in 'dive-in' stage
+          if (authenticatedUser.role === ROLES.GUEST && stageId && stageId !== 'dive-in') {
+             return res.status(403).json({ error: 'Guest users are restricted to the initial "Dive-In" stage. Please log in to access full journey capabilities.' });
+          }
+
           if (req.headers['custom-auth-bypass-test'] === 'realActor') {
             authenticatedUser = { uid: 'realActor', role: ROLES.USER };
           }
@@ -3629,6 +3681,8 @@ async function startServer() {
           ) {
             return res.status(403).json({ error: 'Unauthorized access to this chat session' });
           }
+
+          console.log(`[Skylar] Chat Request - User: ${userId} (${authenticatedUser.role}), Stage: ${stageId || 'default'}`);
 
           const result = await runJourneyStageFlow({
             userId,
@@ -3647,7 +3701,11 @@ async function startServer() {
           });
         } catch (error: any) {
           console.error('Error in /api/skylar/chat-journey:', error);
-          res.status(500).json({ error: error.message });
+          // If it's a non-JSON error from a downstream service, this catch handles it but we ensure json output
+          res.status(500).json({ 
+            error: error.message || 'Internal server error during chat processing.',
+            details: process.env.NODE_ENV === 'development' ? error.stack : undefined
+          });
         }
       }
     );
