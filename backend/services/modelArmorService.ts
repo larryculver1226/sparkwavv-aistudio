@@ -1,5 +1,4 @@
-import aiplatform from '@google-cloud/aiplatform';
-
+import * as aiplatform from '@google-cloud/aiplatform';
 const { ModelArmorClient } = aiplatform;
 
 /**

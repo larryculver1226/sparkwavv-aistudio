@@ -4,7 +4,18 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 ### Fixed
-- **ESM Compatibility Fix**: Resolved a deployment issue where `@google-cloud/*` packages failed to load named exports in Node.js ESM mode. Updated all Google Cloud SDK imports (aiplatform, discoveryengine, storage, vertexai, containeranalysis, security-center) to use default imports and destructuring.
+- **Firebase Provisioning**: Successfully provisioned Firebase (Firestore and Auth) in the `us-west1` region.
+- **Security Hardening**: Implemented "Fortress" level Firestore Security Rules following the Eight Pillars:
+    - Default-deny catch-all at the top.
+    - Strict ID validation (`isValidId`).
+    - Mandatory email verification for all user writes.
+    - Identity Integrity checks on `create` (exact key/size matching via `hasAll` and `size()`).
+    - Secure `list` queries enforced via `resource.data` checks instead of client-side delegation.
+    - Domain-specific validation helpers for `Users`, `Wavvault`, `Dashboards`, and `Artifacts`.
+    - PII protection for user profile data.
+- **Linter Integration**: Installed `@firebase/eslint-plugin-security-rules` and integrated it into `eslint.config.js` to ensure ongoing rules security.
+- **UI Cleanup**: Removed the "Sanitized Mode Active" banner from the home page for a cleaner presentation, while maintaining the underlying Firebase conditional logic in the services layer.
+- **ESM Compatibility Fix**: Resolved a deployment issue where `@google-cloud/*` packages failed to load named exports in Node.js ESM mode. Updated all Google Cloud SDK imports (aiplatform, discoveryengine, storage, vertexai, containeranalysis, security-center) to use wildcard imports (`import * as pkg`) and destructuring to ensure robust compatibility with both ESM and CJS.
 - **Model Armor Migration**: Updated `ModelArmorService` to import `ModelArmorClient` from the unified `@google-cloud/aiplatform` SDK.
 
 ### Added

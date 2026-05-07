@@ -1,4 +1,4 @@
-import securitycenter from '@google-cloud/security-center';
+import * as securitycenter from '@google-cloud/security-center';
 const { SecurityCenterClient } = securitycenter;
 
 const PROJECT_ID = process.env.VERTEX_AI_PROJECT_ID || process.env.FIREBASE_PROJECT_ID;

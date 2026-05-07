@@ -1,807 +1,224 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
+    
+    // ===============================================================
+    // GLOBAL SAFETY NET
+    // ===============================================================
+    match /{document=**} {
+      allow read, write: if false;
+    }
 
     // ===============================================================
-    // Assumed Data Model
+    // PRIMITIVE HELPERS
     // ===============================================================
-    //
-    // Collection: tenants
-    // Document ID: {tenantId}
-    // Fields:
-    //   - id: string (required)
-    //   - name: string (required)
-    //   - brand: string (required) - sparkwavv or kwieri
-    //   - description: string (optional)
-    //
-    // Collection: admins
-    // Document ID: {uid}
-    // Fields:
-    //   - uid: string (required)
-    //   - email: string (required)
-    //   - role: string (required) - admin, operator, viewer
-    //   - createdAt: timestamp (required)
-    //
-    // Collection: users
-    // Document ID: {uid}
-    // Fields:
-    //   - uid: string (required)
-    //   - sparkwavvId: string (optional) - SW-YYYY-XXXX
-    //   - email: string (required)
-    //   - displayName: string (optional)
-    //   - role: string (required) - admin, user, operator, mentor, agent
-    //   - tenantId: string (required)
-    //   - generationalPersona: string (optional)
-    //   - careerStageRole: string (optional)
-    //   - hierarchicalRole: string (optional)
-    //   - brandPersona: string (optional)
-    //   - brandDNAAttributes: list (optional)
-    //   - journeyStage: string (optional)
-    //   - onboardingComplete: bool (optional)
-    //   - linkedinId: string (optional)
-    //   - linkedinProfile: map (optional)
-    //
-    // Collection: dashboards
-    // Document ID: {userId}
-    // Fields:
-    //   - userId: string (required)
-    //   - sparkwavvId: string (optional)
-    //   - tenantId: string (required)
-    //   - careerHappiness: int (optional)
-    //   - discoveryProgress: string (optional)
-    //   - validationGateMode: string (optional)
-    //
-    // Collection: wavvault
-    // Document ID: {userId}
-    // Fields:
-    //   - userId: string (required)
-    //   - tenantId: string (required)
-    //   - identity: string (optional)
-    //   - strengths: list (optional)
-    //   - careerStories: list (optional)
-    //   - embedding: list (optional)
-    //   - updatedAt: timestamp (optional)
-    //
-    // Collection: artifacts
-    // Document ID: {artifactId}
-    // Fields:
-    //   - id: string (required)
-    //   - userId: string (required)
-    //   - tenantId: string (required)
-    //   - filename: string (required)
-    //   - type: string (required)
-    //   - storagePath: string (required)
-    //   - createdAt: timestamp (required)
-    //
-    // Collection: programs
-    // Document ID: {programId}
-    // Fields:
-    //   - id: string (required)
-    //   - name: string (required)
-    //   - description: string (optional)
-    //   - type: string (optional)
-    //   - curriculum: list (optional)
-    //   - duration: string (optional)
-    //   - tenantId: string (required)
-    //
-    // Collection: cohorts
-    // Document ID: {cohortId}
-    // Fields:
-    //   - id: string (required)
-    //   - programId: string (required)
-    //   - name: string (required)
-    //   - type: string (optional)
-    //   - description: string (optional)
-    //   - targetAudience: string (optional)
-    //   - startDate: timestamp (optional)
-    //   - endDate: timestamp (optional)
-    //   - institution: string (optional)
-    //   - tenantId: string (required)
-    //
-    // Collection: journeys
-    // Document ID: {journeyId}
-    // Fields:
-    //   - id: string (required)
-    //   - userId: string (required)
-    //   - programId: string (required)
-    //   - status: string (required) - active, completed, on-hold
-    //   - currentStep: string (optional)
-    //   - steps: list (optional)
-    //   - startedAt: timestamp (optional)
-    //   - completedAt: timestamp (optional)
-    //   - tenantId: string (required)
-    //
-    // Collection: security_logs
-    // Document ID: {logId}
-    // Fields:
-    //   - id: string (required)
-    //   - timestamp: timestamp (required)
-    //   - actorId: string (required)
-    //   - actorEmail: string (optional)
-    //   - actorRole: string (optional)
-    //   - actionType: string (required)
-    //   - severity: string (required) - INFO, WARNING, CRITICAL
-    //   - targetId: string (optional)
-    //   - targetEmail: string (optional)
-    //   - details: map (optional)
-    //   - ipAddress: string (optional)
-    //
-    // Collection: flagged_content
-    // Document ID: {contentId}
-    // Fields:
-    //   - id: string (required)
-    //   - authorId: string (required)
-    //   - authorName: string (optional)
-    //   - authorEmail: string (optional)
-    //   - type: string (required) - post, comment, profile, artifact
-    //   - reason: string (required)
-    //   - content: string (optional)
-    //   - timestamp: timestamp (required)
-    //   - status: string (required) - pending, approved, deleted
-    //
-    // ===============================================================
-
-    // ===============================================================
-    // Helper Functions
-    // ===============================================================
-
-    function isAuthenticated() {
+    
+    function isSignedIn() {
       return request.auth != null;
     }
 
+    function isVerified() {
+      return isSignedIn() && (
+        request.auth.token.email_verified == true || 
+        request.auth.token.firebase.sign_in_provider == "google.com" ||
+        request.auth.token.email.lower() == "larry.culver1226@gmail.com"
+      );
+    }
+
     function isOwner(userId) {
-      return isAuthenticated() && request.auth.uid == userId;
+      return isSignedIn() && request.auth.uid == userId;
     }
 
     function isAdmin() {
-      return isAuthenticated() && 
-        ((exists(/databases/$(database)/documents/admins/$(request.auth.uid)) && (get(/databases/$(database)/documents/admins/$(request.auth.uid)).data.role == 'admin' || get(/databases/$(database)/documents/admins/$(request.auth.uid)).data.role == 'super_admin')) ||
-         (exists(/databases/$(database)/documents/users/$(request.auth.uid)) && (get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin' || get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'super_admin')) ||
-         ('email' in request.auth.token && request.auth.token.email.lower() == "larry.culver1226@gmail.com" && (request.auth.token.email_verified == true || request.auth.token.firebase.sign_in_provider == "google.com")));
+      return isVerified() && (
+        request.auth.token.email.lower() == "larry.culver1226@gmail.com" ||
+        exists(/databases/$(database)/documents/admins/$(request.auth.uid)) ||
+        (exists(/databases/$(database)/documents/users/$(request.auth.uid)) && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin')
+      );
     }
 
-    function isOperator() {
-      return isAuthenticated() && 
-        (isAdmin() || 
-         (exists(/databases/$(database)/documents/admins/$(request.auth.uid)) && get(/databases/$(database)/documents/admins/$(request.auth.uid)).data.role == 'operator') ||
-         (exists(/databases/$(database)/documents/users/$(request.auth.uid)) && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'operator'));
+    function isValidId(id) {
+      return id is string && id.size() > 0 && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    function incoming() {
+      return request.resource.data;
+    }
+
+    function existing() {
+      return resource.data;
     }
 
     function isRecent(time) {
-      return time is timestamp || time is string;
-    }
-
-    function unchanged(field) {
-      return !(field in request.resource.data) || 
-             request.resource.data[field] == resource.data[field];
-    }
-
-    function hasRequiredFields(fields) {
-      return request.resource.data.keys().hasAll(fields);
-    }
-
-    function hasOnlyAllowedFields(fields) {
-      return request.resource.data.keys().hasOnly(fields);
-    }
-
-    function isValidEmail(email) {
-      return email is string && email.matches("^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}$");
-    }
-
-    function validString(field, min, max) {
-      return request.resource.data[field] is string && 
-             request.resource.data[field].size() >= min && 
-             request.resource.data[field].size() <= max;
-    }
-
-    // ===============================================================
-    // Domain Validators
-    // ===============================================================
-
-    function isValidAdmin(data) {
-      let allowedFields = ['uid', 'email', 'role', 'createdAt'];
-      return hasRequiredFields(allowedFields) &&
-             hasOnlyAllowedFields(allowedFields) &&
-             data.uid == request.auth.uid &&
-             isValidEmail(data.email) &&
-             data.role in ['admin', 'operator', 'viewer'] &&
-             (resource == null ? isRecent(data.createdAt) : data.createdAt == resource.data.createdAt);
-    }
-
-    function isValidUser(data) {
-      let allowedFields = [
-        'uid', 'sparkwavvId', 'email', 'displayName', 'role', 'tenantId', 
-        'generationalPersona', 'careerStageRole', 'hierarchicalRole', 'brandPersona', 
-        'brandDNAAttributes', 'journeyStage', 'onboardingComplete', 'linkedinId', 'linkedinProfile',
-        'firstName', 'lastName', 'jobTitle', 'companyOrg', 'phone', 'programTrack', 
-        'lifecycleStage', 'outcomesAttributes', 'feedbackQuote', 'userId', 'createdAt',
-        'userData', 'currentStep', 'summary', 'updatedAt', 'emailVerified',
-        'photoURL', 'alignmentScore', 'location', 'website', 'bio', 'voiceMode', 
-        'specializedSector', 'wavvaultSeeds', 'ignitionCompletedAt'
-      ];
-      return hasRequiredFields(['uid', 'email', 'role', 'tenantId']) &&
-             hasOnlyAllowedFields(allowedFields) &&
-             data.uid is string && data.uid.size() < 128 &&
-             isValidEmail(data.email) && data.email.size() < 256 &&
-             data.role in ['admin', 'user', 'operator', 'mentor', 'agent', 'super_admin', 'editor', 'viewer'] &&
-             data.tenantId is string && data.tenantId.size() < 64 &&
-             (!('sparkwavvId' in data) || (data.sparkwavvId is string && data.sparkwavvId.size() < 64)) &&
-             (!('displayName' in data) || (data.displayName is string && data.displayName.size() < 100)) &&
-             (!('generationalPersona' in data) || (data.generationalPersona is string && data.generationalPersona.size() < 100)) &&
-             (!('careerStageRole' in data) || (data.careerStageRole is string && data.careerStageRole.size() < 100)) &&
-             (!('hierarchicalRole' in data) || (data.hierarchicalRole is string && data.hierarchicalRole.size() < 100)) &&
-             (!('brandPersona' in data) || (data.brandPersona is string && data.brandPersona.size() < 100)) &&
-             (!('brandDNAAttributes' in data) || data.brandDNAAttributes is list) &&
-             (!('journeyStage' in data) || (data.journeyStage is string && data.journeyStage.size() < 100)) &&
-             (!('onboardingComplete' in data) || data.onboardingComplete is bool) &&
-             (!('linkedinId' in data) || (data.linkedinId is string && data.linkedinId.size() < 100)) &&
-             (!('linkedinProfile' in data) || (data.linkedinProfile is string && data.linkedinProfile.size() < 500)) &&
-             (!('firstName' in data) || (data.firstName is string && data.firstName.size() < 100)) &&
-             (!('lastName' in data) || (data.lastName is string && data.lastName.size() < 100)) &&
-             (!('jobTitle' in data) || (data.jobTitle is string && data.jobTitle.size() < 100)) &&
-             (!('companyOrg' in data) || (data.companyOrg is string && data.companyOrg.size() < 100)) &&
-             (!('phone' in data) || (data.phone is string && data.phone.size() < 32)) &&
-             (!('programTrack' in data) || (data.programTrack is string && data.programTrack.size() < 100)) &&
-             (!('lifecycleStage' in data) || (data.lifecycleStage is string && data.lifecycleStage.size() < 100)) &&
-             (!('outcomesAttributes' in data) || (data.outcomesAttributes is string && data.outcomesAttributes.size() < 500)) &&
-             (!('feedbackQuote' in data) || (data.feedbackQuote is string && data.feedbackQuote.size() < 1000)) &&
-             (!('userId' in data) || (data.userId is string && data.userId.size() < 128)) &&
-             (!('createdAt' in data) || (resource == null ? isRecent(data.createdAt) : data.createdAt == resource.data.createdAt)) &&
-             (!('userData' in data) || data.userData is map) &&
-             (!('currentStep' in data) || (data.currentStep is string && data.currentStep.size() < 100)) &&
-             (!('summary' in data) || data.summary is map) &&
-             (!('emailVerified' in data) || data.emailVerified is bool) &&
-             (!('photoURL' in data) || (data.photoURL is string && data.photoURL.size() < 2000)) &&
-             (!('alignmentScore' in data) || (data.alignmentScore is number)) &&
-             (!('location' in data) || (data.location is string && data.location.size() < 200)) &&
-             (!('website' in data) || (data.website is string && data.website.size() < 500)) &&
-             (!('bio' in data) || (data.bio is string && data.bio.size() < 2000)) &&
-             (!('voiceMode' in data) || data.voiceMode is bool) &&
-             (!('specializedSector' in data) || (data.specializedSector is string && data.specializedSector.size() < 100)) &&
-             (!('wavvaultSeeds' in data) || data.wavvaultSeeds is map) &&
-             (!('ignitionCompletedAt' in data) || data.ignitionCompletedAt is timestamp) &&
-             (!('updatedAt' in data) || (resource == null ? isRecent(data.updatedAt) : data.updatedAt == resource.data.updatedAt));
-    }
-
-    function isValidDashboard(data) {
-      let allowedFields = [
-        'userId', 'sparkwavvId', 'tenantId', 'careerHappiness', 'discoveryProgress', 
-        'validationGateMode', 'strengths', 'resumeStatus', 'careerProfileStatus', 
-        'jobMatches', 'aiCompanion', 'effortTier', 'energyTrough', 'financialExpenses', 
-        'rppValidated', 'milestones', 'updatedAt', 'displayName', 'pieOfLife', 
-        'perfectDay', 'alignmentMatrix', 'mentorNote', 'mentorNoteTimestamp', 
-        'validationPending', '_persistenceStatus', 'phaseProgress',
-        'validationStatus', 'pendingGateId'
-      ];
-      return hasRequiredFields(['userId']) &&
-             hasOnlyAllowedFields(allowedFields) &&
-             data.userId is string && data.userId.size() < 128 &&
-             (!('tenantId' in data) || data.tenantId == null || (data.tenantId is string && data.tenantId.size() < 64)) &&
-             (!('sparkwavvId' in data) || data.sparkwavvId == null || (data.sparkwavvId is string && data.sparkwavvId.size() < 64)) &&
-             (!('careerHappiness' in data) || data.careerHappiness == null || (data.careerHappiness is int && data.careerHappiness >= 0 && data.careerHappiness <= 100)) &&
-             (!('discoveryProgress' in data) || data.discoveryProgress == null || (data.discoveryProgress is string && data.discoveryProgress.size() < 100)) &&
-             (!('phaseProgress' in data) || data.phaseProgress == null || data.phaseProgress is map) &&
-             (!('validationGateMode' in data) || data.validationGateMode == null || (data.validationGateMode is string && data.validationGateMode.size() < 100)) &&
-             (!('strengths' in data) || data.strengths == null || (data.strengths is list && data.strengths.size() < 50)) &&
-             (!('resumeStatus' in data) || data.resumeStatus == null || (data.resumeStatus is string && data.resumeStatus.size() < 500)) &&
-             (!('careerProfileStatus' in data) || data.careerProfileStatus == null || (data.careerProfileStatus is string && data.careerProfileStatus.size() < 500)) &&
-             (!('jobMatches' in data) || data.jobMatches == null || (data.jobMatches is list && data.jobMatches.size() < 20)) &&
-             (!('aiCompanion' in data) || data.aiCompanion == null || (data.aiCompanion is map)) &&
-             (!('effortTier' in data) || data.effortTier == null || (data.effortTier is string && data.effortTier.size() < 20)) &&
-             (!('energyTrough' in data) || data.energyTrough == null || (data.energyTrough is map)) &&
-             (!('financialExpenses' in data) || data.financialExpenses == null || (data.financialExpenses is list && data.financialExpenses.size() < 100)) &&
-             (!('rppValidated' in data) || data.rppValidated == null || (data.rppValidated is bool)) &&
-             (!('milestones' in data) || data.milestones == null || (data.milestones is list && data.milestones.size() < 50)) &&
-             (!('displayName' in data) || data.displayName == null || (data.displayName is string && data.displayName.size() < 100)) &&
-             (!('pieOfLife' in data) || data.pieOfLife == null || data.pieOfLife is list) &&
-             (!('perfectDay' in data) || data.perfectDay == null || data.perfectDay is list) &&
-             (!('alignmentMatrix' in data) || data.alignmentMatrix == null || data.alignmentMatrix is map) &&
-             (!('mentorNote' in data) || data.mentorNote == null || (data.mentorNote is string && data.mentorNote.size() < 5000)) &&
-             (!('mentorNoteTimestamp' in data) || data.mentorNoteTimestamp == null || data.mentorNoteTimestamp is string || data.mentorNoteTimestamp is timestamp) &&
-             (!('validationPending' in data) || data.validationPending == null || data.validationPending is bool) &&
-             (!('_persistenceStatus' in data) || data._persistenceStatus == null || (data._persistenceStatus is string && data._persistenceStatus.size() < 20)) &&
-             (!('validationStatus' in data) || data.validationStatus == null || (data.validationStatus is string && data.validationStatus.size() < 100)) &&
-             (!('pendingGateId' in data) || data.pendingGateId == null || (data.pendingGateId is string && data.pendingGateId.size() < 100)) &&
-             (!('updatedAt' in data) || data.updatedAt == null || (resource == null ? isRecent(data.updatedAt) : data.updatedAt == resource.data.updatedAt));
-    }
-
-    function isValidArtifact(data) {
-      let allowedFields = ['id', 'userId', 'tenantId', 'filename', 'type', 'storagePath', 'createdAt'];
-      return hasRequiredFields(allowedFields) &&
-             hasOnlyAllowedFields(allowedFields) &&
-             data.id is string && data.id.size() < 128 &&
-             data.userId is string && data.userId.size() < 128 &&
-             data.tenantId is string && data.tenantId.size() < 64 &&
-             data.filename is string && data.filename.size() < 256 &&
-             data.type is string && data.type.size() < 64 &&
-             data.storagePath is string && data.storagePath.size() < 512 &&
-             (resource == null ? isRecent(data.createdAt) : data.createdAt == resource.data.createdAt);
-    }
-
-    function isValidSecurityLog(data) {
-      let allowedFields = ['id', 'timestamp', 'actorId', 'actorEmail', 'actorRole', 'actionType', 'severity', 'targetId', 'targetEmail', 'details', 'ipAddress'];
-      return hasRequiredFields(['id', 'timestamp', 'actorId', 'actionType', 'severity']) &&
-             hasOnlyAllowedFields(allowedFields) &&
-             data.id is string && data.id.size() < 128 &&
-             (resource == null ? isRecent(data.timestamp) : data.timestamp == resource.data.timestamp) &&
-             data.actorId is string && data.actorId.size() < 128 &&
-             data.actionType in ["USER_CREATE", "USER_UPDATE", "USER_DELETE", "ROLE_CHANGE", "ADMIN_PROMOTION", "LOGIN_FAILURE", "PASSWORD_RESET"] &&
-             data.severity in ["INFO", "WARNING", "CRITICAL"];
-    }
-
-    function isValidFlaggedContent(data) {
-      let allowedFields = ['id', 'authorId', 'authorName', 'authorEmail', 'type', 'reason', 'content', 'timestamp', 'status'];
-      return hasRequiredFields(['id', 'authorId', 'type', 'reason', 'timestamp', 'status']) &&
-             hasOnlyAllowedFields(allowedFields) &&
-             data.id is string && data.id.size() < 128 &&
-             data.authorId is string && data.authorId.size() < 128 &&
-             data.type in ["post", "comment", "profile", "artifact"] &&
-             data.reason is string && data.reason.size() < 500 &&
-             (resource == null ? isRecent(data.timestamp) : data.timestamp == resource.data.timestamp) &&
-             data.status in ["pending", "approved", "deleted"];
-    }
-
-    function isValidWavvault(data) {
-      let allowedFields = [
-        'userId', 'tenantId', 'identity', 'strengths', 'careerStories', 'embedding', 
-        'updatedAt', 'graph', 'logs', 'journeyEvents', 'artifacts', 'lastSynthesis', 
-        'isDiscoveryUnlocked', 'contentHash', 'previousHash', 'lastCommitHash', 'lastCommitTimestamp',
-        'effortTier', 'energyManagement', 'rppPartners', 'twentyOneQuestions', 'perfectDay', 'prioritizationRankings',
-        'pieOfLife', 'extinguishers', 'accomplishmentLedger', 'fiveStories', 'attributeAssignments',
-        'chatHistory', 'validationGates', 'bestSelfProfile', 'futureVision', 'productivityPlan',
-        'careerPersona', 'brandIdentity', 'credentialAnalysis', 'matchedOpportunities', 'interviewSessions',
-        'synthesizedAssets'
-      ];
-      return hasRequiredFields(['userId']) &&
-             hasOnlyAllowedFields(allowedFields) &&
-             data.userId is string && data.userId.size() < 128 &&
-             (!('tenantId' in data) || data.tenantId == null || (data.tenantId is string && data.tenantId.size() < 64)) &&
-             (!('identity' in data) || data.identity == null || (data.identity is string && data.identity.size() < 5000)) &&
-             (!('strengths' in data) || data.strengths == null || (data.strengths is list && data.strengths.size() < 50)) &&
-             (!('careerStories' in data) || data.careerStories == null || (data.careerStories is list && data.careerStories.size() < 20)) &&
-             (!('graph' in data) || data.graph == null || data.graph is map) &&
-             (!('logs' in data) || data.logs == null || data.logs is list) &&
-             (!('journeyEvents' in data) || data.journeyEvents == null || data.journeyEvents is list) &&
-             (!('artifacts' in data) || data.artifacts == null || data.artifacts is list) &&
-             (!('lastSynthesis' in data) || data.lastSynthesis == null || (data.lastSynthesis is string && data.lastSynthesis.size() < 100)) &&
-             (!('isDiscoveryUnlocked' in data) || data.isDiscoveryUnlocked == null || data.isDiscoveryUnlocked is bool) &&
-             (!('contentHash' in data) || data.contentHash == null || (data.contentHash is string && data.contentHash.size() < 128)) &&
-             (!('previousHash' in data) || data.previousHash == null || (data.previousHash is string && data.previousHash.size() < 128)) &&
-             (!('lastCommitHash' in data) || data.lastCommitHash == null || (data.lastCommitHash is string && data.lastCommitHash.size() < 128)) &&
-             (!('lastCommitTimestamp' in data) || data.lastCommitTimestamp == null || isRecent(data.lastCommitTimestamp)) &&
-             (!('effortTier' in data) || data.effortTier == null || data.effortTier is string) &&
-             (!('energyManagement' in data) || data.energyManagement == null || data.energyManagement is map) &&
-             (!('rppPartners' in data) || data.rppPartners == null || data.rppPartners is list) &&
-             (!('twentyOneQuestions' in data) || data.twentyOneQuestions == null || data.twentyOneQuestions is map) &&
-             (!('perfectDay' in data) || data.perfectDay == null || (data.perfectDay is string || data.perfectDay is list)) &&
-             (!('prioritizationRankings' in data) || data.prioritizationRankings == null || data.prioritizationRankings is map) &&
-             (!('pieOfLife' in data) || data.pieOfLife == null || (data.pieOfLife is map || data.pieOfLife is list)) &&
-             (!('extinguishers' in data) || data.extinguishers == null || (data.extinguishers is map || data.extinguishers is list)) &&
-             (!('accomplishmentLedger' in data) || data.accomplishmentLedger == null || data.accomplishmentLedger is list) &&
-             (!('fiveStories' in data) || data.fiveStories == null || data.fiveStories is list) &&
-             (!('attributeAssignments' in data) || data.attributeAssignments == null || data.attributeAssignments is map) &&
-             (!('chatHistory' in data) || data.chatHistory == null || data.chatHistory is list) &&
-             (!('validationGates' in data) || data.validationGates == null || data.validationGates is map) &&
-             (!('bestSelfProfile' in data) || data.bestSelfProfile == null || data.bestSelfProfile is map) &&
-             (!('futureVision' in data) || data.futureVision == null || data.futureVision is map) &&
-             (!('productivityPlan' in data) || data.productivityPlan == null || data.productivityPlan is map) &&
-             (!('careerPersona' in data) || data.careerPersona == null || data.careerPersona is map) &&
-             (!('brandIdentity' in data) || data.brandIdentity == null || data.brandIdentity is map) &&
-             (!('credentialAnalysis' in data) || data.credentialAnalysis == null || data.credentialAnalysis is map) &&
-             (!('matchedOpportunities' in data) || data.matchedOpportunities == null || data.matchedOpportunities is list) &&
-             (!('interviewSessions' in data) || data.interviewSessions == null || data.interviewSessions is list) &&
-             (!('synthesizedAssets' in data) || data.synthesizedAssets == null || data.synthesizedAssets is list) &&
-             (!('embedding' in data) || data.embedding == null || data.embedding is list) &&
-             (!('updatedAt' in data) || data.updatedAt == null || (resource == null ? isRecent(data.updatedAt) : data.updatedAt == resource.data.updatedAt));
-    }
-
-    function isValidSystemLog(data) {
-      let allowedFields = ['id', 'timestamp', 'level', 'serviceName', 'message', 'details'];
-      return hasRequiredFields(['id', 'timestamp', 'level', 'serviceName', 'message']) &&
-             hasOnlyAllowedFields(allowedFields) &&
-             data.id is string && data.id.size() < 128 &&
-             (resource == null ? isRecent(data.timestamp) : data.timestamp == resource.data.timestamp) &&
-             data.level in ["INFO", "WARN", "ERROR", "DEBUG"] &&
-             data.serviceName in ["AUTH", "API", "FIRESTORE", "STORAGE", "SYSTEM"] &&
-             data.message is string && data.message.size() < 2000;
-    }
-
-    function isValidStorageMetric(data) {
-      let allowedFields = ['id', 'totalSize', 'artifactCount', 'lastUpdated'];
-      return hasRequiredFields(['id', 'totalSize', 'artifactCount']) &&
-             hasOnlyAllowedFields(allowedFields) &&
-             data.id is string && data.id.size() < 64 &&
-             (data.totalSize is float || data.totalSize is int) &&
-             data.artifactCount is int &&
-             (!('lastUpdated' in data) || (resource == null ? isRecent(data.lastUpdated) : data.lastUpdated == resource.data.lastUpdated));
-    }
-
-    function isValidInvitation(data) {
-      let allowedFields = ['id', 'senderId', 'senderName', 'recipientEmail', 'recipientName', 'relationship', 'status', 'createdAt', 'acceptedAt'];
-      return hasRequiredFields(['id', 'senderId', 'recipientEmail', 'status', 'createdAt']) &&
-             hasOnlyAllowedFields(allowedFields) &&
-             data.id is string && data.id.size() < 128 &&
-             data.senderId is string && data.senderId.size() < 128 &&
-             isValidEmail(data.recipientEmail) &&
-             data.status in ["pending", "accepted", "declined"] &&
-             (resource == null ? isRecent(data.createdAt) : data.createdAt == resource.data.createdAt);
-    }
-
-    function isValidPartnerAccess(data) {
-      let allowedFields = ['id', 'tenantId', 'userUid', 'userName', 'permissions', 'grantedAt'];
-      return hasRequiredFields(['id', 'tenantId', 'userUid', 'permissions', 'grantedAt']) &&
-             hasOnlyAllowedFields(allowedFields) &&
-             data.id is string && data.id.size() < 128 &&
-             data.tenantId is string && data.tenantId.size() < 64 &&
-             data.userUid is string && data.userUid.size() < 128 &&
-             data.permissions is list && data.permissions.size() <= 2 &&
-             (resource == null ? isRecent(data.grantedAt) : data.grantedAt == resource.data.grantedAt);
-    }
-
-    function isValidPartnerSuggestion(data) {
-      let allowedFields = ['id', 'userId', 'partnerTenantId', 'partnerUid', 'type', 'content', 'status', 'synthesisNote', 'createdAt', 'updatedAt'];
-      return hasRequiredFields(['id', 'userId', 'partnerTenantId', 'type', 'content', 'status', 'createdAt']) &&
-             hasOnlyAllowedFields(allowedFields) &&
-             data.id is string && data.id.size() < 128 &&
-             data.userId is string && data.userId.size() < 128 &&
-             data.partnerTenantId is string && data.partnerTenantId.size() < 64 &&
-             data.type in ['dna_shift', 'milestone'] &&
-             data.content is map &&
-             data.status in ['pending', 'accepted', 'declined'] &&
-             (resource == null ? isRecent(data.createdAt) : data.createdAt == resource.data.createdAt);
-    }
-
-    function isValidPartnerApplication(data) {
-      let allowedFields = ['id', 'companyName', 'contactName', 'contactEmail', 'methodology', 'yearsExperience', 'specialization', 'aiReadiness', 'clientCapacity', 'motivation', 'status', 'createdAt'];
-      return hasRequiredFields(['id', 'companyName', 'contactName', 'contactEmail', 'status', 'createdAt']) &&
-             hasOnlyAllowedFields(allowedFields) &&
-             data.id is string && data.id.size() < 128 &&
-             isValidEmail(data.contactEmail) &&
-             data.status in ['pending', 'reviewed', 'approved', 'rejected'] &&
-             (resource == null ? isRecent(data.createdAt) : data.createdAt == resource.data.createdAt);
-    }
-
-    function isValidUserInsight(data) {
-      let allowedFields = ['id', 'userId', 'type', 'content', 'status', 'timestamp', 'evidence', 'conflictWith', 'tags', 'journeyPhase'];
-      return hasRequiredFields(['id', 'userId', 'type', 'content', 'status', 'timestamp']) &&
-             hasOnlyAllowedFields(allowedFields) &&
-             data.id is string && data.id.size() < 128 &&
-             data.userId is string && data.userId.size() < 128 &&
-             data.type in ['pivot', 'core_value', 'primary_goal', 'strength'] &&
-             data.content is string && data.content.size() < 2000 &&
-             data.status in ['pending', 'confirmed', 'superseded'] &&
-             (resource == null ? isRecent(data.timestamp) : data.timestamp == resource.data.timestamp) &&
-             (!('evidence' in data) || (data.evidence is string && data.evidence.size() < 5000)) &&
-             (!('conflictWith' in data) || (data.conflictWith is string && data.conflictWith.size() < 128)) &&
-             (!('tags' in data) || (data.tags is list && data.tags.size() < 20)) &&
-             (!('journeyPhase' in data) || data.journeyPhase in ["Dive-In", "Ignition", "Discovery", "Branding", "Outreach"]);
-    }
-
-    function isValidUserAsset(data) {
-      let allowedFields = ['id', 'userId', 'type', 'content', 'metadata', 'createdAt', 'journeyPhase'];
-      return hasRequiredFields(['id', 'userId', 'type', 'content', 'createdAt']) &&
-             hasOnlyAllowedFields(allowedFields) &&
-             data.id is string && data.id.size() < 128 &&
-             data.userId is string && data.userId.size() < 128 &&
-             data.type in ['portrait', 'outreach_sequence'] &&
-             data.content is string && data.content.size() < 1000000 &&
-             (resource == null ? isRecent(data.createdAt) : data.createdAt == resource.data.createdAt) &&
-             (!('journeyPhase' in data) || data.journeyPhase in ["Dive-In", "Ignition", "Discovery", "Branding", "Outreach"]);
-    }
-
-    function isValidValidationGateEvent(data) {
-      let allowedFields = ['id', 'userId', 'phase', 'timestamp', 'status', 'verdict', 'integrityHash', 'previousEventId', 'serverTimestamp'];
-      return hasRequiredFields(['id', 'userId', 'phase', 'timestamp', 'status']) &&
-             hasOnlyAllowedFields(allowedFields) &&
-             data.id is string && data.id.size() < 128 &&
-             data.userId is string && data.userId.size() < 128 &&
-             data.phase is string && data.phase.size() < 100 &&
-             data.status in ['passed', 'warning', 'failed'] &&
-             (!('verdict' in data) || (data.verdict is string && data.verdict.size() < 1000)) &&
-             (!('integrityHash' in data) || (data.integrityHash is string && data.integrityHash.size() < 128)) &&
-             (!('previousEventId' in data) || (data.previousEventId is string && data.previousEventId.size() < 128));
-    }
-
-    function isValidDistilledArtifact(data) {
-      let allowedFields = ['id', 'userId', 'type', 'title', 'content', 'timestamp', 'sourceGateId', 'metadata', 'serverTimestamp', 'journeyPhase', 'status'];
-      return hasRequiredFields(['id', 'userId', 'type', 'title', 'timestamp']) &&
-             hasOnlyAllowedFields(allowedFields) &&
-             data.id is string && data.id.size() < 128 &&
-             data.userId is string && data.userId.size() < 128 &&
-             data.type in ['spark', 'pie-of-life', 'perfect-day', 'five-stories', 'brand-pillar', 'manifesto'] &&
-             data.title is string && data.title.size() < 256 &&
-             (!('sourceGateId' in data) || (data.sourceGateId is string && data.sourceGateId.size() < 128)) &&
-             (!('journeyPhase' in data) || data.journeyPhase in ["Dive-In", "Ignition", "Discovery", "Branding", "Outreach"]) &&
-             (!('status' in data) || data.status in ["draft", "review", "approved"]);
-    }
-
-    function isValidUserActivity(data) {
-      let allowedFields = ['id', 'userId', 'tenantId', 'type', 'title', 'description', 'timestamp', 'relatedEntityId', 'journeyPhase', 'tags'];
-      return hasRequiredFields(['id', 'userId', 'tenantId', 'type', 'title', 'timestamp']) &&
-             hasOnlyAllowedFields(allowedFields) &&
-             data.id is string && data.id.size() < 128 &&
-             data.userId is string && data.userId.size() < 128 &&
-             data.tenantId is string && data.tenantId.size() < 64 &&
-             data.type in ['artifact_created', 'insight_discovered', 'phase_unlocked', 'asset_generated', 'milestone_completed', 'profile_updated', 'mentor_note_received'] &&
-             data.title is string && data.title.size() < 256 &&
-             (resource == null ? isRecent(data.timestamp) : data.timestamp == resource.data.timestamp) &&
-             (!('description' in data) || (data.description is string && data.description.size() < 1000)) &&
-             (!('relatedEntityId' in data) || (data.relatedEntityId is string && data.relatedEntityId.size() < 128)) &&
-             (!('journeyPhase' in data) || data.journeyPhase in ["Dive-In", "Ignition", "Discovery", "Branding", "Outreach"]) &&
-             (!('tags' in data) || (data.tags is list && data.tags.size() < 20));
-    }
-
-    function isValidBrandNarrative(data) {
-      let allowedFields = ['userId', 'pillars', 'strengths', 'skillsCloud', 'secretId', 'createdAt', 'updatedAt'];
-      return hasRequiredFields(['userId', 'pillars', 'secretId', 'createdAt']) &&
-             hasOnlyAllowedFields(allowedFields) &&
-             data.userId is string && data.userId.size() < 128 &&
-             data.pillars is list && data.pillars.size() == 3 &&
-             data.secretId is string && data.secretId.size() < 128 &&
-             (resource == null ? isRecent(data.createdAt) : data.createdAt == resource.data.createdAt);
+      return time is timestamp && time <= request.time && time > request.time - duration.value(5, 'm');
     }
 
     function isCoachOf(tenantId) {
-      return isAuthenticated() && 
+      return isVerified() && 
              exists(/databases/$(database)/documents/users/$(request.auth.uid)) &&
              get(/databases/$(database)/documents/users/$(request.auth.uid)).data.tenantId == tenantId &&
              get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role in ['mentor', 'admin'];
     }
 
     function isPartnerOf(userId) {
-      return isAuthenticated() && 
+      return isVerified() && 
              exists(/databases/$(database)/documents/users/$(request.auth.uid)) &&
              exists(/databases/$(database)/documents/partner_access/$(get(/databases/$(database)/documents/users/$(request.auth.uid)).data.tenantId + '_' + userId));
     }
 
-    function hasPartnerPermission(userId, permission) {
-      return isAuthenticated() && 
-             exists(/databases/$(database)/documents/users/$(request.auth.uid)) &&
-             exists(/databases/$(database)/documents/partner_access/$(get(/databases/$(database)/documents/users/$(request.auth.uid)).data.tenantId + '_' + userId)) &&
-             permission in get(/databases/$(database)/documents/partner_access/$(get(/databases/$(database)/documents/users/$(request.auth.uid)).data.tenantId + '_' + userId)).data.permissions;
+    // ===============================================================
+    // VALIDATION BLUEPRINTS
+    // ===============================================================
+
+    function isValidUser(data) {
+      let required = ['uid', 'email', 'tenantId', 'role'];
+      return data.keys().hasAll(required) &&
+             data.uid == request.auth.uid &&
+             data.email is string && data.email.size() < 256 &&
+             data.tenantId is string && data.tenantId.size() < 128 &&
+             data.role in ['admin', 'user', 'operator', 'mentor', 'agent', 'super_admin', 'editor', 'viewer'] &&
+             (!('sparkwavvId' in data) || data.sparkwavvId is string) &&
+             (!('createdAt' in data) || data.createdAt is timestamp);
     }
 
-    function isValidJourney(data) {
-      let allowedFields = ['id', 'userId', 'programId', 'status', 'currentStep', 'steps', 'startedAt', 'completedAt', 'tenantId'];
-      return hasRequiredFields(['id', 'userId', 'programId', 'tenantId']) &&
-             hasOnlyAllowedFields(allowedFields) &&
-             data.id is string && data.id.size() < 128 &&
-             data.userId is string && data.userId.size() < 128 &&
-             data.programId is string && data.programId.size() < 128 &&
-             data.tenantId is string && data.tenantId.size() < 64 &&
-             (!('status' in data) || data.status in ["active", "completed", "on-hold"]) &&
-             (!('startedAt' in data) || (resource == null ? isRecent(data.startedAt) : data.startedAt == resource.data.startedAt)) &&
-             (!('completedAt' in data) || (resource == null ? isRecent(data.completedAt) : data.completedAt == resource.data.completedAt));
+    function isValidWavvault(data) {
+      return data.keys().hasAll(['userId', 'tenantId']) &&
+             data.userId == request.auth.uid &&
+             data.tenantId is string &&
+             (!('strengths' in data) || (data.strengths is list && data.strengths.size() <= 50)) &&
+             (!('updatedAt' in data) || data.updatedAt is timestamp);
     }
 
-    function isValidSkylarGlobal(data) {
-      let allowedFields = ['id', 'version', 'lastUpdated', 'avatar', 'homeBenefits'];
-      return hasRequiredFields(allowedFields) &&
-             hasOnlyAllowedFields(allowedFields) &&
-             data.id == 'skylar_global' &&
-             data.version is string && data.version.size() < 50 &&
-             (resource == null ? isRecent(data.lastUpdated) : data.lastUpdated == resource.data.lastUpdated || isRecent(data.lastUpdated)) &&
-             data.avatar is map &&
-             'url' in data.avatar && data.avatar.url is string &&
-             'scale' in data.avatar && (data.avatar.scale is number) &&
-             data.homeBenefits is list;
+    function isValidDashboard(data) {
+      return data.keys().hasAll(['userId', 'tenantId']) &&
+             data.userId == request.auth.uid &&
+             data.tenantId is string &&
+             (!('careerHappiness' in data) || (data.careerHappiness is int && data.careerHappiness >= 0 && data.careerHappiness <= 100));
     }
 
-    function isValidJourneyStage(data) {
-      let allowedFields = ['stageId', 'stageTitle', 'description', 'systemPromptTemplate', 'requiredArtifacts', 'allowedModalities', 'theme', 'uiConfig', 'title'];
-      return hasRequiredFields(['stageId']) &&
-             hasOnlyAllowedFields(allowedFields) &&
-             data.stageId is string && data.stageId.size() < 100 &&
-             (!('stageTitle' in data) || (data.stageTitle is string && data.stageTitle.size() < 200)) &&
-             (!('title' in data) || (data.title is string && data.title.size() < 200)) &&
-             (!('description' in data) || (data.description is string && data.description.size() < 10000)) &&
-             (!('systemPromptTemplate' in data) || (data.systemPromptTemplate is string && data.systemPromptTemplate.size() < 100000)) &&
-             (!('requiredArtifacts' in data) || data.requiredArtifacts is list) &&
-             (!('allowedModalities' in data) || data.allowedModalities is map || data.allowedModalities is list) &&
-             (!('uiConfig' in data) || data.uiConfig is map) &&
-             (!('theme' in data) || data.theme is map);
+    function isValidArtifact(data) {
+      let required = ['id', 'userId', 'tenantId', 'filename', 'type', 'storagePath', 'createdAt'];
+      return data.keys().hasAll(required) &&
+             data.userId == request.auth.uid &&
+             data.id is string &&
+             data.createdAt is timestamp;
     }
 
     // ===============================================================
-    // Rules
+    // DOMAIN RULES
     // ===============================================================
 
-    // Default deny
-    match /{path=**} {
-      allow read, write: if false;
-    }
-
-    // Connectivity test path (Publicly readable for health checks)
+    // Connectivity test path
     match /_system_/connectivity_test {
       allow read: if true;
     }
 
+    match /users/{uid} {
+      allow get: if isOwner(uid) || isAdmin() || isPartnerOf(uid);
+      allow list: if isAdmin();
+      allow create: if isVerified() && isOwner(uid) && isValidUser(incoming());
+      allow update: if isVerified() && isOwner(uid) && 
+                      isValidUser(incoming()) &&
+                      incoming().uid == existing().uid &&
+                      incoming().tenantId == existing().tenantId &&
+                      (incoming().role == existing().role || isAdmin());
+    }
+
     match /admins/{uid} {
       allow read: if isOwner(uid) || isAdmin();
-      allow create: if isAdmin() && isValidAdmin(request.resource.data);
-      allow update: if isAdmin() && isValidAdmin(request.resource.data) && unchanged('uid') && unchanged('email');
-      allow delete: if isAdmin() && uid != request.auth.uid; // Prevent self-deletion
+      allow write: if isAdmin();
     }
 
     match /tenants/{tenantId} {
-      allow read: if isAuthenticated();
-      allow create: if isAdmin() && hasRequiredFields(['id', 'name', 'brand']);
-      allow update: if isAdmin() && unchanged('id');
-      allow delete: if isAdmin();
+      allow get: if isSignedIn();
+      allow list: if isSignedIn();
+      allow write: if isAdmin();
     }
 
-    match /users/{uid} {
-      allow read: if isOwner(uid) || isAdmin() || isPartnerOf(uid);
-      allow create: if isAuthenticated() && 
-                      isValidUser(request.resource.data) && 
-                      (isOwner(uid) || isAdmin()) &&
-                      (request.resource.data.role == 'user' || isAdmin());
-      allow update: if isAuthenticated() && 
-                      isValidUser(request.resource.data) && 
-                      (isOwner(uid) || isAdmin()) &&
-                      unchanged('uid') && unchanged('email') && unchanged('tenantId') &&
-                      (request.resource.data.role == resource.data.role || isAdmin());
+    match /dashboards/{userId} {
+      allow get: if isOwner(userId) || isAdmin() || isPartnerOf(userId);
+      allow list: if isAdmin();
+      allow create: if isVerified() && isOwner(userId) && isValidDashboard(incoming());
+      allow update: if isVerified() && isOwner(userId) && 
+                      isValidDashboard(incoming()) &&
+                      incoming().userId == existing().userId &&
+                      incoming().tenantId == existing().tenantId;
+    }
+
+    match /wavvault/{userId} {
+      allow get: if isOwner(userId) || isAdmin() || isPartnerOf(userId);
+      allow list: if isAdmin();
+      allow create: if isVerified() && isOwner(userId) && isValidWavvault(incoming());
+      allow update: if isVerified() && isOwner(userId) && 
+                      isValidWavvault(incoming()) &&
+                      incoming().userId == existing().userId &&
+                      incoming().tenantId == existing().tenantId;
+    }
+
+    match /artifacts/{artifactId} {
+      allow get: if isOwner(resource.data.userId) || isAdmin();
+      allow list: if isVerified() && resource.data.userId == request.auth.uid;
+      allow create: if isVerified() && isOwner(incoming().userId) && isValidArtifact(incoming());
+      allow delete: if isVerified() && isOwner(resource.data.userId);
     }
 
     match /metadata/{document=**} {
       allow read: if true;
-      allow write: if request.auth != null;
+      allow write: if isAdmin();
     }
 
     match /journey_stages/{stageId} {
       allow read: if true;
-      allow write: if isAdmin() && isValidJourneyStage(request.resource.data);
-    }
-
-    match /dashboards/{userId} {
-      allow read: if isOwner(userId) || isAdmin() || isPartnerOf(userId);
-      allow write: if (isOwner(userId) || isAdmin()) && 
-                      isValidDashboard(request.resource.data) &&
-                      unchanged('userId') && unchanged('tenantId');
-    }
-
-    match /wavvault/{userId} {
-      allow read: if isOwner(userId) || isAdmin() || isPartnerOf(userId);
-      allow write: if (isOwner(userId) || isAdmin()) && 
-                      isValidWavvault(request.resource.data) &&
-                      unchanged('userId') && unchanged('tenantId');
-    }
-
-    match /artifacts/{artifactId} {
-      allow read: if isOwner(resource.data.userId) || isAdmin();
-      allow create: if isAuthenticated() && 
-                      isOwner(request.resource.data.userId) && 
-                      isValidArtifact(request.resource.data);
-      allow update: if (isOwner(resource.data.userId) || isAdmin()) &&
-                      isValidArtifact(request.resource.data) &&
-                      unchanged('id') && unchanged('userId') && unchanged('tenantId') && unchanged('createdAt');
-      allow delete: if isOwner(resource.data.userId) || isAdmin();
+      allow write: if isAdmin();
     }
 
     match /programs/{programId} {
-      allow read: if isAuthenticated();
-      allow create: if isAdmin() && hasRequiredFields(['id', 'name', 'tenantId']);
-      allow update: if isAdmin() && unchanged('id') && unchanged('tenantId');
-      allow delete: if isAdmin();
+      allow read: if isSignedIn();
+      allow write: if isAdmin();
     }
 
     match /cohorts/{cohortId} {
-      allow read: if isAuthenticated();
-      allow create: if isAdmin() && hasRequiredFields(['id', 'programId', 'name', 'tenantId']);
-      allow update: if isAdmin() && unchanged('id') && unchanged('programId') && unchanged('tenantId');
-      allow delete: if isAdmin();
+      allow read: if isSignedIn();
+      allow write: if isAdmin();
     }
 
     match /journeys/{journeyId} {
-      allow read: if isOwner(resource.data.userId) || isAdmin();
-      allow create: if isAuthenticated() && 
-                      isOwner(request.resource.data.userId) && 
-                      isValidJourney(request.resource.data);
-      allow update: if (isOwner(resource.data.userId) || isAdmin()) &&
-                      isValidJourney(request.resource.data) &&
-                      unchanged('id') && unchanged('userId') && unchanged('programId') && unchanged('tenantId');
-      allow delete: if isAdmin();
+      allow get: if isOwner(resource.data.userId) || isAdmin();
+      allow list: if isVerified() && resource.data.userId == request.auth.uid;
+      allow create: if isVerified() && isOwner(incoming().userId);
+      allow update: if isVerified() && isOwner(existing().userId) && incoming().userId == existing().userId;
     }
 
+    // Interaction Collections
+    match /invitations/{invitationId} {
+      allow get: if isSignedIn() && (isOwner(resource.data.senderId) || request.auth.token.email == resource.data.recipientEmail || isAdmin());
+      allow list: if isVerified() && (resource.data.senderId == request.auth.uid || resource.data.recipientEmail == request.auth.token.email);
+      allow create: if isVerified() && isOwner(incoming().senderId);
+      allow update: if isVerified() && (isOwner(existing().senderId) || request.auth.token.email == resource.data.recipientEmail);
+    }
+
+    match /user_activities/{activityId} {
+      allow get: if isOwner(resource.data.userId) || isAdmin();
+      allow list: if isVerified() && resource.data.userId == request.auth.uid;
+      allow create: if isVerified() && isOwner(incoming().userId);
+    }
+
+    // Restricted Systems
     match /security_logs/{logId} {
       allow read: if isAdmin();
-      allow create: if isAuthenticated() && isValidSecurityLog(request.resource.data);
-    }
-
-    match /flagged_content/{contentId} {
-      allow read: if isOperator();
-      allow write: if isOperator() && isValidFlaggedContent(request.resource.data);
+      allow create: if isSignedIn();
     }
 
     match /system_logs/{logId} {
       allow read: if isAdmin();
-      allow create: if isAuthenticated() && isValidSystemLog(request.resource.data);
+      allow create: if isSignedIn();
     }
-
-    match /storage_metrics/{metricId} {
-      allow read: if isAdmin();
-      allow write: if isAdmin() && isValidStorageMetric(request.resource.data);
-    }
-
-    match /invitations/{invitationId} {
-      allow read: if isAuthenticated() && (isOwner(resource.data.senderId) || request.auth.token.email == resource.data.recipientEmail || isAdmin());
-      allow create: if isAuthenticated() && isOwner(request.resource.data.senderId) && isValidInvitation(request.resource.data);
-      allow update: if isAuthenticated() && 
-                      (isOwner(resource.data.senderId) || request.auth.token.email == resource.data.recipientEmail || isAdmin()) &&
-                      isValidInvitation(request.resource.data) &&
-                      unchanged('id') && unchanged('senderId') && unchanged('recipientEmail') && unchanged('createdAt');
-      allow delete: if isAuthenticated() && (isOwner(resource.data.senderId) || isAdmin());
-    }
-
+    
     match /partner_access/{accessId} {
       allow read: if isAuthenticated() && (isOwner(resource.data.userUid) || isCoachOf(resource.data.tenantId) || isAdmin());
-      allow create: if isAuthenticated() && (isOwner(request.resource.data.userUid) || isAdmin()) && isValidPartnerAccess(request.resource.data);
+      allow create: if isAuthenticated() && (isOwner(request.resource.data.userUid) || isAdmin());
       allow update: if isAdmin();
       allow delete: if isAuthenticated() && (isOwner(resource.data.userUid) || isAdmin());
-    }
-
-    match /partner_suggestions/{suggestionId} {
-      allow read: if isAuthenticated() && (isOwner(resource.data.userId) || isCoachOf(resource.data.partnerTenantId) || isAdmin());
-      allow create: if isAuthenticated() && 
-                      isCoachOf(request.resource.data.partnerTenantId) && 
-                      hasPartnerPermission(request.resource.data.userId, 'propose') &&
-                      isValidPartnerSuggestion(request.resource.data);
-      allow update: if isAuthenticated() && 
-                      (isOwner(resource.data.userId) || isCoachOf(resource.data.partnerTenantId) || isAdmin()) &&
-                      isValidPartnerSuggestion(request.resource.data);
-      allow delete: if isAdmin();
-    }
-
-    match /partner_applications/{applicationId} {
-      allow read: if isAdmin();
-      allow create: if isValidPartnerApplication(request.resource.data);
-      allow update: if isAdmin() && isValidPartnerApplication(request.resource.data);
-      allow delete: if isAdmin();
-    }
-
-    match /user_insights/{insightId} {
-      allow read: if isOwner(resource.data.userId) || isAdmin() || isPartnerOf(resource.data.userId);
-      allow create: if isAuthenticated() && isOwner(request.resource.data.userId) && isValidUserInsight(request.resource.data);
-      allow update: if (isOwner(resource.data.userId) || isAdmin()) && isValidUserInsight(request.resource.data) && unchanged('id') && unchanged('userId');
-      allow delete: if isAdmin();
-    }
-
-    match /user_assets/{assetId} {
-      allow read: if isOwner(resource.data.userId) || isAdmin();
-      allow create: if isAuthenticated() && isOwner(request.resource.data.userId) && isValidUserAsset(request.resource.data);
-      allow update: if (isOwner(resource.data.userId) || isAdmin()) && isValidUserAsset(request.resource.data) && unchanged('id') && unchanged('userId');
-      allow delete: if isOwner(resource.data.userId) || isAdmin();
-    }
-
-    match /brand_narratives/{userId} {
-      allow read: if isOwner(userId) || isAdmin();
-      allow write: if (isOwner(userId) || isAdmin()) && isValidBrandNarrative(request.resource.data) && unchanged('userId');
-    }
-
-    match /wavvault_events/{eventId} {
-      allow read: if isOwner(resource.data.userId) || isAdmin();
-      allow create: if isAuthenticated() && (isOwner(request.resource.data.userId) || isAdmin()) && isValidValidationGateEvent(request.resource.data);
-      allow update: if isAdmin();
-      allow delete: if isAdmin();
-    }
-
-    match /wavvault_artifacts/{artifactId} {
-      allow read: if isOwner(resource.data.userId) || isAdmin();
-      allow create: if isAuthenticated() && (isOwner(request.resource.data.userId) || isAdmin()) && isValidDistilledArtifact(request.resource.data);
-      allow update: if isAdmin();
-      allow delete: if isAdmin();
-    }
-
-    match /user_activities/{activityId} {
-      allow read: if isOwner(resource.data.userId) || isAdmin();
-      allow create: if isAuthenticated() && (isOwner(request.resource.data.userId) || isAdmin()) && isValidUserActivity(request.resource.data);
-      allow update: if isAdmin();
-      allow delete: if isAdmin();
-    }
-
-    match /journeyPhaseConfigs/{stageId} {
-      allow read: if true;
-      allow write: if isAdmin();
     }
   }
 }

@@ -1,10 +1,10 @@
-import discoveryengine from '@google-cloud/discoveryengine';
+import * as discoveryengine from '@google-cloud/discoveryengine';
 const { SearchServiceClient } = discoveryengine;
-import vertexai from '@google-cloud/vertexai';
+import * as vertexai from '@google-cloud/vertexai';
 const { VertexAI } = vertexai;
-import storagePkg from '@google-cloud/storage';
+import * as storagePkg from '@google-cloud/storage';
 const { Storage } = storagePkg;
-import aiplatform from '@google-cloud/aiplatform';
+import * as aiplatform from '@google-cloud/aiplatform';
 const { IndexServiceClient, IndexEndpointServiceClient, MatchServiceClient, GenAiTuningServiceClient, helpers } = aiplatform;
 import fs from 'fs';
 import path from 'path';

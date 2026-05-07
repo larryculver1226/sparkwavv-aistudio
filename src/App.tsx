@@ -3314,18 +3314,6 @@ export default function App() {
 
   return (
     <SkylarConfigProvider>
-      {!isFirebaseConfigured && (
-        <div className="fixed top-0 left-0 right-0 z-[10000] bg-red-600 px-4 py-1.5 flex items-center justify-center gap-3 text-white text-[10px] font-black uppercase tracking-widest shadow-2xl">
-          <ShieldAlert className="w-3 h-3 animate-pulse" />
-          <span>Sanitized Mode Active: Firebase Config Missing</span>
-          <button 
-            onClick={() => window.open('https://ai.studio/build', '_blank')}
-            className="ml-2 px-2 py-0.5 bg-white/20 hover:bg-white/30 rounded border border-white/30 transition-colors"
-          >
-            Configure Vault
-          </button>
-        </div>
-      )}
       <SEOManager />
       <ScrollToTop />
 

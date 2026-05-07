@@ -63,7 +63,7 @@ import { getGeminiApiKey } from './src/services/aiConfig.js';
 import { vertexService } from './backend/services/vertexService.js';
 import { initializeMcpClient } from './backend/services/mcpBridge.js';
 import { methodologyGenerator } from './src/utils/methodologyGenerator.js';
-import discoveryengine from '@google-cloud/discoveryengine';
+import * as discoveryengine from '@google-cloud/discoveryengine';
 const { DocumentServiceClient } = discoveryengine;
 import { sccService } from './backend/services/sccService';
 import { artifactAnalysisService } from './backend/services/artifactAnalysisService';

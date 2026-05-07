@@ -1,8 +1,8 @@
-import discoveryengine from '@google-cloud/discoveryengine';
+import * as discoveryengine from '@google-cloud/discoveryengine';
 const { EngineServiceClient, DataStoreServiceClient } = discoveryengine;
-import aiplatform from '@google-cloud/aiplatform';
+import * as aiplatform from '@google-cloud/aiplatform';
 const { EndpointServiceClient } = aiplatform;
-import storagePkg from '@google-cloud/storage';
+import * as storagePkg from '@google-cloud/storage';
 const { Storage } = storagePkg;
 
 const PROJECT_ID = process.env.VERTEX_AI_PROJECT_ID || process.env.FIREBASE_PROJECT_ID;
