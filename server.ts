@@ -3829,7 +3829,7 @@ async function startServer() {
           }
 
           const response = await ai.models.generateContent({
-            model: modelId || 'gemini-2.5-flash-image',
+            model: modelId || 'gemini-2.0-flash',
             contents: { parts },
           });
 
@@ -3898,7 +3898,7 @@ async function startServer() {
           `;
 
           const response = await ai.models.generateContent({
-            model: 'gemini-2.5-flash',
+            model: 'gemini-2.0-flash',
             contents: [{ parts: [{ text: prompt }] }],
             config: {
               tools: [{ urlContext: {} }] as Array<any>,
@@ -4657,7 +4657,7 @@ async function startServer() {
         })).optional().default([])
       });
 
-      let activeTargetModel = 'googleai/gemini-2.5-flash';
+      let activeTargetModel = 'googleai/gemini-2.0-flash';
       if (!process.env.GEMINI_API_KEY && process.env.VERTEX_AI_PROJECT_ID) activeTargetModel = 'vertexai/gemini-1.5-flash';
 
       const { output } = await ai.generate({

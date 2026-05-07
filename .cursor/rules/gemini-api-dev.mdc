@@ -15,7 +15,7 @@ const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
 ## Text Generation
 ```typescript
 const response = await ai.models.generateContent({
-  model: 'gemini-2.5-flash',
+  model: 'gemini-2.0-flash',
   contents: 'Tell me a joke.',
 });
 console.log(response.text);
@@ -26,7 +26,7 @@ console.log(response.text);
 import { Type } from '@google/genai';
 
 const response = await ai.models.generateContent({
-  model: 'gemini-2.5-flash',
+  model: 'gemini-2.0-flash',
   contents: 'List 3 colors.',
   config: {
     responseMimeType: 'application/json',

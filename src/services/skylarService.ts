@@ -904,7 +904,7 @@ class SkylarService {
     userId: string,
     style: string,
     referencePhoto?: string,
-    modelId: string = 'gemini-2.5-flash-image'
+    modelId: string = 'gemini-2.0-flash'
   ): Promise<string> {
     const token = await auth.currentUser?.getIdToken();
     try {

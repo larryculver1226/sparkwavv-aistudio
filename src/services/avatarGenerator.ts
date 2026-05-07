@@ -14,7 +14,7 @@ export async function generateSkylarOptions(imageBuffer: string) {
 
   for (const prompt of prompts) {
     const response = await ai.models.generateContent({
-      model: 'gemini-2.5-flash-image',
+      model: 'gemini-2.0-flash',
       contents: {
         parts: [
           {

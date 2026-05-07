@@ -199,7 +199,7 @@ const skylarTools = [
 async function agentNode(state: SkylarGraphState) {
   const apiKey = getGeminiApiKey();
   const llm = new ChatGoogleGenerativeAI({
-    model: 'gemini-2.5-flash',
+    model: 'gemini-2.0-flash',
     apiKey,
     temperature: 0.7,
   }).bindTools(skylarTools);

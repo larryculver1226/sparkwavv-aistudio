@@ -28,7 +28,7 @@ export const EveningSpark: React.FC<{ currentStage: string }> = ({ currentStage 
       }
 
       const ai = new GoogleGenAI({ apiKey });
-      const model = 'gemini-2.5-flash';
+      const model = 'gemini-2.0-flash';
 
       const prompt = `
         You are the Sparkwavv AI Companion, Skylar. 

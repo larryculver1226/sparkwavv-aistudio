@@ -13,7 +13,7 @@ async function generate() {
 
   for (let i = 0; i < prompts.length; i++) {
     const response = await ai.models.generateContent({
-      model: 'gemini-2.5-flash-image',
+      model: 'gemini-2.0-flash',
       contents: {
         parts: [
           {

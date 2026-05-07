@@ -115,7 +115,7 @@ export const HighFidelitySynthesisLab: React.FC = () => {
     if (!user?.uid) return;
     setLoading(true);
     try {
-      const modelId = useHighFidelity ? 'gemini-3.1-flash-image-preview' : 'gemini-2.5-flash-image';
+      const modelId = 'gemini-2.0-flash';
 
       if (useHighFidelity && window.aistudio) {
         const hasKey = await window.aistudio.hasSelectedApiKey();
