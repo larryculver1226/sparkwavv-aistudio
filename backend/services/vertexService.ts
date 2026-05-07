@@ -260,7 +260,7 @@ export class VertexService {
     } catch (error: any) {
       console.warn('[VERTEX MEDLM ERROR] Falling back to Gemini Pro:', error.message || error);
       try {
-        const fallbackModel = ai.getGenerativeModel({ model: 'gemini-1.5-pro' });
+        const fallbackModel = ai.getGenerativeModel({ model: 'gemini-2.0-flash' });
         const result = await fallbackModel.generateContent(`[Healthcare Context] ${enhancedPrompt}`);
         const response = await result.response;
         return response.candidates?.[0]?.content?.parts?.[0]?.text || null;
@@ -460,7 +460,7 @@ export class VertexService {
     const endpointId = process.env.VERTEX_AI_LOBKOWICZ_ENDPOINT_ID;
     const modelPath = endpointId 
       ? `projects/${PROJECT_ID}/locations/${LOCATION}/endpoints/${endpointId}`
-      : 'gemini-1.5-flash-002';
+      : 'gemini-2.0-flash';
 
     const generativeModel = ai.getGenerativeModel({
       model: modelPath,
@@ -587,7 +587,7 @@ export class VertexService {
   /**
    * Create a Vertex AI Tuning Job (Phase 2)
    */
-  async createTuningJob(gcsUri: string, modelName: string = 'gemini-1.5-flash-002') {
+  async createTuningJob(gcsUri: string, modelName: string = 'gemini-2.0-flash') {
     if (!PROJECT_ID) throw new Error('Project ID missing');
     
     const client = getTuningClient();

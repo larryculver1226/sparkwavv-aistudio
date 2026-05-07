@@ -31,7 +31,7 @@ const isVertexAvailable =
 const targetModel = activeGeminiKey
   ? 'googleai/gemini-2.0-flash'
   : isVertexAvailable
-    ? 'vertexai/gemini-1.5-flash'
+    ? 'vertexai/gemini-2.0-flash'
     : 'googleai/gemini-2.0-flash';
 
 const vertexConfig: any = {
@@ -466,7 +466,7 @@ export const analyzeDiscoveryLaunchpadTool = ai.defineTool(
     } catch (e) {}
 
     let activeTargetModel = 'googleai/gemini-2.0-flash';
-    if (!process.env.GEMINI_API_KEY && process.env.VERTEX_AI_PROJECT_ID) activeTargetModel = 'vertexai/gemini-1.5-flash';
+    if (!process.env.GEMINI_API_KEY && process.env.VERTEX_AI_PROJECT_ID) activeTargetModel = 'vertexai/gemini-2.0-flash';
 
     try {
       // Phase 4: Model Armor Integration - Input Sanitization
@@ -531,7 +531,7 @@ export const generateNarrativeStoriesTool = ai.defineTool(
     } catch (e) {}
 
     let activeTargetModel = 'googleai/gemini-2.0-flash';
-    if (!process.env.GEMINI_API_KEY && process.env.VERTEX_AI_PROJECT_ID) activeTargetModel = 'vertexai/gemini-1.5-flash';
+    if (!process.env.GEMINI_API_KEY && process.env.VERTEX_AI_PROJECT_ID) activeTargetModel = 'vertexai/gemini-2.0-flash';
 
     try {
       // Model Armor Integration
@@ -598,7 +598,7 @@ export const modelFutureVisionTool = ai.defineTool(
     } catch (e) {}
 
     let activeTargetModel = 'googleai/gemini-2.0-flash';
-    if (!process.env.GEMINI_API_KEY && process.env.VERTEX_AI_PROJECT_ID) activeTargetModel = 'vertexai/gemini-1.5-flash';
+    if (!process.env.GEMINI_API_KEY && process.env.VERTEX_AI_PROJECT_ID) activeTargetModel = 'vertexai/gemini-2.0-flash';
 
     try {
       // Model Armor Integration
@@ -660,7 +660,7 @@ export const optimizeProductivityPlanTool = ai.defineTool(
     } catch (e) {}
 
     let activeTargetModel = 'googleai/gemini-2.0-flash';
-    if (!process.env.GEMINI_API_KEY && process.env.VERTEX_AI_PROJECT_ID) activeTargetModel = 'vertexai/gemini-1.5-flash';
+    if (!process.env.GEMINI_API_KEY && process.env.VERTEX_AI_PROJECT_ID) activeTargetModel = 'vertexai/gemini-2.0-flash';
 
     try {
       // Model Armor Integration
@@ -720,7 +720,7 @@ export const buildCareerPersonaTool = ai.defineTool(
     } catch (e) {}
 
     let activeTargetModel = 'googleai/gemini-2.0-flash';
-    if (!process.env.GEMINI_API_KEY && process.env.VERTEX_AI_PROJECT_ID) activeTargetModel = 'vertexai/gemini-1.5-flash';
+    if (!process.env.GEMINI_API_KEY && process.env.VERTEX_AI_PROJECT_ID) activeTargetModel = 'vertexai/gemini-2.0-flash';
 
     try {
       // Model Armor Integration
@@ -784,7 +784,7 @@ export const architectBrandIdentityTool = ai.defineTool(
     } catch (e) {}
 
     let activeTargetModel = 'googleai/gemini-2.0-flash';
-    if (!process.env.GEMINI_API_KEY && process.env.VERTEX_AI_PROJECT_ID) activeTargetModel = 'vertexai/gemini-1.5-flash';
+    if (!process.env.GEMINI_API_KEY && process.env.VERTEX_AI_PROJECT_ID) activeTargetModel = 'vertexai/gemini-2.0-flash';
 
     try {
       // Model Armor Integration
@@ -2848,7 +2848,7 @@ export const runJourneyStageFlow = ai.defineFlow(
           console.warn(
             '[Skylar] Invalid Gemini API Key detected but Vertex AI is configured. Falling back to Vertex AI.'
           );
-          activeTargetModel = 'vertexai/gemini-1.5-flash';
+          activeTargetModel = 'vertexai/gemini-2.0-flash';
         }
       }
 
