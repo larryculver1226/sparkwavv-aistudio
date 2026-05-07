@@ -12,7 +12,7 @@ export interface ProbeResult {
  */
 export async function probeFirebaseKeyForGeminiAccess(): Promise<ProbeResult> {
   const firebaseApiKey = firebaseConfig.apiKey;
-  const probeModel = 'gemini-1.5-flash';
+  const probeModel = 'gemini-2.0-flash';
   // Using countTokens as a harmless, low-latency probe
   const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${probeModel}:countTokens?key=${firebaseApiKey}`;
 

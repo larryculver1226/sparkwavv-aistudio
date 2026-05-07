@@ -3771,7 +3771,7 @@ async function startServer() {
           const voiceName = PERSONA_CONFIG[persona]?.voice || 'Kore';
 
           const response = await ai.models.generateContent({
-            model: 'gemini-3.1-flash-tts-preview',
+            model: 'gemini-2.0-flash',
             contents: [{ parts: [{ text }] }],
             config: {
               responseModalities: [Modality.AUDIO],
@@ -4000,7 +4000,7 @@ async function startServer() {
               'Please read this document carefully and extract all its text content. Output ONLY the raw text without any markdown or formatting blocks.';
 
             const response = await ai.models.generateContent({
-              model: 'gemini-1.5-flash',
+              model: 'gemini-2.0-flash',
               contents: [
                 {
                   role: 'user',
@@ -4658,7 +4658,7 @@ async function startServer() {
       });
 
       let activeTargetModel = 'googleai/gemini-2.0-flash';
-      if (!process.env.GEMINI_API_KEY && process.env.VERTEX_AI_PROJECT_ID) activeTargetModel = 'vertexai/gemini-1.5-flash';
+      if (!process.env.GEMINI_API_KEY && process.env.VERTEX_AI_PROJECT_ID) activeTargetModel = 'vertexai/gemini-2.0-flash';
 
       const { output } = await ai.generate({
         model: activeTargetModel,
@@ -5750,7 +5750,7 @@ async function startServer() {
       return res.json({ status: 'missing', message: 'GOOGLE_MAPS_API_KEY not found in environment.' });
     }
 
-    const probeModel = 'gemini-1.5-flash';
+    const probeModel = 'gemini-2.0-flash';
     const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${probeModel}:countTokens?key=${apiKey}`;
 
     try {

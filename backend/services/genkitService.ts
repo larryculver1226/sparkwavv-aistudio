@@ -3156,7 +3156,7 @@ export const analyzeWavvaultArtifactFlow = ai.defineFlow(
       return { title: 'Security Alert', extractedSkills: [], industryRelevance: 'Content blocked by safety policy.', documentSummary: 'Blocked.' };
     }
 
-    let activeTargetModel = 'googleai/gemini-1.5-flash';
+    let activeTargetModel = 'googleai/gemini-2.0-flash';
     if (!process.env.GEMINI_API_KEY && process.env.VERTEX_AI_PROJECT_ID) {
       activeTargetModel = 'vertexai/gemini-1.5-flash';
     }
