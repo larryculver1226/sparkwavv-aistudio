@@ -532,12 +532,42 @@ let adminDb: any;
 let db: any;
 let sparkwavvAdmin: admin.app.App | null = null;
 
+// Log status to a file for diagnostics - moved up so it can be updated during init
+const envStatus: any = {
+  VITE_FIREBASE_API_KEY: firebaseAppletConfig.apiKey || process.env.VITE_FIREBASE_API_KEY || '',
+  VITE_FIREBASE_AUTH_DOMAIN:
+    firebaseAppletConfig.authDomain || process.env.VITE_FIREBASE_AUTH_DOMAIN || '',
+  VITE_FIREBASE_PROJECT_ID:
+    firebaseAppletConfig.projectId || process.env.VITE_FIREBASE_PROJECT_ID || '',
+  VITE_FIREBASE_STORAGE_BUCKET:
+    firebaseAppletConfig.storageBucket || process.env.VITE_FIREBASE_STORAGE_BUCKET || '',
+  VITE_FIREBASE_MESSAGING_SENDER_ID:
+    firebaseAppletConfig.messagingSenderId || process.env.VITE_FIREBASE_MESSAGING_SENDER_ID || '',
+  VITE_FIREBASE_APP_ID: firebaseAppletConfig.appId || process.env.VITE_FIREBASE_APP_ID || '',
+  FIREBASE_PROJECT_ID: firebaseAppletConfig.projectId || process.env.FIREBASE_PROJECT_ID || '',
+  FIREBASE_CLIENT_EMAIL: process.env.FIREBASE_CLIENT_EMAIL || '',
+  FIREBASE_PRIVATE_KEY: process.env.FIREBASE_PRIVATE_KEY ? 'PRESENT' : 'MISSING',
+  FIREBASE_SERVICE_ACCOUNT_SOURCE: 'INDIVIDUAL_VARS',
+  USER_COUNT: 0,
+  AUTH_STATUS: 'PENDING',
+  FIRESTORE_STATUS: 'PENDING',
+};
+
 // Single Project Initialization (gen-lang-client-0883822731)
 try {
   const serviceAccountJson = process.env.FIREBASE_SERVICE_ACCOUNT_JSON;
-  if (serviceAccountJson) {
+  if (serviceAccountJson && !serviceAccountJson.includes('placeholder')) {
     console.log(`[AUTH] Initializing Firebase Admin via FIREBASE_SERVICE_ACCOUNT_JSON`);
     const serviceAccount = JSON.parse(serviceAccountJson);
+    
+    const projectId = serviceAccount.project_id;
+    const clientEmail = serviceAccount.client_email;
+
+    // Update envStatus for diagnostics
+    envStatus.FIREBASE_PROJECT_ID = projectId;
+    envStatus.FIREBASE_CLIENT_EMAIL = clientEmail;
+    envStatus.FIREBASE_PRIVATE_KEY = serviceAccount.private_key ? 'PRESENT' : 'MISSING';
+    envStatus.FIREBASE_SERVICE_ACCOUNT_SOURCE = 'JSON_BLOB';
 
     // Normalize private key newlines inside the parsed service account
     if (serviceAccount && serviceAccount.private_key) {
@@ -546,7 +576,7 @@ try {
 
     sparkwavvAdmin = admin.initializeApp({
       credential: admin.credential.cert(serviceAccount),
-      projectId: serviceAccount.project_id,
+      projectId: projectId,
     });
     isFirebaseAdminConfigured = true;
 
@@ -562,6 +592,8 @@ try {
       if (databaseId === 'default') databaseId = '(default)';
     }
 
+    console.log(`[AUTH] Project: ${projectId}, Database: ${databaseId || '(default)'}`);
+
     sparkwavvDb = (databaseId && databaseId !== '(default)')
       ? getFirestore(sparkwavvAdmin, databaseId)
       : getFirestore(sparkwavvAdmin);
@@ -569,8 +601,12 @@ try {
 
     // Connectivity Check
     db.collection('test').doc('connection').get()
-      .then(() => console.log(`[AUTH] Firestore connectivity check successful for ${databaseId || '(default)'}.`))
+      .then(() => {
+        console.log(`[AUTH] Firestore connectivity check successful for ${databaseId || '(default)'}.`);
+        envStatus.FIRESTORE_STATUS = 'OK (Init)';
+      })
       .catch((err) => {
+        envStatus.FIRESTORE_STATUS = `ERROR (Init): ${err.message}`;
         if (err.message.includes('permission') || err.code === 7) {
           console.warn(`[AUTH] Firestore PERMISSION_DENIED on ${databaseId || '(default)'}. Rules or Service Account may be restrictive.`);
         } else if (err.code === 5 || err.message.includes('NOT_FOUND')) {
@@ -651,6 +687,12 @@ try {
           clientEmail,
           privateKey: processedKey,
         });
+
+        // Sync envStatus for Individual Vars diagnostic
+        envStatus.FIREBASE_PROJECT_ID = projectId;
+        envStatus.FIREBASE_CLIENT_EMAIL = clientEmail;
+        envStatus.FIREBASE_PRIVATE_KEY = 'PRESENT';
+        envStatus.FIREBASE_SERVICE_ACCOUNT_SOURCE = 'INDIVIDUAL_VARS';
 
         // Diagnostic: Check if we are trying to access a project that doesn't match the service account
         let keyProjectId = projectId;
@@ -750,24 +792,7 @@ async function withTimeout<T>(promise: Promise<T>, timeoutMs: number = 15000): P
 }
 
 // Log status to a file for diagnostics
-const envStatus: any = {
-  VITE_FIREBASE_API_KEY: firebaseAppletConfig.apiKey || process.env.VITE_FIREBASE_API_KEY || '',
-  VITE_FIREBASE_AUTH_DOMAIN:
-    firebaseAppletConfig.authDomain || process.env.VITE_FIREBASE_AUTH_DOMAIN || '',
-  VITE_FIREBASE_PROJECT_ID:
-    firebaseAppletConfig.projectId || process.env.VITE_FIREBASE_PROJECT_ID || '',
-  VITE_FIREBASE_STORAGE_BUCKET:
-    firebaseAppletConfig.storageBucket || process.env.VITE_FIREBASE_STORAGE_BUCKET || '',
-  VITE_FIREBASE_MESSAGING_SENDER_ID:
-    firebaseAppletConfig.messagingSenderId || process.env.VITE_FIREBASE_MESSAGING_SENDER_ID || '',
-  VITE_FIREBASE_APP_ID: firebaseAppletConfig.appId || process.env.VITE_FIREBASE_APP_ID || '',
-  FIREBASE_PROJECT_ID: firebaseAppletConfig.projectId || process.env.FIREBASE_PROJECT_ID || '',
-  FIREBASE_CLIENT_EMAIL: process.env.FIREBASE_CLIENT_EMAIL || '',
-  FIREBASE_PRIVATE_KEY: process.env.FIREBASE_PRIVATE_KEY ? 'PRESENT' : 'MISSING',
-  USER_COUNT: 0,
-  AUTH_STATUS: 'OK',
-  FIRESTORE_STATUS: 'OK',
-};
+// Moved to top of server.ts
 
 import { skylar } from './src/services/skylarService';
 
@@ -5953,12 +5978,14 @@ async function runConnectivityChecks() {
     try {
       const listUsersResult = await withTimeout(sparkwavvAdmin.auth().listUsers(), 15000);
       envStatus.USER_COUNT = listUsersResult.users.length;
+      envStatus.AUTH_STATUS = 'OK';
       console.log(`[AUTH] Firebase Auth connected. Found ${envStatus.USER_COUNT} users.`);
 
       const db = getFirestoreDb();
       let fsUsers: any[] = [];
       if (db) {
         const snapshot = (await withTimeout(db.collection('users').get(), 15000)) as any;
+        envStatus.FIRESTORE_STATUS = 'OK';
         fsUsers = snapshot.docs.map((d: any) => ({ uid: d.id, ...d.data() }));
         console.log(
           `[FIRESTORE] Connectivity check successful. Found ${snapshot.size} users in 'users' collection.`

@@ -1,6 +1,10 @@
 {
+  "apiKey": "PLACEHOLDER",
+  "authDomain": "PLACEHOLDER",
   "projectId": "sparkwavv-prod",
-  "appId": "sparkwavv-prod",
   "storageBucket": "sparkwavv-prod.firebasestorage.app",
+  "messagingSenderId": "PLACEHOLDER",
+  "appId": "sparkwavv-prod",
+  "measurementId": "PLACEHOLDER",
   "firestoreDatabaseId": "(default)"
 }

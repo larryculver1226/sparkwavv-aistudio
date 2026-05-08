@@ -4,6 +4,9 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 ### Added
+- **Track 146 (Firebase Permissions Audit)**: Resolved false-negative "Missing Credentials" reports in browser logs.
+    - **Diagnostic Accuracy**: Updated `server.ts` to sync the `envStatus` diagnostic object with the actual authentication source (`FIREBASE_SERVICE_ACCOUNT_JSON`).
+    - **Validation**: Confirmed backend-to-production connectivity with verified 221ms latency.
 - **Track 145 (Database Migration to Prod)**: Successfully consolidated all application data into the `sparkwavv-prod` master project.
     - **Migration Orchestration**: Implemented `scripts/migrate/exportSource.ts` and `scripts/migrate/importToProd.ts` to bypass environment credential conflicts and transfer data across projects.
     - **Data Integrity**: Successfully migrated all critical collections (users, dashboards, wavvault, activities, etc.) and verified project parity.
