@@ -2585,6 +2585,7 @@ export const runJourneyStageFlow = ai.defineFlow(
         }
       );
     } catch (error) {
+      console.error('[Skylar] Skylar chat GENKIT error:', error);
       // Gracefully handle invalid API keys by catching specific error strings from Google AI and Genkit
       const errorString = error instanceof Error ? error.message : String(error);
       let activeTargetModel = targetModel;
@@ -2608,6 +2609,7 @@ export const runJourneyStageFlow = ai.defineFlow(
           );
           
           try {
+            console.log(`[Skylar] Triggering MCP Fallback for user message...`);
             const mcpResult = await mcpRegistry.generateContent({
               role: "Skylar Assistant (Strategic Resilience Mode)",
               prompt: userContent.map(c => c.text || JSON.stringify(c)).join('\n'),
@@ -2617,12 +2619,16 @@ export const runJourneyStageFlow = ai.defineFlow(
               }))
             });
 
+            console.log('[Skylar] MCP Fallback succeeded. Model:', mcpResult.model);
             return {
               text: mcpResult.text,
               executedActions: [],
             };
-          } catch (mcpError) {
-            console.error('[Skylar] Emergency MCP Fallback also failed:', mcpError);
+          } catch (mcpError: any) {
+            console.error('[Skylar] Emergency MCP Fallback also failed:', mcpError.message || mcpError);
+            if (mcpError.message?.includes('referer <empty>')) {
+              console.error('[Skylar] DETECTED REF BLOCK in MCP. Headers might not be propagating correctly.');
+            }
             return {
               text: "I'm currently experiencing connectivity issues with my primary intelligence systems. This is often caused by an expired or invalid API key in the project settings. Please refresh your Gemini API Key in AI Studio to restore full functionality.",
               executedActions: [],

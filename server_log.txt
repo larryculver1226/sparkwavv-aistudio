@@ -1,0 +1,30 @@
+
+node:internal/modules/run_main:123
+    triggerUncaughtException(
+    ^
+Error [ERR_MODULE_NOT_FOUND]: Cannot find module '/app/applet/server.ts' imported from /app/applet/
+    at finalizeResolution (node:internal/modules/esm/resolve:275:11)
+    at moduleResolve (node:internal/modules/esm/resolve:861:10)
+    at defaultResolve (node:internal/modules/esm/resolve:985:11)
+    at nextResolve (node:internal/modules/esm/hooks:748:28)
+    at resolveBase (file:///root/.npm/_npx/fd45a72a545557e9/node_modules/tsx/dist/esm/index.mjs?1778261963788:2:3744)
+    at resolveDirectory (file:///root/.npm/_npx/fd45a72a545557e9/node_modules/tsx/dist/esm/index.mjs?1778261963788:2:4243)
+    at resolveTsPaths (file:///root/.npm/_npx/fd45a72a545557e9/node_modules/tsx/dist/esm/index.mjs?1778261963788:2:4984)
+    at resolve (file:///root/.npm/_npx/fd45a72a545557e9/node_modules/tsx/dist/esm/index.mjs?1778261963788:2:5361)
+    at nextResolve (node:internal/modules/esm/hooks:748:28)
+    at Hooks.resolve (node:internal/modules/esm/hooks:240:30) {
+  code: 'ERR_MODULE_NOT_FOUND',
+  url: 'file:///app/applet/server.ts'
+}
+
+Node.js v22.22.2
+npm notice
+npm notice New major version of npm available! 10.9.7 -> 11.14.0
+npm notice Changelog: https://github.com/npm/cli/releases/tag/v11.14.0
+npm notice To update run: npm install -g npm@11.14.0
+npm notice
+npm notice
+npm notice New major version of npm available! 10.9.7 -> 11.14.0
+npm notice Changelog: https://github.com/npm/cli/releases/tag/v11.14.0
+npm notice To update run: npm install -g npm@11.14.0
+npm notice

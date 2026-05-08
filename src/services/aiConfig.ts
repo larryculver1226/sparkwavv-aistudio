@@ -8,7 +8,7 @@ export const getGeminiApiKey = () => {
     // process.env might not be available
   }
 
-  const keysToTry = ['GEMINI_API_KEY', 'GOOGLE_API_KEY', 'GOOGLE_GENAI_API_KEY', 'VITE_GEMINI_API_KEY', 'API_KEY'];
+  const keysToTry = ['API_KEY', 'VITE_GEMINI_API_KEY', 'GOOGLE_AI_API_KEY', 'GOOGLE_GENAI_API_KEY', 'GOOGLE_API_KEY', 'GEMINI_API_KEY'];
   let key = '';
   let foundSource = 'NONE';
   let firebaseKey = env.VITE_FIREBASE_API_KEY || '';

@@ -1,9 +1,9 @@
 import http from 'http';
 
 const postData = JSON.stringify({
-  userId: "user123",
-  stageId: "some-stage",
-  message: "Test message"
+  userId: "realActor",
+  stageId: "dive-in",
+  message: "Hello Skylar"
 });
 
 const req = http.request({
@@ -13,7 +13,8 @@ const req = http.request({
   method: 'POST',
   headers: {
     'Content-Type': 'application/json',
-    'Content-Length': Buffer.byteLength(postData)
+    'Content-Length': Buffer.byteLength(postData),
+    'custom-auth-bypass-test': 'realActor'
   }
 }, (res) => {
   let data = '';
