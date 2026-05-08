@@ -19,8 +19,21 @@ try {
 }
 
 const getDb = () => {
-  const databaseId = firebaseAppletConfig.firestoreDatabaseId;
+  const envDbId = process.env.VITE_FIREBASE_DATABASE_ID || process.env.FIREBASE_DATABASE_ID;
+  const configDbId = firebaseAppletConfig.firestoreDatabaseId;
+  
+  let databaseId = envDbId || configDbId;
+  
   if (databaseId) {
+    if (typeof databaseId === 'string') {
+      databaseId = databaseId.trim().replace(/^["']|["']$/g, '');
+      if (databaseId === 'default' || databaseId === '') {
+        databaseId = '(default)';
+      }
+    }
+  }
+
+  if (databaseId && databaseId !== '(default)') {
     return getFirestore(admin.app(), databaseId);
   }
   return getFirestore(admin.app());

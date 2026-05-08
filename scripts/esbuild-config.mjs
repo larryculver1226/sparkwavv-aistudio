@@ -19,11 +19,25 @@ export const config = {
   },
   publicPath: '/', // for the loader
   define: {
-    'process.env.NODE_ENV': JSON.stringify(process.env.NODE_ENV || 'development'),
+    'process.env.NODE_ENV': JSON.stringify(process.env.NODE_ENV || 'production'),
     ...Object.keys(process.env).filter(key => key.startsWith('VITE_') && !/PRIVATE_KEY|SECRET|CREDENTIAL|SERVICE_ACCOUNT/i.test(key)).reduce((acc, key) => {
       acc[`process.env.${key}`] = JSON.stringify(process.env[key]);
+      acc[`import.meta.env.${key}`] = JSON.stringify(process.env[key]);
       return acc;
     }, {}),
+    'process.env': JSON.stringify(
+      Object.keys(process.env)
+        .filter(key => key.startsWith('VITE_') || key === 'NODE_ENV')
+        .reduce((acc, key) => ({ ...acc, [key]: process.env[key] }), {})
+    ),
+    'import.meta.env': JSON.stringify(
+      Object.keys(process.env)
+        .filter(key => key.startsWith('VITE_') || key === 'NODE_ENV')
+        .reduce((acc, key) => ({ ...acc, [key]: process.env[key], MODE: process.env.NODE_ENV || 'production', PROD: process.env.NODE_ENV === 'production', DEV: process.env.NODE_ENV !== 'production' }), {})
+    ),
+    'import.meta.env.MODE': JSON.stringify(process.env.NODE_ENV || 'production'),
+    'import.meta.env.PROD': JSON.stringify(process.env.NODE_ENV === 'production'),
+    'import.meta.env.DEV': JSON.stringify(process.env.NODE_ENV !== 'production'),
     // some react packages expect `global`
     'global': 'window'
   },

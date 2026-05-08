@@ -63,24 +63,31 @@ const testFirestore = async () => {
       await authPromise;
 
       console.log('🛡️ [Main] Testing Firestore connection...');
+      console.log('🛡️ [Main] Target Database ID:', db.databaseId || '(unknown)');
+      console.log('🛡️ [Main] Target Project ID:', db.app.options.projectId);
 
       try {
         // Try named database first
-        await getDocFromServer(doc(db, '_system_', 'connectivity_test'));
+        const testDocRef = doc(db, 'users', 'connectivity_test');
+        console.log('🛡️ [Main] Fetching doc from path:', testDocRef.path);
+        await getDocFromServer(testDocRef);
         console.log('🛡️ [Main] Firestore connection successful (Named Database).');
       } catch (namedError: any) {
         console.warn('⚠️ [Main] Named database failed:', namedError.message);
+        console.error('❌ [Main] Error Code:', namedError.code);
 
         if (
           namedError.message?.includes('offline') ||
-          namedError.message?.includes('unavailable')
+          namedError.message?.includes('unavailable') ||
+          namedError.message?.includes('permission')
         ) {
           console.log('🛡️ [Main] Attempting fallback to (default) database...');
           try {
-            await getDocFromServer(doc(dbDefault, '_system_', 'connectivity_test'));
+            await getDocFromServer(doc(dbDefault, 'users', 'connectivity_test'));
             console.log('🛡️ [Main] Firestore connection successful (Default Database).');
           } catch (defaultError: any) {
             console.error('❌ [Main] Default database also failed:', defaultError.message);
+            console.error('❌ [Main] Error Code:', defaultError.code);
             throw defaultError;
           }
         } else {

@@ -29,9 +29,12 @@ const getEnvVar = (viteVal: string | undefined, processKey: string, jsonFallback
 
   // Final sanitization check before returning
   if (val && typeof val === 'string') {
-    const trimmed = val.trim();
-    if (trimmed !== '' && !trimmed.includes('PLACEHOLDER') && !trimmed.startsWith('$$')) {
-      return trimmed;
+    let sanitized = val.trim();
+    // Remove wrapping quotes if they exist
+    sanitized = sanitized.replace(/^["']|["']$/g, '');
+    
+    if (sanitized !== '' && !sanitized.includes('PLACEHOLDER') && !sanitized.startsWith('$$')) {
+      return sanitized;
     }
   }
 

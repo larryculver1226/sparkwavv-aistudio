@@ -82,15 +82,26 @@ try {
   const rawDatabaseId = getViteEnv('VITE_FIREBASE_DATABASE_ID') || firebaseConfig.firestoreDatabaseId;
   let databaseId = rawDatabaseId && !rawDatabaseId.startsWith('PLACEHOLDER') ? rawDatabaseId : '(default)';
   
-  // Normalize 'default' to '(default)' for Firestore Enterprise compatibility
-  if (databaseId === 'default') {
-    databaseId = '(default)';
+  // Robust normalization for 'default' -> '(default)'
+  if (typeof databaseId === 'string') {
+    databaseId = databaseId.trim().replace(/^["']|["']$/g, '');
+    if (databaseId === 'default' || databaseId === '') {
+      databaseId = '(default)';
+    }
   }
+
+  console.log('🛡️ [Firebase] Selected Database ID:', databaseId);
+  console.log('🛡️ [Firebase] Target Project ID:', config.projectId);
+  console.log('🛡️ [Firebase] Auth Domain:', config.authDomain);
   
   const firestoreSettings = { experimentalForceLongPolling: true };
   
   dbInstance = initializeFirestore(sparkwavvApp, firestoreSettings, databaseId);
+  // Add databaseId property for debugging if needed (internal but helps my logs in main.tsx)
+  (dbInstance as any).databaseId = databaseId;
+
   dbDefaultInstance = databaseId === '(default)' ? dbInstance : initializeFirestore(sparkwavvApp, firestoreSettings, '(default)');
+  (dbDefaultInstance as any).databaseId = '(default)';
 } catch (e) {
   console.error('🛡️ [Firebase] Boot Critical Failure:', e);
   // Last resort safe stubs
