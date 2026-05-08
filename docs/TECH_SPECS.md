@@ -152,8 +152,19 @@ All Journey Phase Prompts must adhere to the standardized framework:
 - **Tuning Jobs**: Integration with Vertex AI Tuning API for methodology fine-tuning.
 - **GCS Pipeline**: Automated data staging and bucket management.
 
-## Track 031: Regression Tests & Admin Feedback
-### Test Architecture
+## Database Migration (Track 145)
+
+To migrate from the AI Studio sandbox (`gen-lang-client-...`) to the production project (`sparkwavv-prod`):
+
+### 1. Requirements
+- **Service Account**: A JSON key for `sparkwavv-prod` with `Owner` or `Cloud Datastore Owner` permissions.
+- **Project Parity**: Both projects must have Firestore enabled in **Native Mode**.
+
+### 2. Migration Procedure
+1. Create a snapshot of the sandbox data.
+2. Provide the `destination` Service Account JSON via the `FIREBASE_SERVICE_ACCOUNT_JSON` environment variable.
+3. Run the automated migration script `npm run migrate:prod`.
+
 - **Framework**: Playwright for E2E, Vitest for Unit/Component.
 - **Suites**: Full Regression (`npm run test:e2e`) and Smoke (`npm run test:e2e:smoke`).
 - **Mocking**: Playwright `page.route` used to mock Firebase Auth and Gemini API for deterministic testing.

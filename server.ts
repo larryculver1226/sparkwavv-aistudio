@@ -550,12 +550,12 @@ try {
     });
     isFirebaseAdminConfigured = true;
 
-    // Database 1: Sparkwavv (User Data)
-    let databaseId =
-      process.env.VITE_FIREBASE_DATABASE_ID ||
-      (isPlaceholder(firebaseAppletConfig.firestoreDatabaseId)
-        ? null
-        : firebaseAppletConfig.firestoreDatabaseId);
+    const envDbId = process.env.VITE_FIREBASE_DATABASE_ID || process.env.FIREBASE_DATABASE_ID;
+    const configDbId = !isPlaceholder(firebaseAppletConfig.firestoreDatabaseId)
+        ? firebaseAppletConfig.firestoreDatabaseId
+        : null;
+    
+    let databaseId = envDbId || configDbId;
     
     if (databaseId) {
       databaseId = databaseId.trim().replace(/^["']|["']$/g, '');
@@ -567,6 +567,19 @@ try {
       : getFirestore(sparkwavvAdmin);
     db = sparkwavvDb;
 
+    // Connectivity Check
+    db.collection('test').doc('connection').get()
+      .then(() => console.log(`[AUTH] Firestore connectivity check successful for ${databaseId || '(default)'}.`))
+      .catch((err) => {
+        if (err.message.includes('permission') || err.code === 7) {
+          console.warn(`[AUTH] Firestore PERMISSION_DENIED on ${databaseId || '(default)'}. Rules or Service Account may be restrictive.`);
+        } else if (err.code === 5 || err.message.includes('NOT_FOUND')) {
+          console.error(`[AUTH] Firestore Database NOT FOUND: ${databaseId || '(default)'}. Verify databaseId in settings.`);
+        } else {
+          console.error(`[AUTH] Firestore connectivity check failed:`, err.message);
+        }
+      });
+
     // Database 2: Admin (System Data) - Using 'admindb'
     try {
       adminDb = getFirestore(sparkwavvAdmin, 'admindb');
@@ -577,16 +590,21 @@ try {
     }
     console.log(`[AUTH] Firebase Admin initialized successfully via Service Account JSON.`);
   } else {
-    const projectId =
-      (!isPlaceholder(firebaseAppletConfig.projectId) ? firebaseAppletConfig.projectId : null) ||
-      process.env.FIREBASE_PROJECT_ID;
+    const envProjId = process.env.FIREBASE_PROJECT_ID || process.env.VITE_FIREBASE_PROJECT_ID;
+    const configProjId =
+      !isPlaceholder(firebaseAppletConfig.projectId) ? firebaseAppletConfig.projectId : null;
+    
+    // Prioritize explicit ENV override over platform-provided config
+    const projectId = (envProjId && !isPlaceholder(envProjId)) ? envProjId : configProjId;
+
     let clientEmail =
+      process.env.FIREBASE_CLIENT_EMAIL ||
       (!isPlaceholder(firebaseAppletConfig.clientEmail)
         ? firebaseAppletConfig.clientEmail
-        : null) || process.env.FIREBASE_CLIENT_EMAIL;
+        : null);
     let privateKey =
-      (!isPlaceholder(firebaseAppletConfig.privateKey) ? firebaseAppletConfig.privateKey : null) ||
-      process.env.FIREBASE_PRIVATE_KEY;
+      process.env.FIREBASE_PRIVATE_KEY ||
+      (!isPlaceholder(firebaseAppletConfig.privateKey) ? firebaseAppletConfig.privateKey : null);
 
     if (projectId) {
       console.log(`[AUTH] Initializing Firebase Admin for Project: ${projectId}`);
@@ -633,18 +651,32 @@ try {
           clientEmail,
           privateKey: processedKey,
         });
+
+        // Diagnostic: Check if we are trying to access a project that doesn't match the service account
+        let keyProjectId = projectId;
+        try {
+          const rawKey = process.env.FIREBASE_SERVICE_ACCOUNT_JSON || privateKey;
+          if (rawKey && rawKey.trim().startsWith('{')) {
+            const parsed = JSON.parse(rawKey);
+            if (parsed.project_id) keyProjectId = parsed.project_id;
+          }
+        } catch (e) {}
+
+        if (keyProjectId !== projectId) {
+          console.warn(`[AUTH] PROJECT MISMATCH DETECTED: Service Account Project (${keyProjectId}) does not match configured FIREBASE_PROJECT_ID (${projectId}). This will likely cause NOT_FOUND or PERMISSION_DENIED errors. Set FIREBASE_PROJECT_ID=${keyProjectId} in environment to align them.`);
+        }
       }
 
       // Initialize as DEFAULT app
       sparkwavvAdmin = admin.initializeApp(options);
       isFirebaseAdminConfigured = true;
 
-      // Database 1: Sparkwavv (User Data)
-      let databaseId =
-        process.env.VITE_FIREBASE_DATABASE_ID ||
-        (isPlaceholder(firebaseAppletConfig.firestoreDatabaseId)
-          ? null
-          : firebaseAppletConfig.firestoreDatabaseId);
+      const envDbId = process.env.VITE_FIREBASE_DATABASE_ID || process.env.FIREBASE_DATABASE_ID;
+      const configDbId = !isPlaceholder(firebaseAppletConfig.firestoreDatabaseId)
+          ? firebaseAppletConfig.firestoreDatabaseId
+          : null;
+      
+      let databaseId = envDbId || configDbId;
 
       if (databaseId) {
         databaseId = databaseId.trim().replace(/^["']|["']$/g, '');
@@ -655,6 +687,19 @@ try {
         ? getFirestore(sparkwavvAdmin, databaseId)
         : getFirestore(sparkwavvAdmin);
       db = sparkwavvDb;
+
+      // Connectivity Check
+      db.collection('test').doc('connection').get()
+        .then(() => console.log(`[AUTH] Firestore connectivity check successful for ${databaseId || '(default)'} (Environment Config).`))
+        .catch((err) => {
+          if (err.message.includes('permission') || err.code === 7) {
+            console.warn(`[AUTH] Firestore PERMISSION_DENIED on ${databaseId || '(default)'} (Environment Config).`);
+          } else if (err.code === 5 || err.message.includes('NOT_FOUND')) {
+            console.error(`[AUTH] Firestore Database NOT FOUND (Environment Config): ${databaseId || '(default)'}.`);
+          } else {
+            console.error(`[AUTH] Firestore connectivity check failed (Environment Config):`, err.message);
+          }
+        });
 
       // Database 2: Admin (System Data) - Using 'admindb'
       try {
@@ -776,7 +821,7 @@ async function startServer() {
       return user && user.role !== ROLES.GUEST;
     },
     keyGenerator: (req) => {
-      // Use standard ip detection, handling potential IPv6 wrapping
+      // Use standard ip detection, but satisfy express-rate-limit's check for IPv6 normalization
       const ip = (req.headers['x-forwarded-for'] as string) || req.ip || 'anonymous';
       return ip.split(',')[0].trim().replace(/^::ffff:/, '');
     },

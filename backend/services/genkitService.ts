@@ -65,9 +65,11 @@ async function getFirestoreInstance() {
 
     if (targetDbId) {
       targetDbId = targetDbId.trim().replace(/^["']|["']$/g, '');
-      if (targetDbId === 'default') {
+      if (targetDbId === 'default' || targetDbId === '') {
         targetDbId = '(default)';
       }
+    } else {
+      targetDbId = '(default)';
     }
 
     const appName = targetProjectId ? `sparkwavv-${targetProjectId.replace(/[^a-zA-Z0-9]/g, '-')}` : 'sparkwavv-default';
@@ -2455,20 +2457,20 @@ export const runJourneyStageFlow = ai.defineFlow(
           if (stageDoc.exists) {
             stageConfig = stageDoc.data();
           } else {
-            console.warn(`[GenkitService] Journey stage configuration not found in Firestore for ID: ${input.stageId}. Falling back to defaults.`);
+            console.warn(`[GenkitService] Journey stage configuration '${input.stageId}' NOT FOUND in ${db.projectId}/${db.databaseId}. Falling back to bundle defaults.`);
             const defaultStages = defaultJourneyStages as any;
             stageConfig = defaultStages[input.stageId] || defaultStages['dive-in'];
           }
         } catch (innerError: any) {
-          console.error(`[GenkitService] Failed collection fetch 'journeyPhaseConfigs' (Stage: ${input.stageId}):`, innerError.message || innerError);
+          console.error(`[GenkitService] PERMISSION_DENIED or Error fetching 'journeyPhaseConfigs' (Stage: ${input.stageId}) from ${db.projectId}/${db.databaseId}:`, innerError.message || innerError);
           
-          if (innerError.message?.includes('NOT_FOUND') || innerError.code === 5 || innerError.code === 7 || innerError.message?.includes('PERMISSION_DENIED')) {
-             console.log('[GenkitService] Attempting emergency fallback to (default) database for configs (Permission or Not Found)...');
+          if (innerError.message?.includes('PERMISSION_DENIED') || innerError.code === 7) {
+             console.log('[GenkitService] Attempting emergency config fetch via default Firestore context...');
              const fallbackDb = (await import('firebase-admin/firestore')).getFirestore(); 
              const fallbackDoc = await fallbackDb.collection('journeyPhaseConfigs').doc(input.stageId).get();
              if (fallbackDoc.exists) {
                 stageConfig = fallbackDoc.data();
-                console.log('[GenkitService] Emergency fallback successful.');
+                console.log('[GenkitService] Emergency fallback SUCCESS.');
              } else {
                 throw innerError;
              }

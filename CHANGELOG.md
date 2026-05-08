@@ -4,6 +4,11 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 ### Added
+- **Track 145 (Database Migration to Prod)**: Successfully consolidated all application data into the `sparkwavv-prod` master project.
+    - **Migration Orchestration**: Implemented `scripts/migrate/exportSource.ts` and `scripts/migrate/importToProd.ts` to bypass environment credential conflicts and transfer data across projects.
+    - **Data Integrity**: Successfully migrated all critical collections (users, dashboards, wavvault, activities, etc.) and verified project parity.
+    - **Diagnostics**: Enhanced `server.ts` with project mismatch detection and logging.
+    - **Configuration**: Updated `firebase-applet-config.json` to point to production as the master database.
 - **Track 144 (Skylar Guest Security)**: Implemented a multi-layered security and resilience strategy for unauthenticated Skylar users.
     - **Rate Limiting**: Integrated `express-rate-limit` and `express-slow-down` on the `/api/skylar/chat-journey` endpoint.
     - **Stricter Quotas**: Implemented a 20-request per 15-minute window for guests with progressive speed-throttling after 5 requests.
@@ -13,6 +18,11 @@ All notable changes to this project will be documented in this file.
 - **Track 143 (Multimodal Resilience)**: Successfully migrated Vision (Resume Parsing) and Image Generation tools to the MCP Model Registry.
     - **API Key Continuity**: Implemented automatic rotation and placeholder filtering for `GEMINI_API_KEY` and `API_KEY`. Fixed MCP environment inheritance and stabilized the Gemini API payload structure (resolved `Unknown name "role"` 400 errors).
     - **Firestore Stability**: Resolved `5 NOT_FOUND` and `7 PERMISSION_DENIED` errors by implementing Firebase App reuse, stabilizing `(default)` ID translation, and adding safety whitespace stripping for DB configuration.
+- **Track 144 (Diagnostics & Resilience)**: Hardened the system against environmental blocks and configuration errors.
+    - **Firestore Diagnostics**: Added proactive connectivity checks in `server.ts` to log detailed project/database permission status on boot.
+    - **Referer Resilience**: Implemented dynamic referer rotation and retry logic in `mcp-model-registry` to bypass 403 Forbidden blocks on restricted Gemini API keys.
+    - **Config Safety**: Enhanced `genkitService.ts` with descriptive error logging and emergency config fallbacks to prevent "dive-in" stage failures.
+    - **IPv6 Compliance**: Standardized rate-limiter `keyGenerator` in `server.ts` to suppress IPv6 validation warnings.
 
 ### Fixed
 - **Network Errors**: Resolved the "network or proxy restriction" UI error by providing specific feedback for backend startup, payload size limits, and authentication redirects.
