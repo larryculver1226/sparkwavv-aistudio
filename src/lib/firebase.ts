@@ -80,7 +80,13 @@ try {
   storageInstance = getStorage(sparkwavvApp);
   
   const rawDatabaseId = getViteEnv('VITE_FIREBASE_DATABASE_ID') || firebaseConfig.firestoreDatabaseId;
-  const databaseId = rawDatabaseId && !rawDatabaseId.startsWith('PLACEHOLDER') ? rawDatabaseId : '(default)';
+  let databaseId = rawDatabaseId && !rawDatabaseId.startsWith('PLACEHOLDER') ? rawDatabaseId : '(default)';
+  
+  // Normalize 'default' to '(default)' for Firestore Enterprise compatibility
+  if (databaseId === 'default') {
+    databaseId = '(default)';
+  }
+  
   const firestoreSettings = { experimentalForceLongPolling: true };
   
   dbInstance = initializeFirestore(sparkwavvApp, firestoreSettings, databaseId);

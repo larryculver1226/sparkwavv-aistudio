@@ -4,6 +4,10 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 ### Added
+- **Track 148 (Security & Connectivity Hotfixes)**: Finalized production security hardening and resolved bootstrap permission blockers.
+    - **IPv6 Compliance**: Standardized and normalized the rate-limiter `keyGenerator` in `server.ts` to suppress IPv6 bypass warnings.
+    - **Public Read Access**: Restructured `firestore.rules` to move public bootstrap collections (`metadata`, `journeyPhaseConfigs`) to the top level, explicitly unlocking them for unauthenticated app initialization.
+    - **Connectivity Probes**: Updated backend initialization logic in `server.ts` to use real production metadata docs (`metadata/skylar_global`) for connectivity validation instead of generic test paths.
 - **Track 146 (Firebase Permissions Audit)**: Resolved false-negative "Missing Credentials" reports in browser logs.
     - **Diagnostic Accuracy**: Updated `server.ts` to sync the `envStatus` diagnostic object with the actual authentication source (`FIREBASE_SERVICE_ACCOUNT_JSON`).
     - **Validation**: Confirmed backend-to-production connectivity with verified 221ms latency.

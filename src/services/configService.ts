@@ -3,6 +3,29 @@ import { db, isFirebaseConfigured } from '../lib/firebase';
 import { SkylarGlobalConfig, SkylarStageConfig, DEFAULT_MODALITIES } from '../types/skylar-config';
 import { handleFirestoreError, OperationType } from '../lib/firestore-errors';
 
+// Helper for fetching via server-side proxy when Firestore rules block direct public access
+async function fetchFromProxy<T>(colName: string, docId?: string): Promise<T | null> {
+  try {
+    const url = docId
+      ? `/api/bootstrap/config/${colName}/${docId}`
+      : `/api/bootstrap/config/${colName}`;
+    const response = await fetch(url);
+    if (!response.ok) {
+      console.warn(`[Config Proxy] HTTP error ${response.status} for ${url}`);
+      return null;
+    }
+    const data = await response.json();
+    console.log(`[Config Proxy] Successfully fetched ${colName}${docId ? '/' + docId : ''}`);
+    return data as T;
+  } catch (error: any) {
+    console.warn(
+      `[Config Proxy] Request failed for ${colName}${docId ? '/' + docId : ''}:`,
+      error?.message || error
+    );
+    return null;
+  }
+}
+
 // In-memory cache
 let globalConfigCache: SkylarGlobalConfig | null = null;
 let journeyStagesCache: Record<string, SkylarStageConfig> | null = null;
@@ -50,16 +73,22 @@ export const configService = {
         globalConfigCache = data;
         return data;
       } else {
-        console.warn('skylar_global document not found in metadata collection.');
+        console.warn('[Config Service] skylar_global document not found. Attempting Proxy fallback...');
+        const proxyData = await fetchFromProxy<SkylarGlobalConfig>('metadata', 'skylar_global');
+        if (proxyData) {
+          globalConfigCache = proxyData;
+          return proxyData;
+        }
         return null;
       }
     } catch (error: any) {
-      if (error?.message?.includes('offline') || error?.message?.includes('permission-denied') || error?.code === 'unavailable') {
-        console.warn('[Config Service] Firestore read failed for skylar_global. Using default fallback.');
-        return null;
+      console.warn('[Config Service] Firestore read failed for skylar_global. Attempting Proxy fallback...', error?.message || error);
+      const proxyData = await fetchFromProxy<SkylarGlobalConfig>('metadata', 'skylar_global');
+      if (proxyData) {
+        globalConfigCache = proxyData;
+        return proxyData;
       }
-      handleFirestoreError(error, OperationType.GET, 'metadata/skylar_global');
-      throw error;
+      return null;
     }
   },
 
@@ -85,12 +114,8 @@ export const configService = {
         }
       },
       (error: any) => {
-        if (error?.message?.includes('offline') || error?.message?.includes('permission-denied') || error?.code === 'unavailable') {
-          console.warn('[Config Service] Firestore subscription failed for skylar_global. Using default fallback.');
-          callback(null);
-        } else {
-          handleFirestoreError(error, OperationType.GET, 'metadata/skylar_global');
-        }
+        console.warn('[Config Service] Firestore subscription failed for skylar_global. Using null callback.', error?.message || error);
+        callback(null);
       }
     );
   },
@@ -164,35 +189,57 @@ export const configService = {
       journeyStagesCache = stages;
       return stages;
     } catch (error: any) {
-      if (error?.message?.includes('offline') || error?.message?.includes('permission-denied') || error?.message?.includes('Empty snapshot') || error?.code === 'unavailable') {
-        console.warn('[Config Service] Failed to load journey stages from DB. Falling back to default JSON.');
-        const module = await import('../config/defaultJourneyStages.json');
-        const defaultStages = module.default as Record<string, any>;
+      console.warn('[Config Service] Failed to load journey stages from DB. Attempting Proxy fallback...', error?.message || error);
+      const proxyData = await fetchFromProxy<any[]>('journeyPhaseConfigs');
+      if (proxyData && Array.isArray(proxyData)) {
         const stages: Record<string, SkylarStageConfig> = {};
-        for (const [sId, defaultData] of Object.entries(defaultStages)) {
-          stages[sId] = {
-            stageId: sId,
-            stageTitle: defaultData.title || sId,
-            description: defaultData.description || '',
-            systemPromptTemplate: defaultData.systemPromptTemplate || '',
-            requiredArtifacts: defaultData.requiredArtifacts || [],
-            allowedModalities: Array.isArray(defaultData.allowedModalities) 
+        proxyData.forEach((item) => {
+          const id = item.id || item.stageId;
+          stages[id] = {
+            stageId: id,
+            stageTitle: item.title || item.stageTitle || id,
+            description: item.description || '',
+            systemPromptTemplate: item.systemPromptTemplate || '',
+            requiredArtifacts: item.requiredArtifacts || [],
+            allowedModalities: Array.isArray(item.allowedModalities) 
               ? {
-                  text: defaultData.allowedModalities.includes('text'),
-                  audio: defaultData.allowedModalities.includes('audio'),
-                  image: defaultData.allowedModalities.includes('image'),
-                  video: defaultData.allowedModalities.includes('video'),
+                  text: item.allowedModalities.includes('text'),
+                  audio: item.allowedModalities.includes('audio'),
+                  image: item.allowedModalities.includes('image'),
+                  video: item.allowedModalities.includes('video'),
                 }
-              : defaultData.allowedModalities || DEFAULT_MODALITIES,
-            uiConfig: defaultData.uiConfig || { theme: 'dark', layout: 'split' }
+              : item.allowedModalities || DEFAULT_MODALITIES,
+            uiConfig: item.uiConfig || { theme: 'dark', layout: 'split' }
           } as SkylarStageConfig;
-        }
+        });
         journeyStagesCache = stages;
         return stages;
-      } else {
-        handleFirestoreError(error, OperationType.LIST, 'journeyPhaseConfigs');
-        throw error;
       }
+
+      console.warn('[Config Service] Proxy failed or returned invalid data. Falling back to default JSON.');
+      const module = await import('../config/defaultJourneyStages.json');
+      const defaultStages = module.default as Record<string, any>;
+      const stages: Record<string, SkylarStageConfig> = {};
+      for (const [sId, defaultData] of Object.entries(defaultStages)) {
+        stages[sId] = {
+          stageId: sId,
+          stageTitle: defaultData.title || sId,
+          description: defaultData.description || '',
+          systemPromptTemplate: defaultData.systemPromptTemplate || '',
+          requiredArtifacts: defaultData.requiredArtifacts || [],
+          allowedModalities: Array.isArray(defaultData.allowedModalities) 
+            ? {
+                text: defaultData.allowedModalities.includes('text'),
+                audio: defaultData.allowedModalities.includes('audio'),
+                image: defaultData.allowedModalities.includes('image'),
+                video: defaultData.allowedModalities.includes('video'),
+              }
+            : defaultData.allowedModalities || DEFAULT_MODALITIES,
+          uiConfig: defaultData.uiConfig || { theme: 'dark', layout: 'split' }
+        } as SkylarStageConfig;
+      }
+      journeyStagesCache = stages;
+      return stages;
     }
   },
 
@@ -241,12 +288,31 @@ export const configService = {
         return config;
       }
     } catch (error: any) {
-      if (error?.message?.includes('offline') || error?.message?.includes('permission-denied') || error?.code === 'unavailable') {
-        console.warn(`[Config Service] Firestore read failed for "${normalizedStageId}". Falling back to default internal config.`);
-      } else {
-        handleFirestoreError(error, OperationType.GET, `journeyPhaseConfigs/${normalizedStageId}`);
-        throw error;
+      console.warn(`[Config Service] Firestore read failed for "${normalizedStageId}". Attempting Proxy fallback...`, error?.message || error);
+      const proxyData = await fetchFromProxy<any>('journeyPhaseConfigs', normalizedStageId);
+      if (proxyData) {
+        const config = {
+          stageId: normalizedStageId,
+          stageTitle: proxyData.title || proxyData.stageTitle || normalizedStageId,
+          description: proxyData.description || '',
+          systemPromptTemplate: proxyData.systemPromptTemplate || '',
+          requiredArtifacts: proxyData.requiredArtifacts || [],
+          allowedModalities: Array.isArray(proxyData.allowedModalities) 
+            ? {
+                text: proxyData.allowedModalities.includes('text'),
+                audio: proxyData.allowedModalities.includes('audio'),
+                image: proxyData.allowedModalities.includes('image'),
+                video: proxyData.allowedModalities.includes('video'),
+              }
+            : proxyData.allowedModalities || DEFAULT_MODALITIES,
+          uiConfig: proxyData.uiConfig || { theme: 'dark', layout: 'split' }
+        } as SkylarStageConfig;
+        
+        if (!journeyStagesCache) journeyStagesCache = {};
+        journeyStagesCache[normalizedStageId] = config;
+        return config;
       }
+      console.warn('[Config Service] Proxy fallback failed. Using internal default.');
     }
 
     // Fallback logic for missing document or offline/permission error

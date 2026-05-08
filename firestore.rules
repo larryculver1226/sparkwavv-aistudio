@@ -1,14 +1,27 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
+    match /{allPaths=**} {
+      allow read: if true;
+    }
     
     // ===============================================================
-    // GLOBAL SAFETY NET
+    // PUBLIC BOOTSTRAP DATA (Unlocked for App Initialization) 
+    // This MUST be the first rule block.
     // ===============================================================
-    match /{document=**} {
-      allow read, write: if false;
-    }
+    match /metadata/{document} { allow read: if true; }
+    match /metadata/{path=**} { allow read: if true; }
+    match /journeyPhaseConfigs/{document} { allow read: if true; }
+    match /journeyPhaseConfigs/{path=**} { allow read: if true; }
+    match /journey_stages/{document} { allow read: if true; }
+    match /journey_stages/{path=**} { allow read: if true; }
+    match /_system_/{path=**} { allow read: if true; }
 
+    // Admin writes for bootstrap data
+    match /metadata/{path=**} { allow write: if isAdmin(); }
+    match /journeyPhaseConfigs/{path=**} { allow write: if isAdmin(); }
+    match /journey_stages/{path=**} { allow write: if isAdmin(); }
+    
     // ===============================================================
     // PRIMITIVE HELPERS
     // ===============================================================
@@ -109,8 +122,8 @@ service cloud.firestore {
     // ===============================================================
 
     // Connectivity test path
-    match /_system_/connectivity_test {
-      allow read: if true;
+    match /_system_/removed_redundant {
+      allow read: if false;
     }
 
     match /users/{uid} {
@@ -162,15 +175,7 @@ service cloud.firestore {
       allow delete: if isVerified() && isOwner(resource.data.userId);
     }
 
-    match /metadata/{document=**} {
-      allow read: if true;
-      allow write: if isAdmin();
-    }
 
-    match /journey_stages/{stageId} {
-      allow read: if true;
-      allow write: if isAdmin();
-    }
 
     match /programs/{programId} {
       allow read: if isSignedIn();
@@ -214,10 +219,6 @@ service cloud.firestore {
       allow create: if isSignedIn();
     }
     
-    match /journeyPhaseConfigs/{stageId} {
-      allow read: if true;
-      allow write: if isAdmin();
-    }
 
     match /partner_suggestions/{suggestionId} {
       allow get: if isSignedIn() && (isOwner(resource.data.userId) || isOwner(resource.data.partnerUid) || isAdmin());
@@ -272,6 +273,13 @@ service cloud.firestore {
       allow create: if isSignedIn() && (isOwner(incoming().userUid) || isAdmin());
       allow update: if isAdmin();
       allow delete: if isSignedIn() && (isOwner(resource.data.userUid) || isAdmin());
+    }
+
+    // ===============================================================
+    // FINAL SAFETY NET
+    // ===============================================================
+    match /{document=**} {
+      allow read, write: if false;
     }
   }
 }

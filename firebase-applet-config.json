@@ -1,10 +1,10 @@
 {
-  "apiKey": "PLACEHOLDER",
-  "authDomain": "PLACEHOLDER",
   "projectId": "sparkwavv-prod",
+  "appId": "1:763933246770:web:1090802b771599a46e432b",
+  "apiKey": "AIzaSyDR8caF0rbAP2BtwGSUvvEO2D1U-WuZTpQ",
+  "authDomain": "sparkwavv-prod.firebaseapp.com",
+  "firestoreDatabaseId": "ai-studio-1a3eb665-2cd9-4e84-a599-413bb4ee52e0",
   "storageBucket": "sparkwavv-prod.firebasestorage.app",
-  "messagingSenderId": "PLACEHOLDER",
-  "appId": "sparkwavv-prod",
-  "measurementId": "PLACEHOLDER",
-  "firestoreDatabaseId": "(default)"
+  "messagingSenderId": "763933246770",
+  "measurementId": ""
 }
