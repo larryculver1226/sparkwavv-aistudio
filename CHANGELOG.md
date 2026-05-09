@@ -4,6 +4,7 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 ### Fixed
+- **Track 153 (Dev-Prod Standardization)**: Initialized standardization of the deployment pipeline, shifting to dynamic service naming and automated secret versioning (latest).
 - **Track 152 (Firebase Key Injection Fix)**: Resolved "Missing API Key" errors in production by correcting secret expansion in `cloudbuild.yaml` and hardening `src/config.ts` fallback logic.
 - **Track 150 (Comprehensive Skylar Fix)**: Resolved persistent connectivity and authentication issues.
     - **Global Fetch Interceptor**: Strengthened `backend/services/patchFetch.ts` with autonomous Referer rotation and Axios bridging.
