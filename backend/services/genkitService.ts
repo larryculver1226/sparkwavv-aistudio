@@ -163,12 +163,22 @@ if (vertexProjectId && !isVertexAvailable) {
 }
 
 const targetModel = activeGeminiKey
-  ? 'googleai/gemini-1.5-flash'
+  ? 'googleai/gemini-3-flash-preview'
   : isVertexAvailable
     ? 'vertexai/gemini-1.5-flash'
-    : 'googleai/gemini-1.5-flash'; // Fallback to 1.5 if nothing else matches
+    : 'googleai/gemini-3-flash-preview'; // Fallback if nothing else matches
 
 console.log(`[GenkitService] Default target model set to: ${targetModel} (Vertex Available: ${isVertexAvailable})`);
+
+/**
+ * Gets the preferred model string for a specific tool/flow.
+ */
+function getPreferredModel(): string {
+  if (process.env.GEMINI_API_KEY) return 'googleai/gemini-3-flash-preview';
+  if (isVertexAvailable) return 'vertexai/gemini-1.5-flash';
+  return 'googleai/gemini-3-flash-preview';
+}
+
 
 const vertexConfig: any = {
   location: process.env.VERTEX_AI_LOCATION || 'us-central1',
@@ -574,8 +584,7 @@ export const analyzeDiscoveryLaunchpadTool = ai.defineTool(
       if (doc.exists && doc.data()?.systemPrompt) systemPrompt = doc.data()!.systemPrompt;
     } catch (e) {}
 
-    let activeTargetModel = 'googleai/gemini-1.5-flash';
-    if (!process.env.GEMINI_API_KEY && process.env.VERTEX_AI_PROJECT_ID) activeTargetModel = 'vertexai/gemini-1.5-flash';
+    const activeTargetModel = getPreferredModel();
 
     try {
       // Phase 4: Model Armor Integration - Input Sanitization
@@ -635,8 +644,7 @@ export const generateNarrativeStoriesTool = ai.defineTool(
       if (doc.exists && doc.data()?.systemPrompt) systemPrompt = doc.data()!.systemPrompt;
     } catch (e) {}
 
-    let activeTargetModel = 'googleai/gemini-1.5-flash';
-    if (!process.env.GEMINI_API_KEY && process.env.VERTEX_AI_PROJECT_ID) activeTargetModel = 'vertexai/gemini-1.5-flash';
+    const activeTargetModel = getPreferredModel();
 
     try {
       // Model Armor Integration
@@ -700,8 +708,7 @@ export const modelFutureVisionTool = ai.defineTool(
       if (doc.exists && doc.data()?.systemPrompt) systemPrompt = doc.data()!.systemPrompt;
     } catch (e) {}
 
-    let activeTargetModel = 'googleai/gemini-1.5-flash';
-    if (!process.env.GEMINI_API_KEY && process.env.VERTEX_AI_PROJECT_ID) activeTargetModel = 'vertexai/gemini-1.5-flash';
+    const activeTargetModel = getPreferredModel();
 
     try {
       // Model Armor Integration
@@ -760,8 +767,7 @@ export const optimizeProductivityPlanTool = ai.defineTool(
       if (doc.exists && doc.data()?.systemPrompt) systemPrompt = doc.data()!.systemPrompt;
     } catch (e) {}
 
-    let activeTargetModel = 'googleai/gemini-1.5-flash';
-    if (!process.env.GEMINI_API_KEY && process.env.VERTEX_AI_PROJECT_ID) activeTargetModel = 'vertexai/gemini-1.5-flash';
+    const activeTargetModel = getPreferredModel();
 
     try {
       // Model Armor Integration
@@ -818,8 +824,7 @@ export const buildCareerPersonaTool = ai.defineTool(
       if (doc.exists && doc.data()?.systemPrompt) systemPrompt = doc.data()!.systemPrompt;
     } catch (e) {}
 
-    let activeTargetModel = 'googleai/gemini-1.5-flash';
-    if (!process.env.GEMINI_API_KEY && process.env.VERTEX_AI_PROJECT_ID) activeTargetModel = 'vertexai/gemini-1.5-flash';
+    const activeTargetModel = getPreferredModel();
 
     try {
       // Model Armor Integration
@@ -880,8 +885,7 @@ export const architectBrandIdentityTool = ai.defineTool(
       if (doc.exists && doc.data()?.systemPrompt) systemPrompt = doc.data()!.systemPrompt;
     } catch (e) {}
 
-    let activeTargetModel = 'googleai/gemini-1.5-flash';
-    if (!process.env.GEMINI_API_KEY && process.env.VERTEX_AI_PROJECT_ID) activeTargetModel = 'vertexai/gemini-1.5-flash';
+    const activeTargetModel = getPreferredModel();
 
     try {
       // Model Armor Integration
@@ -1019,8 +1023,7 @@ export const verifyCredentialsTool = ai.defineTool(
       if (doc.exists && doc.data()?.systemPrompt) systemPrompt = doc.data()!.systemPrompt;
     } catch (e) {}
 
-    let activeTargetModel = 'googleai/gemini-1.5-flash';
-    if (!process.env.GEMINI_API_KEY && process.env.VERTEX_AI_PROJECT_ID) activeTargetModel = 'vertexai/gemini-1.5-flash';
+    const activeTargetModel = getPreferredModel();
 
     try {
       // Model Armor Integration
@@ -1078,8 +1081,7 @@ export const executeJobMatchingTool = ai.defineTool(
       if (doc.exists && doc.data()?.systemPrompt) systemPrompt = doc.data()!.systemPrompt;
     } catch (e) {}
 
-    let activeTargetModel = 'googleai/gemini-1.5-flash';
-    if (!process.env.GEMINI_API_KEY && process.env.VERTEX_AI_PROJECT_ID) activeTargetModel = 'vertexai/gemini-1.5-flash';
+    const activeTargetModel = getPreferredModel();
 
     try {
       // Model Armor Integration
@@ -1127,8 +1129,7 @@ export const coachInterviewSimulationTool = ai.defineTool(
       if (doc.exists && doc.data()?.systemPrompt) systemPrompt = doc.data()!.systemPrompt;
     } catch (e) {}
 
-    let activeTargetModel = 'googleai/gemini-1.5-flash';
-    if (!process.env.GEMINI_API_KEY && process.env.VERTEX_AI_PROJECT_ID) activeTargetModel = 'vertexai/gemini-1.5-flash';
+    const activeTargetModel = getPreferredModel();
 
     try {
       // Model Armor Integration
@@ -3016,10 +3017,7 @@ export const performSynthesisFlow = ai.defineFlow(
     // Model Armor Integration
     const inputSanity = await modelArmor.sanitizePrompt(JSON.stringify(input.history).substring(0, 5000));
     
-    let activeTargetModel = 'googleai/gemini-1.5-flash';
-    if (!process.env.GEMINI_API_KEY && process.env.VERTEX_AI_PROJECT_ID) {
-      activeTargetModel = 'vertexai/gemini-1.5-flash';
-    }
+    const activeTargetModel = getPreferredModel();
 
     const prompt = `You are the Skylar Analytical Architect. Your task is to perform a "Neural Synthesis" of the user's career data.
 Analyze the provided chat history and document content to extract a structured Knowledge Graph of the user's professional identity.
@@ -3091,8 +3089,7 @@ export const performGateReviewFlow = ai.defineFlow(
     // Model Armor Integration
     const inputSanity = await modelArmor.sanitizePrompt(JSON.stringify(input.history).substring(0, 5000));
 
-    let activeTargetModel = 'googleai/gemini-1.5-flash';
-    if (!process.env.GEMINI_API_KEY && process.env.VERTEX_AI_PROJECT_ID) activeTargetModel = 'vertexai/gemini-1.5-flash';
+    const activeTargetModel = getPreferredModel();
 
     const dnaContent = input.dnaContext ? JSON.stringify(input.dnaContext) : '';
     const prompt = `You are the Skylar Validation Architect. Perform a "Validation Gate" review for the user moving from ${input.currentPhase} to ${input.targetPhase}.
@@ -3164,8 +3161,7 @@ export const getEmotionalIntelligenceFlow = ai.defineFlow(
       }
     }
 
-    let activeTargetModel = 'googleai/gemini-1.5-flash';
-    if (!process.env.GEMINI_API_KEY && process.env.VERTEX_AI_PROJECT_ID) activeTargetModel = 'vertexai/gemini-1.5-flash';
+    const activeTargetModel = getPreferredModel();
 
     const prompt = `Analyze the user's emotional state, sentiment and motivation based on their specific WavVault profile, current Journey Stage, and recent chat history.
 ${userDoc ? `\nCurrent Journey Stage: ${userDoc.timelineStage || 'Unknown'}` : ''}
@@ -3216,8 +3212,7 @@ export const getResonanceFeedbackFlow = ai.defineFlow(
       return { resonanceScore: 0, feedback: 'Content blocked by safety policy.', suggestions: [] };
     }
 
-    let activeTargetModel = 'googleai/gemini-1.5-flash';
-    if (!process.env.GEMINI_API_KEY && process.env.VERTEX_AI_PROJECT_ID) activeTargetModel = 'vertexai/gemini-1.5-flash';
+    const activeTargetModel = getPreferredModel();
 
     const dnaContent = input.dnaContext ? JSON.stringify(input.dnaContext) : '';
     const prompt = `You are Skylar, the Strategic Conductor. Provide real-time resonance feedback on this content.
@@ -3274,10 +3269,7 @@ export const generateInteractivePortfolioFlow = ai.defineFlow(
     // Model Armor Integration
     const inputSanity = await modelArmor.sanitizePrompt(JSON.stringify(input.dnaContext));
 
-    let activeTargetModel = 'googleai/gemini-1.5-flash';
-    if (!process.env.GEMINI_API_KEY && process.env.VERTEX_AI_PROJECT_ID) {
-      activeTargetModel = 'vertexai/gemini-1.5-flash';
-    }
+    const activeTargetModel = getPreferredModel();
 
     const dnaContent = input.dnaContext ? JSON.stringify(input.dnaContext) : '';
     const prompt = `You are the Skylar Narrative Journalist. Generate content for a multi-page "Interactive Portfolio" based on the user's professional DNA: ${dnaContent}.
@@ -3368,10 +3360,7 @@ export const generateTargetedSequenceFlow = ai.defineFlow(
     // Model Armor Integration
     const inputSanity = await modelArmor.sanitizePrompt(`${input.targetRole} at ${input.targetCompany} | DNA: ${JSON.stringify(input.dnaContext)}`);
 
-    let activeTargetModel = 'googleai/gemini-1.5-flash';
-    if (!process.env.GEMINI_API_KEY && process.env.VERTEX_AI_PROJECT_ID) {
-      activeTargetModel = 'vertexai/gemini-1.5-flash';
-    }
+    const activeTargetModel = getPreferredModel();
 
     const dnaContent = input.dnaContext ? JSON.stringify(input.dnaContext) : '';
     const prompt = `Generate a targeted professional outreach sequence for ${input.targetRole} at ${input.targetCompany}.
@@ -3445,10 +3434,7 @@ export const generateLiveResumeFlow = ai.defineFlow(
     // Model Armor Integration
     const inputSanity = await modelArmor.sanitizePrompt(JSON.stringify(input.dnaContext));
 
-    let activeTargetModel = 'googleai/gemini-1.5-flash';
-    if (!process.env.GEMINI_API_KEY && process.env.VERTEX_AI_PROJECT_ID) {
-      activeTargetModel = 'vertexai/gemini-1.5-flash';
-    }
+    const activeTargetModel = getPreferredModel();
 
     const dnaContent = input.dnaContext ? JSON.stringify(input.dnaContext) : '';
     const prompt = `You are the Skylar Narrative Journalist. Generate a high-fidelity "Live Resume" content based on the user's professional DNA: ${dnaContent}.

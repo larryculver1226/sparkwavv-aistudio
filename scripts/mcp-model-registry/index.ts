@@ -13,8 +13,8 @@ import path from "path";
 import fs from "fs";
 
 const MODELS = {
-  CORE_REASONING: "gemini-1.5-flash",
-  UTILITY_TASK: "gemini-1.5-flash",
+  CORE_REASONING: "gemini-3-flash-preview",
+  UTILITY_TASK: "gemini-3-flash-preview",
 };
 
 /**
@@ -22,7 +22,8 @@ const MODELS = {
  * Now simply delegates to the patched global fetch which handles rotation and axios bridging.
  */
 const customFetch = async (url: any, options: any) => {
-  return fetch(url, options);
+  // Ensure we are using the global patched fetch which handles rotation
+  return global.fetch(url, options);
 };
 
 // Vertex AI Config
@@ -122,15 +123,20 @@ async function generateWithFallback(
       return { text, attachments, model: `googleai/${modelId}`, status: "success" };
     } catch (error: any) {
       const errorMsg = error.message || String(error);
-      console.error(`[MCP Registry] Google AI failed: ${errorMsg}`);
+      const errorBody = error.response ? JSON.stringify(error.response.data) : "";
+      const combinedError = `${errorMsg} ${errorBody}`;
+      
+      console.error(`[MCP Registry] Google AI failed: ${combinedError}`);
 
-      const isAuthError = errorMsg.includes('API key expired') || 
-                          errorMsg.includes('API_KEY_INVALID') || 
-                          errorMsg.includes('403') ||
-                          errorMsg.includes('400') ||
-                          errorMsg.includes('blocked');
+      const isAuthError = combinedError.includes('API key expired') || 
+                          combinedError.includes('API_KEY_INVALID') || 
+                          combinedError.includes('403') ||
+                          combinedError.includes('400') ||
+                          combinedError.includes('blocked') ||
+                          combinedError.includes('PERMISSION_DENIED');
 
       if (isAuthError && rotateApiKey() && retryCount < availableKeys.length) {
+        console.error(`[MCP Registry] Retrying with different key due to auth error...`);
         return generateWithFallback(contents, requestedModel, temperature, retryCount + 1);
       }
       
@@ -141,10 +147,10 @@ async function generateWithFallback(
       }
 
       return {
-        text: `I'm sorry, my Gemini API Key appears to be expired or blocked. Error: ${errorMsg}`,
+        text: `I'm sorry, my Gemini API Key appears to be expired or blocked. Error: ${combinedError}`,
         model: requestedModel,
         status: "error_api_key",
-        originalError: errorMsg
+        originalError: combinedError
       };
     }
   } else if (isVertexAvailable && vertexInstance) {

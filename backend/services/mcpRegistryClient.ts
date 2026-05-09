@@ -63,7 +63,12 @@ export class McpModelRegistryClient {
         // Ensure specific keys are definitely passed even if shell environment is sparse
         GEMINI_API_KEY: process.env.GEMINI_API_KEY || '',
         API_KEY: process.env.API_KEY || '',
-        APP_URL: process.env.APP_URL || ''
+        APP_URL: process.env.APP_URL || '',
+        SHARED_APP_URL: process.env.SHARED_APP_URL || '',
+        VITE_APP_URL: process.env.VITE_APP_URL || process.env.APP_URL || '',
+        VITE_SHARED_APP_URL: process.env.VITE_SHARED_APP_URL || process.env.SHARED_APP_URL || '',
+        VERTEX_AI_PROJECT_ID: process.env.VERTEX_AI_PROJECT_ID || '',
+        VERTEX_AI_LOCATION: process.env.VERTEX_AI_LOCATION || ''
       } as any
     });
 
