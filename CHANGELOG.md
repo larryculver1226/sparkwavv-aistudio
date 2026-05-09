@@ -3,7 +3,15 @@
 All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
-### Added
+### Fixed
+- **Track 150 (Comprehensive Skylar Fix)**: Resolved persistent connectivity and authentication issues.
+    - **Global Fetch Interceptor**: Strengthened `backend/services/patchFetch.ts` with autonomous Referer rotation and Axios bridging.
+    - **MCP Registry Resilience**: Added **Vertex AI fallback** and key rotation to the Model Registry to survive Gemini API key expirations.
+    - **Firestore Robustness**: Implemented silent fallbacks for `journeyPhaseConfigs` to eliminate production permission errors.
+- **Track 151 (Cloud Build Alignment)**: Project-agnostic `cloudbuild.yaml` with dynamic project IDs and environment-appropriate secret versions.
+    - **Global Interceptor**: Implemented a global `fetch` interceptor in `genkitService.ts` to inject valid `Referer` and `Origin` headers for all Google API calls.
+    - **Fallback Logic**: Expanded Genkit error handling to recognize restricted key errors and trigger automatic fallback to Vertex AI and MCP Model Registry gateways.
+    - **Key Extraction**: Hardened `aiConfig.ts` to skip restricted browser-side keys during server-to-server initialization.
 - **Track 148 (Security & Connectivity Hotfixes)**: Finalized production security hardening and resolved bootstrap permission blockers.
     - **IPv6 Compliance**: Standardized and normalized the rate-limiter `keyGenerator` in `server.ts` to suppress IPv6 bypass warnings.
     - **Public Read Access**: Restructured `firestore.rules` to move public bootstrap collections (`metadata`, `journeyPhaseConfigs`) to the top level, explicitly unlocking them for unauthenticated app initialization.

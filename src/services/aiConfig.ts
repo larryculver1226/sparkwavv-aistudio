@@ -11,7 +11,7 @@ export const getGeminiApiKey = () => {
   const keysToTry = ['API_KEY', 'VITE_GEMINI_API_KEY', 'GOOGLE_AI_API_KEY', 'GOOGLE_GENAI_API_KEY', 'GOOGLE_API_KEY', 'GEMINI_API_KEY'];
   let key = '';
   let foundSource = 'NONE';
-  let firebaseKey = env.VITE_FIREBASE_API_KEY || '';
+  let firebaseKey = (env.VITE_FIREBASE_API_KEY || env.FIREBASE_API_KEY || '').trim().replace(/^["']|["']$/g, '');
 
   // Try to identify the Firebase key to avoid using it for GenAI on the server
   if (!firebaseKey && typeof process !== 'undefined') {

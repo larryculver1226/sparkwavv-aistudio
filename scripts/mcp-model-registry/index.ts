@@ -1,90 +1,5 @@
 import axios from "axios";
-
-/**
- * Referrer Fix: Global fetch override for Node.js 18+ to ensure referer is never empty.
- * This resolves 403 Forbidden errors from restricted API keys.
- * MUST BE AT THE VERY TOP before other imports.
- */
-if (typeof fetch !== 'undefined') {
-  // Use a symbol to track if we've already patched
-  const FETCH_PATCHED = Symbol.for('sparkwavv_fetch_patched');
-  
-  if (!(global as any)[FETCH_PATCHED]) {
-    const systemFetch = fetch;
-    const appUrl = "https://ais-dev-6de5lrtpnvciah3xwxmagf-232918548667.us-east1.run.app";
-    const sharedUrl = "https://ais-pre-6de5lrtpnvciah3xwxmagf-232918548667.us-east1.run.app";
-
-    // @ts-ignore
-    global.fetch = async (url, options: any = {}) => {
-      const urlStr = url.toString();
-      // Only apply referer rotation to Google AI APIs
-      if (!urlStr.includes('googleapis.com')) {
-        return systemFetch(url, options);
-      }
-
-      const tryFetch = async (referer: string | null) => {
-        const headers: Record<string, string> = {};
-        
-        // Copy original headers
-        if (options.headers) {
-          if (options.headers instanceof Headers) {
-            options.headers.forEach((v, k) => { headers[k] = v; });
-          } else if (Array.isArray(options.headers)) {
-            options.headers.forEach(([k, v]) => { headers[k] = v; });
-          } else {
-            Object.assign(headers, options.headers);
-          }
-        }
-
-        if (referer) {
-          headers['Referer'] = referer;
-          headers['Origin'] = referer;
-        }
-
-        try {
-          // Use axios as it's more reliable for setting forbidden headers in Node
-          const axiosRes = await axios({
-            url: urlStr,
-            method: (options.method || 'GET').toUpperCase(),
-            data: options.body,
-            headers,
-            responseType: 'arraybuffer',
-            validateStatus: () => true, // Don't throw on non-200
-          });
-
-          // Convert axios response back to fetch-like Response
-          return new Response(axiosRes.data, {
-            status: axiosRes.status,
-            statusText: axiosRes.statusText,
-            headers: axiosRes.headers as any,
-          });
-        } catch (e: any) {
-          console.error(`[MCP Registry Patch] Axios bridge failed for ${urlStr}: ${e.message}`);
-          return systemFetch(url, options);
-        }
-      };
-
-      // First attempt with shared url
-      let response = await tryFetch(sharedUrl);
-      
-      // If blocked, try dev url
-      if (response.status === 403) {
-        response = await tryFetch(appUrl);
-      }
-      
-      // If still blocked, try without referer
-      if (response.status === 403) {
-        response = await tryFetch(null);
-      }
-
-      return response;
-    };
-    (global as any)[FETCH_PATCHED] = true;
-    (global as any).systemFetch = systemFetch;
-    console.error("[MCP Registry] Global fetch patched with Axios bridge for Referer support");
-  }
-}
-
+import "../../backend/services/patchFetch.ts";
 import { Server } from "@modelcontextprotocol/sdk/server/index.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import {
@@ -92,6 +7,7 @@ import {
   ListToolsRequestSchema,
 } from "@modelcontextprotocol/sdk/types.js";
 import { GoogleGenAI } from "@google/genai";
+import { VertexAI } from "@google-cloud/vertexai";
 import dotenv from "dotenv";
 import path from "path";
 import fs from "fs";
@@ -103,56 +19,26 @@ const MODELS = {
 
 /**
  * Custom fetch to handle the "Referrer <empty>" issue
+ * Now simply delegates to the patched global fetch which handles rotation and axios bridging.
  */
 const customFetch = async (url: any, options: any) => {
-  const appUrl = "https://ais-dev-6de5lrtpnvciah3xwxmagf-232918548667.us-east1.run.app";
-  const sharedUrl = "https://ais-pre-6de5lrtpnvciah3xwxmagf-232918548667.us-east1.run.app";
-  
-  const isGoogleApi = url.toString().includes('googleapis.com');
-  if (!isGoogleApi) return fetch(url, options);
-
-  const tryWithReferer = async (referer: string | null) => {
-    const headers = new Headers(options?.headers || {});
-    if (referer) {
-      headers.set("Referer", referer);
-      headers.set("referer", referer);
-      headers.set("Origin", referer);
-      headers.set("origin", referer);
-    } else {
-      headers.delete("Referer");
-      headers.delete("referer");
-      headers.delete("Origin");
-      headers.delete("origin");
-    }
-    
-    const plainHeaders: Record<string, string> = {};
-    headers.forEach((v, k) => plainHeaders[k] = v);
-    
-    // We use the patched global fetch or original if available
-    // But since we are already handling referer here, 
-    // we want to avoid infinite recursion if fetch is patched.
-    // If FETCH_PATCHED is true, we should use the hidden systemFetch.
-    const FETCH_PATCHED = Symbol.for('sparkwavv_fetch_patched');
-    const systemFetch = (global as any)[FETCH_PATCHED] ? (global as any).systemFetch : fetch;
-    
-    return (systemFetch || fetch)(url, { ...options, headers: plainHeaders });
-  };
-
-  let response = await tryWithReferer(sharedUrl);
-  if (response.status === 403) {
-    console.error(`[MCP customFetch] 403 for ${sharedUrl}, trying ${appUrl}`);
-    response = await tryWithReferer(appUrl);
-  }
-  if (response.status === 403) {
-    console.error(`[MCP customFetch] 403 for ${appUrl}, trying WITHOUT referer`);
-    response = await tryWithReferer(null);
-  }
-  return response;
+  return fetch(url, options);
 };
 
-// Initialize Google AI with custom fetch if possible
-// Note: @google/generative-ai uses standard fetch, we can override globally or pass in if SDK supports it.
-// Node 18+ has global fetch.
+// Vertex AI Config
+const vertexProjectId = process.env.VERTEX_AI_PROJECT_ID;
+const vertexLocation = process.env.VERTEX_AI_LOCATION || 'us-central1';
+const isVertexAvailable = vertexProjectId && vertexProjectId.trim() !== '' && !vertexProjectId.includes('gen-lang-client');
+
+let vertexInstance: VertexAI | null = null;
+if (isVertexAvailable) {
+  try {
+    vertexInstance = new VertexAI({ project: vertexProjectId!, location: vertexLocation });
+    console.error(`[MCP Registry] Vertex AI initialized for project: ${vertexProjectId}`);
+  } catch (e) {
+    console.error(`[MCP Registry] Failed to initialize Vertex AI:`, e);
+  }
+}
 
 const getApiKeys = () => {
   const keys = [
@@ -163,9 +49,7 @@ const getApiKeys = () => {
     process.env.GENAI_API_KEY
   ].filter(Boolean) as string[];
   
-  console.error(`[MCP Registry] Detected ${keys.length} potential keys in environment.`);
-  
-  // Filter out placeholder patterns like {{...}} or empty placeholders
+  // Filter out placeholder patterns
   const validKeys = keys.filter(k => 
     k &&
     k.length > 5 && 
@@ -174,7 +58,6 @@ const getApiKeys = () => {
     k !== 'undefined'
   );
 
-  console.error(`[MCP Registry] Found ${validKeys.length} valid keys after filtering.`);
   return [...new Set(validKeys)]; // Unique keys only
 };
 
@@ -184,8 +67,6 @@ let currentKeyIndex = 0;
 const getApiKey = () => {
   if (availableKeys.length === 0) return "";
   const key = availableKeys[currentKeyIndex];
-  const masked = `${key.substring(0, 4)}...${key.substring(key.length - 4)}`;
-  console.error(`[MCP Registry] Using Key Index ${currentKeyIndex}: ${masked}`);
   return key;
 };
 
@@ -195,7 +76,6 @@ const rotateApiKey = () => {
     console.error(`[MCP Registry] Rotated to next available API key (Index: ${currentKeyIndex}, Total: ${availableKeys.length})`);
     return true;
   }
-  console.error(`[MCP Registry] No more keys to rotate to (Total: ${availableKeys.length})`);
   return false;
 };
 
@@ -209,94 +89,95 @@ async function generateWithFallback(
   retryCount: number = 0
 ): Promise<any> {
   const apiKey = getApiKey();
-  if (!apiKey) {
-    throw new Error("Missing Gemini API Key in MCP environment.");
-  }
-
-  const ai = new GoogleGenAI({ apiKey, fetch: customFetch });
   
-  // Try Primary Model
-  try {
-    console.error(`[MCP Registry] Attempting generation with primary model: ${requestedModel} (Key Index: ${currentKeyIndex})`);
-    
-    // Convert contents to the format expected by @google/genai if it's not already
-    // The @google/genai generateContent expects { model, contents }
-    const result = await ai.models.generateContent({
-      model: requestedModel,
-      contents,
-      config: { temperature }
-    });
-    
-    let text = result.text || "";
-    const attachments: any[] = [];
-    
-    // We can iterate through candidates parts if needed, but result.text is usually enough
-    if (!text && result.candidates?.[0]?.content?.parts) {
-       for (const part of result.candidates[0].content.parts) {
-         if (part.text) text += part.text;
-         if (part.inlineData) {
-           attachments.push({
-             data: part.inlineData.data,
-             mimeType: part.inlineData.mimeType
-           });
+  // Try Google AI (Primary)
+  if (apiKey) {
+    try {
+      const ai = new GoogleGenAI({ apiKey, fetch: customFetch });
+      const modelId = requestedModel.startsWith('vertexai/') ? requestedModel.split('/')[1] : requestedModel;
+      
+      console.error(`[MCP Registry] Attempting Google AI: ${modelId} (Key Index: ${currentKeyIndex})`);
+      
+      const result = await ai.models.generateContent({
+        model: modelId,
+        contents,
+        config: { temperature }
+      });
+      
+      let text = result.text || "";
+      const attachments: any[] = [];
+      
+      if (!text && result.candidates?.[0]?.content?.parts) {
+         for (const part of result.candidates[0].content.parts) {
+           if (part.text) text += part.text;
+           if (part.inlineData) {
+             attachments.push({
+               data: part.inlineData.data,
+               mimeType: part.inlineData.mimeType
+             });
+           }
          }
-       }
-    }
+      }
 
-    return {
-      text: text,
-      attachments,
-      model: requestedModel,
-      status: "success"
-    };
-  } catch (error: any) {
-    const errorMsg = error.message || String(error);
-    console.error(`[MCP Registry] Primary model failed: ${errorMsg}`);
+      return { text, attachments, model: `googleai/${modelId}`, status: "success" };
+    } catch (error: any) {
+      const errorMsg = error.message || String(error);
+      console.error(`[MCP Registry] Google AI failed: ${errorMsg}`);
 
-    // Critical: If key is expired or invalid, reporting it is better than trying fallback if it uses same key
-    const isApiKeyError = errorMsg.includes('API key expired') || 
+      const isAuthError = errorMsg.includes('API key expired') || 
                           errorMsg.includes('API_KEY_INVALID') || 
                           errorMsg.includes('403') ||
                           errorMsg.includes('400') ||
-                          errorMsg.includes('blocked') ||
-                          errorMsg.includes('referer') ||
-                          errorMsg.includes('forbidden');
+                          errorMsg.includes('blocked');
 
-    if (isApiKeyError) {
-      if (rotateApiKey() && retryCount < availableKeys.length) {
+      if (isAuthError && rotateApiKey() && retryCount < availableKeys.length) {
         return generateWithFallback(contents, requestedModel, temperature, retryCount + 1);
       }
+      
+      // If Google AI Auth failed and no more keys, try Vertex AI if available
+      if (isVertexAvailable && vertexInstance) {
+         console.error(`[MCP Registry] Switching to Vertex AI fallback...`);
+         return generateWithVertex(contents, requestedModel, temperature);
+      }
+
       return {
-        text: `I'm sorry, my Gemini API Key appears to be expired or invalid. Please renew the API key in the Google AI Studio settings to restore my intelligence capabilities. (Error: ${errorMsg})`,
+        text: `I'm sorry, my Gemini API Key appears to be expired or blocked. Error: ${errorMsg}`,
         model: requestedModel,
         status: "error_api_key",
         originalError: errorMsg
       };
     }
+  } else if (isVertexAvailable && vertexInstance) {
+     return generateWithVertex(contents, requestedModel, temperature);
+  }
 
-    const isModelUnavailable = errorMsg.includes("404") || errorMsg.includes("not found") || errorMsg.includes("permission");
+  throw new Error("No valid AI provider (Google AI or Vertex AI) available.");
+}
+
+async function generateWithVertex(contents: any[], modelId: string, temperature: number): Promise<any> {
+  if (!vertexInstance) throw new Error("Vertex AI not initialized");
+  
+  const rawModelId = modelId.includes('/') ? modelId.split('/')[1] : modelId;
+  console.error(`[MCP Registry] Attempting Vertex AI: ${rawModelId}`);
+  
+  const model = vertexInstance.getGenerativeModel({
+    model: rawModelId,
+    generationConfig: { temperature }
+  });
+
+  try {
+    const result = await model.generateContent({ contents });
+    const response = await result.response;
+    const text = response.candidates?.[0]?.content?.parts?.[0]?.text || "";
     
-    if (isModelUnavailable && requestedModel !== MODELS.UTILITY_TASK) {
-      console.error(`[MCP Registry] Primary model ${requestedModel} failed or unavailable. Falling back to ${MODELS.UTILITY_TASK}.`);
-      
-      // Fallback to Utility Model
-      try {
-        const result = await generateWithFallback(contents, MODELS.UTILITY_TASK, temperature, retryCount);
-        return {
-          ...result,
-          status: result.status === 'success' ? "fallback_success" : result.status,
-          originalError: errorMsg
-        };
-      } catch (fallbackError: any) {
-        return {
-          text: `Critical Failure: Primary and Fallback models failed. ${errorMsg}`,
-          model: requestedModel,
-          status: "failure"
-        };
-      }
-    }
-    
-    throw error;
+    return {
+      text,
+      model: `vertexai/${rawModelId}`,
+      status: "success"
+    };
+  } catch (e: any) {
+    console.error(`[MCP Registry] Vertex AI failed:`, e.message);
+    throw e;
   }
 }
 

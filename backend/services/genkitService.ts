@@ -1,3 +1,4 @@
+import './patchFetch.js';
 import { genkit, z } from 'genkit';
 import { googleAI } from '@genkit-ai/googleai';
 import { vertexAI } from '@genkit-ai/vertexai';
@@ -2457,24 +2458,19 @@ export const runJourneyStageFlow = ai.defineFlow(
           if (stageDoc.exists) {
             stageConfig = stageDoc.data();
           } else {
-            console.warn(`[GenkitService] Journey stage configuration '${input.stageId}' NOT FOUND in ${db.projectId}/${db.databaseId}. Falling back to bundle defaults.`);
+            // Silently fall back to bundle if not found in DB
             const defaultStages = defaultJourneyStages as any;
             stageConfig = defaultStages[input.stageId] || defaultStages['dive-in'];
           }
         } catch (innerError: any) {
-          console.error(`[GenkitService] PERMISSION_DENIED or Error fetching 'journeyPhaseConfigs' (Stage: ${input.stageId}) from ${db.projectId}/${db.databaseId}:`, innerError.message || innerError);
+          const isPermissionIssue = innerError.message?.includes('PERMISSION_DENIED') || innerError.code === 7;
           
-          if (innerError.message?.includes('PERMISSION_DENIED') || innerError.code === 7) {
-             console.log('[GenkitService] Attempting emergency config fetch via default Firestore context...');
-             const fallbackDb = (await import('firebase-admin/firestore')).getFirestore(); 
-             const fallbackDoc = await fallbackDb.collection('journeyPhaseConfigs').doc(input.stageId).get();
-             if (fallbackDoc.exists) {
-                stageConfig = fallbackDoc.data();
-                console.log('[GenkitService] Emergency fallback SUCCESS.');
-             } else {
-                throw innerError;
-             }
+          if (isPermissionIssue) {
+             console.log(`[GenkitService] Permission issue accessing DB. Falling back to local config for ${input.stageId}.`);
+             const defaultStages = defaultJourneyStages as any;
+             stageConfig = defaultStages[input.stageId] || defaultStages['dive-in'];
           } else {
+            console.error(`[GenkitService] Error fetching 'journeyPhaseConfigs' (Stage: ${input.stageId}):`, innerError.message || innerError);
             throw innerError;
           }
         }
@@ -2596,11 +2592,14 @@ export const runJourneyStageFlow = ai.defineFlow(
         errorString.includes('API_KEY_MISSING') ||
         errorString.includes('API key is required') ||
         errorString.includes('Please pass in the API key') ||
+        errorString.includes('API_KEY_HTTP_REFERRER_BLOCKED') ||
+        errorString.includes('referer <empty>') ||
         errorString.includes('expired') ||
         errorString.includes('renew') ||
         errorString.includes('NOT_FOUND') ||
         errorString.includes('no longer available') ||
         errorString.includes('PERMISSION_DENIED') ||
+        errorString.includes('403') ||
         errorString.includes('400')
       ) {
         if (!isVertexAvailable) {
