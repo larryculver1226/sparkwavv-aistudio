@@ -27,7 +27,7 @@ const getViteEnv = (key: string) => {
   return undefined;
 };
 const isPlaceholder = (val: any) =>
-  !val || (typeof val === 'string' && (val.startsWith('PLACEHOLDER') || val.startsWith('$$') || val === ''));
+  !val || (typeof val === 'string' && (val.startsWith('PLACEHOLDER') || val.startsWith('$$') || val.includes('UNSET') || val === ''));
 
 const config = {
   apiKey: !isPlaceholder(firebaseConfig.apiKey)
@@ -70,7 +70,11 @@ if (config.apiKey) {
     `${config.apiKey.substring(0, 6)}...${config.apiKey.substring(config.apiKey.length - 4)}`
   );
 } else {
+  const rawInConfig = firebaseConfig.apiKey;
+  const rawInVite = getViteEnv('VITE_FIREBASE_API_KEY');
   console.warn('🛡️ [Firebase] API Key is MISSING! (Checks: JSON, Environment)');
+  console.log('🛡️ [Firebase] Diagnostic - JSON Key:', rawInConfig ? (rawInConfig.startsWith('$$') ? 'REMAINING_VAR' : 'EXISTS') : 'EMPTY');
+  console.log('🛡️ [Firebase] Diagnostic - Vite Key:', rawInVite ? (rawInVite.startsWith('$$') ? 'REMAINING_VAR' : 'EXISTS') : 'EMPTY');
 }
 
 let sparkwavvApp: any;
@@ -148,5 +152,5 @@ export const setTenantId = (tenantId: string | null) => {
   console.log(`🛡️ [Firebase] Tenant ID set to: ${tenantId}`);
 };
 
-export const isFirebaseConfigured = !!config.apiKey && (typeof config.apiKey === 'string') && !config.apiKey.startsWith('PLACEHOLDER');
+export const isFirebaseConfigured = !!config.apiKey && (typeof config.apiKey === 'string') && !config.apiKey.startsWith('PLACEHOLDER') && !config.apiKey.startsWith('$$');
 export const isAdminFirebaseConfigured = isFirebaseConfigured; // In single project mode, if one is configured, both are

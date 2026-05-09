@@ -23,15 +23,15 @@ steps:
 
   # Step 2: Build the Docker image with Vite build arguments
   - name: 'gcr.io/cloud-builders/docker'
+    entrypoint: 'bash'
     args:
-      - 'build'
-      - '-t'
-      - 'gcr.io/$PROJECT_ID/sparkwavv-prod:$COMMIT_SHA'
-      - '--build-arg'
-      - 'VITE_FIREBASE_API_KEY=$$VITE_FIREBASE_API_KEY'
-      - '--build-arg'
-      - 'VITE_FIREBASE_PROJECT_ID=$$VITE_FIREBASE_PROJECT_ID'
-      - '.'
+      - '-c'
+      - |
+        docker build \
+          -t gcr.io/$PROJECT_ID/sparkwavv-prod:$COMMIT_SHA \
+          --build-arg VITE_FIREBASE_API_KEY=$$VITE_FIREBASE_API_KEY \
+          --build-arg VITE_FIREBASE_PROJECT_ID=$$VITE_FIREBASE_PROJECT_ID \
+          .
     secretEnv:
       - 'VITE_FIREBASE_API_KEY'
       - 'VITE_FIREBASE_PROJECT_ID'

@@ -4,6 +4,7 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 ### Fixed
+- **Track 152 (Firebase Key Injection Fix)**: Resolved "Missing API Key" errors in production by correcting secret expansion in `cloudbuild.yaml` and hardening `src/config.ts` fallback logic.
 - **Track 150 (Comprehensive Skylar Fix)**: Resolved persistent connectivity and authentication issues.
     - **Global Fetch Interceptor**: Strengthened `backend/services/patchFetch.ts` with autonomous Referer rotation and Axios bridging.
     - **MCP Registry Resilience**: Added **Vertex AI fallback** and key rotation to the Model Registry to survive Gemini API key expirations.

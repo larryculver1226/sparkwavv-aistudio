@@ -19,9 +19,18 @@ const getEnvVar = (viteVal: string | undefined, processKey: string, jsonFallback
   // Fallback to process.env for Node/Backend usage
   if (isInvalid(val)) {
     try {
-      if (typeof process !== 'undefined' && process.env && process.env[processKey]) {
-        val = process.env[processKey];
-        source = 'Process Environment';
+      if (typeof process !== 'undefined' && process.env) {
+        // Try common variations if the primary one is missing
+        val = process.env[processKey] || 
+              process.env[processKey.replace('VITE_', '')] || 
+              process.env['FIREBASE_API_KEY'] ||
+              process.env['GEMINI_API_KEY']; // As a last resort, some projects reuse keys
+        
+        if (val && !isInvalid(val)) {
+          source = 'Process Environment (Fallback)';
+        } else {
+          val = undefined;
+        }
       }
     } catch (e) { /* Ignored */ }
   }
