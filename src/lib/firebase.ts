@@ -27,7 +27,7 @@ const getViteEnv = (key: string) => {
   return undefined;
 };
 const isPlaceholder = (val: any) =>
-  !val || (typeof val === 'string' && (val.startsWith('PLACEHOLDER') || val === ''));
+  !val || (typeof val === 'string' && (val.startsWith('PLACEHOLDER') || val.startsWith('$$') || val === ''));
 
 const config = {
   apiKey: !isPlaceholder(firebaseConfig.apiKey)
@@ -55,15 +55,22 @@ const config = {
 
 console.log('🛡️ [Firebase] Initializing with Project ID:', config.projectId);
 
+// Double check for common env injection failures
+if (config.apiKey && typeof config.apiKey === 'string' && config.apiKey.startsWith('$$')) {
+  console.warn('🛡️ [Firebase] Detected unresolved build secret in API Key. Clearing for fallback.');
+  config.apiKey = undefined;
+}
+
 if (config.apiKey) {
-  const keySource = getViteEnv('VITE_FIREBASE_API_KEY') ? 'Environment Variable' : 'Config File';
+  const isFromVite = getViteEnv('VITE_FIREBASE_API_KEY') === config.apiKey;
+  const keySource = isFromVite ? 'Environment Variable' : 'Config File';
   console.log(`🛡️ [Firebase] API Key Source: ${keySource}`);
   console.log(
     '🛡️ [Firebase] API Key:',
     `${config.apiKey.substring(0, 6)}...${config.apiKey.substring(config.apiKey.length - 4)}`
   );
 } else {
-  console.warn('🛡️ [Firebase] API Key is MISSING!');
+  console.warn('🛡️ [Firebase] API Key is MISSING! (Checks: JSON, Environment)');
 }
 
 let sparkwavvApp: any;

@@ -5,26 +5,31 @@ import firebaseConfig from '../firebase-applet-config.json';
 // Safely access environment variables in both Vite and Node.js environments
 const getEnvVar = (viteVal: string | undefined, processKey: string, jsonFallback?: string): string | undefined => {
   let val: string | undefined = viteVal;
+  let source = 'Vite Environment';
 
   // Treat explicit placeholder strings, unresolved cloudbuild variables, or empty strings as 'missing'
-  if (val) {
-    if (val.trim() === '' || val.includes('PLACEHOLDER') || val.startsWith('$$')) {
-      val = undefined;
-    }
-  }
+  const isInvalid = (v: any) => 
+    !v || 
+    (typeof v === 'string' && (v.trim() === '' || v.includes('PLACEHOLDER') || v.startsWith('$$')));
 
-  // Fallback to config file
-  if (!val && jsonFallback) {
-    val = (firebaseConfig as any)[jsonFallback];
+  if (isInvalid(val)) {
+    val = undefined;
   }
 
   // Fallback to process.env for Node/Backend usage
-  try {
-    if (!val && typeof process !== 'undefined' && process.env && process.env[processKey]) {
-      val = process.env[processKey];
-    }
-  } catch (e) {
-    // Ignored
+  if (isInvalid(val)) {
+    try {
+      if (typeof process !== 'undefined' && process.env && process.env[processKey]) {
+        val = process.env[processKey];
+        source = 'Process Environment';
+      }
+    } catch (e) { /* Ignored */ }
+  }
+
+  // Fallback to config file
+  if (isInvalid(val) && jsonFallback) {
+    val = (firebaseConfig as any)[jsonFallback];
+    source = 'Config File (JSON)';
   }
 
   // Final sanitization check before returning
@@ -34,6 +39,10 @@ const getEnvVar = (viteVal: string | undefined, processKey: string, jsonFallback
     sanitized = sanitized.replace(/^["']|["']$/g, '');
     
     if (sanitized !== '' && !sanitized.includes('PLACEHOLDER') && !sanitized.startsWith('$$')) {
+      if (typeof window !== 'undefined' && processKey.includes('API_KEY')) {
+        const masked = sanitized.length > 8 ? `${sanitized.substring(0, 4)}...${sanitized.substring(sanitized.length - 4)}` : '****';
+        console.log(`[Config] Loaded ${processKey} from ${source}: ${masked}`);
+      }
       return sanitized;
     }
   }
