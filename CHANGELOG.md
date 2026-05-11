@@ -4,6 +4,21 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 ### Fixed
+- **Track 158 (AI Registry & Patch Hardening)**: Resolved persistent `API_KEY_HTTP_REFERRER_BLOCKED` and `API_KEY_INVALID` errors.
+    - **Patched Fetch v3**: Hardened `patchFetch.ts` with explicit lowercase `referer` and matching `Origin` headers for Google domains. Expanded the rotation pool to include Firebase prod domains.
+    - **Key Pool Expansion**: Authorized the use of Firebase API keys for server-side Gemini calls and added them to the MCP Registry rotation pool to increase failover resilience.
+    - **Genkit Integration**: Explicitly injected the global patched fetch into `@genkit-ai/googleai` plugins to ensure all sub-agent calls benefit from referer rotation.
+- **Track 157 (Infrastructure & DB Reliability)**: Resolved `5 NOT_FOUND` Firestore errors and clarified rate-limit validation warnings.
+    - **Firestore Auto-Fallback**: Implemented a robust initialization sequence that verifies connectivity to the AI Studio-provided database ID and automatically falls back to the `(default)` database if the primary is missing (common with custom project IDs).
+    - **Bootstrap Sync**: Wrapped all startup bootstrap tasks (Admin promotion, Partner ecosystem init) in a `firestoreReady` promise to prevent race conditions during DB migration/fallback.
+    - **Rate Limit IPv6 Fix**: Resolved `express-rate-limit` ValidationErrors by setting `trust proxy` and explicitly disabling IP validation checks for custom key generators.
+- **Track 156 (Auth & Resource Protection)**: Resolved 401 Unauthorized errors on admin endpoints by narrowing the scope of the Global Fetch Interceptor to only target AI-specific endpoints.
+    - **Refined Interceptor**: Updated `patchFetch.ts` to strictly target `generativelanguage.googleapis.com`, `aiplatform.googleapis.com`, and `vertexai.googleapis.com`. This prevents interference with Firebase Admin SDK token verification.
+    - **Auth Debugging**: Added detailed logging to `server.ts` `verifyToken` middleware to capture and diagnose project mismatches or token expirations.
+- **Track 155 (Global Fetch & Registry Hardening)**: Finalized multi-layered fix for `API_KEY_HTTP_REFERRER_BLOCKED` and `API_KEY_INVALID` errors.
+    - **Global Fetch Patch**: Hardened `patchFetch.ts` to aggressively strip problematic headers (`Host`, `Origin`, `Sec-Fetch-*`, `Via`) and expanded referer rotation to include trailing slash variations.
+    - **MCP Model Registry**: Updated the registry to detect `API key expired` errors and automatically remove dead keys from the rotation pool to prevent wasted retries.
+    - **XD3 Suppression**: Resolved specific `Origin doesn't match Host` 400 errors by ensuring the `Origin` header is completely removed from server-side requests.
 - **Track 154 (Gemini Auth & Referrer Fixes)**: Addressing `API_KEY_HTTP_REFERRER_BLOCKED` and `API_KEY_INVALID` errors by hardening the Global Fetch Interceptor and improving MCP Registry rotation. Fixed "Origin doesn't match Host" 400 errors by removing manual Origin injection.
 - **Track 153 (Dev-Prod Standardization)**: Initialized standardization of the deployment pipeline, shifting to dynamic service naming and automated secret versioning (latest).
 - **Track 152 (Firebase Key Injection Fix)**: Resolved "Missing API Key" errors in production by correcting secret expansion in `cloudbuild.yaml` and hardening `src/config.ts` fallback logic.

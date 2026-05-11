@@ -1,8 +1,8 @@
+import './backend/services/patchFetch.js';
 import dotenv from 'dotenv';
 dotenv.config();
 
 import axios from 'axios';
-import './backend/services/patchFetch.js';
 
 import { validateConfig } from './src/config';
 validateConfig();
@@ -535,6 +535,12 @@ let adminDb: any;
 let db: any;
 let sparkwavvAdmin: admin.app.App | null = null;
 
+// Promise to track Firestore initialization readiness
+let resolveFirestoreReady: (value: unknown) => void;
+export const firestoreReady = new Promise((resolve) => {
+  resolveFirestoreReady = resolve;
+});
+
 // Log status to a file for diagnostics - moved up so it can be updated during init
 const envStatus: any = {
   VITE_FIREBASE_API_KEY: firebaseAppletConfig.apiKey || process.env.VITE_FIREBASE_API_KEY || '',
@@ -604,21 +610,49 @@ try {
 
     // Connectivity Check
     const connectivityPath = 'metadata/skylar_global';
-    db.doc(connectivityPath).get()
-      .then(() => {
-        console.log(`[AUTH] Firestore connectivity check successful for ${databaseId || '(default)'} (at ${connectivityPath}).`);
+    
+    const runConnectivityCheck = async (dbInstance: any, dbIdLabel: string) => {
+      try {
+        await dbInstance.doc(connectivityPath).get();
+        console.log(`[AUTH] Firestore connectivity check successful for ${dbIdLabel} (at ${connectivityPath}).`);
         envStatus.FIRESTORE_STATUS = 'OK (Init)';
-      })
-      .catch((err) => {
-        envStatus.FIRESTORE_STATUS = `ERROR (Init): ${err.message}`;
-        if (err.message.includes('permission') || err.code === 7) {
-          console.warn(`[AUTH] Firestore PERMISSION_DENIED on ${databaseId || '(default)'} at ${connectivityPath}. Rules or Service Account may be restrictive.`);
-        } else if (err.code === 5 || err.message.includes('NOT_FOUND')) {
-          console.error(`[AUTH] Firestore Document NOT FOUND: ${connectivityPath} on ${databaseId || '(default)'}.`);
-        } else {
-          console.error(`[AUTH] Firestore connectivity check failed:`, err.message);
+        return true;
+      } catch (err: any) {
+        if (err.code === 5 || err.message.includes('NOT_FOUND') || err.message.includes('database') || err.message.includes('instance')) {
+          console.error(`[AUTH] Firestore Database or Document NOT FOUND: ${dbIdLabel}. ${err.message}`);
+          return false;
         }
-      });
+        console.warn(`[AUTH] Firestore connectivity warning for ${dbIdLabel}: ${err.message}`);
+        // If it's permission denied, we still "found" it but can't read this specific doc
+        if (err.code === 7) return true; 
+        return false;
+      }
+    };
+
+    // We use a self-executing async function but we don't necessarily await it here 
+    // unless we wrap the entire init in a promise.
+    const initializeProjectDb = async (currentDb: any, currentDbId: string) => {
+      const success = await runConnectivityCheck(currentDb, currentDbId || '(default)');
+      if (!success && currentDbId && currentDbId !== '(default)') {
+        console.warn(`[AUTH] AI Studio Database ID ${currentDbId} failed. Falling back to (default) database...`);
+        try {
+          const fallbackDb = getFirestore(sparkwavvAdmin!);
+          const fallbackSuccess = await runConnectivityCheck(fallbackDb, '(default)');
+          if (fallbackSuccess) {
+            console.log(`[AUTH] Successfully switched to (default) database.`);
+            sparkwavvDb = fallbackDb;
+            db = fallbackDb;
+            if (adminDb === sparkwavvDb) adminDb = fallbackDb;
+          }
+        } catch (e: any) {
+           console.error(`[AUTH] Critical: Both specified database and default database failed: ${e.message}`);
+        }
+      }
+    };
+
+    initializeProjectDb(db, databaseId).then(() => {
+      resolveFirestoreReady(true);
+    });
 
     // Database 2: Admin (System Data) - Using 'admindb'
     try {
@@ -736,17 +770,45 @@ try {
 
       // Connectivity Check
       const connectivityPath = 'metadata/skylar_global';
-      db.doc(connectivityPath).get()
-        .then(() => console.log(`[AUTH] Firestore connectivity check successful for ${databaseId || '(default)'} (at ${connectivityPath}) (Environment Config).`))
-        .catch((err) => {
-          if (err.message.includes('permission') || err.code === 7) {
-            console.warn(`[AUTH] Firestore PERMISSION_DENIED on ${databaseId || '(default)'} at ${connectivityPath} (Environment Config).`);
-          } else if (err.code === 5 || err.message.includes('NOT_FOUND')) {
-            console.error(`[AUTH] Firestore Document NOT FOUND: ${connectivityPath} on ${databaseId || '(default)'} (Environment Config).`);
-          } else {
-            console.error(`[AUTH] Firestore connectivity check failed (Environment Config):`, err.message);
+      
+      const runConnectivityCheck = async (dbInstance: any, dbIdLabel: string) => {
+        try {
+          await dbInstance.doc(connectivityPath).get();
+          console.log(`[AUTH] Firestore connectivity check successful for ${dbIdLabel} (at ${connectivityPath}) (Environment Config).`);
+          return true;
+        } catch (err: any) {
+          if (err.code === 5 || err.message.includes('NOT_FOUND') || err.message.includes('database') || err.message.includes('instance')) {
+             console.error(`[AUTH] Firestore Database or Document NOT FOUND: ${dbIdLabel} (Environment Config). ${err.message}`);
+             return false;
           }
-        });
+          console.warn(`[AUTH] Firestore connectivity warning for ${dbIdLabel} (Environment Config): ${err.message}`);
+          if (err.code === 7) return true;
+          return false;
+        }
+      };
+
+      const initializeEnvDb = async (currentDb: any, currentDbId: string) => {
+        const success = await runConnectivityCheck(currentDb, currentDbId || '(default)');
+        if (!success && currentDbId && currentDbId !== '(default)') {
+          console.warn(`[AUTH] AI Studio Database ID ${currentDbId} failed (Environment Config). Falling back to (default) database...`);
+          try {
+            const fallbackDb = getFirestore(sparkwavvAdmin!);
+            const fallbackSuccess = await runConnectivityCheck(fallbackDb, '(default)');
+            if (fallbackSuccess) {
+              console.log(`[AUTH] Successfully switched to (default) database (Environment Config).`);
+              sparkwavvDb = fallbackDb;
+              db = fallbackDb;
+              if (adminDb === sparkwavvDb) adminDb = fallbackDb;
+            }
+          } catch (e: any) {
+             console.error(`[AUTH] Critical: Both specified database and default database failed (Environment Config): ${e.message}`);
+          }
+        }
+      };
+
+      initializeEnvDb(db, databaseId).then(() => {
+        resolveFirestoreReady(true);
+      });
 
       // Database 2: Admin (System Data) - Using 'admindb'
       try {
@@ -852,7 +914,12 @@ async function startServer() {
     },
     keyGenerator: (req) => {
       // satisfy express-rate-limit's check for IPv6 normalization
-      return (req.ip || (req.headers['x-forwarded-for'] as string) || 'anonymous').replace(/^::ffff:/, '');
+      const rawIp = req.ip || (req.headers['x-forwarded-for'] as string) || 'anonymous';
+      return rawIp.replace(/^::ffff:/, '');
+    },
+    validate: {
+      ip: false,
+      xForwardedForHeader: false
     },
   });
 
@@ -979,17 +1046,43 @@ async function startServer() {
   };
 
   const verifyToken = async (req: express.Request) => {
-    const idToken = req.headers.authorization?.split('Bearer ')[1];
-    if (!idToken || idToken === 'undefined') return null;
+    const authHeader = req.headers.authorization;
+    if (!authHeader) {
+      console.warn(`[AUTH] No authorization header present for ${req.path}`);
+      return null;
+    }
+
+    const idToken = authHeader.split('Bearer ')[1];
+    if (!idToken || idToken === 'undefined' || idToken === 'null') {
+      console.warn(`[AUTH] Invalid token format in header for ${req.path}`);
+      return null;
+    }
 
     try {
       // Try Admin Project First
       if (isFirebaseAdminConfigured && sparkwavvAdmin) {
-        const decodedToken = await sparkwavvAdmin.auth().verifyIdToken(idToken);
-        return decodedToken;
+        try {
+          const decodedToken = await sparkwavvAdmin.auth().verifyIdToken(idToken);
+          return decodedToken;
+        } catch (authError: any) {
+          console.error(`[AUTH] Firebase Admin verifyIdToken failed for ${req.path}: ${authError.message}`);
+          
+          // Check for common mismatch issues
+          if (authError.message.includes('aud')) {
+            console.error(`[AUTH] Audience Mismatch: Token is for a different project than the service account.`);
+          }
+          
+          // Re-throw to be caught by outer block or just return null
+          throw authError;
+        }
+      } else {
+        console.warn(`[AUTH] Firebase Admin not configured or initialized during ${req.path} check.`);
       }
     } catch (e: any) {
-      console.warn(`[AUTH] Token verification failed: ${e.message}`);
+      // Already logged above if it was an authError
+      if (!e.message.includes('verifyIdToken failed')) {
+        console.warn(`[AUTH] Token verification error for ${req.path}: ${e.message}`);
+      }
     }
     return null;
   };
@@ -1248,8 +1341,6 @@ async function startServer() {
       }
     };
 
-    promoteSpecificUser('larry.culver1226@gmail.com');
-
     // Bootstrap Kwieri Tenant and Mark Workman
     const bootstrapPartnerEcosystem = async () => {
       if (!isFirebaseAdminConfigured || !sparkwavvAdmin) {
@@ -1315,7 +1406,11 @@ async function startServer() {
       }
     };
 
-    bootstrapPartnerEcosystem();
+    // Await database readiness before running bootstraps
+    firestoreReady.then(() => {
+      promoteSpecificUser('larry.culver1226@gmail.com');
+      bootstrapPartnerEcosystem();
+    });
 
     // Configure SendGrid
     if (process.env.SENDGRID_API_KEY && process.env.SENDGRID_API_KEY.startsWith('SG.')) {
@@ -6012,8 +6107,10 @@ async function startServer() {
       24 * 60 * 60 * 1000
     );
 
-    // Run connectivity checks in background
-    runConnectivityChecks().catch((err) => console.error('Connectivity checks failed:', err));
+    // Run connectivity checks in background after DB is settled
+    firestoreReady.then(() => {
+      runConnectivityChecks().catch((err) => console.error('Connectivity checks failed:', err));
+    });
   });
 }
 

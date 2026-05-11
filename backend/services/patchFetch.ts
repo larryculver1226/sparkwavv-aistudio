@@ -22,7 +22,14 @@ if (typeof global !== 'undefined' && typeof window === 'undefined') {
         const url = (typeof input === 'object' && 'url' in input) ? input.url : input;
         const urlStr = url?.toString();
         
-        if (urlStr && urlStr.includes('googleapis.com')) {
+        // ONLY intercept Google AI endpoints that hit 403 API_KEY_HTTP_REFERRER_BLOCKED or XD3 errors
+        const isAiEndpoint = urlStr && (
+          urlStr.includes('generativelanguage.googleapis.com') || 
+          urlStr.includes('aiplatform.googleapis.com') ||
+          urlStr.includes('vertexai.googleapis.com')
+        );
+        
+        if (isAiEndpoint) {
            const tryFetch = async (referer: string | null) => {
               const headers: Record<string, string> = {
                 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
@@ -47,27 +54,45 @@ if (typeof global !== 'undefined' && typeof window === 'undefined') {
                 }
               }
 
-              if (referer) {
-                headers['Referer'] = referer;
-                headers['X-Referer'] = referer; // Extra hint
-              }
-
-              // CRITICAL: Remove Origin header to prevent "Origin doesn't match Host for XD3"
-              // Google APIs can sometimes be sensitive to this header when coming from server-side Node.
-              const keysToDelete = Object.keys(headers).filter(k => k.toLowerCase() === 'origin' || k.toLowerCase() === 'host');
+              // CRITICAL: Remove headers that trigger Google's XD3 (Cross-Domain Protection) 
+              // These headers are often injected by SDKs or during proxying and cause 400/403 errors.
+              const keysToDelete = Object.keys(headers).filter(k => {
+                const lowK = k.toLowerCase();
+                return lowK === 'origin' || 
+                       lowK === 'host' || 
+                       lowK.startsWith('sec-fetch-') ||
+                       lowK === 'referer' || 
+                       lowK === 'x-referer' ||
+                       lowK === 'x-forwarded-for' ||
+                       lowK === 'x-cloud-trace-context' ||
+                       lowK === 'via' ||
+                       lowK === 'forwarded';
+              });
               keysToDelete.forEach(k => delete headers[k]);
 
+              if (referer) {
+                headers['referer'] = referer;
+                headers['Referer'] = referer;
+                headers['X-Referer'] = referer;
+                
+                // For Google domains, Origin might be expected to match
+                if (referer.includes('google.com') || referer.includes('ai.studio')) {
+                  headers['origin'] = referer.replace(/\/$/, '');
+                  headers['Origin'] = headers['origin'];
+                }
+              }
+
+              // Log just the keys to see if any forbidden ones are present
+              const headerKeys = Object.keys(headers).join(', ');
+              process.stdout.write(`[Global Fetch Patch] Firing request to ${urlStr.substring(0, 100)}... with Referer/Origin: ${referer || 'none'} | Headers: [${headerKeys}]\n`);
+
               try {
-                process.stdout.write(`[Global Fetch Patch] Firing request to ${urlStr.substring(0, 100)}... with Referer: ${referer || 'none'}\n`);
                 // Ensure body is handled correctly for various types
                 let data = init.body;
                 if (typeof input === 'object' && 'body' in input && !data) {
                   data = input.body;
                 }
 
-                // If referer is present but we still get 400 XD3, it might be the Referer itself.
-                // However, Referer is usually required for AI Studio keys.
-                
                 const axiosRes = await axios({
                   url: urlStr,
                   method: (init.method || (input && (input as any).method) || 'GET').toUpperCase(),
@@ -75,8 +100,8 @@ if (typeof global !== 'undefined' && typeof window === 'undefined') {
                   headers: headers,
                   responseType: 'arraybuffer',
                   validateStatus: () => true,
-                  maxRedirects: 5,
-                  timeout: 60000
+                  maxRedirects: 4,
+                  timeout: 45000
                 });
 
                 // Filter out headers that might cause issues with Response
@@ -98,34 +123,51 @@ if (typeof global !== 'undefined' && typeof window === 'undefined') {
               }
            };
 
-           // Attempt rotation: Shared -> Dev -> AI Studio -> alkalimojo -> None
+           // Attempt rotation: Shared -> Dev -> AI Studio -> alkalimojo -> PROD -> None
            const referers = [
-             sharedUrl, 
-             appUrl, 
+             "https://aistudio.google.com/",
              "https://aistudio.google.com", 
+             "https://ai.studio/",
              "https://ai.studio",
-             "https://alkalimojo.com"
+             sharedUrl, 
+             sharedUrl ? sharedUrl + "/" : null,
+             appUrl, 
+             appUrl ? appUrl + "/" : null,
+             "https://sparkwavv-prod.firebaseapp.com/",
+             "https://sparkwavv-prod.firebaseapp.com",
+             "https://alkalimojo.com/",
+             "https://alkalimojo.com",
+             fbAuthDomain,
+             fbAuthDomain ? fbAuthDomain + "/" : null
            ].filter(Boolean) as string[];
 
-           if (fbAuthDomain) referers.push(fbAuthDomain);
-
-           let response: Response | null = null;
+           let lastResponse: Response | null = null;
            
            for (const ref of referers) {
-             response = await tryFetch(ref);
-             if (response.status !== 403) return response;
+             lastResponse = await tryFetch(ref);
              
-             // If 403, check if it's actually a referer block
-             const body = await response.clone().text();
-             if (body.includes('API_KEY_HTTP_REFERRER_BLOCKED') || body.includes('referer <empty>')) {
-               console.warn(`[Global Fetch Patch] 403 (Referer Blocked) with ${ref}, retrying...`);
+             if (lastResponse.status >= 200 && lastResponse.status < 300) {
+               return lastResponse;
+             }
+             
+             const body = await lastResponse.clone().text();
+             const isRetryable = (lastResponse.status === 400 || lastResponse.status === 403) && (
+               body.includes('API_KEY_HTTP_REFERRER_BLOCKED') || 
+               body.includes('referer <empty>') ||
+               body.includes('Referer <empty>') ||
+               body.includes('Origin doesn\'t match Host') ||
+               body.includes('XD3') ||
+               body.includes('PERMISSION_DENIED')
+             );
+
+             if (isRetryable) {
+               console.warn(`[Global Fetch Patch] ${lastResponse.status} (Auth/Origin Block) with ${ref}, retrying...`);
+               continue;
              } else {
-               // Other 403 (e.g. Permission Denied for project/model), don't retry with referers
-               return response;
+               return lastResponse;
              }
            }
            
-           // Final fallback: No referer
            return await tryFetch(null);
         }
         return originalFetch(input, init);

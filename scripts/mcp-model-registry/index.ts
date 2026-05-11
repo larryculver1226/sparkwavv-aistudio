@@ -47,7 +47,9 @@ const getApiKeys = () => {
     process.env.API_KEY,
     process.env.VITE_GEMINI_API_KEY,
     process.env.GOOGLE_AI_API_KEY,
-    process.env.GENAI_API_KEY
+    process.env.GENAI_API_KEY,
+    process.env.VITE_FIREBASE_API_KEY,
+    process.env.FIREBASE_API_KEY
   ].filter(Boolean) as string[];
   
   // Filter out placeholder patterns
@@ -71,7 +73,17 @@ const getApiKey = () => {
   return key;
 };
 
-const rotateApiKey = () => {
+const rotateApiKey = (isPermanentFailure: boolean = false) => {
+  if (isPermanentFailure && availableKeys.length > 0) {
+    const failedKey = availableKeys[currentKeyIndex];
+    const masked = failedKey ? `${failedKey.substring(0, 4)}...${failedKey.substring(failedKey.length - 4)}` : "unknown";
+    console.error(`[MCP Registry] Removing permanently failed key from rotation: ${masked}`);
+    availableKeys.splice(currentKeyIndex, 1);
+    // currentKeyIndex stays same, but availableKeys is smaller now
+    if (currentKeyIndex >= availableKeys.length) currentKeyIndex = 0;
+    return availableKeys.length > 0;
+  }
+
   if (availableKeys.length > 1) {
     currentKeyIndex = (currentKeyIndex + 1) % availableKeys.length;
     console.error(`[MCP Registry] Rotated to next available API key (Index: ${currentKeyIndex}, Total: ${availableKeys.length})`);
@@ -127,15 +139,15 @@ async function generateWithFallback(
       const combinedError = `${errorMsg} ${errorBody}`;
       
       console.error(`[MCP Registry] Google AI failed: ${combinedError}`);
-
-      const isAuthError = combinedError.includes('API key expired') || 
-                          combinedError.includes('API_KEY_INVALID') || 
+      
+      const isExpired = combinedError.includes('API key expired') || combinedError.includes('API_KEY_INVALID');
+      const isAuthError = isExpired || 
                           combinedError.includes('403') ||
                           combinedError.includes('400') ||
                           combinedError.includes('blocked') ||
                           combinedError.includes('PERMISSION_DENIED');
 
-      if (isAuthError && rotateApiKey() && retryCount < availableKeys.length) {
+      if (isAuthError && rotateApiKey(isExpired) && retryCount < (availableKeys.length + 1)) {
         console.error(`[MCP Registry] Retrying with different key due to auth error...`);
         return generateWithFallback(contents, requestedModel, temperature, retryCount + 1);
       }

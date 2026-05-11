@@ -13,13 +13,9 @@ export const getGeminiApiKey = () => {
   let foundSource = 'NONE';
   let firebaseKey = (env.VITE_FIREBASE_API_KEY || env.FIREBASE_API_KEY || '').trim().replace(/^["']|["']$/g, '');
 
-  // Try to identify the Firebase key to avoid using it for GenAI on the server
+  // Try to identify the Firebase key
   if (!firebaseKey && typeof process !== 'undefined') {
-    try {
-      // Use synchronous require if available (CommonJS) or just skip if we can't get it easily
-      // In this environment, we might be in ESM. Let's try to get it from a common env var.
-      // But we can also check the config file if we are on the server.
-    } catch (e) {}
+     firebaseKey = (env.VITE_FIREBASE_API_KEY || env.FIREBASE_API_KEY || '').trim().replace(/^["']|["']$/g, '');
   }
 
   for (const name of keysToTry) {
@@ -30,17 +26,20 @@ export const getGeminiApiKey = () => {
         // Skip keys that are known placeholders
         if (trimmed.includes('PLACEHOLDER')) continue;
         
-        // Skip the Firebase key if we are on the server (it's usually restricted to referer)
-        if (firebaseKey && trimmed === firebaseKey && typeof window === 'undefined') {
-          console.log(`[AIConfig] Skipping ${name} because it matches the restricted Firebase API Key.`);
-          continue;
-        }
+        // We no longer skip the Firebase key because patchFetch.ts handles Referer injection
+        // This allows using the project's primary key for Gemini if no other key is provided.
         
         key = trimmed;
         foundSource = name;
         break;
       }
     }
+  }
+
+  // Fallback to Firebase key if no dedicated Gemini key was found
+  if (!key && firebaseKey && (firebaseKey.startsWith('AIza') || firebaseKey.length > 20)) {
+    key = firebaseKey;
+    foundSource = 'FIREBASE_API_KEY_FALLBACK';
   }
 
   if (key) {

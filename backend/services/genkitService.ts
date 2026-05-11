@@ -188,7 +188,7 @@ if (isVertexAvailable) {
   vertexConfig.projectId = vertexProjectId;
 }
 
-const activePlugins = [googleAI({ apiKey: activeGeminiKey || undefined })];
+const activePlugins = [googleAI({ apiKey: activeGeminiKey || undefined, fetch: global.fetch })];
 if (isVertexAvailable) {
   activePlugins.push(vertexAI(vertexConfig));
 }
