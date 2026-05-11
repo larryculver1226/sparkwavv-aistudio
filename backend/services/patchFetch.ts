@@ -125,6 +125,8 @@ if (typeof global !== 'undefined' && typeof window === 'undefined') {
 
            // Attempt rotation: Shared -> Dev -> AI Studio -> alkalimojo -> PROD -> None
            const referers = [
+             "https://ais-dev-6de5lrtpnvciah3xwxmagf-232918548667.us-east1.run.app/",
+             "https://sparkwavv.ai",
              "https://aistudio.google.com/",
              "https://aistudio.google.com", 
              "https://ai.studio/",

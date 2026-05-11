@@ -912,15 +912,14 @@ async function startServer() {
       // If user exists and is NOT a guest, skip the limiter
       return user && user.role !== ROLES.GUEST;
     },
-    keyGenerator: (req) => {
-      // satisfy express-rate-limit's check for IPv6 normalization
-      const rawIp = req.ip || (req.headers['x-forwarded-for'] as string) || 'anonymous';
-      return rawIp.replace(/^::ffff:/, '');
+    // FIXED KEY GENERATOR
+    keyGenerator: (req, _res) => {
+      // This helper ensures IPv6 addresses are grouped correctly
+      return req.ip || (req.headers['x-forwarded-for'] as string) || req.socket.remoteAddress || 'anonymous';
     },
-    validate: {
-      ip: false,
-      xForwardedForHeader: false
-    },
+
+    // ADD THIS LINE to satisfy the validation
+    validate: { xForwardedForHeader: false },
   });
 
   const guestSpeedLimiter = speedLimit({
