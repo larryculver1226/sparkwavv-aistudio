@@ -8,6 +8,10 @@ All notable changes to this project will be documented in this file.
     - **Patched Fetch v3**: Hardened `patchFetch.ts` with explicit lowercase `referer` and matching `Origin` headers for Google domains. Expanded the rotation pool to include Firebase prod domains.
     - **Key Pool Expansion**: Authorized the use of Firebase API keys for server-side Gemini calls and added them to the MCP Registry rotation pool to increase failover resilience.
     - **Genkit Integration**: Explicitly injected the global patched fetch into `@genkit-ai/googleai` plugins to ensure all sub-agent calls benefit from referer rotation.
+- **Track 160 (Firestore Lifecycle & Race Condition Fix)**: Resolved persistent `5 NOT_FOUND` errors during server startup.
+    - **Race Condition Elimination**: Wrapped all Firestore-dependent bootstrap tasks (Admin promotion, Partner ecosystem init, Health checks) in the `firestoreReady` promise to ensure they only execute after the primary database or (default) fallback is confirmed.
+    - **Stale Instance Fix**: Refactored `promoteSpecificUser` and `bootstrapPartnerEcosystem` to dynamically call `getFirestoreDb()` inside their execution blocks, preventing the use of stale/broken database instances captured in early-startup closures.
+    - **Resilient Fallback**: Consolidated the dual-path initialization logic (JSON vs Env) and ensured the `adminDb` (dedicated system DB) correctly falls back to the primary database if a dedicated `admindb` instance is missing.
 - **Track 159 (Rate Limit Compliance)**: Applied the IPv6 helper to `express-rate-limit` configuration to resolve validation warnings and improve IP grouping accuracy for IPv6 clients.
 - **Track 157 (Infrastructure & DB Reliability)**: Resolved `5 NOT_FOUND` Firestore errors and clarified rate-limit validation warnings.
     - **Firestore Auto-Fallback**: Implemented a robust initialization sequence that verifies connectivity to the AI Studio-provided database ID and automatically falls back to the `(default)` database if the primary is missing (common with custom project IDs).

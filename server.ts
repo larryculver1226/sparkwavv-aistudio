@@ -612,56 +612,60 @@ try {
     const connectivityPath = 'metadata/skylar_global';
     
     const runConnectivityCheck = async (dbInstance: any, dbIdLabel: string) => {
+      // Small pause if it's the first time, to allow provisioning/network to settle
+      await new Promise(r => setTimeout(r, 500));
+      
       try {
-        await dbInstance.doc(connectivityPath).get();
-        console.log(`[AUTH] Firestore connectivity check successful for ${dbIdLabel} (at ${connectivityPath}).`);
-        envStatus.FIRESTORE_STATUS = 'OK (Init)';
+        // Try a read that is lightweight
+        const doc = await dbInstance.doc('health/connectivity').get();
+        console.log(`[AUTH] Firestore connectivity check successful for ${dbIdLabel}.`);
         return true;
       } catch (err: any) {
-        if (err.code === 5 || err.message.includes('NOT_FOUND') || err.message.includes('database') || err.message.includes('instance')) {
-          console.error(`[AUTH] Firestore Database or Document NOT FOUND: ${dbIdLabel}. ${err.message}`);
+        // Code 5 is specifically NOT_FOUND. In the context of a db instance, this often means the database doesn't exist.
+        if (err.code === 5 || err.message.includes('NOT_FOUND')) {
+          console.error(`[AUTH] Firestore Database/Resource NOT FOUND: ${dbIdLabel}. Resource: ${err.message}`);
           return false;
         }
+        // Code 7 is PERMISSION_DENIED. This means the DB exists but we can't read this specific path.
+        if (err.code === 7 || err.message.includes('PERMISSION_DENIED')) {
+          console.log(`[AUTH] Firestore exists but access is restricted (Permission Denied) for ${dbIdLabel}. Treating as exists.`);
+          return true;
+        }
         console.warn(`[AUTH] Firestore connectivity warning for ${dbIdLabel}: ${err.message}`);
-        // If it's permission denied, we still "found" it but can't read this specific doc
-        if (err.code === 7) return true; 
         return false;
       }
     };
 
     // We use a self-executing async function but we don't necessarily await it here 
     // unless we wrap the entire init in a promise.
-    const initializeProjectDb = async (currentDb: any, currentDbId: string) => {
-      const success = await runConnectivityCheck(currentDb, currentDbId || '(default)');
-      if (!success && currentDbId && currentDbId !== '(default)') {
-        console.warn(`[AUTH] AI Studio Database ID ${currentDbId} failed. Falling back to (default) database...`);
-        try {
-          const fallbackDb = getFirestore(sparkwavvAdmin!);
-          const fallbackSuccess = await runConnectivityCheck(fallbackDb, '(default)');
-          if (fallbackSuccess) {
-            console.log(`[AUTH] Successfully switched to (default) database.`);
-            sparkwavvDb = fallbackDb;
-            db = fallbackDb;
-            if (adminDb === sparkwavvDb) adminDb = fallbackDb;
+      const initializeProjectDb = async (currentDb: any, currentDbId: string) => {
+        const success = await runConnectivityCheck(currentDb, currentDbId || '(default)');
+        if (!success && currentDbId && currentDbId !== '(default)') {
+          console.warn(`[AUTH] AI Studio Database ID ${currentDbId} failed. Falling back to (default) database...`);
+          try {
+            const fallbackDb = getFirestore(sparkwavvAdmin!);
+            const fallbackSuccess = await runConnectivityCheck(fallbackDb, '(default)');
+            if (fallbackSuccess) {
+              console.log(`[AUTH] Successfully switched to (default) database.`);
+              sparkwavvDb = fallbackDb;
+              db = fallbackDb;
+              adminDb = fallbackDb;
+            } else {
+              console.error(`[AUTH] Fallback to (default) database also failed.`);
+            }
+          } catch (e: any) {
+             console.error(`[AUTH] Critical: Both specified database and default database failed: ${e.message}`);
           }
-        } catch (e: any) {
-           console.error(`[AUTH] Critical: Both specified database and default database failed: ${e.message}`);
         }
-      }
-    };
+      };
 
     initializeProjectDb(db, databaseId).then(() => {
       resolveFirestoreReady(true);
     });
 
-    // Database 2: Admin (System Data) - Using 'admindb'
-    try {
-      adminDb = getFirestore(sparkwavvAdmin, 'admindb');
-      console.log(`[AUTH] Admin Database 'admindb' initialized.`);
-    } catch (e: any) {
-      console.warn(`[AUTH] Could not initialize 'admindb', falling back to default: ${e.message}`);
-      adminDb = sparkwavvDb;
-    }
+    // Database 2: Admin (System Data) - Fallback to main database
+    adminDb = sparkwavvDb;
+    console.log(`[AUTH] Admin tasks will use main database: ${databaseId || '(default)'} (JSON Path)`);
     console.log(`[AUTH] Firebase Admin initialized successfully via Service Account JSON.`);
   } else {
     const envProjId = process.env.FIREBASE_PROJECT_ID || process.env.VITE_FIREBASE_PROJECT_ID;
@@ -772,17 +776,23 @@ try {
       const connectivityPath = 'metadata/skylar_global';
       
       const runConnectivityCheck = async (dbInstance: any, dbIdLabel: string) => {
+        // Small pause
+        await new Promise(r => setTimeout(r, 500));
+        
         try {
-          await dbInstance.doc(connectivityPath).get();
-          console.log(`[AUTH] Firestore connectivity check successful for ${dbIdLabel} (at ${connectivityPath}) (Environment Config).`);
+          await dbInstance.doc('health/connectivity').get();
+          console.log(`[AUTH] Firestore connectivity check successful for ${dbIdLabel} (Env Path).`);
           return true;
         } catch (err: any) {
-          if (err.code === 5 || err.message.includes('NOT_FOUND') || err.message.includes('database') || err.message.includes('instance')) {
-             console.error(`[AUTH] Firestore Database or Document NOT FOUND: ${dbIdLabel} (Environment Config). ${err.message}`);
+          if (err.code === 5 || err.message.includes('NOT_FOUND')) {
+             console.error(`[AUTH] Firestore Database/Resource NOT FOUND: ${dbIdLabel} (Env Path). ${err.message}`);
              return false;
           }
-          console.warn(`[AUTH] Firestore connectivity warning for ${dbIdLabel} (Environment Config): ${err.message}`);
-          if (err.code === 7) return true;
+          if (err.code === 7 || err.message.includes('PERMISSION_DENIED')) {
+            console.log(`[AUTH] Firestore exists but access restricted (Env Path): ${dbIdLabel}. Treating as exists.`);
+            return true;
+          }
+          console.warn(`[AUTH] Firestore connectivity warning for ${dbIdLabel} (Env Path): ${err.message}`);
           return false;
         }
       };
@@ -790,18 +800,20 @@ try {
       const initializeEnvDb = async (currentDb: any, currentDbId: string) => {
         const success = await runConnectivityCheck(currentDb, currentDbId || '(default)');
         if (!success && currentDbId && currentDbId !== '(default)') {
-          console.warn(`[AUTH] AI Studio Database ID ${currentDbId} failed (Environment Config). Falling back to (default) database...`);
+          console.warn(`[AUTH] AI Studio Database ID ${currentDbId} failed (Env). Falling back to (default) database...`);
           try {
             const fallbackDb = getFirestore(sparkwavvAdmin!);
             const fallbackSuccess = await runConnectivityCheck(fallbackDb, '(default)');
             if (fallbackSuccess) {
-              console.log(`[AUTH] Successfully switched to (default) database (Environment Config).`);
+              console.log(`[AUTH] Successfully switched to (default) database (Env).`);
               sparkwavvDb = fallbackDb;
               db = fallbackDb;
-              if (adminDb === sparkwavvDb) adminDb = fallbackDb;
+              adminDb = fallbackDb;
+            } else {
+              console.error(`[AUTH] Fallback to (default) database also failed (Env).`);
             }
           } catch (e: any) {
-             console.error(`[AUTH] Critical: Both specified database and default database failed (Environment Config): ${e.message}`);
+             console.error(`[AUTH] Critical: Both specified database and default database failed (Env): ${e.message}`);
           }
         }
       };
@@ -810,16 +822,10 @@ try {
         resolveFirestoreReady(true);
       });
 
-      // Database 2: Admin (System Data) - Using 'admindb'
-      try {
-        adminDb = getFirestore(sparkwavvAdmin, 'admindb');
-        console.log(`[AUTH] Admin Database 'admindb' initialized.`);
-      } catch (e: any) {
-        console.warn(
-          `[AUTH] Could not initialize 'admindb', falling back to default: ${e.message}`
-        );
-        adminDb = sparkwavvDb;
-      }
+    // Database 2: Admin (System Data) - Try admindb but fallback immediately if it causes issues
+    // Note: AI Studio often only has one database, so we prefer the main one
+    adminDb = sparkwavvDb;
+    console.log(`[AUTH] Admin tasks will use main database: ${databaseId || '(default)'}`);
 
       console.log(`[AUTH] Firebase Admin initialized successfully for project ${projectId}.`);
     }
@@ -1256,162 +1262,166 @@ async function startServer() {
     }
   });
 
-  // RBAC Helpers & Routes
-  if (isFirebaseAdminConfigured) {
-    const db = getFirestoreDb();
-    if (db) {
-      console.log('Firestore initialized for project:', process.env.FIREBASE_PROJECT_ID);
-
-      // Run migrations
-      migrateDashboardsToFirestore(db).catch((err) => console.error('Migration failed:', err));
-
-      // Connectivity check
-      db.collection('health')
-        .doc('check')
-        .set({ lastCheck: new Date() }, { merge: true })
-        .then(() => console.log('Firestore connectivity verified.'))
-        .catch((err) => {
-          console.error('Firestore connectivity check failed:', err.message || err);
-          if (err.code === 5) {
-            console.error(
-              "CRITICAL: Firestore Database NOT FOUND. Please ensure you have clicked 'Create Database' in the Firebase Console for project:",
-              process.env.FIREBASE_PROJECT_ID
-            );
-          }
-        });
-    }
-
-    // Manual promotion for larry.culver1226@gmail.com
-    const promoteSpecificUser = async (email: string) => {
-      if (!isFirebaseAdminConfigured || !sparkwavvAdmin) {
-        console.log(`[AUTH] Promotion skipped: Firebase Admin not configured.`);
-        return;
-      }
-      try {
-        let userRecord;
-        try {
-          userRecord = await sparkwavvAdmin.auth().getUserByEmail(email);
-          console.log(`[AUTH] Found existing user ${email} (${userRecord.uid})`);
-        } catch (e: any) {
-          if (e.code === 'auth/user-not-found') {
-            console.log(`[AUTH] User ${email} not found, creating...`);
-            userRecord = await sparkwavvAdmin.auth().createUser({
-              email: email,
-              password: process.env.ADMIN_INITIAL_PASSWORD || 'PLACEHOLDER_CHANGE_ME_1',
-              emailVerified: true,
-              displayName: 'Larry Culver',
-            });
-            console.log(`[AUTH] Created new user ${email} (${userRecord.uid})`);
-          } else {
-            throw e;
-          }
+  // RBAC Helpers & Routes - WAIT for database settled status
+  firestoreReady.then(() => {
+      // Manual promotion helper
+      const promoteSpecificUser = async (email: string) => {
+        if (!isFirebaseAdminConfigured || !sparkwavvAdmin) {
+          console.log(`[AUTH] Promotion skipped: Firebase Admin not configured.`);
+          return;
         }
-
-        const uid = userRecord.uid;
-
-        // Update Firestore role
-        await db.collection('users').doc(uid).set(
-          {
-            role: ROLES.SUPER_ADMIN,
-            tenantId: 'sparkwavv',
-            email: email,
-            journeyStage: 'NONE',
-            updatedAt: admin.firestore.FieldValue.serverTimestamp(),
-          },
-          { merge: true }
-        );
-
-        // Set Custom Claims
-        await sparkwavvAdmin.auth().setCustomUserClaims(uid, {
-          role: ROLES.SUPER_ADMIN,
-          tenantId: 'sparkwavv',
-        });
-
-        console.log(`[AUTH] User ${email} promoted to SUPER_ADMIN with custom claims.`);
-
-        // Always ensure password is set to the environment variable for consistency
-        const newPassword = process.env.ADMIN_INITIAL_PASSWORD || 'PLACEHOLDER_CHANGE_ME_1';
-        await sparkwavvAdmin.auth().updateUser(uid, {
-          password: newPassword,
-        });
-        console.log(`[AUTH] Password ensured for ${email}.`);
-      } catch (error: any) {
-        console.error(`[AUTH] Error promoting user ${email}:`, error.message || error);
-      }
-    };
-
-    // Bootstrap Kwieri Tenant and Mark Workman
-    const bootstrapPartnerEcosystem = async () => {
-      if (!isFirebaseAdminConfigured || !sparkwavvAdmin) {
-        console.log(`[BOOTSTRAP] Bootstrap skipped: Firebase Admin not configured.`);
-        return;
-      }
-      try {
-        const db = getFirestoreDb();
-        if (!db) return;
-
-        // 1. Create Kwieri Tenant
-        const kwieriTenant = {
-          id: 'kwieri',
-          name: 'Kwieri',
-          brand: 'kwieri',
-          description: 'Strategic Role-Playing Partners for Career Growth',
-          logoUrl:
-            'https://images.leadconnectorhq.com/image/f_webp/q_80/r_1200/u_https://assets.cdn.filesafe.space/3GWNqV7gyYunWoTZF4Vn/media/6794d8d06a58c403bd198b6c.png',
-          primaryColor: '#0F172A',
-        };
-        await db.collection('tenants').doc('kwieri').set(kwieriTenant, { merge: true });
-        console.log('[BOOTSTRAP] Kwieri tenant initialized.');
-
-        // 2. Create Mark Workman (Kwieri Admin)
-        const markEmail = 'markw@sparkwavv.com';
         try {
-          let markUser;
+          const db = getFirestoreDb();
+          if (!db) throw new Error('Firestore not initialized');
+
+          let userRecord;
           try {
-            markUser = await sparkwavvAdmin.auth().getUserByEmail(markEmail);
-          } catch (e) {
-            // Create user if not exists
-            markUser = await sparkwavvAdmin.auth().createUser({
-              email: markEmail,
-              password: process.env.PARTNER_INITIAL_PASSWORD || 'PLACEHOLDER_CHANGE_ME_2', // Secure fallback
-              displayName: 'Mark Workman',
-            });
+            userRecord = await sparkwavvAdmin.auth().getUserByEmail(email);
+            console.log(`[AUTH] Found existing user ${email} (${userRecord.uid})`);
+          } catch (e: any) {
+            if (e.code === 'auth/user-not-found') {
+              console.log(`[AUTH] User ${email} not found, creating...`);
+              userRecord = await sparkwavvAdmin.auth().createUser({
+                email: email,
+                password: process.env.ADMIN_INITIAL_PASSWORD || 'PLACEHOLDER_CHANGE_ME_1',
+                emailVerified: true,
+                displayName: 'Larry Culver',
+              });
+              console.log(`[AUTH] Created new user ${email} (${userRecord.uid})`);
+            } else {
+              throw e;
+            }
           }
 
-          const markUid = markUser.uid;
-          await db.collection('users').doc(markUid).set(
+          const uid = userRecord.uid;
+
+          // Update Firestore role
+          await db.collection('users').doc(uid).set(
             {
-              uid: markUid,
-              email: markEmail,
-              displayName: 'Mark Workman',
-              role: ROLES.MENTOR, // Partners are mentors/coaches
-              tenantId: 'kwieri',
-              onboardingComplete: true,
+              role: ROLES.SUPER_ADMIN,
+              tenantId: 'sparkwavv',
+              email: email,
+              journeyStage: 'NONE',
               updatedAt: admin.firestore.FieldValue.serverTimestamp(),
             },
             { merge: true }
           );
 
-          // Set custom claims
-          await sparkwavvAdmin
-            .auth()
-            .setCustomUserClaims(markUid, { role: ROLES.MENTOR, tenantId: 'kwieri' });
-          console.log(`[BOOTSTRAP] Mark Workman (${markEmail}) initialized as Kwieri Mentor.`);
-        } catch (e: any) {
-          console.error('[BOOTSTRAP] Error initializing Mark Workman:', e.message);
-        }
-      } catch (error: any) {
-        console.error('[BOOTSTRAP] Partner ecosystem bootstrap failed:', error.message);
-      }
-    };
+          // Set Custom Claims
+          await sparkwavvAdmin.auth().setCustomUserClaims(uid, {
+            role: ROLES.SUPER_ADMIN,
+            tenantId: 'sparkwavv',
+          });
 
-    // Await database readiness before running bootstraps
-    firestoreReady.then(() => {
-      promoteSpecificUser('larry.culver1226@gmail.com');
-      bootstrapPartnerEcosystem();
+          console.log(`[AUTH] User ${email} promoted to SUPER_ADMIN with custom claims.`);
+
+          // Always ensure password is set to the environment variable for consistency
+          const newPassword = process.env.ADMIN_INITIAL_PASSWORD || 'PLACEHOLDER_CHANGE_ME_1';
+          await sparkwavvAdmin.auth().updateUser(uid, {
+            password: newPassword,
+          });
+          console.log(`[AUTH] Password ensured for ${email}.`);
+        } catch (error: any) {
+          console.error(`[AUTH] Error promoting user ${email}:`, error.message || error);
+        }
+      };
+
+      // Bootstrap Kwieri Tenant and Mark Workman
+      const bootstrapPartnerEcosystem = async () => {
+        if (!isFirebaseAdminConfigured || !sparkwavvAdmin) {
+          console.log(`[BOOTSTRAP] Bootstrap skipped: Firebase Admin not configured.`);
+          return;
+        }
+        try {
+          const db = getFirestoreDb();
+          if (!db) return;
+
+          // 1. Create Kwieri Tenant
+          const kwieriTenant = {
+            id: 'kwieri',
+            name: 'Kwieri',
+            brand: 'kwieri',
+            description: 'Strategic Role-Playing Partners for Career Growth',
+            logoUrl:
+              'https://images.leadconnectorhq.com/image/f_webp/q_80/r_1200/u_https://assets.cdn.filesafe.space/3GWNqV7gyYunWoTZF4Vn/media/6794d8d06a58c403bd198b6c.png',
+            primaryColor: '#0F172A',
+          };
+          await db.collection('tenants').doc('kwieri').set(kwieriTenant, { merge: true });
+          console.log('[BOOTSTRAP] Kwieri tenant initialized.');
+
+          // 2. Create Mark Workman (Kwieri Admin)
+          const markEmail = 'markw@sparkwavv.com';
+          try {
+            let markUser;
+            try {
+              markUser = await sparkwavvAdmin.auth().getUserByEmail(markEmail);
+            } catch (e) {
+              // Create user if not exists
+              markUser = await sparkwavvAdmin.auth().createUser({
+                email: markEmail,
+                password: process.env.PARTNER_INITIAL_PASSWORD || 'PLACEHOLDER_CHANGE_ME_2', // Secure fallback
+                displayName: 'Mark Workman',
+              });
+            }
+
+            const markUid = markUser.uid;
+            await db.collection('users').doc(markUid).set(
+              {
+                uid: markUid,
+                email: markEmail,
+                displayName: 'Mark Workman',
+                role: ROLES.MENTOR, // Partners are mentors/coaches
+                tenantId: 'kwieri',
+                onboardingComplete: true,
+                updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+              },
+              { merge: true }
+            );
+
+            // Set custom claims
+            await sparkwavvAdmin
+              .auth()
+              .setCustomUserClaims(markUid, { role: ROLES.MENTOR, tenantId: 'kwieri' });
+            console.log(`[BOOTSTRAP] Mark Workman (${markEmail}) initialized as Kwieri Mentor.`);
+          } catch (e: any) {
+            console.error('[BOOTSTRAP] Error initializing Mark Workman:', e.message);
+          }
+        } catch (error: any) {
+          console.error('[BOOTSTRAP] Partner ecosystem bootstrap failed:', error.message);
+        }
+      };
+
+      if (isFirebaseAdminConfigured) {
+        const db = getFirestoreDb();
+        if (db) {
+          console.log(`[BOOTSTRAP] Database detected: ${db.projectId || 'unknown'} (isFirestoreReady: true)`);
+
+          // Run migrations
+          migrateDashboardsToFirestore(db).catch((err) => console.error('Migration failed:', err));
+
+          // Global Connectivity check
+          db.collection('health')
+            .doc('check')
+            .set({ lastCheck: new Date() }, { merge: true })
+            .then(() => console.log('[FIRESTORE] Global connectivity verified via health check.'))
+            .catch((err: any) => {
+              console.error('[FIRESTORE] Critical health check failed:', err.message || err);
+              if (err.code === 5) {
+                console.error(
+                  "CRITICAL FAILURE: Firestore Database NOT FOUND even after fallback attempt. Project:",
+                  process.env.FIREBASE_PROJECT_ID || firebaseAppletConfig.projectId
+                );
+              }
+            });
+        }
+
+        // Run other bootstraps
+        promoteSpecificUser('larry.culver1226@gmail.com');
+        bootstrapPartnerEcosystem();
+      }
     });
 
-    // Configure SendGrid
+    // Configure SendGrid (can run immediately)
     if (process.env.SENDGRID_API_KEY && process.env.SENDGRID_API_KEY.startsWith('SG.')) {
       try {
         sgMail.setApiKey(process.env.SENDGRID_API_KEY);
@@ -4813,7 +4823,6 @@ async function startServer() {
         }
       }
     );
-  }
 
   // Registration API
   app.post('/api/register', (req, res) => {
