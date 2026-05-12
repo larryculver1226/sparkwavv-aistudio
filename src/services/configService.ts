@@ -253,6 +253,7 @@ export const configService = {
     }
 
     if (!isFirebaseConfigured) {
+      console.warn('[Config Service] Firebase is NOT configured. Falling back to internal manifest for stage:', normalizedStageId);
       return this.fallbackToSingleDefaultStage(normalizedStageId);
     }
 

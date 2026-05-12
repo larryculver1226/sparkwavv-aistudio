@@ -159,7 +159,10 @@ export const validateConfig = () => {
   if (missing.length > 0) {
     const errorMsg = `[CONFIGURATION WARNING] The following environment variables are missing or invalid: ${missing.join(', ')}. The application may function in a degraded state. Please update your AI Studio Secrets Vault or .env file with valid values.`;
     console.warn(errorMsg);
+    console.log('[CONFIGURATION DEBUG] Current Config Keys:', Object.keys(config).filter(k => !!(config as any)[k]));
     // We no longer throw here to allow the app to boot and show a "Missing Configuration" state if needed.
     // throw new Error(errorMsg);
+  } else {
+    console.log('✅ [Configuration] All required variables are present and valid.');
   }
 };

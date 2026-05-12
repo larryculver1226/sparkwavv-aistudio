@@ -53,6 +53,24 @@ const config = {
     : getViteEnv('VITE_FIREBASE_MEASUREMENT_ID'),
 };
 
+// --- EMERGENCY DIAGNOSTICS ---
+if (typeof window !== 'undefined') {
+  console.log('🔍 [Firebase Diagnostic] Raw Config from JSON:', {
+    hasApiKey: !!firebaseConfig.apiKey,
+    apiKeyLength: firebaseConfig.apiKey?.length || 0,
+    apiKeyStart: firebaseConfig.apiKey?.substring(0, 4),
+    isPlaceholder: isPlaceholder(firebaseConfig.apiKey),
+    projectId: firebaseConfig.projectId
+  });
+  
+  console.log('🔍 [Firebase Diagnostic] Resolved Config:', {
+    projectId: config.projectId,
+    hasApiKey: !!config.apiKey,
+    apiKeyStart: config.apiKey?.substring(0, 4),
+    isPlaceholder: isPlaceholder(config.apiKey)
+  });
+}
+
 console.log('🛡️ [Firebase] Initializing with Project ID:', config.projectId);
 
 // Double check for common env injection failures
@@ -153,5 +171,23 @@ export const setTenantId = (tenantId: string | null) => {
   console.log(`🛡️ [Firebase] Tenant ID set to: ${tenantId}`);
 };
 
-export const isFirebaseConfigured = !!config.apiKey && (typeof config.apiKey === 'string') && !config.apiKey.startsWith('PLACEHOLDER') && !config.apiKey.startsWith('$$');
+export const isFirebaseConfigured = (() => {
+  const isString = typeof config.apiKey === 'string';
+  const hasValue = !!config.apiKey;
+  const isNotPlaceholder = !isPlaceholder(config.apiKey);
+  
+  const result = hasValue && isString && isNotPlaceholder;
+  
+  if (typeof window !== 'undefined') {
+    console.log('🛡️ [Firebase] isFirebaseConfigured check:', {
+      result,
+      hasValue,
+      isString,
+      isNotPlaceholder,
+      apiKeyType: typeof config.apiKey
+    });
+  }
+  
+  return result;
+})();
 export const isAdminFirebaseConfigured = isFirebaseConfigured; // In single project mode, if one is configured, both are
