@@ -1,8 +1,208 @@
 rules_version = '2';
+
 service cloud.firestore {
   match /databases/{database}/documents {
-    match /{allPaths=**} {
-      allow read, write: if true;
+    
+    // ==========================================
+    // 0. GLOBAL SAFETY NET
+    // ==========================================
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // ==========================================
+    // 1. PRIMITIVES & HELPERS
+    // ==========================================
+    
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isEmailVerified() {
+      return isSignedIn() && request.auth.token.email_verified == true;
+    }
+
+    function isOwner(userId) {
+      return isSignedIn() && request.auth.uid == userId;
+    }
+
+    function isAdmin() {
+      return isSignedIn() && (
+        request.auth.token.email == 'larry.culver1226@gmail.com' ||
+        exists(/databases/$(database)/documents/admins/$(request.auth.uid))
+      );
+    }
+
+    function isValidId(id) {
+      return id is string && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    function incoming() {
+      return request.resource.data;
+    }
+
+    function existing() {
+      return resource.data;
+    }
+
+    // ==========================================
+    // 2. VALIDATION BLUEPRINTS
+    // ==========================================
+
+    function isValidUser(data) {
+      return data.uid == request.auth.uid 
+          && data.email is string && data.email.size() <= 256
+          && data.tenantId is string && data.tenantId.size() <= 50;
+    }
+
+    function isValidDashboard(data) {
+      return data.userId == request.auth.uid
+          && data.tenantId is string;
+    }
+
+    function isValidWavvault(data) {
+      return data.userId == request.auth.uid
+          && data.tenantId is string;
+    }
+
+    // ==========================================
+    // 3. COLLECTION RULES
+    // ==========================================
+
+    // --- Users ---
+    match /users/{uid} {
+      allow get: if isOwner(uid) || isAdmin();
+      allow list: if isAdmin() || (isSignedIn() && resource.data.uid == request.auth.uid);
+      allow create: if isOwner(uid) && isValidUser(incoming()) && incoming().role == 'user';
+      allow update: if (isOwner(uid) && isValidUser(incoming()) && incoming().role == existing().role)
+                    || isAdmin();
+    }
+
+    // --- Dashboards ---
+    match /dashboards/{userId} {
+      allow get: if isOwner(userId) || isAdmin();
+      allow list: if isAdmin() || (isSignedIn() && resource.data.userId == request.auth.uid);
+      allow create: if isOwner(userId) && isValidDashboard(incoming());
+      allow update: if (isOwner(userId) && isValidDashboard(incoming())) || isAdmin();
+    }
+
+    // --- Wavvault (Vector searchable data) ---
+    match /wavvault/{userId} {
+      allow get: if isOwner(userId) || isAdmin();
+      allow list: if isAdmin() || (isSignedIn() && resource.data.userId == request.auth.uid);
+      allow create: if isOwner(userId) && isValidWavvault(incoming());
+      allow update: if (isOwner(userId) && isValidWavvault(incoming())) || isAdmin();
+    }
+
+    // --- User Assets (Generated portraits, etc) ---
+    match /user_assets/{assetId} {
+      allow get: if isSignedIn() && (resource.data.userId == request.auth.uid || isAdmin());
+      allow list: if isSignedIn() && (resource.data.userId == request.auth.uid || isAdmin());
+      allow create: if isSignedIn() && incoming().userId == request.auth.uid; // Usually AI generated but client may initiate
+      allow delete: if isSignedIn() && (resource.data.userId == request.auth.uid || isAdmin());
+    }
+
+    // --- User Insights ---
+    match /user_insights/{insightId} {
+      allow read: if isSignedIn() && (resource.data.userId == request.auth.uid || isAdmin());
+      allow write: if isAdmin(); // System generated
+    }
+
+    // --- User Activities ---
+    match /user_activities/{activityId} {
+      allow read: if isSignedIn() && (resource.data.userId == request.auth.uid || isAdmin());
+      allow create: if isAdmin(); // Materialized views are system-only
+    }
+
+    // --- Artifacts (Distilled & Raw) ---
+    match /wavvault_artifacts/{artifactId} {
+      allow read: if isSignedIn() && (resource.data.userId == request.auth.uid || isAdmin());
+      allow write: if isAdmin();
+    }
+
+    match /artifacts/{artifactId} {
+      allow read: if isSignedIn() && (resource.data.userId == request.auth.uid || isAdmin());
+      allow create: if isSignedIn() && incoming().userId == request.auth.uid;
+      allow delete: if isSignedIn() && (resource.data.userId == request.auth.uid || isAdmin());
+    }
+
+    // --- Public Metadata & Config ---
+    match /metadata/{documentId} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
+    match /tenants/{tenantId} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
+    match /programs/{programId} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
+    match /journeyPhaseConfigs/{stageId} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
+    match /journey_stages/{stageId} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
+    match /cohorts/{cohortId} {
+      allow read: if isSignedIn();
+      allow write: if isAdmin();
+    }
+
+    // --- Journeys (User progress in programs) ---
+    match /journeys/{journeyId} {
+      allow read: if isSignedIn() && (resource.data.userId == request.auth.uid || isAdmin());
+      allow create: if isSignedIn() && incoming().userId == request.auth.uid;
+      allow update: if isSignedIn() && (resource.data.userId == request.auth.uid || isAdmin());
+    }
+
+    // --- Logs (Append only for system/admins) ---
+    match /security_logs/{logId} {
+      allow read: if isAdmin();
+      allow create: if true; // System needs to log events
+    }
+
+    match /system_logs/{logId} {
+      allow read: if isAdmin();
+      allow create: if true;
+    }
+
+    // --- Feedback & Flagged Content ---
+    match /feedback_issues/{issueId} {
+      allow create: if isSignedIn();
+      allow read, update: if isAdmin();
+    }
+
+    match /flagged_content/{contentId} {
+      allow create: if isSignedIn();
+      allow read, update: if isAdmin();
+    }
+
+    // --- Admins collection (Internal) ---
+    match /admins/{uid} {
+      allow read: if isSignedIn();
+      allow write: if isAdmin();
+    }
+
+    // --- Partner Features ---
+    match /invitations/{invitationId} {
+      allow read: if isSignedIn() && (resource.data.senderId == request.auth.uid || resource.data.recipientEmail == request.auth.token.email || isAdmin());
+      allow create: if isSignedIn() && incoming().senderId == request.auth.uid;
+      allow update: if isSignedIn() && (resource.data.senderId == request.auth.uid || resource.data.recipientEmail == request.auth.token.email || isAdmin());
+    }
+
+    // --- Storage Metrics ---
+    match /storage_metrics/{metricId} {
+      allow read: if true;
+      allow write: if isAdmin();
     }
   }
 }

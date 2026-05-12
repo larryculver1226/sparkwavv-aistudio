@@ -3,7 +3,10 @@
 All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
-### Fixed
+- **Track 155 (Firebase Production Cutover)**: [COMPLETED] Successfully migrated application state and authentication to the production project `sparkwavv-prod`.
+    - **Auth Migration**: Ported all user accounts (UIDs intact) from the sandbox.
+    - **Data Migration**: Transferred 17 Firestore collections to the production database.
+    - **Hardened Security**: Deployed production-grade Firestore Security Rules and standardized environment credentials.
 - **Track 158 (AI Registry & Patch Hardening)**: Resolved persistent `API_KEY_HTTP_REFERRER_BLOCKED` and `API_KEY_INVALID` errors.
     - **Patched Fetch v3**: Hardened `patchFetch.ts` with explicit lowercase `referer` and matching `Origin` headers for Google domains. Expanded the rotation pool to include Firebase prod domains.
     - **Key Pool Expansion**: Authorized the use of Firebase API keys for server-side Gemini calls and added them to the MCP Registry rotation pool to increase failover resilience.

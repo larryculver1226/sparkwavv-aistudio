@@ -83,8 +83,11 @@ const isPlaceholder = (val: any) => typeof val === 'string' && val.startsWith('P
 let firebaseAppletConfig: any = {};
 try {
   const configPath = path.join(__dirname, 'firebase-applet-config.json');
+  console.log(`[STORAGE] Attempting to read config from: ${configPath}`);
   if (fs.existsSync(configPath)) {
-    firebaseAppletConfig = JSON.parse(fs.readFileSync(configPath, 'utf8'));
+    const rawConfig = fs.readFileSync(configPath, 'utf8');
+    firebaseAppletConfig = JSON.parse(rawConfig);
+    console.log(`[STORAGE] Config pre-read successful. Project: ${firebaseAppletConfig.projectId}`);
     if (
       firebaseAppletConfig.projectId &&
       !isPlaceholder(firebaseAppletConfig.projectId) &&
@@ -92,6 +95,8 @@ try {
     ) {
       process.env.FIREBASE_PROJECT_ID = firebaseAppletConfig.projectId;
     }
+  } else {
+    console.warn(`[STORAGE] Config file NOT FOUND at: ${configPath}`);
   }
 } catch (error) {
   console.warn('Could not pre-read firebase-applet-config.json:', error);
@@ -548,6 +553,8 @@ const envStatus: any = {
     firebaseAppletConfig.authDomain || process.env.VITE_FIREBASE_AUTH_DOMAIN || '',
   VITE_FIREBASE_PROJECT_ID:
     firebaseAppletConfig.projectId || process.env.VITE_FIREBASE_PROJECT_ID || '',
+  VITE_FIREBASE_DATABASE_ID:
+    process.env.VITE_FIREBASE_DATABASE_ID || firebaseAppletConfig.firestoreDatabaseId || '(default)',
   VITE_FIREBASE_STORAGE_BUCKET:
     firebaseAppletConfig.storageBucket || process.env.VITE_FIREBASE_STORAGE_BUCKET || '',
   VITE_FIREBASE_MESSAGING_SENDER_ID:
@@ -557,16 +564,17 @@ const envStatus: any = {
   FIREBASE_CLIENT_EMAIL: process.env.FIREBASE_CLIENT_EMAIL || '',
   FIREBASE_PRIVATE_KEY: process.env.FIREBASE_PRIVATE_KEY ? 'PRESENT' : 'MISSING',
   FIREBASE_SERVICE_ACCOUNT_SOURCE: 'INDIVIDUAL_VARS',
+  DATABASE_ID: '(PENDING)',
   USER_COUNT: 0,
   AUTH_STATUS: 'PENDING',
   FIRESTORE_STATUS: 'PENDING',
 };
 
-// Single Project Initialization (gen-lang-client-0883822731)
+// Firebase Admin Initialization (Production sparkwavv-prod)
 try {
-  const serviceAccountJson = process.env.FIREBASE_SERVICE_ACCOUNT_JSON;
+  const serviceAccountJson = process.env.PROD_FIREBASE_SERVICE_ACCOUNT_JSON || process.env.FIREBASE_SERVICE_ACCOUNT_JSON;
   if (serviceAccountJson && !serviceAccountJson.includes('placeholder')) {
-    console.log(`[AUTH] Initializing Firebase Admin via FIREBASE_SERVICE_ACCOUNT_JSON`);
+    console.log(`[AUTH] Initializing Firebase Admin via Service Account JSON`);
     const serviceAccount = JSON.parse(serviceAccountJson);
     
     const projectId = serviceAccount.project_id;
@@ -576,7 +584,7 @@ try {
     envStatus.FIREBASE_PROJECT_ID = projectId;
     envStatus.FIREBASE_CLIENT_EMAIL = clientEmail;
     envStatus.FIREBASE_PRIVATE_KEY = serviceAccount.private_key ? 'PRESENT' : 'MISSING';
-    envStatus.FIREBASE_SERVICE_ACCOUNT_SOURCE = 'JSON_BLOB';
+    envStatus.FIREBASE_SERVICE_ACCOUNT_SOURCE = process.env.PROD_FIREBASE_SERVICE_ACCOUNT_JSON ? 'PROD_JSON_BLOB' : 'JSON_BLOB';
 
     // Normalize private key newlines inside the parsed service account
     if (serviceAccount && serviceAccount.private_key) {
@@ -594,12 +602,15 @@ try {
         ? firebaseAppletConfig.firestoreDatabaseId
         : null;
     
-    let databaseId = envDbId || configDbId;
+    // For sparkwavv-prod, we usually use '(default)'
+    let databaseId = (configDbId && configDbId.startsWith('ai-studio-')) ? configDbId : (envDbId || configDbId);
     
     if (databaseId) {
       databaseId = databaseId.trim().replace(/^["']|["']$/g, '');
-      if (databaseId === 'default') databaseId = '(default)';
+      if (databaseId === 'default' || databaseId === '') databaseId = '(default)';
     }
+
+    envStatus.DATABASE_ID = databaseId || '(default)';
 
     console.log(`[AUTH] Project: ${projectId}, Database: ${databaseId || '(default)'}`);
 
@@ -641,7 +652,7 @@ try {
       const initializeProjectDb = async (currentDb: any, currentDbId: string) => {
         const success = await runConnectivityCheck(currentDb, currentDbId || '(default)');
         if (!success && currentDbId && currentDbId !== '(default)') {
-          console.warn(`[AUTH] AI Studio Database ID ${currentDbId} failed. Falling back to (default) database...`);
+          console.warn(`[AUTH] Firestore Database ID ${currentDbId} failed. Falling back to (default) database...`);
           try {
             const fallbackDb = getFirestore(sparkwavvAdmin!);
             const fallbackSuccess = await runConnectivityCheck(fallbackDb, '(default)');
@@ -760,12 +771,15 @@ try {
           ? firebaseAppletConfig.firestoreDatabaseId
           : null;
       
-      let databaseId = envDbId || configDbId;
+      // Favor configDbId if it's a real AI Studio provisioned ID
+      let databaseId = (configDbId && configDbId.startsWith('ai-studio-')) ? configDbId : (envDbId || configDbId);
 
       if (databaseId) {
         databaseId = databaseId.trim().replace(/^["']|["']$/g, '');
         if (databaseId === 'default') databaseId = '(default)';
       }
+      
+      envStatus.DATABASE_ID = databaseId || '(default)';
 
       sparkwavvDb = (databaseId && databaseId !== '(default)')
         ? getFirestore(sparkwavvAdmin, databaseId)

@@ -1,49 +1,47 @@
-import { initializeApp, cert, getApp, getApps, applicationDefault } from 'firebase-admin/app';
+import { initializeApp, cert } from 'firebase-admin/app';
 import { getFirestore } from 'firebase-admin/firestore';
-import fs from 'fs';
-import path from 'path';
+import * as dotenv from 'dotenv';
+
+dotenv.config();
 
 /**
- * Sparkwavv Production Migration Script
+ * Sparkwavv Production Migration Script (Precise Version)
  */
 
 async function migrate() {
   console.log('🚀 Starting Sparkwavv Production Migration...');
 
-  // 1. Initialize Source (AI Studio Sandbox)
-  const sandboxConfigPath = path.join(process.cwd(), 'firebase-applet-config.json');
-  const sandboxConfig = JSON.parse(fs.readFileSync(sandboxConfigPath, 'utf8'));
+  // 1. Source (Sandbox)
+  const sourceSaJson = process.env.FIREBASE_SERVICE_ACCOUNT_JSON;
+  if (!sourceSaJson) {
+      console.error('❌ Missing FIREBASE_SERVICE_ACCOUNT_JSON for source (sandbox).');
+      return;
+  }
+  const sourceSa = JSON.parse(sourceSaJson);
+  const sourceDbId = 'ai-studio-1a3eb665-2cd9-4e84-a599-413bb4ee52e0';
   
-  console.log(`📡 Connecting to Source Sandbox: ${sandboxConfig.projectId} (DB: ${sandboxConfig.firestoreDatabaseId})`);
-  
-  // Temporarily clear production key from environment to prevent it from overriding sandbox auth
-  const backupKey = process.env.FIREBASE_SERVICE_ACCOUNT_JSON;
-  delete process.env.FIREBASE_SERVICE_ACCOUNT_JSON;
-  delete process.env.GOOGLE_APPLICATION_CREDENTIALS;
-
+  console.log(`📡 Connecting to Source Sandbox: ${sourceSa.project_id} (DB: ${sourceDbId})`);
   const sourceApp = initializeApp({
-    projectId: sandboxConfig.projectId,
+    credential: cert(sourceSa),
+    projectId: sourceSa.project_id,
   }, 'source-sandbox');
 
-  if (backupKey) process.env.FIREBASE_SERVICE_ACCOUNT_JSON = backupKey;
-
-  // 2. Initialize Destination (sparkwavv-prod)
-  const destKeyRaw = process.env.FIREBASE_SERVICE_ACCOUNT_JSON;
-  if (!destKeyRaw || destKeyRaw.includes('placeholder')) {
-    console.error('❌ ERROR: FIREBASE_SERVICE_ACCOUNT_JSON is missing or invalid.');
-    process.exit(1);
+  // 2. Destination (Prod)
+  const destSaJson = process.env.PROD_FIREBASE_SERVICE_ACCOUNT_JSON;
+  if (!destSaJson) {
+    console.error('❌ Missing PROD_FIREBASE_SERVICE_ACCOUNT_JSON for destination.');
+    return;
   }
-
-  const destKey = JSON.parse(destKeyRaw);
-  console.log(`📡 Connecting to Destination Project: ${destKey.project_id}`);
+  const destSa = JSON.parse(destSaJson);
+  console.log(`📡 Connecting to Destination Project: ${destSa.project_id} (DB: default)`);
   
   const destApp = initializeApp({
-    credential: cert(destKey),
-    projectId: destKey.project_id,
+    credential: cert(destSa),
+    projectId: destSa.project_id,
   }, 'dest-prod');
 
-  const sourceDb = getFirestore(sourceApp, sandboxConfig.firestoreDatabaseId);
-  const destDb = getFirestore(destApp); // Destination uses (default)
+  const sourceDb = getFirestore(sourceApp, sourceDbId);
+  const destDb = getFirestore(destApp); 
 
   const collections = [
     'users',
@@ -53,7 +51,16 @@ async function migrate() {
     'journeyPhaseConfigs',
     'metadata',
     'feedback_issues',
-    'user_activities'
+    'user_activities',
+    'agent_configs',
+    'cohorts',
+    'health',
+    'journeys',
+    'programs',
+    'security_logs',
+    'system_logs',
+    'tenants',
+    'user_insights'
   ];
 
   for (const collectionName of collections) {
@@ -68,7 +75,7 @@ async function migrate() {
 
       console.log(`   Found ${snapshot.size} documents. Writing to destination...`);
       
-      const batch = destDb.batch();
+      let batch = destDb.batch();
       let count = 0;
 
       for (const doc of snapshot.docs) {
@@ -79,7 +86,8 @@ async function migrate() {
         // Write in chunks of 500
         if (count % 400 === 0) {
           await batch.commit();
-          console.log(`   Migrated ${count} logs...`);
+          console.log(`   Committing batch at ${count}...`);
+          batch = destDb.batch();
         }
       }
 
@@ -90,12 +98,10 @@ async function migrate() {
       console.log(`   ✅ Successfully migrated ${count} documents to ${collectionName}.`);
     } catch (err: any) {
       console.error(`   ❌ Error processing ${collectionName}: ${err.message}`);
-      if (err.stack) console.error(err.stack);
     }
   }
 
   console.log('\n🎉 Production Migration Complete.');
-  console.log('Next: Verify your collections in the sparkwavv-prod Google Cloud Console.');
 }
 
 migrate().catch(err => {

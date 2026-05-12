@@ -90,8 +90,9 @@ try {
   authInstance = getAuth(sparkwavvApp);
   storageInstance = getStorage(sparkwavvApp);
   
-  const rawDatabaseId = getViteEnv('VITE_FIREBASE_DATABASE_ID') || firebaseConfig.firestoreDatabaseId;
-  let databaseId = rawDatabaseId && !rawDatabaseId.startsWith('PLACEHOLDER') ? rawDatabaseId : '(default)';
+  const envDbId = getViteEnv('VITE_FIREBASE_DATABASE_ID');
+  const configDbId = !isPlaceholder(firebaseConfig.firestoreDatabaseId) ? firebaseConfig.firestoreDatabaseId : null;
+  let databaseId = (configDbId && configDbId.startsWith('ai-studio-')) ? configDbId : (envDbId || configDbId || '(default)');
   
   // Robust normalization for 'default' -> '(default)'
   if (typeof databaseId === 'string') {
