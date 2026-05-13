@@ -65,6 +65,7 @@ import { logEvent } from './backend/services/loggingService.js';
 import axios from 'axios';
 import { ROLES, JOURNEY_STAGES, TENANTS } from './src/constants.js';
 import { getGeminiApiKey } from './src/services/aiConfig.js';
+import { skylar } from './src/services/skylarService.js';
 import { vertexService } from './backend/services/vertexService.js';
 import { initializeMcpClient } from './backend/services/mcpBridge.js';
 import { methodologyGenerator } from './src/utils/methodologyGenerator.js';
@@ -880,8 +881,6 @@ async function withTimeout<T>(promise: Promise<T>, timeoutMs: number = 15000): P
 
 // Log status to a file for diagnostics
 // Moved to top of server.ts
-
-import { skylar } from './src/services/skylarService';
 
 async function startServer() {
   console.log('Starting server initialization...');

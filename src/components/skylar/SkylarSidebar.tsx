@@ -24,7 +24,7 @@ import {
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import clsx from 'clsx';
-import { ChatMessage, SkylarPersona, PERSONA_CONFIG } from '../../services/skylarService';
+import { skylar, ChatMessage, SkylarPersona, PERSONA_CONFIG } from '../../services/skylarService';
 import { SKYLAR_DEFAULTS } from '../../constants';
 import { useIdentity } from '../../contexts/IdentityContext';
 import { useSkylarConfig } from '../../contexts/SkylarConfigContext';
