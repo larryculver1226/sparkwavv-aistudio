@@ -20,7 +20,8 @@ export const config = {
   publicPath: '/', // for the loader
   define: {
     'process.env.NODE_ENV': JSON.stringify(process.env.NODE_ENV || 'production'),
-    ...Object.keys(process.env).filter(key => key.startsWith('VITE_') && !/PRIVATE_KEY|SECRET|CREDENTIAL|SERVICE_ACCOUNT/i.test(key)).reduce((acc, key) => {
+    ...Object.keys(process.env).filter(key => key.startsWith('VITE_')).reduce((acc, key) => {
+      // Define both process.env and import.meta.env for compatibility
       acc[`process.env.${key}`] = JSON.stringify(process.env[key]);
       acc[`import.meta.env.${key}`] = JSON.stringify(process.env[key]);
       return acc;

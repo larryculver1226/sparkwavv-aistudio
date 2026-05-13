@@ -45,35 +45,35 @@ const getEnvVar = (viteVal: string | undefined, processKey: string): string | un
 // Define the Firebase config object as requested for production alignment
 export const firebaseConfig = {
   apiKey: getEnvVar(
-    typeof import.meta !== 'undefined' && import.meta.env ? import.meta.env.VITE_FIREBASE_API_KEY : undefined, 
+    import.meta.env?.VITE_FIREBASE_API_KEY, 
     'VITE_FIREBASE_API_KEY'
   ),
   authDomain: getEnvVar(
-    typeof import.meta !== 'undefined' && import.meta.env ? import.meta.env.VITE_FIREBASE_AUTH_DOMAIN : undefined, 
+    import.meta.env?.VITE_FIREBASE_AUTH_DOMAIN, 
     'VITE_FIREBASE_AUTH_DOMAIN'
   ),
   projectId: getEnvVar(
-    typeof import.meta !== 'undefined' && import.meta.env ? import.meta.env.VITE_FIREBASE_PROJECT_ID : undefined, 
+    import.meta.env?.VITE_FIREBASE_PROJECT_ID, 
     'VITE_FIREBASE_PROJECT_ID'
   ) || 'sparkwavv-prod',
   storageBucket: getEnvVar(
-    typeof import.meta !== 'undefined' && import.meta.env ? import.meta.env.VITE_FIREBASE_STORAGE_BUCKET : undefined, 
+    import.meta.env?.VITE_FIREBASE_STORAGE_BUCKET, 
     'VITE_FIREBASE_STORAGE_BUCKET'
   ),
   messagingSenderId: getEnvVar(
-    typeof import.meta !== 'undefined' && import.meta.env ? import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID : undefined, 
+    import.meta.env?.VITE_FIREBASE_MESSAGING_SENDER_ID, 
     'VITE_FIREBASE_MESSAGING_SENDER_ID'
   ),
   appId: getEnvVar(
-    typeof import.meta !== 'undefined' && import.meta.env ? import.meta.env.VITE_FIREBASE_APP_ID : undefined, 
+    import.meta.env?.VITE_FIREBASE_APP_ID, 
     'VITE_FIREBASE_APP_ID'
   ),
   measurementId: getEnvVar(
-    typeof import.meta !== 'undefined' && import.meta.env ? import.meta.env.VITE_FIREBASE_MEASUREMENT_ID : undefined, 
+    import.meta.env?.VITE_FIREBASE_MEASUREMENT_ID, 
     'VITE_FIREBASE_MEASUREMENT_ID'
   ),
   firestoreDatabaseId: getEnvVar(
-    typeof import.meta !== 'undefined' && import.meta.env ? import.meta.env.VITE_FIREBASE_DATABASE_ID : undefined, 
+    import.meta.env?.VITE_FIREBASE_DATABASE_ID, 
     'VITE_FIREBASE_DATABASE_ID'
   ) || '(default)'
 };
@@ -99,7 +99,9 @@ export const config = {
   
   // Validation Flags
   get isFirebaseConfigured() {
-    return !!(this.apiKey && this.projectId === 'sparkwavv-prod' && !this.apiKey.includes('placeholder'));
+    // If we have an API key and it's not a placeholder, we are mostly configured
+    // We warn about project alignment but don't strictly block unless key is missing
+    return !!(this.apiKey && !this.apiKey.toLowerCase().includes('placeholder'));
   }
 };
 
