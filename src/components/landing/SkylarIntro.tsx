@@ -3,10 +3,12 @@ import { motion } from 'motion/react';
 import { X, Sparkles } from 'lucide-react';
 import { useSkylarConfig } from '../../contexts/SkylarConfigContext';
 
+import { SKYLAR_DEFAULTS } from '../../constants';
+
 export const SkylarAvatar: React.FC = () => {
   const { global } = useSkylarConfig();
-  const skylarAvatar = global?.avatar?.url || 'https://images.unsplash.com/photo-1560250097-0b93528c311a?auto=format&fit=crop&q=80&w=800';
-  const scale = global?.avatar?.scale || 1;
+  const skylarAvatar = global?.avatar?.url || SKYLAR_DEFAULTS.AVATAR_URL;
+  const scale = global?.avatar?.scale || SKYLAR_DEFAULTS.SCALE;
 
   return (
     <motion.div

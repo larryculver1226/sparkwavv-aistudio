@@ -1,5 +1,6 @@
 import { Modality, Type, FunctionDeclaration, ThinkingLevel } from '@google/genai';
 import { getGeminiApiKey } from './aiConfig';
+import { SKYLAR_DEFAULTS } from '../constants';
 import { genkitTracer } from './agentOpsService';
 import { KnowledgeGraph, WavvaultData, TargetOpportunity } from '../types/wavvault';
 import defaultJourneyStages from '../config/defaultJourneyStages.json';
@@ -445,32 +446,28 @@ export const PERSONA_CONFIG = {
   discovery: {
     name: 'Skylar Discovery Architect',
     voice: 'Kore',
-    avatar:
-      'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=400&h=400&fit=crop&crop=faces',
+    avatar: SKYLAR_DEFAULTS.AVATAR_URL,
     instruction:
       "You are the Skylar Discovery Architect. Your goal is to help the user identify their 'best self' through attribute extraction from their accomplishments and exercises. Be professional, clear, and analytical. Focus on 'bringing attributes to life'.",
   },
   branding: {
     name: 'Skylar Narrative Journalist',
     voice: 'Zephyr',
-    avatar:
-      'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=400&h=400&fit=crop&crop=faces',
+    avatar: SKYLAR_DEFAULTS.AVATAR_URL,
     instruction:
       "You are the Skylar Narrative Journalist. Your goal is to help the user transform their accomplishments into dual-perspective stories: a factual 'Journalist' version and an emotional 'Reflective' version. Be calm, steady, and encouraging of emotional depth.",
   },
   outreach: {
     name: 'Skylar Kickspark Drill Master',
     voice: 'Puck',
-    avatar:
-      'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=400&h=400&fit=crop&crop=faces',
+    avatar: SKYLAR_DEFAULTS.AVATAR_URL,
     instruction:
       'You are the Skylar Kickspark Drill Master. Your goal is to enforce the 80/20 rule and ensure the user is maintaining their 3.5-7 hour weekly commitment. Be energetic, bright, and focused on execution and financial ROI.',
   },
   rpp: {
     name: 'Skylar Role Playing Partner',
     voice: 'Kore',
-    avatar:
-      'https://images.unsplash.com/photo-1519085360753-af0119f7cbe7?w=400&h=400&fit=crop&crop=faces',
+    avatar: SKYLAR_DEFAULTS.AVATAR_URL,
     instruction:
       "You are acting as the user's Role Playing Partner (RPP). Your job is to audit their 'Five Stories' for factual accuracy and emotional depth. Be a 'Hard Trainer' for facts and a 'Soft Coach' for feelings. You must validate their work before they can proceed.",
   },

@@ -4278,7 +4278,8 @@ async function startServer() {
           let extractedText = '';
 
           try {
-            const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
+            const { getGeminiApiKey } = await import('./src/services/aiConfig.js');
+            const ai = new GoogleGenAI({ apiKey: getGeminiApiKey() });
 
             // Upload the file natively via GenAI File API
             const uploadResult = await ai.files.upload({
@@ -4948,7 +4949,8 @@ async function startServer() {
       });
 
       let activeTargetModel = 'googleai/gemini-2.0-flash';
-      if (!process.env.GEMINI_API_KEY && process.env.VERTEX_AI_PROJECT_ID) activeTargetModel = 'vertexai/gemini-2.0-flash';
+      const geminiKey = getGeminiApiKey();
+      if (!geminiKey && process.env.VERTEX_AI_PROJECT_ID) activeTargetModel = 'vertexai/gemini-2.0-flash';
 
       const { output } = await ai.generate({
         model: activeTargetModel,

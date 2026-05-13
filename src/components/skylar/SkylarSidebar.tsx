@@ -24,7 +24,8 @@ import {
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import clsx from 'clsx';
-import { skylar, ChatMessage, SkylarPersona, PERSONA_CONFIG } from '../../services/skylarService';
+import { ChatMessage, SkylarPersona, PERSONA_CONFIG } from '../../services/skylarService';
+import { SKYLAR_DEFAULTS } from '../../constants';
 import { useIdentity } from '../../contexts/IdentityContext';
 import { useSkylarConfig } from '../../contexts/SkylarConfigContext';
 import { useLocation } from 'react-router-dom';
@@ -668,11 +669,11 @@ export const SkylarSidebar: React.FC<SkylarSidebarProps> = ({ onLogin }) => {
   };
 
   const getSkylarAvatar = () => {
-    return global?.avatar?.url || PERSONA_CONFIG[persona].avatar;
+    return global?.avatar?.url || SKYLAR_DEFAULTS.AVATAR_URL;
   };
 
   const getSkylarScale = () => {
-    return global?.avatar?.scale || 1;
+    return global?.avatar?.scale || SKYLAR_DEFAULTS.SCALE;
   };
 
   return (

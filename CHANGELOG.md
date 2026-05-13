@@ -3,6 +3,10 @@
 All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
+- **Track 161 (Avatar & Metadata Consistency)**: [COMPLETED] Resolved the production avatar discrepancy and unified Skylar's visual identity across all platforms.
+    - **Uniform Fallbacks**: Unified all persona avatars in `PERSONA_CONFIG` to the primary male professional identity (photo-1560250097) in `skylarService.ts`.
+    - **Production Sync**: Successfully migrated the verified `skylar_global` metadata from the AI Studio sandbox database to the production Firestore database, ensuring the global avatar override is active in production.
+    - **Visual Parity**: Synchronized fallback logic between the Home Page (`SkylarIntro`) and Chat Sidebar (`SkylarSidebar`) to eliminate flickering and mismatches during configuration loads.
 - **Track 155 (Firebase Production Cutover)**: [COMPLETED] Successfully migrated application state and authentication to the production project `sparkwavv-prod`.
     - **Auth Migration**: Ported all user accounts (UIDs intact) from the sandbox.
     - **Data Migration**: Transferred 17 Firestore collections to the production database.
@@ -30,7 +34,7 @@ All notable changes to this project will be documented in this file.
 - **Track 154 (Gemini Auth & Referrer Fixes)**: Addressing `API_KEY_HTTP_REFERRER_BLOCKED` and `API_KEY_INVALID` errors by hardening the Global Fetch Interceptor and improving MCP Registry rotation. Fixed "Origin doesn't match Host" 400 errors by removing manual Origin injection.
 - **Track 153 (Dev-Prod Standardization)**: Initialized standardization of the deployment pipeline, shifting to dynamic service naming and automated secret versioning (latest).
 - **Track 152 (Firebase Key Injection Fix)**: Resolved "Missing API Key" errors in production by correcting secret expansion in `cloudbuild.yaml` and hardening `src/config.ts` fallback logic.
-- **Track 150 (Comprehensive Skylar Fix)**: Resolved persistent connectivity and authentication issues.
+- **Track 161**: Production Avatar Synchronization (Unified persona fallbacks in `skylarService.ts` and synced `metadata/skylar_global` from Sandbox to Production DB).
     - **Global Fetch Interceptor**: Strengthened `backend/services/patchFetch.ts` with autonomous Referer rotation and Axios bridging.
     - **MCP Registry Resilience**: Added **Vertex AI fallback** and key rotation to the Model Registry to survive Gemini API key expirations.
     - **Firestore Robustness**: Implemented silent fallbacks for `journeyPhaseConfigs` to eliminate production permission errors.

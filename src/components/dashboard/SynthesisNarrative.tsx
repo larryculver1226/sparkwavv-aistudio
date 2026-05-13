@@ -14,6 +14,8 @@ import {
 import { UserInsight } from '../../types/dashboard';
 import { EvolutionVisualizer } from '../EvolutionVisualizer';
 import { audioService } from '../../services/audioService';
+import { useSkylarConfig } from '../../contexts/SkylarConfigContext';
+import { SKYLAR_DEFAULTS } from '../../constants';
 
 interface SynthesisNarrativeProps {
   insights: UserInsight[];
@@ -21,11 +23,15 @@ interface SynthesisNarrativeProps {
 }
 
 export const SynthesisNarrative: React.FC<SynthesisNarrativeProps> = ({ insights, onComplete }) => {
+  const { global } = useSkylarConfig();
   const [currentIndex, setCurrentIndex] = useState(0);
   const [isPaused, setIsPaused] = useState(false);
   const [isMuted, setIsMuted] = useState(false);
   const [narrativeText, setNarrativeText] = useState('');
   const [isTyping, setIsTyping] = useState(false);
+
+  const skylarAvatar = global?.avatar?.url || SKYLAR_DEFAULTS.AVATAR_URL;
+  const skylarScale = global?.avatar?.scale || SKYLAR_DEFAULTS.SCALE;
 
   const currentInsight = insights[currentIndex];
 
@@ -99,8 +105,15 @@ export const SynthesisNarrative: React.FC<SynthesisNarrativeProps> = ({ insights
       {/* Header Controls */}
       <div className="absolute top-12 left-12 right-12 flex items-center justify-between z-10">
         <div className="flex items-center gap-4">
-          <div className="w-12 h-12 rounded-2xl bg-neon-cyan/10 border border-neon-cyan/20 flex items-center justify-center">
-            <Brain className="w-6 h-6 text-neon-cyan animate-pulse" />
+          <div className="w-12 h-12 rounded-2xl bg-neon-cyan/10 border border-neon-cyan/20 flex items-center justify-center overflow-hidden relative">
+            <img
+              src={skylarAvatar}
+              alt="Skylar"
+              className="w-full h-full object-cover transition-transform duration-500"
+              style={{ transform: `scale(${skylarScale})` }}
+              referrerPolicy="no-referrer"
+            />
+            <div className="absolute inset-0 bg-neon-cyan/10 animate-pulse" />
           </div>
           <div>
             <h3 className="text-xl font-display font-bold text-white tracking-tight uppercase">

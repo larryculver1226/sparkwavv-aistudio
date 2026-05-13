@@ -12,10 +12,16 @@ import {
 } from 'lucide-react';
 import { StrategicDirective } from '../../../types/dashboard';
 import { marketSignalService } from '../../../services/marketSignalService';
+import { useSkylarConfig } from '../../../contexts/SkylarConfigContext';
+import { SKYLAR_DEFAULTS } from '../../../constants';
 
 export const SkylarSidePanel: React.FC<{ userId: string }> = ({ userId }) => {
+  const { global } = useSkylarConfig();
   const [directives, setDirectives] = useState<StrategicDirective[]>([]);
   const [activeDirective, setActiveDirective] = useState<StrategicDirective | null>(null);
+
+  const skylarAvatar = global?.avatar?.url || SKYLAR_DEFAULTS.AVATAR_URL;
+  const skylarScale = global?.avatar?.scale || SKYLAR_DEFAULTS.SCALE;
 
   useEffect(() => {
     const loadDirectives = async () => {
@@ -33,11 +39,17 @@ export const SkylarSidePanel: React.FC<{ userId: string }> = ({ userId }) => {
         <div className="flex items-center gap-4 mb-6">
           <div className="relative">
             <div className="w-[60px] h-[60px] rounded-full bg-neon-cyan/20 border border-neon-cyan/40 flex items-center justify-center overflow-hidden">
-              <Brain className="w-6 h-6 text-neon-cyan" />
+              <img
+                src={skylarAvatar}
+                alt="Skylar"
+                className="w-full h-full object-cover transition-transform duration-500"
+                style={{ transform: `scale(${skylarScale})` }}
+                referrerPolicy="no-referrer"
+              />
               <motion.div
                 animate={{ scale: [1, 1.2, 1], opacity: [0.3, 0.6, 0.3] }}
                 transition={{ duration: 4, repeat: Infinity }}
-                className="absolute inset-0 bg-neon-cyan/20 rounded-full"
+                className="absolute inset-0 bg-neon-cyan/10 rounded-full"
               />
             </div>
             <div className="absolute -bottom-1 -right-1 w-4 h-4 rounded-full bg-neon-lime border-2 border-black flex items-center justify-center">

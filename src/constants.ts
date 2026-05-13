@@ -81,6 +81,11 @@ export const BRAND_DNA_ATTRIBUTES = [
   'analyst',
 ] as const;
 
+export const SKYLAR_DEFAULTS = {
+  AVATAR_URL: 'https://images.unsplash.com/photo-1560250097-0b93528c311a?auto=format&fit=crop&q=80&w=800',
+  SCALE: 1,
+} as const;
+
 export const ROLES = {
   ADMIN: 'admin',
   SUPER_ADMIN: 'super_admin',

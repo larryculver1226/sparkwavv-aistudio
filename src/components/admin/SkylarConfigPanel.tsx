@@ -4,6 +4,7 @@ import { Save, RefreshCw, Plus, Trash2, Image as ImageIcon, Sparkles, AlertCircl
 import { configService } from '../../services/configService';
 import { generateHomeBenefits } from '../../services/geminiService';
 import { SkylarGlobalConfig } from '../../types/skylar-config';
+import { SKYLAR_DEFAULTS } from '../../constants';
 
 export const SkylarConfigPanel: React.FC = () => {
   const [config, setConfig] = useState<SkylarGlobalConfig | null>(null);
@@ -40,8 +41,8 @@ export const SkylarConfigPanel: React.FC = () => {
           version: '1.0.0',
           lastUpdated: new Date().toISOString(),
           avatar: {
-            url: 'https://images.unsplash.com/photo-1560250097-0b93528c311a?auto=format&fit=crop&q=80&w=800',
-            scale: 1
+            url: SKYLAR_DEFAULTS.AVATAR_URL,
+            scale: SKYLAR_DEFAULTS.SCALE
           },
           homeBenefits: [
             "Skylar: Your high-fidelity intelligence partner.",
@@ -134,8 +135,8 @@ export const SkylarConfigPanel: React.FC = () => {
       version: '1.0.0',
       lastUpdated: new Date().toISOString(),
       avatar: {
-        url: 'https://images.unsplash.com/photo-1560250097-0b93528c311a?auto=format&fit=crop&q=80&w=800',
-        scale: 1
+        url: SKYLAR_DEFAULTS.AVATAR_URL,
+        scale: SKYLAR_DEFAULTS.SCALE
       },
       homeBenefits: [
         "Skylar: Your high-fidelity intelligence partner.",
