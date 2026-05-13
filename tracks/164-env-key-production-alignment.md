@@ -1,4 +1,4 @@
-# Track 156: Environment Key Production Alignment
+# Track 164: Environment Key Production Alignment
 
 ## Overview
 Address the critical failure of Firebase initialization in production (`sparkwavv-prod`) due to missing `VITE_FIREBASE_API_KEY`. Align development (AI Studio) and production environmental configurations to ensure stability across deployments.

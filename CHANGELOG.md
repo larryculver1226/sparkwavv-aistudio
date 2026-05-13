@@ -3,7 +3,7 @@
 All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
-- **Track 163 (Environment Alignment & Production Guardrails)**: [COMPLETED] Unified the environment variable resolution and implemented a "Degraded Mode" UI for missing configuration.
+- **Track 164 (Environment Alignment & Production Guardrails)**: [COMPLETED] Unified the environment variable resolution and implemented a "Degraded Mode" UI for missing configuration.
     - **Robust Key Resolution**: Enhanced `src/config.ts` with diagnostic logging that tracks the resolution of every sensitive key across Vite, Process, and JSON sources.
     - **Degraded Mode UI**: Added a persistent neon warning banner in `src/App.tsx` that triggers if `VITE_FIREBASE_API_KEY` is missing, informing users precisely how to restore functionality.
     - **Safe Initialization**: Refactored `src/lib/firebase.ts` to use centralized configuration and implement "Safe Stubs" for Auth/Firestore/Storage, preventing application crashes even when configuration is broken.

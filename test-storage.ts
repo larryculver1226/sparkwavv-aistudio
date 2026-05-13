@@ -1,7 +1,7 @@
 import admin from "firebase-admin";
 
-const projectId = "gen-lang-client-0883822731";
-const storageBucket = "gen-lang-client-0883822731.firebasestorage.app";
+const projectId = "sparkwavv-prod";
+const storageBucket = "sparkwavv-prod.firebasestorage.app";
 
 admin.initializeApp({
   projectId,

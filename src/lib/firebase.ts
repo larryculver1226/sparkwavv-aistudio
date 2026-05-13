@@ -4,17 +4,25 @@ import { getFirestore, initializeFirestore } from 'firebase/firestore';
 import { getStorage } from 'firebase/storage';
 import { config as appConfig } from '../config';
 
+const TARGET_PROJECT = 'sparkwavv-prod';
+
 const firebaseConfig = {
   apiKey: appConfig.firebaseApiKey,
-  authDomain: appConfig.firebaseAuthDomain,
-  projectId: appConfig.firebaseProjectId,
-  storageBucket: appConfig.firebaseStorageBucket,
+  authDomain: appConfig.firebaseAuthDomain || `${TARGET_PROJECT}.firebaseapp.com`,
+  projectId: appConfig.firebaseProjectId || TARGET_PROJECT,
+  storageBucket: appConfig.firebaseStorageBucket || `${TARGET_PROJECT}.firebasestorage.app`,
   messagingSenderId: appConfig.firebaseMessagingSenderId,
   appId: appConfig.firebaseAppId,
   measurementId: appConfig.firebaseMeasurementId,
 };
 
-console.log('🛡️ [Firebase] Initializing with Project ID:', firebaseConfig.projectId);
+if (typeof window !== 'undefined') {
+  if (firebaseConfig.projectId !== TARGET_PROJECT) {
+    console.warn(`🛡️ [Firebase] STRICT ALIGNMENT WARNING: Current Project ID is "${firebaseConfig.projectId}", but strictly targeting "${TARGET_PROJECT}".`);
+  } else {
+    console.log(`🛡️ [Firebase] Strictly initializing with Project ID: ${TARGET_PROJECT}`);
+  }
+}
 
 let sparkwavvApp: any;
 let authInstance: any;

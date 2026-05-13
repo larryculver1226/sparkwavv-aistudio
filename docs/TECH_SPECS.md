@@ -18,6 +18,10 @@
 To enable full enterprise intelligence, the following environment variables must be configured in the AI Studio Settings:
 
 ### 1. Firebase & Core Infrastructure
+- `VITE_FIREBASE_API_KEY`: **[CRITICAL]** The public Web API Key from Firebase Console (Settings > General). Required for browser-side Auth and Firestore. 
+  - *AI Studio*: Add to Settings > Secrets.
+  - *Production (sparkwavv.ai)*: Inject into Cloud Build / Cloud Run environment.
+- `VITE_FIREBASE_PROJECT_ID`: The unique ID of your project (e.g., `sparkwavv-prod`).
 - `FIREBASE_SERVICE_ACCOUNT_JSON`: The full JSON string of your Google Cloud Service Account key. This enables Firebase Admin and Vertex AI Enterprise features.
 - `VITE_FIREBASE_DATABASE_ID`: The ID of your Firestore database (e.g., `(default)` or a custom ID like `sparkwavv-db`).
 - `SESSION_SECRET`: A random string for securing user sessions.

@@ -101,7 +101,7 @@ export const config = {
     typeof import.meta !== 'undefined' && import.meta.env ? import.meta.env.VITE_FIREBASE_PROJECT_ID : undefined, 
     'VITE_FIREBASE_PROJECT_ID', 
     'projectId'
-  ),
+  ) || 'sparkwavv-prod',
   firebaseStorageBucket: getEnvVar(
     typeof import.meta !== 'undefined' && import.meta.env ? import.meta.env.VITE_FIREBASE_STORAGE_BUCKET : undefined, 
     'VITE_FIREBASE_STORAGE_BUCKET', 
@@ -138,12 +138,12 @@ export const config = {
   geminiApiKey: getEnvVar(undefined, 'GEMINI_API_KEY'),
   apiKey: getEnvVar(undefined, 'API_KEY'),
 
-  firebaseServerProjectId: getEnvVar(undefined, 'FIREBASE_PROJECT_ID'),
+  firebaseServerProjectId: getEnvVar(undefined, 'FIREBASE_PROJECT_ID') || 'sparkwavv-prod',
   firebaseClientEmail: getEnvVar(undefined, 'FIREBASE_CLIENT_EMAIL'),
   firebasePrivateKey: getEnvVar(undefined, 'FIREBASE_PRIVATE_KEY'),
   firebaseServiceAccountJson: getEnvVar(undefined, 'FIREBASE_SERVICE_ACCOUNT_JSON'),
-
-  vertexAiProjectId: getEnvVar(undefined, 'VERTEX_AI_PROJECT_ID'),
+  
+  vertexAiProjectId: getEnvVar(undefined, 'VERTEX_AI_PROJECT_ID') || 'sparkwavv-prod',
   vertexAiLocation: getEnvVar(undefined, 'VERTEX_AI_LOCATION'),
   vertexAiSearchEngineId: getEnvVar(undefined, 'VERTEX_AI_SEARCH_ENGINE_ID'),
   vertexAiSearchDataStoreId: getEnvVar(undefined, 'VERTEX_AI_SEARCH_DATA_STORE_ID'),
@@ -153,7 +153,7 @@ export const config = {
 
   // Validation Flags
   get isFirebaseConfigured() {
-    return !!(this.firebaseApiKey && this.firebaseProjectId && !this.firebaseApiKey.includes('placeholder'));
+    return !!(this.firebaseApiKey && this.firebaseProjectId === 'sparkwavv-prod' && !this.firebaseApiKey.includes('placeholder'));
   }
 };
 
