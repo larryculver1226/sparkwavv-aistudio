@@ -1,4 +1,4 @@
-import firebaseConfig from '../../firebase-applet-config.json';
+import { config } from '../config';
 
 export interface ProbeResult {
   isVulnerable: boolean;
@@ -11,7 +11,7 @@ export interface ProbeResult {
  * If successful, the key is "over-privileged" and vulnerable.
  */
 export async function probeFirebaseKeyForGeminiAccess(): Promise<ProbeResult> {
-  const firebaseApiKey = firebaseConfig.apiKey;
+  const firebaseApiKey = config.firebaseApiKey;
   const probeModel = 'gemini-2.0-flash';
   // Using countTokens as a harmless, low-latency probe
   const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${probeModel}:countTokens?key=${firebaseApiKey}`;

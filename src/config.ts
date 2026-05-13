@@ -1,9 +1,7 @@
 // src/config.ts
 
-import firebaseConfig from '../firebase-applet-config.json';
-
 // Safely access environment variables in both Vite and Node.js environments
-const getEnvVar = (viteVal: string | undefined, processKey: string, jsonFallback?: string): string | undefined => {
+const getEnvVar = (viteVal: string | undefined, processKey: string): string | undefined => {
   let val: string | undefined = viteVal;
   let source = 'Vite Environment';
 
@@ -51,17 +49,6 @@ const getEnvVar = (viteVal: string | undefined, processKey: string, jsonFallback
     } catch (e) { /* Ignored */ }
   }
 
-  // Fallback to config file
-  if (!val && jsonFallback) {
-    val = (firebaseConfig as any)[jsonFallback];
-    if (val && !isInvalid(val)) {
-      source = 'Config File (JSON)';
-      logDecision('Value found in JSON config', val, source);
-    } else {
-      val = undefined;
-    }
-  }
-
   if (!val) {
     logDecision('FAILED to resolve value', undefined, 'NONE');
   }
@@ -89,43 +76,35 @@ export const config = {
   // Client (Vite) Configs - Statically written so Vite replaces them during build
   firebaseApiKey: getEnvVar(
     typeof import.meta !== 'undefined' && import.meta.env ? import.meta.env.VITE_FIREBASE_API_KEY : undefined, 
-    'VITE_FIREBASE_API_KEY', 
-    'apiKey'
+    'VITE_FIREBASE_API_KEY'
   ),
   firebaseAuthDomain: getEnvVar(
     typeof import.meta !== 'undefined' && import.meta.env ? import.meta.env.VITE_FIREBASE_AUTH_DOMAIN : undefined, 
-    'VITE_FIREBASE_AUTH_DOMAIN', 
-    'authDomain'
+    'VITE_FIREBASE_AUTH_DOMAIN'
   ),
   firebaseProjectId: getEnvVar(
     typeof import.meta !== 'undefined' && import.meta.env ? import.meta.env.VITE_FIREBASE_PROJECT_ID : undefined, 
-    'VITE_FIREBASE_PROJECT_ID', 
-    'projectId'
+    'VITE_FIREBASE_PROJECT_ID'
   ) || 'sparkwavv-prod',
   firebaseStorageBucket: getEnvVar(
     typeof import.meta !== 'undefined' && import.meta.env ? import.meta.env.VITE_FIREBASE_STORAGE_BUCKET : undefined, 
-    'VITE_FIREBASE_STORAGE_BUCKET', 
-    'storageBucket'
+    'VITE_FIREBASE_STORAGE_BUCKET'
   ),
   firebaseMessagingSenderId: getEnvVar(
     typeof import.meta !== 'undefined' && import.meta.env ? import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID : undefined, 
-    'VITE_FIREBASE_MESSAGING_SENDER_ID', 
-    'messagingSenderId'
+    'VITE_FIREBASE_MESSAGING_SENDER_ID'
   ),
   firebaseAppId: getEnvVar(
     typeof import.meta !== 'undefined' && import.meta.env ? import.meta.env.VITE_FIREBASE_APP_ID : undefined, 
-    'VITE_FIREBASE_APP_ID', 
-    'appId'
+    'VITE_FIREBASE_APP_ID'
   ),
   firebaseMeasurementId: getEnvVar(
     typeof import.meta !== 'undefined' && import.meta.env ? import.meta.env.VITE_FIREBASE_MEASUREMENT_ID : undefined, 
-    'VITE_FIREBASE_MEASUREMENT_ID', 
-    'measurementId'
+    'VITE_FIREBASE_MEASUREMENT_ID'
   ),
   firebaseDatabaseId: getEnvVar(
     typeof import.meta !== 'undefined' && import.meta.env ? import.meta.env.VITE_FIREBASE_DATABASE_ID : undefined, 
-    'VITE_FIREBASE_DATABASE_ID', 
-    'firestoreDatabaseId'
+    'VITE_FIREBASE_DATABASE_ID'
   ),
 
   // Server (Backend) Configs

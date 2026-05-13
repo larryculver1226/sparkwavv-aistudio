@@ -4,7 +4,7 @@ import { ShieldCheck, Loader2, AlertCircle, User, ShieldAlert, LogOut } from 'lu
 import { useNavigate } from 'react-router-dom';
 import { useIdentity } from '../contexts/IdentityContext';
 import { ROLES } from '../constants';
-import firebaseConfig from '../../firebase-applet-config.json';
+import { config } from '../config';
 
 export const AdminLogin: React.FC<{
   onLogin: () => void;
@@ -343,17 +343,13 @@ export const AdminLogin: React.FC<{
                     <div className="space-y-1">
                       <p className="opacity-40 uppercase text-[8px]">Project ID</p>
                       <p className="truncate">
-                        {import.meta.env.VITE_FIREBASE_PROJECT_ID ||
-                          firebaseConfig.projectId ||
-                          'Not Set'}
+                        {config.firebaseProjectId || 'Not Set'}
                       </p>
                     </div>
                     <div className="space-y-1">
                       <p className="opacity-40 uppercase text-[8px]">API Key</p>
                       <p className="truncate">
-                        {import.meta.env.VITE_FIREBASE_API_KEY || firebaseConfig.apiKey
-                          ? '••••••••'
-                          : 'Not Set'}
+                        {config.firebaseApiKey ? '••••••••' : 'Not Set'}
                       </p>
                     </div>
                   </div>

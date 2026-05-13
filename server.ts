@@ -80,30 +80,10 @@ const __dirname = path.dirname(__filename);
 // Helper to check if a value is a placeholder
 const isPlaceholder = (val: any) => typeof val === 'string' && val.startsWith('PLACEHOLDER');
 
-// Pre-load Firebase config for environment consistency
+// Pre-load Firebase config - removed hardcoded JSON dependency for production security
 let firebaseAppletConfig: any = {};
-try {
-  const configPath = path.join(__dirname, 'firebase-applet-config.json');
-  console.log(`[STORAGE] Attempting to read config from: ${configPath}`);
-  if (fs.existsSync(configPath)) {
-    const rawConfig = fs.readFileSync(configPath, 'utf8');
-    firebaseAppletConfig = JSON.parse(rawConfig);
-    console.log(`[STORAGE] Config pre-read successful. Project: ${firebaseAppletConfig.projectId}`);
-    if (
-      firebaseAppletConfig.projectId &&
-      !isPlaceholder(firebaseAppletConfig.projectId) &&
-      !process.env.FIREBASE_PROJECT_ID
-    ) {
-      process.env.FIREBASE_PROJECT_ID = firebaseAppletConfig.projectId;
-    }
-  } else {
-    console.warn(`[STORAGE] Config file NOT FOUND at: ${configPath}`);
-  }
-} catch (error) {
-  console.warn('Could not pre-read firebase-applet-config.json:', error);
-}
 
-const PROJECT_ID = process.env.VERTEX_AI_PROJECT_ID || process.env.FIREBASE_PROJECT_ID;
+const PROJECT_ID = process.env.VERTEX_AI_PROJECT_ID || process.env.VITE_FIREBASE_PROJECT_ID || process.env.FIREBASE_PROJECT_ID;
 const LOCATION = process.env.VERTEX_AI_LOCATION || 'global';
 const DATA_STORE_ID = process.env.VERTEX_AI_SEARCH_DATA_STORE_ID;
 
@@ -549,19 +529,14 @@ export const firestoreReady = new Promise((resolve) => {
 
 // Log status to a file for diagnostics - moved up so it can be updated during init
 const envStatus: any = {
-  VITE_FIREBASE_API_KEY: firebaseAppletConfig.apiKey || process.env.VITE_FIREBASE_API_KEY || '',
-  VITE_FIREBASE_AUTH_DOMAIN:
-    firebaseAppletConfig.authDomain || process.env.VITE_FIREBASE_AUTH_DOMAIN || '',
-  VITE_FIREBASE_PROJECT_ID:
-    firebaseAppletConfig.projectId || process.env.VITE_FIREBASE_PROJECT_ID || '',
-  VITE_FIREBASE_DATABASE_ID:
-    process.env.VITE_FIREBASE_DATABASE_ID || firebaseAppletConfig.firestoreDatabaseId || '(default)',
-  VITE_FIREBASE_STORAGE_BUCKET:
-    firebaseAppletConfig.storageBucket || process.env.VITE_FIREBASE_STORAGE_BUCKET || '',
-  VITE_FIREBASE_MESSAGING_SENDER_ID:
-    firebaseAppletConfig.messagingSenderId || process.env.VITE_FIREBASE_MESSAGING_SENDER_ID || '',
-  VITE_FIREBASE_APP_ID: firebaseAppletConfig.appId || process.env.VITE_FIREBASE_APP_ID || '',
-  FIREBASE_PROJECT_ID: firebaseAppletConfig.projectId || process.env.FIREBASE_PROJECT_ID || '',
+  VITE_FIREBASE_API_KEY: process.env.VITE_FIREBASE_API_KEY || '',
+  VITE_FIREBASE_AUTH_DOMAIN: process.env.VITE_FIREBASE_AUTH_DOMAIN || '',
+  VITE_FIREBASE_PROJECT_ID: process.env.VITE_FIREBASE_PROJECT_ID || '',
+  VITE_FIREBASE_DATABASE_ID: process.env.VITE_FIREBASE_DATABASE_ID || '(default)',
+  VITE_FIREBASE_STORAGE_BUCKET: process.env.VITE_FIREBASE_STORAGE_BUCKET || '',
+  VITE_FIREBASE_MESSAGING_SENDER_ID: process.env.VITE_FIREBASE_MESSAGING_SENDER_ID || '',
+  VITE_FIREBASE_APP_ID: process.env.VITE_FIREBASE_APP_ID || '',
+  FIREBASE_PROJECT_ID: process.env.FIREBASE_PROJECT_ID || '',
   FIREBASE_CLIENT_EMAIL: process.env.FIREBASE_CLIENT_EMAIL || '',
   FIREBASE_PRIVATE_KEY: process.env.FIREBASE_PRIVATE_KEY ? 'PRESENT' : 'MISSING',
   FIREBASE_SERVICE_ACCOUNT_SOURCE: 'INDIVIDUAL_VARS',
@@ -1237,9 +1212,8 @@ async function startServer() {
     res.json({
       firebase: {
         admin: isFirebaseAdminConfigured,
-        projectId: process.env.FIREBASE_PROJECT_ID || firebaseAppletConfig.projectId || null,
-        databaseId:
-          process.env.VITE_FIREBASE_DATABASE_ID || firebaseAppletConfig.firestoreDatabaseId || null,
+        projectId: process.env.VITE_FIREBASE_PROJECT_ID || process.env.FIREBASE_PROJECT_ID || null,
+        databaseId: process.env.VITE_FIREBASE_DATABASE_ID || process.env.FIREBASE_DATABASE_ID || '(default)',
       },
       gemini: {
         configured: !!geminiKey,
