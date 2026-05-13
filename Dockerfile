@@ -10,16 +10,14 @@ RUN npm install
 COPY . .
 # We use npm run build which compiles both vite assets and server.ts to dist/
 # Accept build arguments
-ARG VITE_FIREBASE_API_KEY
-ARG VITE_FIREBASE_PROJECT_ID
 ARG GEMINI_API_KEY
 ARG SESSION_SECRET
+ARG APP_URL
 
 # Set them as environment variables for the build process
-ENV VITE_FIREBASE_API_KEY=$VITE_FIREBASE_API_KEY
-ENV VITE_FIREBASE_PROJECT_ID=$VITE_FIREBASE_PROJECT_ID
 ENV GEMINI_API_KEY=$GEMINI_API_KEY
 ENV SESSION_SECRET=$SESSION_SECRET
+ENV APP_URL=$APP_URL
 
 # Existing build command follows:
 RUN npm run build
