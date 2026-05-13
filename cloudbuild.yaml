@@ -28,11 +28,11 @@ steps:
       - |
         docker build \
           -t gcr.io/$PROJECT_ID/sparkwavv:$COMMIT_SHA \
-          --build-arg VITE_FIREBASE_API_KEY=$$VITE_FIREBASE_API_KEY \
-          --build-arg VITE_FIREBASE_PROJECT_ID=$$VITE_FIREBASE_PROJECT_ID \
-          --build-arg GEMINI_API_KEY=$$GEMINI_API_KEY \
-          --build-arg SESSION_SECRET=$$SESSION_SECRET \
-          --build-arg APP_URL=$$APP_URL \
+          --build-arg VITE_FIREBASE_API_KEY="$$VITE_FIREBASE_API_KEY" \
+          --build-arg VITE_FIREBASE_PROJECT_ID="$$VITE_FIREBASE_PROJECT_ID" \
+          --build-arg GEMINI_API_KEY="$$GEMINI_API_KEY" \
+          --build-arg SESSION_SECRET="$$SESSION_SECRET" \
+          --build-arg APP_URL="$$APP_URL" \
           .
     secretEnv:
       - 'VITE_FIREBASE_API_KEY'

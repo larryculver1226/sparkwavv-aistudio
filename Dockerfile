@@ -4,6 +4,8 @@ FROM node:20-alpine AS builder
 RUN apk add --no-cache python3 make g++
 
 WORKDIR /app
+ENV NODE_ENV=production
+ENV STRICT_CONFIG=true
 
 # Move build arguments to the very beginning of the build process
 ARG VITE_FIREBASE_API_KEY

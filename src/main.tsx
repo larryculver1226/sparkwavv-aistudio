@@ -13,7 +13,9 @@ console.log('🛡️ [Main] Environment Check:', {
     hasProcessKey: !!(typeof process !== 'undefined' && process.env?.VITE_FIREBASE_API_KEY),
     isConfigured: config.isFirebaseConfigured,
     apiKeyLength: config.firebaseApiKey?.length || 0,
-    projectId: config.firebaseProjectId
+    projectId: config.firebaseProjectId,
+    mode: import.meta.env?.MODE,
+    isProd: import.meta.env?.PROD
 });
 
 // Firebase Configuration Checks

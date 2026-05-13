@@ -5,16 +5,21 @@ const getEnvVar = (viteVal: string | undefined, processKey: string): string | un
   let val: string | undefined = viteVal;
 
   // Helper to check if a value is actually a placeholder or unresolved variable
-  const isInvalid = (v: any) => 
-    !v || 
-    (typeof v === 'string' && (
-      v.trim() === '' || 
-      v.toLowerCase().includes('placeholder') || 
-      v.toLowerCase().includes('unset') ||
-      v.startsWith('$$') // Cloud Build unreplaced var
-    ));
+  const isInvalid = (v: any) => {
+    if (!v) return true;
+    if (typeof v !== 'string') return false;
+    const trimmed = v.trim();
+    if (trimmed === '') return true;
+    const lower = trimmed.toLowerCase();
+    if (lower.includes('placeholder') || lower.includes('unset')) return true;
+    if (v.startsWith('$$')) return true; // Cloud Build unreplaced var
+    return false;
+  };
 
   if (isInvalid(val)) {
+    if (val && val !== 'undefined') {
+      console.warn(`[CONFIG] Invalid value detected for ${processKey}: ${val.substring(0, 10)}${val.length > 10 ? '...' : ''} (type: ${typeof val})`);
+    }
     val = undefined;
   }
 
