@@ -961,6 +961,28 @@ export function SPARKWavvApp({
         )}
       </AnimatePresence>
 
+      {!isFirebaseConfigured && (
+        <div className="fixed top-20 left-1/2 -translate-x-1/2 z-[60] w-full max-w-4xl px-6">
+          <motion.div 
+            initial={{ y: -50, opacity: 0 }}
+            animate={{ y: 0, opacity: 1 }}
+            className="p-4 rounded-2xl bg-neon-magenta/20 border border-neon-magenta/50 backdrop-blur-xl flex items-start gap-4 shadow-[0_0_30px_rgba(255,0,255,0.2)]"
+          >
+            <div className="w-10 h-10 rounded-xl bg-neon-magenta/20 flex items-center justify-center flex-shrink-0">
+              <ShieldAlert className="w-6 h-6 text-neon-magenta" />
+            </div>
+            <div className="flex-grow space-y-1">
+              <h4 className="text-sm font-bold text-white uppercase tracking-wider">Configuration Missing</h4>
+              <p className="text-xs text-white/60 leading-relaxed">
+                Critical services (Authentication, Data Storage) are currently disabled. 
+                Please update your <strong>AI Studio Secrets Vault</strong> or <strong>.env</strong> file with a valid 
+                <code className="mx-1 px-1 py-0.5 rounded bg-white/10 text-neon-cyan">VITE_FIREBASE_API_KEY</code> to restore full functionality.
+              </p>
+            </div>
+          </motion.div>
+        </div>
+      )}
+
       {/* Atmospheric Background */}
       <div className="fixed inset-0 pointer-events-none overflow-hidden z-0">
         <div className="atmosphere absolute inset-[-100px]" />

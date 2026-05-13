@@ -1,99 +1,20 @@
 import { initializeApp, getApps, getApp } from 'firebase/app';
-import { getAuth, GoogleAuthProvider, OAuthProvider } from 'firebase/auth';
+import { getAuth, GoogleAuthProvider } from 'firebase/auth';
 import { getFirestore, initializeFirestore } from 'firebase/firestore';
 import { getStorage } from 'firebase/storage';
-import firebaseConfig from '../../firebase-applet-config.json';
+import { config as appConfig } from '../config';
 
-// Sparkwavv Project (Project 1) - End Users
-const getViteEnv = (key: string) => {
-  try {
-    // Check import.meta.env (Vite/Client-side)
-    if (typeof import.meta !== 'undefined' && (import.meta as any).env) {
-      return (import.meta as any).env[key];
-    }
-  } catch (e) {
-    // import.meta.env might not be available in Node.js
-  }
-
-  try {
-    // Check process.env (Node.js/Server-side)
-    if (typeof process !== 'undefined' && process.env) {
-      return process.env[key];
-    }
-  } catch (e) {
-    // process.env might not be available in some environments
-  }
-
-  return undefined;
-};
-const isPlaceholder = (val: any) =>
-  !val || (typeof val === 'string' && (val.startsWith('PLACEHOLDER') || val.startsWith('$$') || val.includes('UNSET') || val === ''));
-
-const config = {
-  apiKey: !isPlaceholder(firebaseConfig.apiKey)
-    ? firebaseConfig.apiKey
-    : getViteEnv('VITE_FIREBASE_API_KEY'),
-  authDomain: !isPlaceholder(firebaseConfig.authDomain)
-    ? firebaseConfig.authDomain
-    : getViteEnv('VITE_FIREBASE_AUTH_DOMAIN'),
-  projectId: !isPlaceholder(firebaseConfig.projectId)
-    ? firebaseConfig.projectId
-    : getViteEnv('VITE_FIREBASE_PROJECT_ID'),
-  storageBucket: !isPlaceholder(firebaseConfig.storageBucket)
-    ? firebaseConfig.storageBucket
-    : getViteEnv('VITE_FIREBASE_STORAGE_BUCKET'),
-  messagingSenderId: !isPlaceholder(firebaseConfig.messagingSenderId)
-    ? firebaseConfig.messagingSenderId
-    : getViteEnv('VITE_FIREBASE_MESSAGING_SENDER_ID'),
-  appId: !isPlaceholder(firebaseConfig.appId)
-    ? firebaseConfig.appId
-    : getViteEnv('VITE_FIREBASE_APP_ID'),
-  measurementId: !isPlaceholder(firebaseConfig.measurementId)
-    ? firebaseConfig.measurementId
-    : getViteEnv('VITE_FIREBASE_MEASUREMENT_ID'),
+const firebaseConfig = {
+  apiKey: appConfig.firebaseApiKey,
+  authDomain: appConfig.firebaseAuthDomain,
+  projectId: appConfig.firebaseProjectId,
+  storageBucket: appConfig.firebaseStorageBucket,
+  messagingSenderId: appConfig.firebaseMessagingSenderId,
+  appId: appConfig.firebaseAppId,
+  measurementId: appConfig.firebaseMeasurementId,
 };
 
-// --- EMERGENCY DIAGNOSTICS ---
-if (typeof window !== 'undefined') {
-  console.log('🔍 [Firebase Diagnostic] Raw Config from JSON:', {
-    hasApiKey: !!firebaseConfig.apiKey,
-    apiKeyLength: firebaseConfig.apiKey?.length || 0,
-    apiKeyStart: firebaseConfig.apiKey?.substring(0, 4),
-    isPlaceholder: isPlaceholder(firebaseConfig.apiKey),
-    projectId: firebaseConfig.projectId
-  });
-  
-  console.log('🔍 [Firebase Diagnostic] Resolved Config:', {
-    projectId: config.projectId,
-    hasApiKey: !!config.apiKey,
-    apiKeyStart: config.apiKey?.substring(0, 4),
-    isPlaceholder: isPlaceholder(config.apiKey)
-  });
-}
-
-console.log('🛡️ [Firebase] Initializing with Project ID:', config.projectId);
-
-// Double check for common env injection failures
-if (config.apiKey && typeof config.apiKey === 'string' && config.apiKey.startsWith('$$')) {
-  console.warn('🛡️ [Firebase] Detected unresolved build secret in API Key. Clearing for fallback.');
-  config.apiKey = undefined;
-}
-
-if (config.apiKey) {
-  const isFromVite = getViteEnv('VITE_FIREBASE_API_KEY') === config.apiKey;
-  const keySource = isFromVite ? 'Environment Variable' : 'Config File';
-  console.log(`🛡️ [Firebase] API Key Source: ${keySource}`);
-  console.log(
-    '🛡️ [Firebase] API Key:',
-    `${config.apiKey.substring(0, 6)}...${config.apiKey.substring(config.apiKey.length - 4)}`
-  );
-} else {
-  const rawInConfig = firebaseConfig.apiKey;
-  const rawInVite = getViteEnv('VITE_FIREBASE_API_KEY');
-  console.warn('🛡️ [Firebase] API Key is MISSING! (Checks: JSON, Environment)');
-  console.log('🛡️ [Firebase] Diagnostic - JSON Key:', rawInConfig ? (rawInConfig.startsWith('$$') ? 'REMAINING_VAR' : 'EXISTS') : 'EMPTY');
-  console.log('🛡️ [Firebase] Diagnostic - Vite Key:', rawInVite ? (rawInVite.startsWith('$$') ? 'REMAINING_VAR' : 'EXISTS') : 'EMPTY');
-}
+console.log('🛡️ [Firebase] Initializing with Project ID:', firebaseConfig.projectId);
 
 let sparkwavvApp: any;
 let authInstance: any;
@@ -101,16 +22,23 @@ let dbInstance: any;
 let dbDefaultInstance: any;
 let storageInstance: any;
 
+// Flag to track if the SDK is actually connected to a valid project
+export const isFirebaseConfigured = appConfig.isFirebaseConfigured;
+
 try {
-  // We initialize even with placeholders to get valid SDK instances 
-  // that won't crash when passed to firebase/auth or firebase/firestore functions.
-  sparkwavvApp = getApps().length === 0 ? initializeApp(config) : getApp();
+  if (!isFirebaseConfigured) {
+    if (typeof window !== 'undefined') {
+       console.warn('⚠️ [Firebase] Initialization skipped: Missing or invalid API Key.');
+    }
+    throw new Error('Firebase configuration is incomplete. Check environment variables.');
+  }
+
+  // initializeApp will throw if config is totally invalid
+  sparkwavvApp = getApps().length === 0 ? initializeApp(firebaseConfig) : getApp();
   authInstance = getAuth(sparkwavvApp);
   storageInstance = getStorage(sparkwavvApp);
   
-  const envDbId = getViteEnv('VITE_FIREBASE_DATABASE_ID');
-  const configDbId = !isPlaceholder(firebaseConfig.firestoreDatabaseId) ? firebaseConfig.firestoreDatabaseId : null;
-  let databaseId = (configDbId && configDbId.startsWith('ai-studio-')) ? configDbId : (envDbId || configDbId || '(default)');
+  let databaseId = appConfig.firebaseDatabaseId || '(default)';
   
   // Robust normalization for 'default' -> '(default)'
   if (typeof databaseId === 'string') {
@@ -121,21 +49,21 @@ try {
   }
 
   console.log('🛡️ [Firebase] Selected Database ID:', databaseId);
-  console.log('🛡️ [Firebase] Target Project ID:', config.projectId);
-  console.log('🛡️ [Firebase] Auth Domain:', config.authDomain);
   
   const firestoreSettings = { experimentalForceLongPolling: true };
   
   dbInstance = initializeFirestore(sparkwavvApp, firestoreSettings, databaseId);
-  // Add databaseId property for debugging if needed (internal but helps my logs in main.tsx)
   (dbInstance as any).databaseId = databaseId;
 
   dbDefaultInstance = databaseId === '(default)' ? dbInstance : initializeFirestore(sparkwavvApp, firestoreSettings, '(default)');
   (dbDefaultInstance as any).databaseId = '(default)';
 } catch (e) {
-  console.error('🛡️ [Firebase] Boot Critical Failure:', e);
-  // Last resort safe stubs
-  sparkwavvApp = { options: {}, name: '[SANATIZED]' } as any;
+  if (typeof window !== 'undefined') {
+    console.error('🛡️ [Firebase] Boot Failure:', e);
+  }
+  
+  // Last resort safe stubs to prevent downstream crashes
+  sparkwavvApp = { options: {}, name: '[STUB]' } as any;
   authInstance = {
     onAuthStateChanged: (cb: any) => {
       cb(null);
@@ -147,6 +75,7 @@ try {
   dbInstance = { 
     app: sparkwavvApp,
     type: 'firestore',
+    databaseId: '(stub)',
     toJSON: () => ({})
   } as any;
   dbDefaultInstance = dbInstance;
@@ -157,37 +86,16 @@ export const auth = authInstance;
 export const db = dbInstance;
 export const dbDefault = dbDefaultInstance;
 export const storage = storageInstance;
-export const adminDb = dbInstance; // Fallback to main db in sanitized mode
+export const adminDb = dbInstance; 
 export const adminAuth = authInstance;
 
 export const googleProvider = new GoogleAuthProvider();
 
-/**
- * Sets the tenant ID for the Auth instance.
- * This is required for Google Identity Platform multi-tenancy.
- */
 export const setTenantId = (tenantId: string | null) => {
-  auth.tenantId = tenantId;
-  console.log(`🛡️ [Firebase] Tenant ID set to: ${tenantId}`);
+  if (auth && 'tenantId' in auth) {
+    auth.tenantId = tenantId;
+    console.log(`🛡️ [Firebase] Tenant ID set to: ${tenantId}`);
+  }
 };
 
-export const isFirebaseConfigured = (() => {
-  const isString = typeof config.apiKey === 'string';
-  const hasValue = !!config.apiKey;
-  const isNotPlaceholder = !isPlaceholder(config.apiKey);
-  
-  const result = hasValue && isString && isNotPlaceholder;
-  
-  if (typeof window !== 'undefined') {
-    console.log('🛡️ [Firebase] isFirebaseConfigured check:', {
-      result,
-      hasValue,
-      isString,
-      isNotPlaceholder,
-      apiKeyType: typeof config.apiKey
-    });
-  }
-  
-  return result;
-})();
-export const isAdminFirebaseConfigured = isFirebaseConfigured; // In single project mode, if one is configured, both are
+export const isAdminFirebaseConfigured = isFirebaseConfigured;

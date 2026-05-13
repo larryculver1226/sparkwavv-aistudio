@@ -3,6 +3,11 @@
 All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
+- **Track 163 (Environment Alignment & Production Guardrails)**: [COMPLETED] Unified the environment variable resolution and implemented a "Degraded Mode" UI for missing configuration.
+    - **Robust Key Resolution**: Enhanced `src/config.ts` with diagnostic logging that tracks the resolution of every sensitive key across Vite, Process, and JSON sources.
+    - **Degraded Mode UI**: Added a persistent neon warning banner in `src/App.tsx` that triggers if `VITE_FIREBASE_API_KEY` is missing, informing users precisely how to restore functionality.
+    - **Safe Initialization**: Refactored `src/lib/firebase.ts` to use centralized configuration and implement "Safe Stubs" for Auth/Firestore/Storage, preventing application crashes even when configuration is broken.
+    - **Build-Time Verification**: Integrated `npm run check-env` into the `npm run build` command to ensure that deployments fail early if required secrets are missing, preventing "silent failures" in production.
 - **Track 161 (Avatar & Metadata Consistency)**: [COMPLETED] Resolved the production avatar discrepancy and unified Skylar's visual identity across all platforms.
     - **Uniform Fallbacks**: Unified all persona avatars in `PERSONA_CONFIG` to the primary male professional identity (photo-1560250097) in `skylarService.ts`.
     - **Production Sync**: Successfully migrated the verified `skylar_global` metadata from the AI Studio sandbox database to the production Firestore database, ensuring the global avatar override is active in production.

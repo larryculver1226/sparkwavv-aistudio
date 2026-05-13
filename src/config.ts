@@ -7,27 +7,43 @@ const getEnvVar = (viteVal: string | undefined, processKey: string, jsonFallback
   let val: string | undefined = viteVal;
   let source = 'Vite Environment';
 
-  // Treat explicit placeholder strings, unresolved cloudbuild variables, or empty strings as 'missing'
+  // Helper to check if a value is actually a placeholder or unresolved variable
   const isInvalid = (v: any) => 
     !v || 
-    (typeof v === 'string' && (v.trim() === '' || v.includes('PLACEHOLDER') || v.startsWith('$$')));
+    (typeof v === 'string' && (
+      v.trim() === '' || 
+      v.toLowerCase().includes('placeholder') || 
+      v.toLowerCase().includes('unset') ||
+      v.startsWith('$$') // Cloud Build unreplaced var
+    ));
+
+  const logDecision = (decision: string, finalVal: string | undefined, finalSource: string) => {
+    if (typeof window !== 'undefined' && (processKey.includes('API_KEY') || processKey.includes('SECRET'))) {
+      const masked = finalVal && finalVal.length > 8 
+        ? `${finalVal.substring(0, 4)}...${finalVal.substring(finalVal.length - 4)}` 
+        : '****';
+      console.log(`[Config] ${processKey} decision: ${decision} -> Source: ${finalSource} (${finalVal ? masked : 'MISSING'})`);
+    }
+  };
 
   if (isInvalid(val)) {
     val = undefined;
+  } else {
+    logDecision('Value found in Vite env', val, source);
   }
 
   // Fallback to process.env for Node/Backend usage
-  if (isInvalid(val)) {
+  if (!val) {
     try {
       if (typeof process !== 'undefined' && process.env) {
         // Try common variations if the primary one is missing
         val = process.env[processKey] || 
               process.env[processKey.replace('VITE_', '')] || 
-              process.env['FIREBASE_API_KEY'] ||
-              process.env['GEMINI_API_KEY']; // As a last resort, some projects reuse keys
+              process.env['FIREBASE_API_KEY'];
         
         if (val && !isInvalid(val)) {
           source = 'Process Environment (Fallback)';
+          logDecision('Value found in Process env', val, source);
         } else {
           val = undefined;
         }
@@ -36,9 +52,18 @@ const getEnvVar = (viteVal: string | undefined, processKey: string, jsonFallback
   }
 
   // Fallback to config file
-  if (isInvalid(val) && jsonFallback) {
+  if (!val && jsonFallback) {
     val = (firebaseConfig as any)[jsonFallback];
-    source = 'Config File (JSON)';
+    if (val && !isInvalid(val)) {
+      source = 'Config File (JSON)';
+      logDecision('Value found in JSON config', val, source);
+    } else {
+      val = undefined;
+    }
+  }
+
+  if (!val) {
+    logDecision('FAILED to resolve value', undefined, 'NONE');
   }
 
   // Final sanitization check before returning
@@ -46,14 +71,7 @@ const getEnvVar = (viteVal: string | undefined, processKey: string, jsonFallback
     let sanitized = val.trim();
     // Remove wrapping quotes if they exist
     sanitized = sanitized.replace(/^["']|["']$/g, '');
-    
-    if (sanitized !== '' && !sanitized.includes('PLACEHOLDER') && !sanitized.startsWith('$$')) {
-      if (typeof window !== 'undefined' && processKey.includes('API_KEY')) {
-        const masked = sanitized.length > 8 ? `${sanitized.substring(0, 4)}...${sanitized.substring(sanitized.length - 4)}` : '****';
-        console.log(`[Config] Loaded ${processKey} from ${source}: ${masked}`);
-      }
-      return sanitized;
-    }
+    return sanitized;
   }
 
   return undefined;
@@ -132,6 +150,11 @@ export const config = {
   sendgridApiKey: getEnvVar(undefined, 'SENDGRID_API_KEY'),
   skylarFromEmail: getEnvVar(undefined, 'SKYLAR_FROM_EMAIL'),
   googleMapsApiKey: getEnvVar(undefined, 'GOOGLE_MAPS_API_KEY'),
+
+  // Validation Flags
+  get isFirebaseConfigured() {
+    return !!(this.firebaseApiKey && this.firebaseProjectId && !this.firebaseApiKey.includes('placeholder'));
+  }
 };
 
 /**
@@ -146,23 +169,33 @@ export const validateConfig = () => {
   if (isBrowser) {
     if (!config.firebaseApiKey) missing.push('VITE_FIREBASE_API_KEY');
     if (!config.firebaseProjectId) missing.push('VITE_FIREBASE_PROJECT_ID');
-    // VITE_FIREBASE_AUTH_DOMAIN and VITE_FIREBASE_APP_ID might also be required for a complete setup
-    // but the minimal absolute requirement for initializing the SDK is projectId and apiKey
   } else {
     // Backend required variables
-    if (!config.geminiApiKey) missing.push('GEMINI_API_KEY');
+    if (!config.geminiApiKey && !config.apiKey) missing.push('GEMINI_API_KEY');
     if (!config.sessionSecret) missing.push('SESSION_SECRET');
   }
-
-  // Additional backend validation could be added here
   
   if (missing.length > 0) {
-    const errorMsg = `[CONFIGURATION WARNING] The following environment variables are missing or invalid: ${missing.join(', ')}. The application may function in a degraded state. Please update your AI Studio Secrets Vault or .env file with valid values.`;
-    console.warn(errorMsg);
-    console.log('[CONFIGURATION DEBUG] Current Config Keys:', Object.keys(config).filter(k => !!(config as any)[k]));
-    // We no longer throw here to allow the app to boot and show a "Missing Configuration" state if needed.
-    // throw new Error(errorMsg);
+    const errorMsg = `[CONFIGURATION ERROR] The following environment variables are missing or invalid: ${missing.join(', ')}. The application will function in a degraded state or fail to start.`;
+    
+    if (isBrowser) {
+      console.warn(errorMsg);
+      console.log('[CONFIGURATION DEBUG] Current Config Keys:', Object.keys(config).filter(k => !!(config as any)[k]));
+    } else {
+      // On server, we fail loudly if in production or if explicitly requested
+      const isProd = process.env.NODE_ENV === 'production';
+      const isStrict = process.env.STRICT_CONFIG === 'true';
+      
+      if (isProd || isStrict) {
+        console.error('❌ ' + errorMsg);
+        throw new Error(errorMsg);
+      } else {
+        console.warn('⚠️ ' + errorMsg);
+      }
+    }
   } else {
-    console.log('✅ [Configuration] All required variables are present and valid.');
+    if (typeof window !== 'undefined') {
+       console.log('✅ [Configuration] All required variables are present and valid.');
+    }
   }
 };
