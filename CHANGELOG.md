@@ -3,6 +3,10 @@
 All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
+- **Track 165 (Deployment Hardening & Build-Arg Integration)**: [COMPLETED] Resolved deployment failures in Cloud Build by properly injecting build-time secrets and fixing file system errors in the build script.
+    - **Build Secret Injection**: Updated `Dockerfile` and `cloudbuild.yaml` to support `GEMINI_API_KEY` and `SESSION_SECRET` as build arguments, ensuring they are available during the `npm run build` phase.
+    - **Production Region Hardening**: Hardcoded the deployment region to `us-east1` in `cloudbuild.yaml` to maintain consistency with the production Firestore database.
+    - **Build Script Resilience**: Refactored the `build` script in `package.json` to ensure `dist/` is created before any `cp` operations, preventing directory-related errors during build.
 - **Track 164 (Environment Alignment & Production Guardrails)**: [COMPLETED] Unified the environment variable resolution and implemented a "Degraded Mode" UI for missing configuration.
     - **Robust Key Resolution**: Enhanced `src/config.ts` with diagnostic logging that tracks the resolution of every sensitive key across Vite, Process, and JSON sources.
     - **Degraded Mode UI**: Added a persistent neon warning banner in `src/App.tsx` that triggers if `VITE_FIREBASE_API_KEY` is missing, informing users precisely how to restore functionality.

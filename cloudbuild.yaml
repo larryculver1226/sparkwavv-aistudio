@@ -31,10 +31,14 @@ steps:
           -t gcr.io/$PROJECT_ID/sparkwavv:$COMMIT_SHA \
           --build-arg VITE_FIREBASE_API_KEY=$$VITE_FIREBASE_API_KEY \
           --build-arg VITE_FIREBASE_PROJECT_ID=$$VITE_FIREBASE_PROJECT_ID \
+          --build-arg GEMINI_API_KEY=$$GEMINI_API_KEY \
+          --build-arg SESSION_SECRET=$$SESSION_SECRET \
           .
     secretEnv:
       - 'VITE_FIREBASE_API_KEY'
       - 'VITE_FIREBASE_PROJECT_ID'
+      - 'GEMINI_API_KEY'
+      - 'SESSION_SECRET'
 
   # Step 3: Push the image to Google Container Registry
   - name: 'gcr.io/cloud-builders/docker'
