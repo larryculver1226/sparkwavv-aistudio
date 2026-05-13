@@ -21,6 +21,7 @@ Application Environment Variables.md
 API_KEYS.md
 
 # Security: Ignore service accounts and private keys
+firebase-applet-config.json
 *firebase-adminsdk*.json
 *service-account*.json
 *credentials*.json
