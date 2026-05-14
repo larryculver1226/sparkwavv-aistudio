@@ -5,21 +5,16 @@ const getEnvVar = (viteVal: string | undefined, processKey: string): string | un
   let val: string | undefined = viteVal;
 
   // Helper to check if a value is actually a placeholder or unresolved variable
-  const isInvalid = (v: any) => {
-    if (!v) return true;
-    if (typeof v !== 'string') return false;
-    const trimmed = v.trim();
-    if (trimmed === '') return true;
-    const lower = trimmed.toLowerCase();
-    if (lower.includes('placeholder') || lower.includes('unset')) return true;
-    if (v.startsWith('$$')) return true; // Cloud Build unreplaced var
-    return false;
-  };
+  const isInvalid = (v: any) => 
+    !v || 
+    (typeof v === 'string' && (
+      v.trim() === '' || 
+      v.toLowerCase().includes('placeholder') || 
+      v.toLowerCase().includes('unset') ||
+      v.startsWith('$$') // Cloud Build unreplaced var
+    ));
 
   if (isInvalid(val)) {
-    if (val && val !== 'undefined') {
-      console.warn(`[CONFIG] Invalid value detected for ${processKey}: ${val.substring(0, 10)}${val.length > 10 ? '...' : ''} (type: ${typeof val})`);
-    }
     val = undefined;
   }
 
@@ -50,35 +45,35 @@ const getEnvVar = (viteVal: string | undefined, processKey: string): string | un
 // Define the Firebase config object as requested for production alignment
 export const firebaseConfig = {
   apiKey: getEnvVar(
-    import.meta.env?.VITE_FIREBASE_API_KEY, 
+    typeof import.meta !== 'undefined' && import.meta.env ? import.meta.env.VITE_FIREBASE_API_KEY : undefined, 
     'VITE_FIREBASE_API_KEY'
   ),
   authDomain: getEnvVar(
-    import.meta.env?.VITE_FIREBASE_AUTH_DOMAIN, 
+    typeof import.meta !== 'undefined' && import.meta.env ? import.meta.env.VITE_FIREBASE_AUTH_DOMAIN : undefined, 
     'VITE_FIREBASE_AUTH_DOMAIN'
   ),
   projectId: getEnvVar(
-    import.meta.env?.VITE_FIREBASE_PROJECT_ID, 
+    typeof import.meta !== 'undefined' && import.meta.env ? import.meta.env.VITE_FIREBASE_PROJECT_ID : undefined, 
     'VITE_FIREBASE_PROJECT_ID'
   ) || 'sparkwavv-prod',
   storageBucket: getEnvVar(
-    import.meta.env?.VITE_FIREBASE_STORAGE_BUCKET, 
+    typeof import.meta !== 'undefined' && import.meta.env ? import.meta.env.VITE_FIREBASE_STORAGE_BUCKET : undefined, 
     'VITE_FIREBASE_STORAGE_BUCKET'
   ),
   messagingSenderId: getEnvVar(
-    import.meta.env?.VITE_FIREBASE_MESSAGING_SENDER_ID, 
+    typeof import.meta !== 'undefined' && import.meta.env ? import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID : undefined, 
     'VITE_FIREBASE_MESSAGING_SENDER_ID'
   ),
   appId: getEnvVar(
-    import.meta.env?.VITE_FIREBASE_APP_ID, 
+    typeof import.meta !== 'undefined' && import.meta.env ? import.meta.env.VITE_FIREBASE_APP_ID : undefined, 
     'VITE_FIREBASE_APP_ID'
   ),
   measurementId: getEnvVar(
-    import.meta.env?.VITE_FIREBASE_MEASUREMENT_ID, 
+    typeof import.meta !== 'undefined' && import.meta.env ? import.meta.env.VITE_FIREBASE_MEASUREMENT_ID : undefined, 
     'VITE_FIREBASE_MEASUREMENT_ID'
   ),
   firestoreDatabaseId: getEnvVar(
-    import.meta.env?.VITE_FIREBASE_DATABASE_ID, 
+    typeof import.meta !== 'undefined' && import.meta.env ? import.meta.env.VITE_FIREBASE_DATABASE_ID : undefined, 
     'VITE_FIREBASE_DATABASE_ID'
   ) || '(default)'
 };
@@ -104,9 +99,7 @@ export const config = {
   
   // Validation Flags
   get isFirebaseConfigured() {
-    // If we have an API key and it's not a placeholder, we are mostly configured
-    // We warn about project alignment but don't strictly block unless key is missing
-    return !!(this.apiKey && !this.apiKey.toLowerCase().includes('placeholder'));
+    return !!(this.apiKey && this.projectId === 'sparkwavv-prod' && !this.apiKey.includes('placeholder'));
   }
 };
 

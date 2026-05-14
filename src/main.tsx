@@ -7,17 +7,6 @@ import { validateConfig, config } from './config';
 // Validate core configuration to prevent silent failures in Production
 validateConfig();
 
-// Firebase Configuration Diagnostics
-console.log('🛡️ [Main] Environment Check:', {
-    hasViteKey: !!import.meta.env?.VITE_FIREBASE_API_KEY,
-    hasProcessKey: !!(typeof process !== 'undefined' && process.env?.VITE_FIREBASE_API_KEY),
-    isConfigured: config.isFirebaseConfigured,
-    apiKeyLength: config.firebaseApiKey?.length || 0,
-    projectId: config.firebaseProjectId,
-    mode: import.meta.env?.MODE,
-    isProd: import.meta.env?.PROD
-});
-
 // Firebase Configuration Checks
 const firebaseApiKey = config.firebaseApiKey;
 const firebaseProjectId = config.firebaseProjectId;

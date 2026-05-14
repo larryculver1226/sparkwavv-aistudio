@@ -4,27 +4,26 @@ FROM node:20-alpine AS builder
 RUN apk add --no-cache python3 make g++
 
 WORKDIR /app
-ENV NODE_ENV=production
-ENV STRICT_CONFIG=true
+COPY package*.json ./
+RUN npm install
 
-# Move build arguments to the very beginning of the build process
+COPY . .
+# We use npm run build which compiles both vite assets and server.ts to dist/
+# Accept build arguments
 ARG VITE_FIREBASE_API_KEY
 ARG VITE_FIREBASE_PROJECT_ID
 ARG GEMINI_API_KEY
 ARG SESSION_SECRET
 ARG APP_URL
 
+# Set them as environment variables for the build process
 ENV VITE_FIREBASE_API_KEY=$VITE_FIREBASE_API_KEY
 ENV VITE_FIREBASE_PROJECT_ID=$VITE_FIREBASE_PROJECT_ID
 ENV GEMINI_API_KEY=$GEMINI_API_KEY
 ENV SESSION_SECRET=$SESSION_SECRET
 ENV APP_URL=$APP_URL
 
-COPY package*.json ./
-RUN npm install
-
-COPY . .
-# We use npm run build which compiles both vite assets and server.ts to dist/
+# Existing build command follows:
 RUN npm run build
 
 FROM node:20-alpine AS runner

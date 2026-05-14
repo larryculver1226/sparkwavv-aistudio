@@ -20,15 +20,11 @@ export const config = {
   publicPath: '/', // for the loader
   define: {
     'process.env.NODE_ENV': JSON.stringify(process.env.NODE_ENV || 'production'),
-    ...(() => {
-      const viteVars = Object.keys(process.env).filter(key => key.startsWith('VITE_'));
-      console.log(`[BUILD] Found ${viteVars.length} VITE_ environment variables:`, viteVars.map(k => `${k}=${process.env[k] ? 'PRESENT' : 'MISSING'}`));
-      return viteVars.reduce((acc, key) => {
-        acc[`process.env.${key}`] = JSON.stringify(process.env[key]);
-        acc[`import.meta.env.${key}`] = JSON.stringify(process.env[key]);
-        return acc;
-      }, {});
-    })(),
+    ...Object.keys(process.env).filter(key => key.startsWith('VITE_') && !/PRIVATE_KEY|SECRET|CREDENTIAL|SERVICE_ACCOUNT/i.test(key)).reduce((acc, key) => {
+      acc[`process.env.${key}`] = JSON.stringify(process.env[key]);
+      acc[`import.meta.env.${key}`] = JSON.stringify(process.env[key]);
+      return acc;
+    }, {}),
     'process.env': JSON.stringify(
       Object.keys(process.env)
         .filter(key => key.startsWith('VITE_') || key === 'NODE_ENV')
