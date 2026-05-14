@@ -3901,7 +3901,16 @@ async function startServer() {
           });
 
           res.json({
-            response: { text: result.text },
+            response: { 
+              text: result.text,
+              candidates: [
+                {
+                  content: {
+                    parts: [{ text: result.text }]
+                  }
+                }
+              ]
+            },
             executedActions: result.executedActions,
             debugData: result.debugData,
           });

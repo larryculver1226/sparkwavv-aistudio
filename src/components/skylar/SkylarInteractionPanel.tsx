@@ -75,8 +75,9 @@ export const SkylarInteractionPanel: React.FC<SkylarInteractionPanelProps> = ({
             missingArtifacts
           );
 
-          if (mounted && result.response?.candidates?.length) {
-            const responseText = result.response.candidates[0].content.parts[0].text;
+          if (mounted && (result.response?.text || result.response?.candidates?.length)) {
+            const responseText = result.response.text || 
+                                result.response.candidates?.[0]?.content?.parts?.[0]?.text || '';
             setMessages([
               {
                 id: `init-${stageId}`,
@@ -150,7 +151,9 @@ export const SkylarInteractionPanel: React.FC<SkylarInteractionPanelProps> = ({
         missingArtifacts
       );
 
-      const responseText = result.response.candidates?.[0]?.content?.parts?.filter((part: any) => part.text)?.map((part: any) => part.text)?.join('') || '';
+      const responseText = result.response.text || 
+                          result.response.candidates?.[0]?.content?.parts?.filter((part: any) => part.text)?.map((part: any) => part.text)?.join('') || 
+                          '';
 
       const newSkylarMsg: Message = {
         id: crypto.randomUUID(),

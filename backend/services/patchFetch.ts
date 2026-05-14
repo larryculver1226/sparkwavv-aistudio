@@ -101,7 +101,7 @@ if (typeof global !== 'undefined' && typeof window === 'undefined') {
                   responseType: 'arraybuffer',
                   validateStatus: () => true,
                   maxRedirects: 4,
-                  timeout: 45000
+                  timeout: 25000
                 });
 
                 // Filter out headers that might cause issues with Response
@@ -124,28 +124,26 @@ if (typeof global !== 'undefined' && typeof window === 'undefined') {
            };
 
            // Attempt rotation: Shared -> Dev -> AI Studio -> alkalimojo -> PROD -> None
+           // Optimized list: avoid excessive duplications that slow down failure resolution
            const referers = [
-             "https://ais-dev-6de5lrtpnvciah3xwxmagf-232918548667.us-east1.run.app/",
-             "https://sparkwavv.ai",
              "https://aistudio.google.com/",
-             "https://aistudio.google.com", 
              "https://ai.studio/",
-             "https://ai.studio",
-             sharedUrl, 
-             sharedUrl ? sharedUrl + "/" : null,
-             appUrl, 
-             appUrl ? appUrl + "/" : null,
-             "https://sparkwavv-prod.firebaseapp.com/",
-             "https://sparkwavv-prod.firebaseapp.com",
-             "https://alkalimojo.com/",
-             "https://alkalimojo.com",
-             fbAuthDomain,
-             fbAuthDomain ? fbAuthDomain + "/" : null
-           ].filter(Boolean) as string[];
+             appUrl,
+             sharedUrl,
+             "https://sparkwavv.ai",
+             "https://ais-dev-6de5lrtpnvciah3xwxmagf-232918548667.us-east1.run.app/",
+             fbAuthDomain
+           ].filter((v, i, a) => v && a.indexOf(v) === i) as string[];
 
            let lastResponse: Response | null = null;
            
+           // Only try up to 4 referers before giving up to keep latency manageable
+           const maxRetries = 4;
+           let retryCount = 0;
+
            for (const ref of referers) {
+             if (retryCount >= maxRetries) break;
+             
              lastResponse = await tryFetch(ref);
              
              if (lastResponse.status >= 200 && lastResponse.status < 300) {
@@ -156,14 +154,12 @@ if (typeof global !== 'undefined' && typeof window === 'undefined') {
              const isRetryable = (lastResponse.status === 400 || lastResponse.status === 403) && (
                body.includes('API_KEY_HTTP_REFERRER_BLOCKED') || 
                body.includes('referer <empty>') ||
-               body.includes('Referer <empty>') ||
-               body.includes('Origin doesn\'t match Host') ||
-               body.includes('XD3') ||
-               body.includes('PERMISSION_DENIED')
+               body.includes('Origin doesn\'t match Host')
              );
 
              if (isRetryable) {
-               console.warn(`[Global Fetch Patch] ${lastResponse.status} (Auth/Origin Block) with ${ref}, retrying...`);
+               console.warn(`[Global Fetch Patch] ${lastResponse.status} block with ${ref}, retrying...`);
+               retryCount++;
                continue;
              } else {
                return lastResponse;

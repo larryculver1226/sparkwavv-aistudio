@@ -587,6 +587,60 @@ class SkylarService {
     }
   }
 
+  async orchestrateAgent(message: string, history: any[] = [], wavvaultContext: any = {}, userId?: string): Promise<any> {
+    try {
+      const apiKey = getGeminiApiKey();
+      if (!apiKey) {
+        throw new Error('GEMINI_API_KEY is not configured on the server.');
+      }
+
+      // Dynamic import to avoid client-side bundle issues if possible, 
+      // though the top-level import already exists.
+      const { GoogleGenAI } = await import('@google/genai');
+      const genAI = new GoogleGenAI(apiKey);
+      
+      // Use pro model for better tool-calling orchestration
+      const model = genAI.getGenerativeModel({
+        model: 'gemini-1.5-pro',
+        tools: skylarTools as any,
+        systemInstruction: LOBKOWICZ_PROMPT + `\n\nUser Profile Context: ${JSON.stringify(wavvaultContext)}`,
+      });
+
+      const chat = model.startChat({
+        history: history.length > 0 ? history.map(h => ({
+          role: h.role === 'model' ? 'model' : 'user',
+          parts: h.parts || [{ text: h.content || '' }]
+        })) : [],
+      });
+
+      const result = await chat.sendMessage(message);
+      const response = await result.response;
+      let text = response.text();
+      
+      const toolCallsExecuted: any[] = [];
+      const calls = response.candidates?.[0]?.content?.parts?.filter(p => p.functionCall);
+      
+      if (calls && calls.length > 0) {
+        for (const call of calls) {
+          if (call.functionCall) {
+            toolCallsExecuted.push({
+              name: call.functionCall.name,
+              args: call.functionCall.args
+            });
+          }
+        }
+      }
+
+      return {
+        text,
+        toolCallsExecuted,
+      };
+    } catch (error) {
+      console.error('Orchestration Error:', error);
+      throw error;
+    }
+  }
+
   // Vertex AI Agentic Chat - Migrated to Genkit
   async chatWithVertex(
     userId: string,
@@ -666,10 +720,17 @@ class SkylarService {
         genkitTracer.addTrace(result.debugData);
       }
       
+      const responseText = result.response?.text || 
+                          result.response?.candidates?.[0]?.content?.parts?.[0]?.text || 
+                          result.response?.candidates?.[0]?.content?.parts?.filter((p: any) => p.text).map((p: any) => p.text).join('') ||
+                          '';
+
+      const candidates = result.response?.candidates || (responseText ? [{ content: { parts: [{ text: responseText }] } }] : []);
+      
       return { 
         response: {
-          text: result.response?.text || '',
-          candidates: result.response?.candidates || []
+          text: responseText,
+          candidates: candidates
         }, 
         executedActions: result.executedActions || []
       };
