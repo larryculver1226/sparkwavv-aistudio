@@ -123,48 +123,56 @@ if (typeof global !== 'undefined' && typeof window === 'undefined') {
               }
            };
 
-           // Attempt rotation: Shared -> Dev -> AI Studio -> alkalimojo -> PROD -> None
-           // Optimized list: avoid excessive duplications that slow down failure resolution
-           const referers = [
-             "https://aistudio.google.com/",
-             "https://ai.studio/",
-             appUrl,
-             sharedUrl,
-             "https://sparkwavv.ai",
-             "https://ais-dev-6de5lrtpnvciah3xwxmagf-232918548667.us-east1.run.app/",
-             fbAuthDomain
-           ].filter((v, i, a) => v && a.indexOf(v) === i) as string[];
+            // Attempt rotation: AI Studio -> Dev -> Shared -> PROD -> None
+            // We use both trailing slash and no trailing slash because Google restrictions can be sensitive.
+            const referers = [
+              "https://aistudio.google.com",
+              "https://aistudio.google.com/",
+              "https://ai.studio",
+              "https://ai.studio/",
+              appUrl.replace(/\/$/, ''),
+              appUrl.endsWith('/') ? appUrl : appUrl + '/',
+              sharedUrl.replace(/\/$/, ''),
+              sharedUrl.endsWith('/') ? sharedUrl : sharedUrl + '/',
+              "https://sparkwavv.ai",
+              "https://sparkwavv.ai/",
+              fbAuthDomain?.replace(/\/$/, ''),
+              fbAuthDomain && (fbAuthDomain.endsWith('/') ? fbAuthDomain : fbAuthDomain + '/')
+            ].filter((v, i, a) => v && a.indexOf(v) === i) as string[];
 
-           let lastResponse: Response | null = null;
-           
-           // Only try up to 4 referers before giving up to keep latency manageable
-           const maxRetries = 4;
-           let retryCount = 0;
+            let lastResponse: Response | null = null;
+            
+            // Only try up to 6 referers before giving up to keep latency manageable
+            const maxRetries = 6;
+            let retryCount = 0;
 
-           for (const ref of referers) {
-             if (retryCount >= maxRetries) break;
-             
-             lastResponse = await tryFetch(ref);
-             
-             if (lastResponse.status >= 200 && lastResponse.status < 300) {
-               return lastResponse;
-             }
-             
-             const body = await lastResponse.clone().text();
-             const isRetryable = (lastResponse.status === 400 || lastResponse.status === 403) && (
-               body.includes('API_KEY_HTTP_REFERRER_BLOCKED') || 
-               body.includes('referer <empty>') ||
-               body.includes('Origin doesn\'t match Host')
-             );
+            for (const ref of referers) {
+              if (retryCount >= maxRetries) break;
+              
+              lastResponse = await tryFetch(ref);
+              
+              if (lastResponse.status >= 200 && lastResponse.status < 300) {
+                return lastResponse;
+              }
+              
+              const clonedRes = lastResponse.clone();
+              const body = await clonedRes.text();
+              const isRetryable = (lastResponse.status === 400 || lastResponse.status === 403) && (
+                body.includes('API_KEY_HTTP_REFERRER_BLOCKED') || 
+                body.includes('referer <empty>') ||
+                body.includes('Origin doesn\'t match Host') ||
+                body.includes('Referer does not match')
+              );
 
-             if (isRetryable) {
-               console.warn(`[Global Fetch Patch] ${lastResponse.status} block with ${ref}, retrying...`);
-               retryCount++;
-               continue;
-             } else {
-               return lastResponse;
-             }
-           }
+              if (isRetryable) {
+                console.warn(`[Global Fetch Patch] ${lastResponse.status} block with ${ref}, attempting next referer...`);
+                retryCount++;
+                continue;
+              } else {
+                // If it's a 4xx but NOT a referrer block, return it immediately (e.g. invalid payload)
+                return lastResponse;
+              }
+            }
            
            return await tryFetch(null);
         }

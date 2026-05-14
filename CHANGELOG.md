@@ -255,3 +255,4 @@ All notable changes to this project will be documented in this file.
 - Fixed GCS upload permission denied error in `vertexService.ts` by removing bucket creation checks and directly saving the file.
 - Fixed `NavBar.test.tsx` to correctly assert the `navigate('/login')` call instead of the `onNavigate` prop.
 - Fixed `UserDashboard.test.tsx` to correctly map the `getTimelineStage` utility tests to the actual implementation logic.
+- **Track 167 (Production Connectivity & Referrer Blocking)**: [COMPLETED] Resolved connectivity issues in production by expanding referrer rotation in `patchFetch.ts` and improving error diagnostics in `genkitService.ts`.

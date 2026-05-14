@@ -2627,7 +2627,7 @@ export const runJourneyStageFlow = ai.defineFlow(
       const errorString = error instanceof Error ? error.message : String(error);
       let activeTargetModel = targetModel;
 
-      if (
+      const isApiKeyError = 
         errorString.includes('API_KEY_INVALID') || 
         errorString.includes('API key not valid') ||
         errorString.includes('API_KEY_MISSING') ||
@@ -2641,8 +2641,9 @@ export const runJourneyStageFlow = ai.defineFlow(
         errorString.includes('no longer available') ||
         errorString.includes('PERMISSION_DENIED') ||
         errorString.includes('403') ||
-        errorString.includes('400')
-      ) {
+        errorString.includes('400');
+
+      if (isApiKeyError) {
         if (!isVertexAvailable) {
           console.warn(
             `[Skylar] Gemini API error detected (${errorString}). Attempting emergency fallback via MCP Model Registry...`
@@ -2665,12 +2666,17 @@ export const runJourneyStageFlow = ai.defineFlow(
               executedActions: [],
             };
           } catch (mcpError: any) {
-            console.error('[Skylar] Emergency MCP Fallback also failed:', mcpError.message || mcpError);
-            if (mcpError.message?.includes('referer <empty>')) {
-              console.error('[Skylar] DETECTED REF BLOCK in MCP. Headers might not be propagating correctly.');
-            }
+            const mcpErrorMsg = mcpError.message || String(mcpError);
+            console.error('[Skylar] Emergency MCP Fallback also failed:', mcpErrorMsg);
+            
+            // Construct a more helpful message based on environment
+            const isCustomDomain = typeof process !== 'undefined' && process.env.APP_URL && !process.env.APP_URL.includes('run.app');
+            const refreshInstructions = isCustomDomain 
+              ? "Please verify that the GEMINI_API_KEY environment variable is correctly set in your production environment settings." 
+              : "Please refresh your Gemini API Key in the AI Studio Settings > Secrets panel to restore full functionality.";
+
             return {
-              text: "I'm currently experiencing connectivity issues with my primary intelligence systems. This is often caused by an expired or invalid API key in the project settings. Please refresh your Gemini API Key in AI Studio to restore full functionality.",
+              text: `I'm currently experiencing connectivity issues with my primary intelligence systems. This is often caused by an expired or invalid API key in the project settings. ${refreshInstructions}\n\nTechnical details: ${errorString.substring(0, 100)}`,
               executedActions: [],
             };
           }
