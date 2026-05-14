@@ -22,6 +22,7 @@ import {
 import { modelArmor } from './modelArmorService';
 import { fileURLToPath } from 'url';
 import path from 'path';
+import fs from 'fs';
 import { mcpRegistry } from './mcpRegistryClient';
 import { zodToJsonSchema } from 'zod-to-json-schema';
 
@@ -193,11 +194,18 @@ if (isVertexAvailable) {
   activePlugins.push(vertexAI(vertexConfig));
 }
 
+const promptPath = path.resolve(process.cwd(), 'backend/prompts');
+if (fs.existsSync(promptPath)) {
+  console.log(`[GenkitService] Prompt directory verified at: ${promptPath}`);
+} else {
+  console.warn(`[GenkitService] Prompt directory MISSING at: ${promptPath}. cwd: ${process.cwd()}`);
+}
+
 // Initialize Genkit
 export const ai = genkit({
   plugins: activePlugins,
   model: targetModel,
-  promptDir: './backend/prompts',
+  promptDir: promptPath,
 });
 
 // Define Tools
@@ -2637,9 +2645,7 @@ export const runJourneyStageFlow = ai.defineFlow(
         errorString.includes('referer <empty>') ||
         errorString.includes('expired') ||
         errorString.includes('renew') ||
-        errorString.includes('NOT_FOUND') ||
-        errorString.includes('no longer available') ||
-        errorString.includes('PERMISSION_DENIED') ||
+        (errorString.includes('PERMISSION_DENIED') && !errorString.includes('firestore')) ||
         errorString.includes('403') ||
         errorString.includes('400');
 

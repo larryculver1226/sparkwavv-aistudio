@@ -28,6 +28,7 @@
 - [x] patchFetch.ts updated with robust rotation
 - [x] genkitService.ts fallback logic enhanced
 - [x] Technical plan approved by user
+- [x] Refined error handling (removed NOT_FOUND from isApiKeyError)
 - [x] Final verification complete
 
-**Result**: Production connectivity handling hardened. Improved diagnostics added to Skylar.
+**Result**: Production connectivity handling hardened. The root cause was the `isApiKeyError` block incorrectly catching dotprompt `NOT_FOUND` errors and preventing the intended fallback to `ai.generate`.
