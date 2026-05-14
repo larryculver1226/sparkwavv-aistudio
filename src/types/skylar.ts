@@ -26,6 +26,10 @@ export interface JourneyStageDefinition {
   systemPromptTemplate: string;
   requiredArtifacts: string[];
   allowedModalities: Modality[];
+  guestConfig?: {
+    messageLimit: number;
+    personaInstruction: string;
+  };
   uiConfig: {
     theme: 'dark' | 'light' | 'neon';
     layout: 'chat-first' | 'artifact-first' | 'split' | 'sidebar';

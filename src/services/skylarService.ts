@@ -732,7 +732,11 @@ class SkylarService {
           text: responseText,
           candidates: candidates
         }, 
-        executedActions: result.executedActions || []
+        executedActions: result.executedActions || [],
+        guestInfo: result.debugData ? {
+          count: result.debugData.guestMessageCount,
+          limit: result.debugData.GUEST_LIMIT
+        } : undefined
       };
     } catch (error) {
       console.error('Skylar Chat Error:', error);

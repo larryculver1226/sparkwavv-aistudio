@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { motion } from 'motion/react';
-import { Sparkles, Upload, FileText, Loader2, CheckCircle2, ChevronRight, Activity, ArrowRight, Save } from 'lucide-react';
+import { Sparkles, Upload, FileText, Loader2, CheckCircle2, ChevronRight, Activity, ArrowRight, Save, X } from 'lucide-react';
+import { AnimatePresence } from 'motion/react';
 import { useNavigate } from 'react-router-dom';
 import { useIdentity } from '../contexts/IdentityContext';
 import { SkylarStageWrapper } from '../components/skylar/SkylarStageWrapper';
@@ -22,6 +23,7 @@ export default function DiveInPage() {
   const [isSaving, setIsSaving] = useState(false);
   const [cinematicScenes, setCinematicScenes] = useState<any[]>([]);
   const [showCinematic, setShowCinematic] = useState(false);
+  const [showRegistrationOverlay, setShowRegistrationOverlay] = useState(false);
 
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -81,7 +83,11 @@ export default function DiveInPage() {
         setCinematicScenes(payload.scenes);
         setShowCinematic(true);
       }
-    } else if (action === 'create_sparkwavv_account') {
+    } else if (action === 'show_registration_cta' || action === 'create_sparkwavv_account') {
+      if (!user) {
+        setShowRegistrationOverlay(true);
+        return;
+      }
       setIsSaving(true);
       try {
         const idToken = await user?.getIdToken();
@@ -114,30 +120,33 @@ export default function DiveInPage() {
      handleSkylarAction('create_sparkwavv_account', {});
   };
 
-  // Step 1: Authentication Screen (for unauthenticated users)
-  if (!user && status !== 'initializing') {
-    return (
-      <div className="min-h-screen bg-[#050505] text-white flex flex-col p-6 relative overflow-hidden">
-        <div className="absolute inset-0 overflow-hidden pointer-events-none">
-          <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-blue-500/10 blur-[120px] rounded-full animate-pulse" />
-          <div className="absolute bottom-1/4 right-1/4 w-96 h-96 bg-purple-500/10 blur-[120px] rounded-full animate-pulse delay-1000" />
-        </div>
-        <div className="relative z-10 w-full h-full flex-1 flex flex-col justify-center items-center pt-10">
-          <OnboardingContainer 
-            onBackToHome={() => navigate('/')}
-            onSuccess={() => {
-              // Once authenticated, the component will re-render and skip this block,
-              // moving to Step 2 (Context Injection / Resume Upload).
-            }}
-          />
-        </div>
-      </div>
-    );
-  }
-
-  // Step 2 & 3: Context Injection & Skylar Chat (for authenticated users)
+  // Step 2 & 3: Context Injection & Skylar Chat
   return (
     <div className="min-h-screen bg-[#050505] text-white flex flex-col p-6 relative overflow-hidden">
+      <AnimatePresence>
+        {showRegistrationOverlay && (
+          <motion.div 
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-[100] flex items-center justify-center p-6 bg-black/80 backdrop-blur-xl"
+          >
+            <div className="max-w-md w-full relative">
+              <button 
+                onClick={() => setShowRegistrationOverlay(false)}
+                className="absolute -top-12 right-0 p-2 text-white/40 hover:text-white transition-colors"
+              >
+                <X className="w-6 h-6" />
+              </button>
+              <OnboardingContainer 
+                onBackToHome={() => setShowRegistrationOverlay(false)}
+                onSuccess={() => setShowRegistrationOverlay(false)}
+              />
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
       {showCinematic && (
         <CinematicTeaserOverlay 
           scenes={cinematicScenes}

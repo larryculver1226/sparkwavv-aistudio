@@ -30,6 +30,10 @@ export interface SkylarStageConfig {
     image: boolean;
     video: boolean;
   };
+  guestConfig?: {
+    messageLimit: number;
+    personaInstruction: string;
+  };
   uiConfig: {
     theme: 'dark' | 'light' | 'neon';
     layout: 'chat-first' | 'artifact-first' | 'split' | 'sidebar';

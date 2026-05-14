@@ -7,6 +7,8 @@ import { skylar } from '../../services/skylarService';
 import { agentOpsService } from '../../services/agentOpsService';
 import { useSkylarLive } from '../../hooks/useSkylarLive';
 
+import { Info, Lock, ShieldCheck } from 'lucide-react';
+
 interface SkylarInteractionPanelProps {
   stageId: string;
   user: any;
@@ -39,8 +41,24 @@ export const SkylarInteractionPanel: React.FC<SkylarInteractionPanelProps> = ({
   const [input, setInput] = useState('');
   const [isTyping, setIsTyping] = useState(false);
   const [attachments, setAttachments] = useState<File[]>([]);
+  const [guestStats, setGuestStats] = useState<{ count: number; limit: number } | null>(null);
+  const [showPrivacyModal, setShowPrivacyModal] = useState(false);
+  const [guestId, setGuestId] = useState<string | null>(null);
+  
   const fileInputRef = useRef<HTMLInputElement>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  
+  useEffect(() => {
+    if (!user) {
+      let id = localStorage.getItem('sparkwavv_guest_id');
+      if (!id) {
+        id = `guest_${Math.random().toString(36).substring(2, 15)}`;
+        localStorage.setItem('sparkwavv_guest_id', id);
+        setShowPrivacyModal(true);
+      }
+      setGuestId(id);
+    }
+  }, [user]);
   
   const { isLive, isConnecting, startLiveSession, stopLiveSession, error: liveError } = useSkylarLive();
 
@@ -65,8 +83,9 @@ export const SkylarInteractionPanel: React.FC<SkylarInteractionPanelProps> = ({
       if (messages.length === 0 && stageConfig) {
         setIsTyping(true);
         try {
+          const targetId = user?.uid || guestId || 'anonymous';
           const result = await skylar.chatWithVertex(
-            user?.uid || 'anonymous',
+            targetId,
             '[SYSTEM_INIT]',
             [], // Empty history
             stageConfig,
@@ -75,24 +94,29 @@ export const SkylarInteractionPanel: React.FC<SkylarInteractionPanelProps> = ({
             missingArtifacts
           );
 
-          if (mounted && (result.response?.text || result.response?.candidates?.length)) {
-            const responseText = result.response.text || 
-                                result.response.candidates?.[0]?.content?.parts?.[0]?.text || '';
-            setMessages([
-              {
-                id: `init-${stageId}`,
-                role: 'skylar',
-                content: responseText,
-                timestamp: new Date()
-              }
-            ]);
-            
-            if (result.executedActions && result.executedActions.length > 0) {
-              result.executedActions.forEach((action: any) => {
-                if (onActionTriggered) {
-                  onActionTriggered(action.action, action.data);
+          if (mounted) {
+            if (result.guestInfo) {
+              setGuestStats(result.guestInfo);
+            }
+            if (result.response?.text || result.response?.candidates?.length) {
+              const responseText = result.response.text || 
+                                  result.response.candidates?.[0]?.content?.parts?.[0]?.text || '';
+              setMessages([
+                {
+                  id: `init-${stageId}`,
+                  role: 'skylar',
+                  content: responseText,
+                  timestamp: new Date()
                 }
-              });
+              ]);
+              
+              if (result.executedActions && result.executedActions.length > 0) {
+                result.executedActions.forEach((action: any) => {
+                  if (onActionTriggered) {
+                    onActionTriggered(action.action, action.data);
+                  }
+                });
+              }
             }
           }
         } catch (error) {
@@ -137,12 +161,9 @@ export const SkylarInteractionPanel: React.FC<SkylarInteractionPanelProps> = ({
     setIsTyping(true);
 
     try {
-      // In a real implementation, we would send this to the backend/Gemini
-      // using skylar.chatWithVertex or similar, passing the stageConfig.
-      // For now, we simulate a response.
-      
+      const targetId = user?.uid || guestId || 'anonymous';
       const result = await skylar.chatWithVertex(
-        user?.uid || 'anonymous',
+        targetId,
         initialContext ? `${initialContext}\n\nUser Message: ${input}` : input,
         messages.filter(m => !m.content.includes('[SYSTEM_INIT]')).map(m => ({ role: m.role, content: m.content })),
         stageConfig,
@@ -150,6 +171,10 @@ export const SkylarInteractionPanel: React.FC<SkylarInteractionPanelProps> = ({
         undefined, // file
         missingArtifacts
       );
+
+      if (result.guestInfo) {
+        setGuestStats(result.guestInfo);
+      }
 
       const responseText = result.response.text || 
                           result.response.candidates?.[0]?.content?.parts?.filter((part: any) => part.text)?.map((part: any) => part.text)?.join('') || 
@@ -231,18 +256,89 @@ export const SkylarInteractionPanel: React.FC<SkylarInteractionPanelProps> = ({
             <div className={`w-2 h-2 rounded-full bg-${stageConfig.uiConfig.primaryColor || 'neon-cyan'} animate-pulse`} />
             Skylar
           </h2>
-          <p className="text-xs text-white/50 uppercase tracking-widest font-bold mt-1">
-            {stageConfig.title} Phase
-          </p>
+          <div className="flex items-center gap-2 mt-1">
+            <p className="text-xs text-white/50 uppercase tracking-widest font-bold">
+              {stageConfig.title} Phase
+            </p>
+            {guestId && (
+              <span className="px-2 py-0.5 rounded-full bg-neon-cyan/20 border border-neon-cyan/30 text-[10px] text-neon-cyan font-bold uppercase tracking-tighter">
+                Guest Mode
+              </span>
+            )}
+          </div>
         </div>
         
-        {/* Modality Indicators */}
-        <div className="flex gap-2">
-          {isModalityAllowed('audio') && <Mic className="w-4 h-4 text-white/30" />}
-          {isModalityAllowed('image') && <ImageIcon className="w-4 h-4 text-white/30" />}
-          {isModalityAllowed('video') && <Video className="w-4 h-4 text-white/30" />}
+        <div className="flex items-center gap-4">
+          {guestStats && (
+            <div className="hidden md:flex flex-col items-end gap-1">
+              <div className="flex gap-1">
+                {[...Array(guestStats.limit)].map((_, i) => (
+                  <div 
+                    key={i} 
+                    className={`h-1 w-3 rounded-full transition-colors ${i < guestStats.count ? 'bg-neon-cyan' : 'bg-white/10'}`}
+                  />
+                ))}
+              </div>
+              <p className="text-[10px] text-white/40 font-mono">
+                {guestStats.limit - guestStats.count} MESSAGES REMAINING
+              </p>
+            </div>
+          )}
+
+          {/* Modality Indicators */}
+          <div className="flex gap-2">
+            {isModalityAllowed('audio') && <Mic className="w-4 h-4 text-white/30" />}
+            {isModalityAllowed('image') && <ImageIcon className="w-4 h-4 text-white/30" />}
+            {isModalityAllowed('video') && <Video className="w-4 h-4 text-white/30" />}
+          </div>
         </div>
       </div>
+
+      {/* Privacy Modal Overlay */}
+      <AnimatePresence>
+        {showPrivacyModal && (
+          <motion.div 
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="absolute inset-0 z-50 flex items-center justify-center p-6 bg-black/60 backdrop-blur-md"
+          >
+            <motion.div 
+              initial={{ scale: 0.9, y: 20 }}
+              animate={{ scale: 1, y: 0 }}
+              className="bg-zinc-900 border border-white/10 rounded-3xl p-8 max-w-md w-full shadow-2xl shadow-neon-cyan/10"
+            >
+              <div className="w-16 h-16 rounded-2xl bg-neon-cyan/20 flex items-center justify-center mb-6">
+                <ShieldCheck className="w-8 h-8 text-neon-cyan" />
+              </div>
+              <h3 className="text-2xl font-display font-bold text-white mb-4">Privacy & Access Check</h3>
+              <div className="space-y-4 text-white/70 text-sm leading-relaxed mb-8">
+                <p>Welcome to Sparkwavv! You are currently exploring in <span className="text-neon-cyan font-bold">Guest Mode</span>.</p>
+                <ul className="space-y-2 list-none p-0">
+                  <li className="flex items-start gap-2">
+                    <div className="w-1.5 h-1.5 rounded-full bg-neon-cyan mt-1.5 shrink-0" />
+                    <span>Your session is limit to {stageConfig.guestConfig?.messageLimit || 10} insights.</span>
+                  </li>
+                  <li className="flex items-start gap-2">
+                    <div className="w-1.5 h-1.5 rounded-full bg-neon-cyan mt-1.5 shrink-0" />
+                    <span>Any artifacts uploaded (like your resume) are stored in a temporary vault for 24 hours.</span>
+                  </li>
+                  <li className="flex items-start gap-2">
+                    <div className="w-1.5 h-1.5 rounded-full bg-neon-cyan mt-1.5 shrink-0" />
+                    <span>Creating an account will automatically transfer your Guest DNA to your permanent Wavvault.</span>
+                  </li>
+                </ul>
+              </div>
+              <button 
+                onClick={() => setShowPrivacyModal(false)}
+                className="w-full py-4 rounded-xl bg-neon-cyan text-black font-bold hover:brightness-110 transition-all shadow-lg shadow-neon-cyan/20"
+              >
+                Accept & Begin Journey
+              </button>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {/* Chat Area */}
       <div className="flex-1 overflow-y-auto p-6 space-y-6 custom-scrollbar">
@@ -367,10 +463,10 @@ export const SkylarInteractionPanel: React.FC<SkylarInteractionPanelProps> = ({
 
           <button
             onClick={handleSend}
-            disabled={!input.trim() && attachments.length === 0 || isTyping}
+            disabled={(!input.trim() && attachments.length === 0) || isTyping || (guestStats && guestStats.count >= guestStats.limit)}
             className={`p-4 rounded-2xl bg-${stageConfig.uiConfig.primaryColor || 'neon-cyan'} text-black disabled:opacity-50 disabled:cursor-not-allowed hover:brightness-110 transition-all`}
           >
-            <Send className="w-5 h-5" />
+            {guestStats && guestStats.count >= guestStats.limit ? <Lock className="w-5 h-5" /> : <Send className="w-5 h-5" />}
           </button>
         </div>
       </div>

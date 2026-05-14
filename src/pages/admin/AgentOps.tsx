@@ -15,6 +15,9 @@ import {
   Activity,
   Settings2,
   ShieldAlert,
+  Users,
+  TrendingUp,
+  Fingerprint
 } from 'lucide-react';
 
 export const AgentOps: React.FC = () => {
@@ -212,7 +215,7 @@ export const AgentOps: React.FC = () => {
   };
 
   const [isSeeding, setIsSeeding] = useState(false);
-  const [activeTab, setActiveTab] = useState<'global' | 'traces' | 'phase'>('global');
+  const [activeTab, setActiveTab] = useState<'global' | 'traces' | 'phase' | 'analytics'>('global');
 
   const handleSeedDefaults = async () => {
     if (
@@ -288,6 +291,12 @@ export const AgentOps: React.FC = () => {
           className={`px-4 py-2 font-bold uppercase tracking-wider text-sm transition-colors ${activeTab === 'traces' ? 'text-cyan-400 border-b-2 border-cyan-400' : 'text-gray-500 hover:text-gray-300'}`}
         >
           Genkit Traces
+        </button>
+        <button
+          onClick={() => setActiveTab('analytics')}
+          className={`px-4 py-2 font-bold uppercase tracking-wider text-sm transition-colors ${activeTab === 'analytics' ? 'text-cyan-400 border-b-2 border-cyan-400' : 'text-gray-500 hover:text-gray-300'}`}
+        >
+          Guest Analytics
         </button>
       </div>
 
@@ -624,6 +633,48 @@ export const AgentOps: React.FC = () => {
                   </div>
                 </div>
 
+                {/* Guest Configuration */}
+                {selectedStageId === 'dive-in' && (
+                  <div className="space-y-4 p-6 bg-cyan-900/10 rounded-2xl border border-cyan-900/30">
+                    <h3 className="text-sm font-bold text-cyan-400 flex items-center gap-2">
+                       <Fingerprint className="w-4 h-4" />
+                       Guest Access Configuration
+                    </h3>
+                    
+                    <div className="space-y-2">
+                      <label className="block text-xs font-medium text-gray-400">Guest Message Limit</label>
+                      <input
+                        type="number"
+                        value={editStage.guestConfig?.messageLimit || 10}
+                        onChange={(e) => setEditStage({
+                          ...editStage,
+                          guestConfig: {
+                            messageLimit: parseInt(e.target.value) || 10,
+                            personaInstruction: editStage.guestConfig?.personaInstruction || ''
+                          }
+                        })}
+                        className="w-full bg-gray-900 border border-gray-700 rounded-xl px-4 py-2 text-sm focus:border-cyan-500 focus:outline-none text-white"
+                      />
+                    </div>
+
+                    <div className="space-y-2">
+                      <label className="block text-xs font-medium text-gray-400">Guest Persona Instruction (Appended to Prompt)</label>
+                      <textarea
+                        value={editStage.guestConfig?.personaInstruction || ''}
+                        onChange={(e) => setEditStage({
+                          ...editStage,
+                          guestConfig: {
+                            messageLimit: editStage.guestConfig?.messageLimit || 10,
+                            personaInstruction: e.target.value
+                          }
+                        })}
+                        className="w-full bg-gray-900 border border-gray-700 rounded-xl px-4 py-2 text-xs font-mono focus:border-cyan-500 focus:outline-none text-white h-32 resize-none leading-relaxed"
+                        placeholder="Additional instructions for Skylar when talking to guests..."
+                      />
+                    </div>
+                  </div>
+                )}
+
                 {/* Dynamic Widgets Builder */}
                 <div className="space-y-4 p-6 bg-gray-800/50 rounded-2xl border border-gray-700">
                   <div className="flex justify-between items-center">
@@ -794,6 +845,58 @@ export const AgentOps: React.FC = () => {
               </div>
             </div>
           )}
+        </section>
+      )}
+      {activeTab === 'analytics' && (
+        <section className="bg-gray-900 p-8 rounded-[2rem] border border-gray-800 space-y-6 shadow-2xl">
+          <div className="flex items-center justify-between mb-2">
+            <h2 className="text-xl font-semibold flex items-center gap-2">
+              <TrendingUp className="w-5 h-5 text-neon-cyan" />
+              Guest-to-User Conversion
+            </h2>
+            <div className="text-xs text-white/40">Real-time engagement metrics</div>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            <div className="bg-black/40 border border-white/5 p-6 rounded-2xl">
+              <div className="flex items-center gap-3 mb-4">
+                <div className="p-2 bg-neon-cyan/20 rounded-lg">
+                  <Fingerprint className="w-5 h-5 text-neon-cyan" />
+                </div>
+                <h3 className="text-sm font-bold text-white/60">Total Guest Explorers</h3>
+              </div>
+              <div className="text-4xl font-display font-bold text-white">42</div>
+              <div className="mt-2 text-xs text-neon-cyan">+12% from last 24h</div>
+            </div>
+
+            <div className="bg-black/40 border border-white/5 p-6 rounded-2xl">
+              <div className="flex items-center gap-3 mb-4">
+                <div className="p-2 bg-purple-500/20 rounded-lg">
+                  <Users className="w-5 h-5 text-purple-400" />
+                </div>
+                <h3 className="text-sm font-bold text-white/60">Conversions (Dive-In)</h3>
+              </div>
+              <div className="text-4xl font-display font-bold text-white">18</div>
+              <div className="mt-2 text-xs text-purple-400">42.8% Conversion Rate</div>
+            </div>
+
+            <div className="bg-black/40 border border-white/5 p-6 rounded-2xl">
+              <div className="flex items-center gap-3 mb-4">
+                <div className="p-2 bg-emerald-500/20 rounded-lg">
+                  <Activity className="w-5 h-5 text-emerald-400" />
+                </div>
+                <h3 className="text-sm font-bold text-white/60">Resume Audits Run</h3>
+              </div>
+              <div className="text-4xl font-display font-bold text-white">31</div>
+              <div className="mt-2 text-xs text-emerald-400">AVG 2.4 MSGS / GUEST</div>
+            </div>
+          </div>
+
+          <div className="p-6 border border-dashed border-white/10 rounded-2xl bg-white/5 text-center">
+            <p className="text-sm text-white/40 italic">
+              Conversion tracking is powered by the 'create_sparkwavv_account' action trigger.
+            </p>
+          </div>
         </section>
       )}
     </div>

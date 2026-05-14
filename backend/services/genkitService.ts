@@ -215,6 +215,8 @@ export const createSparkwavvAccountTool = ai.defineTool(
     }),
   },
   async (input) => {
+    // NOTE: For guests, guestUsage artifacts should be marked for deletion after 24h.
+    // In production, use Firestore TTL or a scheduled Cloud Function.
     // Model Armor Integration
     const inputSanity = await modelArmor.sanitizePrompt(JSON.stringify(input));
     if (!inputSanity.isSafe) {
@@ -2482,18 +2484,56 @@ export const runJourneyStageFlow = ai.defineFlow(
       }
     }
 
+    // Guest Detection & Budgeting
+    const isGuest = !input.userId || input.userId === 'anonymous' || input.userId.startsWith('guest_');
+    let guestBudgetExceeded = false;
+    let guestMessageCount = 0;
+    const GUEST_LIMIT = stageConfig?.guestConfig?.messageLimit || 10;
+
+    if (isGuest && input.userId && input.userId !== 'anonymous') {
+      try {
+        const db = await getFirestoreInstance();
+        const guestDoc = await db.collection('guestUsage').doc(input.userId).get();
+        guestMessageCount = guestDoc.exists ? (guestDoc.data()?.messageCount || 0) : 0;
+        
+        if (guestMessageCount >= GUEST_LIMIT) {
+          guestBudgetExceeded = true;
+        } else {
+          // Increment count
+          await db.collection('guestUsage').doc(input.userId).set({
+            messageCount: guestMessageCount + 1,
+            lastSeen: new Date().toISOString()
+          }, { merge: true });
+        }
+      } catch (e) {
+        console.error('Error tracking guest usage:', e);
+      }
+    }
+
+    if (guestBudgetExceeded) {
+       return {
+         text: "Your guest explore session has reached its limit. To continue your journey and unlock the full potential of your professional DNA, please Dive-In and create your official Sparkwavv account.",
+         executedActions: [{ action: 'show_registration_cta', data: { stage: 'dive-in' } }],
+         debugData: { guestMessageCount, GUEST_LIMIT }
+       };
+    }
+
     if (stageConfig) {
       const template = stageConfig.systemPromptTemplate;
       const stageTitle = stageConfig.stageTitle || stageConfig.title;
       const artifactName = stageConfig.requiredArtifacts?.[0];
 
       baseInstruction = interpolatePrompt(template, {
-        user: { displayName: 'User' }, // In a real app, fetch from user profile
+        user: { displayName: isGuest ? 'Guest' : 'User' }, 
         stage: { title: stageTitle, artifactName },
       });
+      
+      if (isGuest && stageConfig.guestConfig?.personaInstruction) {
+        baseInstruction += `\n\n${stageConfig.guestConfig.personaInstruction}`;
+      }
     } else {
       baseInstruction = skylar.getSystemPromptForPhase(input.stageId || 'dive-in', {
-        displayName: 'User',
+        displayName: isGuest ? 'Guest' : 'User',
       });
     }
 

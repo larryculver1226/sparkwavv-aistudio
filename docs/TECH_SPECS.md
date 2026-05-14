@@ -134,6 +134,25 @@ All Journey Phase Prompts must adhere to the standardized framework:
 - **`AgentOps.tsx`**:
   - Admin panel component to edit `SkylarStageConfig` (e.g., system prompts, required artifacts, modalities).
 
+## Guest Chat Connection (Track 166)
+
+To balance user acquisition with cost management, unauthenticated "Guest" access to Skylar is implemented with the following constraints:
+
+### 1. Identity & Context
+- **Role**: `ROLES.GUEST`.
+- **UID**: `anonymous` (on server) or `guest_{uuid}` (on client for session persistence).
+- **Stage Lock**: Guests are restricted to the `Dive-In` (Initial Discovery) stage.
+
+### 2. Usage Budgeting
+- **Message Limit**: 5 messages per session (tracked via `localStorage` and enforced via backend rate-limiting/budgeting).
+- **Rate Limiting**: IP-based rate limiting via `express-rate-limit` (20 requests per 15 mins for guests).
+- **Speed Limiting**: Slow down after 5 requests to discourage scraping.
+
+### 3. Conversion Path
+- Once the budget is exhausted, the UI transitions to a "Locked" state.
+- **Primary CTA**: Directs user to the "Dive-In Journey" flow (Sign Up / Onboarding).
+- Skylar's persona for guests is configured to be high-level, focusing on value proposition and guiding the user towards committed participation.
+
 ## Data Models
 - `Dashboard.phaseProgress`: Object containing percentage completion (0-100) for `diveIn`, `ignition`, `discovery`, `branding`, `outreach`.
 - `UserActivity`: Includes `tags` array and `relatedEntityId` for linking to artifacts/milestones.
