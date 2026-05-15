@@ -194,11 +194,14 @@ if (isVertexAvailable) {
   activePlugins.push(vertexAI(vertexConfig));
 }
 
-const promptPath = path.resolve(process.cwd(), 'backend/prompts');
+const rootPromptPath = path.resolve(process.cwd(), 'backend/prompts');
+const distPromptPath = path.resolve(process.cwd(), 'dist/backend/prompts');
+const promptPath = fs.existsSync(rootPromptPath) ? rootPromptPath : distPromptPath;
+
 if (fs.existsSync(promptPath)) {
   console.log(`[GenkitService] Prompt directory verified at: ${promptPath}`);
 } else {
-  console.warn(`[GenkitService] Prompt directory MISSING at: ${promptPath}. cwd: ${process.cwd()}`);
+  console.warn(`[GenkitService] Prompt directory MISSING at: ${promptPath}. Checked root and dist. cwd: ${process.cwd()}`);
 }
 
 // Initialize Genkit

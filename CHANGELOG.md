@@ -256,3 +256,4 @@ All notable changes to this project will be documented in this file.
 - Fixed `NavBar.test.tsx` to correctly assert the `navigate('/login')` call instead of the `onNavigate` prop.
 - Fixed `UserDashboard.test.tsx` to correctly map the `getTimelineStage` utility tests to the actual implementation logic.
 - **Track 167 (Production Connectivity & Referrer Blocking)**: [COMPLETED] Resolved connectivity issues in production by refining `isApiKeyError` logic (removing `NOT_FOUND` to enable dotprompt fallbacks), and expanding referrer rotation variants in `patchFetch.ts`.
+- **Track 168 (Production Prompt Parity & Resilience)**: [COMPLETED] Fixed `NOT_FOUND: Prompt skylarBase not found` in production by updating the build script to copy `backend/prompts` to `dist/` and enhancing `genkitService.ts` to support both root and dist path resolution for prompts.
