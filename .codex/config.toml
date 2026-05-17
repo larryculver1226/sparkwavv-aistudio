@@ -1,3 +1,7 @@
 [mcp_servers."gemini-api-docs-mcp.dev"]
 command = "npx"
 args = [ "-y", "gemini-api-docs-mcp.dev" ]
+
+[mcp_servers.gemini-api-docs-mcp]
+type = "http"
+url = "https://gemini-api-docs-mcp.dev"

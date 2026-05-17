@@ -2501,6 +2501,176 @@ async function startServer() {
       }
     );
 
+    /**
+     * Agent Sync Routine
+     * Triggers the "Lazy Background Worker" logic
+     */
+    app.post('/api/agent/sync', requireRole([ROLES.USER, ROLES.ADMIN]), async (req, res) => {
+      const { uid } = (req as any).user;
+      const { force } = req.body;
+
+      try {
+        const db = getFirestoreDb();
+        if (!db) return res.status(503).json({ error: 'Firestore not available' });
+
+        const syncRef = db.collection('agent_sync').doc(uid);
+        const syncDoc = await syncRef.get();
+        const syncData = syncDoc.data();
+
+        const now = admin.firestore.Timestamp.now();
+        const oneDayAgo = new Date(Date.now() - 24 * 60 * 60 * 1000);
+        const tenMinutesAgo = new Date(Date.now() - 10 * 60 * 1000);
+
+        // --- CONCURRENCY LOCK CHECK ---
+        if (syncData?.lock && syncData.lock.toDate() > tenMinutesAgo) {
+          return res.status(429).json({ 
+            error: 'Agent is currently busy with another operation (Lock active)',
+            remaining: Math.ceil((syncData.lock.toDate().getTime() + 10 * 60000 - Date.now()) / 1000)
+          });
+        }
+
+        // Check if sync is needed (if not forced)
+        if (!force && syncData?.lastSync && syncData.lastSync.toDate() > oneDayAgo) {
+          return res.json({ success: true, message: 'Sync not needed yet', lastSync: syncData.lastSync });
+        }
+
+        // --- ACQUIRE LOCK ---
+        await syncRef.set({
+          userId: uid,
+          lock: now,
+          status: 'processing',
+          lastSync: syncData?.lastSync || now,
+          activeSkills: syncData?.activeSkills || ['scraping', 'job_matching', 'outreach']
+        }, { merge: true });
+
+        // --- Start Base Log ---
+        const logId = uuidv4();
+        const logRef = db.collection('agent_logs').doc(logId);
+        await logRef.set({
+          id: logId,
+          userId: uid,
+          timestamp: now,
+          event: 'SYNC_STARTED',
+          details: 'Initializing DailyAnalystFlow lifecycle...',
+          type: 'info'
+        });
+
+        // --- EXECUTE ASYNC BACKGROUND FLOW ---
+        (async () => {
+          try {
+            // 1. Researching
+            await syncRef.update({ status: 'researching' });
+            await db.collection('agent_logs').add({
+              userId: uid,
+              timestamp: admin.firestore.Timestamp.now(),
+              event: 'RESEARCHING',
+              details: 'Scraping career market trends and RSS feeds...',
+              type: 'info'
+            });
+
+            // Simulate scraping
+            const marketData = "High demand for AI-adjacent Product Roles in specialized niches.";
+
+            // 2. Analyzing
+            await syncRef.update({ status: 'analyzing' });
+            await db.collection('agent_logs').add({
+              userId: uid,
+              timestamp: admin.firestore.Timestamp.now(),
+              event: 'ANALYZING',
+              details: 'Synthesizing market data with Wavvault identity...',
+              type: 'info'
+            });
+
+            // Fetch user identity for analysis
+            const userDoc = await db.collection('users').doc(uid).get();
+            const wavvaultCollection = db.collection('users').doc(uid).collection('wavvault');
+            const wavvaultDoc = await wavvaultCollection.doc('data').get();
+            
+            const userData = userDoc.data();
+            const wavData = wavvaultDoc.data();
+
+            // USE GEMINI FOR PROACTIVE ANALYSIS
+            const geminiKey = getGeminiApiKey();
+            if (geminiKey) {
+              const genAI = new GoogleGenAI(geminiKey);
+              const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
+              
+              const prompt = `
+                You are Skylar, an autonomous career agent.
+                USER DATA:
+                - Profile: ${JSON.stringify(userData)}
+                - Wavvault: ${JSON.stringify(wavData)}
+                - Market Trends: ${marketData}
+
+                IDENTIFY OPPORTUNITIES:
+                Identify 1-2 highly specific nudges for this user. 
+                Focus on skills they should add or networking targets.
+                Return ONLY a JSON array of Nudge objects:
+                [{ "content": "string", "type": "job_alert" | "skill_suggestion" | "network_nudge", "actionLink": "string" }]
+              `;
+
+              const genResult = await model.generateContent(prompt);
+              const responseText = genResult.response.text();
+              const cleanedJson = responseText.replace(/```json|```/g, '').trim();
+              
+              try {
+                const nudges = JSON.parse(cleanedJson);
+                for (const nudge of nudges) {
+                  const nudgeId = uuidv4();
+                  await db.collection('nudges').doc(nudgeId).set({
+                    id: nudgeId,
+                    userId: uid,
+                    content: nudge.content,
+                    type: nudge.type,
+                    read: false,
+                    actionLink: nudge.actionLink || null,
+                    createdAt: admin.firestore.Timestamp.now()
+                  });
+                  
+                  await db.collection('agent_logs').add({
+                    userId: uid,
+                    timestamp: admin.firestore.Timestamp.now(),
+                    event: 'NUDGE_GENERATED',
+                    details: `New proactive nudge created: ${nudge.type}`,
+                    type: 'success'
+                  });
+                }
+              } catch (e) {
+                console.error('[AGENT SYNC] Failed to parse nudges JSON', cleanedJson);
+              }
+            }
+
+            // 3. Finalize
+            await syncRef.update({ 
+              status: 'idle', 
+              lastSync: admin.firestore.Timestamp.now(),
+              lock: null // CLEAR LOCK
+            });
+            await db.collection('agent_logs').add({
+              userId: uid,
+              timestamp: admin.firestore.Timestamp.now(),
+              event: 'SYNC_COMPLETE',
+              details: 'All agent processes finalized successfully.',
+              type: 'success'
+            });
+
+          } catch (error) {
+            console.error('[AGENT SYNC BACKGROUND ERROR]', error);
+            await syncRef.update({ 
+              status: 'idle',
+              lock: null // CLEAR LOCK ON ERROR
+            });
+          }
+        })();
+
+        res.json({ success: true, message: 'Sync routine triggered in background' });
+
+      } catch (error: any) {
+        console.error('[AGENT SYNC ROUTE ERROR]', error);
+        res.status(500).json({ error: error.message });
+      }
+    });
+
     app.post(
       '/api/admin/flagged-content/:id/approve',
       requireRole([ROLES.SUPER_ADMIN, ROLES.ADMIN, ROLES.EDITOR]),

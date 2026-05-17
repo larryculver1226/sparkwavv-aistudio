@@ -1,28 +1,26 @@
-# Security Specification: Sparkwavv Production
+# Security Specification: Database Scraping Protection
 
 ## Data Invariants
-1. **User Isolation**: A user must never be able to read or write another user's private data (Dashboards, Wavvaults, Insights, Assets).
-2. **Relational Integrity**: `dashboards/{userId}` must match the `userId` of the document ID and the `request.auth.uid`.
-3. **Immutable UIDs**: Once a record is created (e.g., a User profile), the `uid` or `userId` field cannot be changed.
-4. **Role Protection**: Standard users cannot promote themselves to `admin` or `super_admin`.
-5. **System Immutability**: `metadata`, `journeyPhaseConfigs`, and `programs` are read-only for standard users.
+1. No user can list documents in `wavvault`, `dashboards`, or `users` that do not belong to their `uid`.
+2. Public metadata (`metadata`, `tenants`, `programs`) is read-only for non-admins.
+3. `SecurityLog` and `SystemLog` are write-only for the system and read-only for admins.
 
-## The "Dirty Dozen" Payloads (Denial Tests)
-1. **Identity Theft**: Attempt to create `dashboards/victim_uid` with `request.auth.uid = attacker_uid`.
-2. **Privilege Escalation**: Update `users/my_uid` with `{ role: 'super_admin' }`.
-3. **Data Poisoning**: Update `users/my_uid` with a 1MB string in `displayName`.
-4. **State Injection**: Update `Wavvault` with `isDiscoveryUnlocked: true` bypassing the Skylar validation gate.
-5. **Orphaned Writes**: Create an `Artifact` without a valid `tenantId`.
-6. **Cross-Tenant Leak**: Attempt to list `tenants` without a valid session (if restricted).
-7. **Audit Log Erasure**: Attempt to `delete` a `security_logs` entry.
-8. **Shadow Field Injection**: Add `isVerified: true` to a `User` profile update.
-9. **ID Poisoning**: Request `get` on `users/..%2F..%2Fsys_config`.
-10. **Query Scraping**: Attempt `allow list` on `users` without a `where(uid == my_uid)` clause.
-11. **Timestamp Spoofing**: Set `updatedAt` to a future date instead of `request.time`.
-12. **Metadata Tampering**: Attempt to `update` `metadata/skylar_global`.
+## The "Dirty Dozen" Payloads (Red Team Tests)
 
-## Rule Strategy
-- **Master Gate**: All user-specific collections use `request.auth.uid == userId` logic.
-- **Action-Based Updates**: Updates to critical fields (like `role`) are blocked.
-- **Validation Blueprints**: Every entity has a schema check.
-- **Global Deny**: `match /{document=**} { allow read, write: if false; }`
+| # | Attack Type | Payload/Query | Expected |
+|---|---|---|---|
+| 1 | Identity Spoof | `get(/users/attacker_id)` where attacker_id != my_id | DENIED |
+| 2 | List Scraping | `list(/wavvault)` without `where("userId", "==", my_id)` | DENIED |
+| 3 | Field Injection | `update(/users/my_id)` with `{ role: 'admin' }` | DENIED |
+| 4 | Orphaned Write | `create(/artifacts/1)` with non-existent `userId` | DENIED |
+| 5 | PII Leak (Unverified) | `get(/users/my_id)` with `email_verified: false` | DENIED (for sensitive fields) |
+| 6 | Immutable Bypass | `update(/dashboards/my_id)` with `{ userId: 'other_id' }` | DENIED |
+| 7 | Global Delete | `delete(/metadata/skylar_global)` | DENIED |
+| 8 | Shadow Update | `update(/wavvault/my_id)` with `{ extra_field: 'malicious' }` | DENIED (via hasOnly) |
+| 9 | Status Shortcut | `update(/journeys/my_id)` with `{ status: 'completed' }` without passing gates | DENIED |
+| 10 | Recursive Cost | Aggressive recursive `list` query | DENIED (via security overhead limits) |
+| 11 | ID Poisoning | `create(/users/!@#$%^&*)` | DENIED (via isValidId) |
+| 12 | Path Injection | `get(/users/../admins/root)` | DENIED (Firestore native protection) |
+
+## Test Runner (Logic Check)
+*Drafting hardened rules next.*

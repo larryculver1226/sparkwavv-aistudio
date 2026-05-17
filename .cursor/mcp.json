@@ -13,6 +13,9 @@
         "tsx",
         "scripts/mcp-server/index.ts"
       ]
+    },
+    "gemini-api-docs-mcp": {
+      "url": "https://gemini-api-docs-mcp.dev"
     }
   }
 }

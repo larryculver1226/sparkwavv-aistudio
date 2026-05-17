@@ -13,7 +13,7 @@
     "build:css": "tailwindcss -i ./src/index.css -o ./dist/public/style.css --minify",
     "build:js": "node scripts/build-client.mjs",
     "build:server": "esbuild server.ts --bundle --platform=node --target=node20 --outfile=dist/server.js --format=esm --packages=external --minify",
-    "build": "mkdir -p dist dist/public && npm run check-env && npm run build:css && npm run build:js && npm run build:server && cp index.html dist/public/ && cp -r public/* dist/public/ && cp -r backend/prompts dist/backend/prompts",
+    "build": "mkdir -p dist/public dist/backend && npm run check-env && npm run build:css && npm run build:js && npm run build:server && cp index.html dist/public/ && cp -r public/* dist/public/ && cp -r backend/prompts dist/backend/",
     "preview": "node dist/server.js",
     "update-skills": "node scripts/update-skills.js",
     "clean": "rm -rf dist",

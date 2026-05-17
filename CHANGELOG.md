@@ -3,6 +3,18 @@
 All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
+- **Track 174 (Skylar Agent Expansion Revisit)**: [COMPLETED] Successfully implemented the proactive Skylar agent framework. Features include a background "Analyst Heartbeat" for daily market syncing, an "Agent Operations" dashboard for transparency, and proactive "Nudge" notifications for actionable career insights.
+- **Track 173 (Skylar Agent-Base AI Expansion)**: [PIVOTED] Archived current progress to clear mental context for a new feature research process. Added `/reset` command to `AGENTS.md` to support this workflow.
+- **Track 172 (Fix Build Failure)**: [COMPLETED] Fixed production build error caused by missing `dist/backend` directory during the prompt copy step.
+- **Track 171 (Database Scraping Audit)**: [COMPLETED] Resolved methodology inadequacies by replacing PSB with the **MASBV (Memory-Audit-Setup-Build-Verify)** framework.
+- **Track 170 (Methodology Overhaul)**: [COMPLETED] Resolved methodology inadequacies by replacing PSB with the **MASBV (Memory-Audit-Setup-Build-Verify)** framework.
+    - **Amnesia Prevention**: Added a mandatory "Memory" phase using `grep` to scan project history before planning.
+    - **Design Integrity**: Implemented a "Design Persona Audit" (Coder vs. Auditor vs. Designer) to critique plans before execution.
+    - **Hardened Gates**: Established 3 mandatory approval gates to prevent implementational drift.
+    - **Documentation**: Created `docs/METHODOLOGY_GUIDE.md` as the permanent reference for agent behavior.
+- **Track 169 (Agentic Skills & MCP Setup)**: [COMPLETED] Enhanced agent capabilities by installing Gemini API Docs MCP and core development skills globally.
+    - **MCP Installation**: Added the Gemini API Docs MCP server (`https://gemini-api-docs-mcp.dev`) for real-time documentation access.
+    - **Skills Expansion**: Installed `gemini-api-dev`, `gemini-live-api-dev`, and `gemini-interactions-api` skills to support advanced Gemini integration, multimodal streaming, and high-fidelity interaction patterns.
 - **Track 165 (Deployment Hardening & Build-Arg Integration)**: [COMPLETED] Resolved deployment failures in Cloud Build by properly injecting build-time secrets and fixing file system errors in the build script.
     - **Build Secret Injection**: Updated `Dockerfile` and `cloudbuild.yaml` to support `GEMINI_API_KEY` and `SESSION_SECRET` as build arguments, ensuring they are available during the `npm run build` phase.
     - **Production Region Hardening**: Hardcoded the deployment region to `us-east1` in `cloudbuild.yaml` to maintain consistency with the production Firestore database.

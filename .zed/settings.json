@@ -8,6 +8,12 @@
         "gemini-api-docs-mcp.dev"
       ],
       "env": {}
+    },
+    "gemini-api-docs-mcp": {
+      "source": "custom",
+      "type": "http",
+      "url": "https://gemini-api-docs-mcp.dev",
+      "headers": {}
     }
   }
 }

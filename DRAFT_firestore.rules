@@ -1,0 +1,195 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    
+    // ==========================================
+    // 0. GLOBAL SAFETY NET
+    // ==========================================
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // ==========================================
+    // 1. PRIMITIVES & HELPERS
+    // ==========================================
+    
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isEmailVerified() {
+      return isSignedIn() && request.auth.token.email_verified == true;
+    }
+
+    function isOwner(userId) {
+      return isSignedIn() && request.auth.uid == userId;
+    }
+
+    function isAdmin() {
+      return isSignedIn() && (
+        request.auth.token.email == 'larry.culver1226@gmail.com' ||
+        exists(/databases/$(database)/documents/admins/$(request.auth.uid))
+      );
+    }
+
+    function isValidId(id) {
+      return id is string && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    function incoming() {
+      return request.resource.data;
+    }
+
+    function existing() {
+      return resource.data;
+    }
+
+    // ==========================================
+    // 2. VALIDATION BLUEPRINTS
+    // ==========================================
+
+    function isValidUser(data) {
+      return data.uid == request.auth.uid 
+          && data.email is string && data.email.size() <= 256
+          && data.tenantId is string && data.tenantId.size() <= 50;
+    }
+
+    function isValidDashboard(data) {
+      return data.userId == request.auth.uid
+          && data.tenantId is string && data.tenantId.size() <= 50;
+    }
+
+    function isValidWavvault(data) {
+      return data.userId == request.auth.uid
+          && data.tenantId is string && data.tenantId.size() <= 50;
+    }
+
+    function isValidArtifact(data) {
+      return data.userId == request.auth.uid
+          && data.tenantId is string && data.tenantId.size() <= 50;
+    }
+
+    function isValidInvitation(data) {
+      return data.senderId == request.auth.uid
+          && data.senderEmail is string && data.senderEmail.size() <= 256
+          && data.receiverEmail is string && data.receiverEmail.size() <= 256
+          && data.status in ['pending', 'accepted', 'declined']
+          && data.role in ['editor', 'viewer'];
+    }
+
+    function isValidPartnerAccess(data) {
+      return data.ownerId is string && data.ownerId.size() <= 128
+          && data.partnerId is string && data.partnerId.size() <= 128
+          && data.status in ['active', 'revoked']
+          && data.permissions is list;
+    }
+
+    // ==========================================
+    // 3. COLLECTION RULES
+    // ==========================================
+
+    // --- Invitations ---
+    match /invitations/{invitationId} {
+      allow get: if isSignedIn() && (
+        resource.data.senderId == request.auth.uid || 
+        resource.data.receiverEmail == request.auth.token.email ||
+        isAdmin()
+      );
+      // PILLAR 8: Query Enforcer (Dual Path)
+      allow list: if isAdmin() || (isSignedIn() && (
+        resource.data.senderId == request.auth.uid || 
+        resource.data.receiverEmail == request.auth.token.email
+      ));
+      
+      allow create: if isSignedIn() && isValidInvitation(incoming()) && incoming().status == 'pending';
+      allow update: if isSignedIn() && (
+        // Allow receiver to change status
+        (resource.data.receiverEmail == request.auth.token.email && incoming().diff(existing()).affectedKeys().hasOnly(['status'])) ||
+        // Allow sender to revoke before acceptance
+        (resource.data.senderId == request.auth.uid && resource.data.status == 'pending' && incoming().diff(existing()).affectedKeys().hasOnly(['status'])) ||
+        isAdmin()
+      );
+    }
+
+    // --- Partner Access ---
+    match /partner_access/{accessId} {
+      allow read: if isSignedIn() && (
+        resource.data.ownerId == request.auth.uid || 
+        resource.data.partnerId == request.auth.uid ||
+        isAdmin()
+      );
+      allow list: if isAdmin() || (isSignedIn() && (
+        resource.data.ownerId == request.auth.uid || 
+        resource.data.partnerId == request.auth.uid
+      ));
+      
+      allow create: if isSignedIn() && resource.data.ownerId == request.auth.uid && isValidPartnerAccess(incoming());
+      allow update: if isAdmin() || (isSignedIn() && resource.data.ownerId == request.auth.uid && incoming().ownerId == existing().ownerId && incoming().partnerId == existing().partnerId);
+      allow delete: if isAdmin() || (isSignedIn() && resource.data.ownerId == request.auth.uid);
+    }
+
+    // --- Users (PII Protected) ---
+    match /users/{uid} {
+      allow get: if isOwner(uid) || isAdmin();
+      // PILLAR 8: Query Enforcer
+      allow list: if isAdmin() || (isOwner(uid) && existing().uid == request.auth.uid);
+      
+      allow create: if isOwner(uid) && isValidUser(incoming()) && incoming().role == 'user';
+      // PILLAR 10: Immutable Identity
+      allow update: if (isOwner(uid) && isValidUser(incoming()) && incoming().role == existing().role)
+                    || isAdmin();
+    }
+
+    // --- Dashboards ---
+    match /dashboards/{userId} {
+      allow get: if isOwner(userId) || isAdmin();
+      allow list: if isAdmin() || (isSignedIn() && resource.data.userId == request.auth.uid);
+      
+      allow create: if isOwner(userId) && isValidDashboard(incoming());
+      allow update: if (isOwner(userId) && incoming().userId == existing().userId && isValidDashboard(incoming())) 
+                    || isAdmin();
+    }
+
+    // --- Wavvault (The Brain) ---
+    match /wavvault/{userId} {
+      allow get: if isOwner(userId) || isAdmin();
+      allow list: if isAdmin() || (isSignedIn() && resource.data.userId == request.auth.uid);
+      
+      allow create: if isOwner(userId) && isValidWavvault(incoming());
+      allow update: if (isOwner(userId) && incoming().userId == existing().userId && isValidWavvault(incoming())) 
+                    || isAdmin();
+    }
+
+    // --- Artifacts ---
+    match /artifacts/{artifactId} {
+      allow read: if isSignedIn() && (resource.data.userId == request.auth.uid || isAdmin());
+      allow create: if isSignedIn() && isValidArtifact(incoming());
+      allow update: if isSignedIn() && resource.data.userId == request.auth.uid && incoming().userId == existing().userId;
+      allow delete: if isSignedIn() && (resource.data.userId == request.auth.uid || isAdmin());
+    }
+
+    // --- Public Metadata (Strict Read-Only) ---
+    match /metadata/{documentId} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
+    match /journey_stages/{stageId} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
+    // --- Logs (Append Only) ---
+    match /security_logs/{logId} {
+      allow read: if isAdmin();
+      allow create: if isSignedIn(); // Allow reporting security events
+    }
+
+    // --- Admin Collection ---
+    match /admins/{uid} {
+      allow read: if isAdmin(); // Restricted read
+      allow write: if isAdmin();
+    }
+  }
+}

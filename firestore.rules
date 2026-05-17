@@ -46,162 +46,146 @@ service cloud.firestore {
     }
 
     // ==========================================
-    // 2. VALIDATION BLUEPRINTS
+    // 2. VALIDATION BLUEPRINTS (Harden with metadata)
     // ==========================================
 
     function isValidUser(data) {
       return data.uid == request.auth.uid 
           && data.email is string && data.email.size() <= 256
-          && data.tenantId is string && data.tenantId.size() <= 50;
+          && (data.tenantId is string || !('tenantId' in data));
     }
 
-    function isValidDashboard(data) {
+    function isValidResource(data) {
       return data.userId == request.auth.uid
-          && data.tenantId is string;
+          && (data.tenantId is string || !('tenantId' in data));
     }
 
-    function isValidWavvault(data) {
-      return data.userId == request.auth.uid
-          && data.tenantId is string;
+    function isValidInvitation(data) {
+      return data.senderId == request.auth.uid
+          && data.senderEmail is string && data.senderEmail.size() <= 256
+          && data.recipientEmail is string && data.recipientEmail.size() <= 256
+          && data.status in ['pending', 'accepted', 'declined'];
+    }
+
+    function isValidPartnerAccess(data) {
+      return data.ownerId is string && data.ownerId.size() <= 128
+          && data.partnerId is string && data.partnerId.size() <= 128
+          && data.status in ['active', 'revoked'];
     }
 
     // ==========================================
     // 3. COLLECTION RULES
     // ==========================================
 
-    // --- Users ---
+    // --- Users (PII Protected) ---
     match /users/{uid} {
       allow get: if isOwner(uid) || isAdmin();
-      allow list: if isAdmin() || (isSignedIn() && resource.data.uid == request.auth.uid);
+      allow list: if isAdmin() || (isOwner(uid) && resource.data.uid == request.auth.uid);
+      
       allow create: if isOwner(uid) && isValidUser(incoming()) && incoming().role == 'user';
       allow update: if (isOwner(uid) && isValidUser(incoming()) && incoming().role == existing().role)
                     || isAdmin();
     }
 
-    // --- Dashboards ---
+    // --- Core Personal Data (Query Enforced) ---
     match /dashboards/{userId} {
       allow get: if isOwner(userId) || isAdmin();
       allow list: if isAdmin() || (isSignedIn() && resource.data.userId == request.auth.uid);
-      allow create: if isOwner(userId) && isValidDashboard(incoming());
-      allow update: if (isOwner(userId) && isValidDashboard(incoming())) || isAdmin();
+      allow create: if isOwner(userId) && isValidResource(incoming());
+      allow update: if (isOwner(userId) && incoming().userId == existing().userId && isValidResource(incoming())) || isAdmin();
     }
 
-    // --- Wavvault (Vector searchable data) ---
     match /wavvault/{userId} {
       allow get: if isOwner(userId) || isAdmin();
       allow list: if isAdmin() || (isSignedIn() && resource.data.userId == request.auth.uid);
-      allow create: if isOwner(userId) && isValidWavvault(incoming());
-      allow update: if (isOwner(userId) && isValidWavvault(incoming())) || isAdmin();
+      allow create: if isOwner(userId) && isValidResource(incoming());
+      allow update: if (isOwner(userId) && incoming().userId == existing().userId && isValidResource(incoming())) || isAdmin();
     }
 
-    // --- User Assets (Generated portraits, etc) ---
+    // --- Assets & Artifacts ---
     match /user_assets/{assetId} {
-      allow get: if isSignedIn() && (resource.data.userId == request.auth.uid || isAdmin());
-      allow list: if isSignedIn() && (resource.data.userId == request.auth.uid || isAdmin());
-      allow create: if isSignedIn() && incoming().userId == request.auth.uid; // Usually AI generated but client may initiate
+      allow read: if isSignedIn() && (resource.data.userId == request.auth.uid || isAdmin());
+      allow list: if isAdmin() || (isSignedIn() && resource.data.userId == request.auth.uid);
+      allow create: if isSignedIn() && incoming().userId == request.auth.uid;
       allow delete: if isSignedIn() && (resource.data.userId == request.auth.uid || isAdmin());
-    }
-
-    // --- User Insights ---
-    match /user_insights/{insightId} {
-      allow read: if isSignedIn() && (resource.data.userId == request.auth.uid || isAdmin());
-      allow write: if isAdmin(); // System generated
-    }
-
-    // --- User Activities ---
-    match /user_activities/{activityId} {
-      allow read: if isSignedIn() && (resource.data.userId == request.auth.uid || isAdmin());
-      allow create: if isAdmin(); // Materialized views are system-only
-    }
-
-    // --- Artifacts (Distilled & Raw) ---
-    match /wavvault_artifacts/{artifactId} {
-      allow read: if isSignedIn() && (resource.data.userId == request.auth.uid || isAdmin());
-      allow write: if isAdmin();
     }
 
     match /artifacts/{artifactId} {
       allow read: if isSignedIn() && (resource.data.userId == request.auth.uid || isAdmin());
+      allow list: if isAdmin() || (isSignedIn() && resource.data.userId == request.auth.uid);
       allow create: if isSignedIn() && incoming().userId == request.auth.uid;
       allow delete: if isSignedIn() && (resource.data.userId == request.auth.uid || isAdmin());
     }
 
+    // --- Multi-User: Invitations ---
+    match /invitations/{invitationId} {
+      allow get: if isSignedIn() && (resource.data.senderId == request.auth.uid || resource.data.recipientEmail == request.auth.token.email || isAdmin());
+      allow list: if isAdmin() || (isSignedIn() && (resource.data.senderId == request.auth.uid || resource.data.recipientEmail == request.auth.token.email));
+      
+      allow create: if isSignedIn() && isValidInvitation(incoming()) && incoming().status == 'pending';
+      allow update: if isSignedIn() && (
+        (resource.data.recipientEmail == request.auth.token.email && incoming().diff(existing()).affectedKeys().hasOnly(['status'])) ||
+        (resource.data.senderId == request.auth.uid && resource.data.status == 'pending' && incoming().diff(existing()).affectedKeys().hasOnly(['status'])) ||
+        isAdmin()
+      );
+    }
+
+    // --- Multi-User: Partner Access ---
+    match /partner_access/{accessId} {
+      allow read: if isSignedIn() && (resource.data.ownerId == request.auth.uid || resource.data.partnerId == request.auth.uid || isAdmin());
+      allow list: if isAdmin() || (isSignedIn() && (resource.data.ownerId == request.auth.uid || resource.data.partnerId == request.auth.uid));
+      
+      allow create: if isSignedIn() && resource.data.ownerId == request.auth.uid && isValidPartnerAccess(incoming());
+      allow update: if isAdmin() || (isSignedIn() && resource.data.ownerId == request.auth.uid && incoming().ownerId == existing().ownerId);
+      allow delete: if isAdmin() || (isSignedIn() && resource.data.ownerId == request.auth.uid);
+    }
+
     // --- Public Metadata & Config ---
-    match /metadata/{documentId} {
-      allow read: if true;
-      allow write: if isAdmin();
-    }
+    match /metadata/{documentId} { allow read: if true; allow write: if isAdmin(); }
+    match /tenants/{tenantId} { allow read: if true; allow write: if isAdmin(); }
+    match /programs/{programId} { allow read: if true; allow write: if isAdmin(); }
+    match /journey_stages/{stageId} { allow read: if true; allow write: if isAdmin(); }
+    match /journeyPhaseConfigs/{configId} { allow read: if true; allow write: if isAdmin(); }
 
-    match /tenants/{tenantId} {
-      allow read: if true;
-      allow write: if isAdmin();
-    }
-
-    match /programs/{programId} {
-      allow read: if true;
-      allow write: if isAdmin();
-    }
-
-    match /journeyPhaseConfigs/{stageId} {
-      allow read: if true;
-      allow write: if isAdmin();
-    }
-
-    match /journey_stages/{stageId} {
-      allow read: if true;
-      allow write: if isAdmin();
-    }
-
-    match /cohorts/{cohortId} {
-      allow read: if isSignedIn();
-      allow write: if isAdmin();
-    }
-
-    // --- Journeys (User progress in programs) ---
+    // --- Journeys & Active States ---
     match /journeys/{journeyId} {
       allow read: if isSignedIn() && (resource.data.userId == request.auth.uid || isAdmin());
+      allow list: if isAdmin() || (isSignedIn() && resource.data.userId == request.auth.uid);
       allow create: if isSignedIn() && incoming().userId == request.auth.uid;
       allow update: if isSignedIn() && (resource.data.userId == request.auth.uid || isAdmin());
     }
 
-    // --- Logs (Append only for system/admins) ---
-    match /security_logs/{logId} {
-      allow read: if isAdmin();
-      allow create: if true; // System needs to log events
+    // --- Agent Sync & Proactive Nudges ---
+    match /agent_sync/{userId} {
+      allow get: if isOwner(userId) || isAdmin();
+      allow list: if isAdmin() || (isSignedIn() && resource.data.userId == request.auth.uid);
+      allow create: if isOwner(userId) && isValidResource(incoming());
+      allow update: if (isOwner(userId) && incoming().userId == existing().userId && isValidResource(incoming())) || isAdmin();
     }
 
-    match /system_logs/{logId} {
-      allow read: if isAdmin();
-      allow create: if true;
+    match /agent_logs/{logId} {
+      allow get: if isSignedIn() && (resource.data.userId == request.auth.uid || isAdmin());
+      allow list: if isAdmin() || (isSignedIn() && resource.data.userId == request.auth.uid);
+      allow create: if isSignedIn() && incoming().userId == request.auth.uid;
+      allow delete: if isAdmin();
     }
 
-    // --- Feedback & Flagged Content ---
-    match /feedback_issues/{issueId} {
-      allow create: if isSignedIn();
-      allow read, update: if isAdmin();
+    match /nudges/{nudgeId} {
+      allow get: if isSignedIn() && (resource.data.userId == request.auth.uid || isAdmin());
+      allow list: if isAdmin() || (isSignedIn() && resource.data.userId == request.auth.uid);
+      allow create: if isAdmin(); 
+      allow update: if isSignedIn() && (resource.data.userId == request.auth.uid && incoming().diff(existing()).affectedKeys().hasOnly(['read'])) || isAdmin();
+      allow delete: if isAdmin() || (isSignedIn() && resource.data.userId == request.auth.uid);
     }
 
-    match /flagged_content/{contentId} {
-      allow create: if isSignedIn();
-      allow read, update: if isAdmin();
-    }
+    // --- Feedback & Logs ---
+    match /feedback_issues/{issueId} { allow create: if isSignedIn(); allow read, update: if isAdmin(); }
+    match /security_logs/{logId} { allow create: if true; allow read: if isAdmin(); }
+    match /system_logs/{logId} { allow create: if true; allow read: if isAdmin(); }
 
-    // --- Admins collection (Internal) ---
+    // --- Admins collection ---
     match /admins/{uid} {
       allow read: if isSignedIn();
-      allow write: if isAdmin();
-    }
-
-    // --- Partner Features ---
-    match /invitations/{invitationId} {
-      allow read: if isSignedIn() && (resource.data.senderId == request.auth.uid || resource.data.recipientEmail == request.auth.token.email || isAdmin());
-      allow create: if isSignedIn() && incoming().senderId == request.auth.uid;
-      allow update: if isSignedIn() && (resource.data.senderId == request.auth.uid || resource.data.recipientEmail == request.auth.token.email || isAdmin());
-    }
-
-    // --- Storage Metrics ---
-    match /storage_metrics/{metricId} {
-      allow read: if true;
       allow write: if isAdmin();
     }
   }

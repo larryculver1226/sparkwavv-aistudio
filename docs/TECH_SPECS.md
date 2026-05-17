@@ -58,6 +58,66 @@ Sparkwavv uses **Google Apigee** (planned) as the API Management layer to secure
 - `/api/admin/*`: Sensitive system management and Vertex AI orchestration APIs.
 - `/api/wavvault/*`: Neural Synthesis Engine data access.
 
+## Security & Scraping Protection (Track 171)
+
+To prevent data scraping via direct API access (e.g., `curl` or custom scripts), the following invariants are enforced:
+
+### 1. Identity-Bound Queries (The Query Enforcer)
+- All `allow list` rules MUST explicitly check `resource.data.userId == request.auth.uid` (or the equivalent owner field).
+- It is FORBIDDEN to use `allow read: if isSignedIn();` without specific resource ownership checks unless the data is explicitly public (e.g., `metadata`).
+
+### 2. PII Isolation
+- Sensitive user data (phone, location, specific career stories) should be treated as "High Sensitivity".
+- Access to these fields requires `request.auth.token.email_verified == true`.
+
+### 3. Rate Limiting & Speed Bumps
+- Guest access is IP-rate-limited (20 req/15 min).
+- Authenticated users are subject to "Wallet Protection" limits to prevent recursive cost-attacks.
+
+### 4. Immutable Identity
+- The `userId` and `tenantId` fields of any document are IMMUTABLE after creation. Any attempt to update them will be rejected by security rules.
+
+- **`AgentSyncState`**:
+  - `userId` (string)
+  - `status` (string): 'idle', 'processing', 'researching', 'analyzing'
+  - `lastSync` (string, format: 'date-time')
+  - `activeSkills` (string[]): ['scraping', 'job_matching', 'outreach']
+- **`AgentLog`**:
+  - `id` (string)
+  - `userId` (string)
+  - `timestamp` (string, format: 'date-time')
+  - `event` (string)
+  - `details` (string)
+  - `type` (string): 'info', 'success', 'warning'
+- **`Nudge`**:
+  - `id` (string)
+  - `userId` (string)
+  - `content` (string)
+  - `type` (string): 'job_alert', 'skill_suggestion', 'network_nudge'
+  - `read` (boolean)
+  - `actionLink` (string, optional)
+  - `createdAt` (string, format: 'date-time')
+
+## Skylar Agent-Base AI Expansion (Track 173)
+
+### Asynchronous Agency
+Skylar implements a "Lazy Background Worker" pattern to simulate autonomous behavior within the serverless environment:
+- **Trigger**: Operations are triggered by user dashboard activity or periodic API pings.
+- **Sync Routine**: `POST /api/agent/sync` evaluates if a background cycle is due based on `lastSync`.
+- **Reasoning Loop**: 
+    1. **Data Gathering**: Fetches recent external data (e.g., job market trends, scraped listings).
+    2. **Synthesis**: Compares external data against the user's `Wavvault` state.
+    3. **Action Generation**: Produces `Nudges` if high-value opportunities are identified.
+
+### Capability UI
+- **Agent Dashboard**: A dedicated monitoring view for users to see Skylar's "Background Thought Process".
+- **Real-time Status**: Displays `AgentSyncState.status` and `AgentLog` feed via Firestore snapshots.
+- **Proactive Nudging**: A notification system for non-chat interactions.
+
+### Security
+- Agent-generated `AgentLog` and `Nudge` documents are subject to same ownership rules as `Wavvault` data.
+- Proactive updates to `Wavvault` by the agent service require `SUPER_ADMIN` or internal service account context.
+
 ## Skylar Agent Architecture (Track 022 & 027)
 
 ### System Prompt Standardization Framework

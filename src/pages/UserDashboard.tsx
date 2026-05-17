@@ -75,6 +75,8 @@ import { GaugeChart } from '../components/dashboard/Gauges';
 import { JourneyTimeline } from '../components/dashboard/JourneyTimeline';
 import { MentorNote } from '../components/dashboard/MentorNote';
 import { DynamicPhaseView } from '../components/dashboard/DynamicPhaseView';
+import { AgentDashboard } from '../components/agent/AgentDashboard';
+import { ProactiveNudge } from '../components/dashboard/ProactiveNudge';
 import { useJourneyStage } from '../hooks/useJourneyStage';
 import { WavvaultContentsWidget } from '../components/dashboard/widgets/WavvaultContentsWidget';
 import { WavvaultSeedingWidget } from '../components/dashboard/widgets/WavvaultSeedingWidget';
@@ -325,7 +327,7 @@ export const UserDashboard: React.FC<{ userId: string; isAdmin?: boolean }> = ({
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isProfileDropdownOpen, setIsProfileDropdownOpen] = useState(false);
   const [activeView, setActiveView] = useState<
-    'dashboard' | 'synthesis' | 'matches' | 'outreach' | 'strengths' | 'history'
+    'dashboard' | 'synthesis' | 'matches' | 'outreach' | 'strengths' | 'history' | 'agent'
   >(() => {
     const view = searchParams.get('view');
     if (view === 'matches') return 'matches';
@@ -333,6 +335,7 @@ export const UserDashboard: React.FC<{ userId: string; isAdmin?: boolean }> = ({
     if (view === 'outreach') return 'outreach';
     if (view === 'strengths') return 'strengths';
     if (view === 'history') return 'history';
+    if (view === 'agent') return 'agent';
     return 'dashboard';
   });
 
@@ -343,11 +346,12 @@ export const UserDashboard: React.FC<{ userId: string; isAdmin?: boolean }> = ({
     else if (view === 'outreach') setActiveView('outreach');
     else if (view === 'strengths') setActiveView('strengths');
     else if (view === 'history') setActiveView('history');
+    else if (view === 'agent') setActiveView('agent');
     else setActiveView('dashboard');
   }, [searchParams]);
 
   const handleViewChange = (
-    view: 'dashboard' | 'synthesis' | 'matches' | 'outreach' | 'strengths' | 'history'
+    view: 'dashboard' | 'synthesis' | 'matches' | 'outreach' | 'strengths' | 'history' | 'agent'
   ) => {
     setActiveView(view);
     setSearchParams({ view });
@@ -850,6 +854,12 @@ export const UserDashboard: React.FC<{ userId: string; isAdmin?: boolean }> = ({
               onClick: () => handleViewChange('outreach'),
             },
             {
+              icon: BrainIcon,
+              label: 'Agent (Skylar)',
+              active: activeView === 'agent',
+              onClick: () => handleViewChange('agent'),
+            },
+            {
               icon: History,
               label: 'History',
               active: activeView === 'history',
@@ -1104,6 +1114,8 @@ export const UserDashboard: React.FC<{ userId: string; isAdmin?: boolean }> = ({
                 <StrengthsView onBack={() => handleViewChange('dashboard')} strengths={wavvaultData?.strengths} />
               ) : activeView === 'history' ? (
                 <HistoryView userId={userId} />
+              ) : activeView === 'agent' ? (
+                <AgentDashboard userId={userId} />
               ) : (
                 <>
                   <div className="mb-12">
@@ -1568,6 +1580,7 @@ export const UserDashboard: React.FC<{ userId: string; isAdmin?: boolean }> = ({
           </div>
         )}
       </AnimatePresence>
+      <ProactiveNudge userId={userId} />
     </div>
   );
 };
