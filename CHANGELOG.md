@@ -3,6 +3,7 @@
 All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
+- **Track 175 (Deployment Infrastructure Audit)**: [COMPLETED] Modernized the CI/CD pipeline. Migrated from legacy Container Registry to Artifact Registry, implemented Docker layer caching optimizations, and hardened secret management by separating build-time and runtime environment variables.
 - **Track 174 (Skylar Agent Expansion Revisit)**: [COMPLETED] Successfully implemented the proactive Skylar agent framework. Features include a background "Analyst Heartbeat" for daily market syncing, an "Agent Operations" dashboard for transparency, and proactive "Nudge" notifications for actionable career insights.
 - **Track 173 (Skylar Agent-Base AI Expansion)**: [PIVOTED] Archived current progress to clear mental context for a new feature research process. Added `/reset` command to `AGENTS.md` to support this workflow.
 - **Track 172 (Fix Build Failure)**: [COMPLETED] Fixed production build error caused by missing `dist/backend` directory during the prompt copy step.

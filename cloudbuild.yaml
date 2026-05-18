@@ -27,23 +27,20 @@ steps:
       - '-c'
       - |
         docker build \
-          -t gcr.io/$PROJECT_ID/sparkwavv:$COMMIT_SHA \
+          --build-arg DOCKER_BUILDKIT=1 \
+          -t us-east1-docker.pkg.dev/$PROJECT_ID/sparkwavv/app:$COMMIT_SHA \
           --build-arg VITE_FIREBASE_API_KEY=$$VITE_FIREBASE_API_KEY \
           --build-arg VITE_FIREBASE_PROJECT_ID=$$VITE_FIREBASE_PROJECT_ID \
-          --build-arg GEMINI_API_KEY=$$GEMINI_API_KEY \
-          --build-arg SESSION_SECRET=$$SESSION_SECRET \
           --build-arg APP_URL=$$APP_URL \
           .
     secretEnv:
       - 'VITE_FIREBASE_API_KEY'
       - 'VITE_FIREBASE_PROJECT_ID'
-      - 'GEMINI_API_KEY'
-      - 'SESSION_SECRET'
       - 'APP_URL'
 
-  # Step 3: Push the image to Google Container Registry
+  # Step 3: Push the image to Artifact Registry
   - name: 'gcr.io/cloud-builders/docker'
-    args: ['push', 'gcr.io/$PROJECT_ID/sparkwavv:$COMMIT_SHA']
+    args: ['push', 'us-east1-docker.pkg.dev/$PROJECT_ID/sparkwavv/app:$COMMIT_SHA']
 
   # Track 133: Container Vulnerability Scan
   - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
@@ -51,7 +48,7 @@ steps:
     args:
       - '-c'
       - |
-        gcloud artifacts docker images scan gcr.io/$PROJECT_ID/sparkwavv:$COMMIT_SHA --format="json" > scan_results.json
+        gcloud artifacts docker images scan us-east1-docker.pkg.dev/$PROJECT_ID/sparkwavv/app:$COMMIT_SHA --format="json" > scan_results.json
     allow_failure: true
 
   # Track 133: Security Gate Enforcement
@@ -67,7 +64,7 @@ steps:
       - 'deploy'
       - 'sparkwavv'
       - '--image'
-      - 'gcr.io/$PROJECT_ID/sparkwavv:$COMMIT_SHA'
+      - 'us-east1-docker.pkg.dev/$PROJECT_ID/sparkwavv/app:$COMMIT_SHA'
       - '--region'
       - 'us-east1'
       - '--platform'
