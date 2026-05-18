@@ -97,6 +97,11 @@ export const config = {
   appUrl: getEnvVar(undefined, 'APP_URL'),
   geminiApiKey: getEnvVar(undefined, 'GEMINI_API_KEY'),
   
+  // Neo4j Configs
+  neo4jUri: getEnvVar(undefined, 'NEO4J_URI'),
+  neo4jUser: getEnvVar(undefined, 'NEO4J_USER') || 'neo4j',
+  neo4jPassword: getEnvVar(undefined, 'NEO4J_PASSWORD'),
+  
   // Validation Flags
   get isFirebaseConfigured() {
     return !!(this.apiKey && this.projectId === 'sparkwavv-prod' && !this.apiKey.includes('placeholder'));

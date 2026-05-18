@@ -80,6 +80,7 @@ import { ProactiveNudge } from '../components/dashboard/ProactiveNudge';
 import { useJourneyStage } from '../hooks/useJourneyStage';
 import { WavvaultContentsWidget } from '../components/dashboard/widgets/WavvaultContentsWidget';
 import { WavvaultSeedingWidget } from '../components/dashboard/widgets/WavvaultSeedingWidget';
+import { CommandCanvas } from '../components/dashboard/CommandCanvas';
 
 // Map journey stages to timeline stages
 export const getTimelineStage = (s: string) => {
@@ -1243,6 +1244,11 @@ export const UserDashboard: React.FC<{ userId: string; isAdmin?: boolean }> = ({
                   {/* Persistent Wavvault Contents Widget */}
                   <div className="mb-12">
                     <WavvaultContentsWidget timelineStage={timelineStage} />
+                  </div>
+
+                  {/* Relational Intelligence: Command Canvas */}
+                  <div className="mb-12">
+                     <CommandCanvas />
                   </div>
 
                   {/* Ignition Phase WavVault Seeding for New Users */}

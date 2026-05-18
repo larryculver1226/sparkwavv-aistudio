@@ -24,6 +24,11 @@ Interpret these inputs as specific triggers:
 
 ## 4. History & Tracking
 - **Tracks**: Every task is a "track". Create a sequentially numbered markdown file in the `/tracks` folder. Reference past related tracks in the header.
+- **High-Fidelity Documentation**: Each track file MUST contain:
+  - **Memory Scan Results (Archeology)**: Summary of relevant historical tracks, greps, and findings.
+  - **Audit Persona Critique**: Feedback from at least three distinct personas (e.g., Architect, Auditor, Designer, DevOps).
+  - **Technical Specs (Phase 3)**: Detailed implementation plan, including schema changes and logic flows.
+  - **Execution Summary (Phase 4)**: A list of specific changes made, including file names and technical decisions.
 - **Changelog**: Maintain a complete history of all coding changes in `CHANGELOG.md`. Update this file at the end of every track.
 
 ## 4. Technical Standards

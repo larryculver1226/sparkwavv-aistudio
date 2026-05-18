@@ -73,6 +73,7 @@ import * as discoveryengine from '@google-cloud/discoveryengine';
 const { DocumentServiceClient } = discoveryengine;
 import { sccService } from './backend/services/sccService';
 import { artifactAnalysisService } from './backend/services/artifactAnalysisService';
+import { syncUserIgnitionToGraph, getUserGraphData } from './backend/services/neo4jSyncService';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -6184,6 +6185,32 @@ async function startServer() {
       res.json({ result });
     } catch (error: any) {
       console.error(error);
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // --- NEO4J GRAPH ROUTES ---
+  app.get('/api/graph/user/:userId', requireRole([ROLES.USER, ROLES.ADMIN, ROLES.SUPER_ADMIN]), async (req, res) => {
+    try {
+      const { userId } = req.params;
+      const data = await getUserGraphData(userId);
+      res.json(data);
+    } catch (error: any) {
+      console.error('[API GRAPH ERROR]', error);
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.post('/api/graph/sync-ignition', requireRole([ROLES.USER, ROLES.ADMIN, ROLES.SUPER_ADMIN]), async (req, res) => {
+    try {
+      const { userId, userName, values } = req.body;
+      if (!userId || !values || !Array.isArray(values)) {
+        return res.status(400).json({ error: 'Missing userId or values array' });
+      }
+      const result = await syncUserIgnitionToGraph(userId, userName, values);
+      res.json(result);
+    } catch (error: any) {
+      console.error('[API GRAPH SYNC ERROR]', error);
       res.status(500).json({ error: error.message });
     }
   });

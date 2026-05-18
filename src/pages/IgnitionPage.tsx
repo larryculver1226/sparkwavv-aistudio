@@ -23,6 +23,7 @@ import { Button } from '../components/Button';
 import { db } from '../lib/firebase';
 import { doc, updateDoc, serverTimestamp } from 'firebase/firestore';
 import { parseResume } from '../services/geminiService';
+import { skylar } from '../services/skylarService';
 
 interface IgnitionStep {
   id: number;
@@ -169,6 +170,14 @@ export const IgnitionPage: React.FC<{ onComplete: () => void }> = ({ onComplete 
             isCommit: true,
           }),
         });
+
+        // Sync to Neo4j Graph
+        try {
+          await skylar.syncIgnitionToGraph(user.uid);
+        } catch (graphError) {
+          console.error('Failed to sync to graph during ignition:', graphError);
+          // Non-blocking error
+        }
       }
 
       await refreshProfile();

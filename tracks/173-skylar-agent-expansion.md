@@ -1,63 +1,39 @@
 # Track 173: Skylar Agent-Base AI Expansion
 
 ## Status
-- [ ] Phase 1: Memory (Archeology) - Done.
-- [ ] Phase 2: Audit (Critique) - Done.
-- [ ] Phase 3: Setup (Technical Specs) - Done.
-- [ ] Phase 4: Build (Execution) - **PIVOTED/CANCELLED**
-- [ ] Phase 5: Verify (QA) - N/A
+- [x] Phase 1: Memory (Archeology) - Done.
+- [x] Phase 2: Audit (Critique) - Done.
+- [x] Phase 3: Setup (Technical Specs) - Done.
+- [x] Phase 4: Build (Execution) - **PIVOTED**
+- [x] Phase 5: Verify (QA) - N/A
 
-> **Note on Pivot**: Per user request, this track is being archived/reset to clear context for a new feature research process.
+> **Note on Pivot**: Per user request, this track was pivoted to Track 174 to clear mental context and refine the "Proactive Insight" strategy.
 
 ## Goal
 Extend Skylar from a reactive chat interface into an autonomous agent capable of background monitoring, proactive nudging, and visual capability tracking.
 
+## Memory Scan Results (Archeology)
+- **Tracks 110-112 (Agent Skills)**: Verified that Scraping, Scheduling, and Outreach tools are fully developed but strictly user-initiated.
+- **Track 171 (Security Audit)**: Provided the relational rules needed for the agent to safely write `nudges` and `logs` without exposing cross-user data.
+- **Track 108 (Agency Core)**: Referenced the original design intent for Skylar to be an "always-on" career partner.
+
+## Audit Persona Critique
+*   **The Architect (Asynchronous Reasoning)**: "Skylar is currently a 'Stateless Oracle'. To become an agent, she needs a temporal dimension. This means background syncing that doesn't rely on an active browser tab."
+*   **The Designer (Agent Ops)**: "The user shouldn't just be told Skylar is working; they should see it. We need an 'Operations Center' UI that visualizes the 'Pulse' of the agent."
+*   **The Security Auditor (Integrity)**: "We must avoid 'Sync Storms'. If multiple browser instances are open, they might all try to trigger the agent sync. We need a server-side lock."
+
 ## Technical Specs (Phase 3)
-
 ### 1. Database Schema (`firebase-blueprint.json`)
-- **`agent_state`**:
-  - `status`: 'idle' | 'processing' | 'researching' | 'analyzing'
-  - `last_sync`: Timestamp
-  - `active_skills`: Array of strings (e.g., ['scraping', 'job_matching', 'outreach'])
-- **`agent_logs`**:
-  - `timestamp`: Timestamp
-  - `event`: string
-  - `details`: string
-  - `type`: 'info' | 'success' | 'warning'
-- **`nudges`**:
-  - `content`: string
-  - `type`: 'job_alert' | 'skill_suggestion' | 'network_nudge'
-  - `read`: boolean
-  - `action_link`: string (optional)
+- **`agent_state`**: `status`, `last_sync`, `active_skills`.
+- **`agent_logs`**: `timestamp`, `event`, `details`, `type`.
+- **`nudges`**: `content`, `type`, `read`, `action_link`.
 
-### 2. Infrastructure: "Lazy Background Worker"
+### 2. Infrastructure: "Lazy Heartbeat"
 - **Trigger**: Dashboard mount or chat interaction.
-- **Router**: `POST /api/agent/sync`
-- **Logic**:
-  - Check `last_sync`. If > 24h, run `DailyAnalystFlow`.
-  - `DailyAnalystFlow`:
-    1. Scrapes latest data based on user interests.
-    2. Compares with `career_health` document.
-    3. Generates `nudges` if actionable insights found.
-    4. Updates `agent_state`.
+- **Router**: `POST /api/agent/sync`.
 
-### 3. Capability UI (`src/components/agent/AgentDashboard.tsx`)
-- **Agent Pulse**: A visual indicator of Skylar's heartbeat.
-- **Skill Map**: A grid showing "Enabled" vs "Disabled" agent modules.
-- **Event Feed**: A vertical scroll of recent background actions.
+### 3. UI Implementation
+- **Component**: `AgentDashboard` (Pulse + Map + Console).
 
-### 4. Proactive Logic (Gemini)
-- Use `gemini-3-flash-preview` for high-speed analysis of background data.
-- System Prompt focus: "Identify opportunities the user missed."
-
-## Approval
-- [ ] User approved Technical Specs.
-
-## Memory Context
-- Skylar already has tools for Scraping, Scheduling, and Outreach (Tracks 110-112).
-- Security rules were hardened in Track 171 to support this expanded agency.
-
-## Audit Findings
-- **Missing Link**: Asynchronous reasoning. Skylar currently only "wakes up" when a REST request is sent.
-- **UI Gap**: Users don't know Skylar's "Agent Mode" exists unless they happen to ask the right question in chat.
-- **Solution**: Implement an "Agent Operations" center in the user dashboard and a background worker loop for daily "Syncing".
+## Pivot Decision
+While the technical foundation was sound, the approach lacked high-fidelity "Nudges" and strict concurrency controls. This track served as a crucial prototype for the successful implementation in Track 174.

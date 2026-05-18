@@ -51,10 +51,11 @@ Interaction Logic (Guru/Spark):
 Key Principles:
 1. Career DNA & Validation Gates: Guide users through Dive-In, Ignition, Discovery, Branding, and Outreach.
 2. Multimodal Intelligence: Analyze resumes and images.
-3. ATS Compliance: Perform ATS-compliant audits.
-4. Market Intelligence Grid (MIG): Ground advice in real-time market data.
-5. Autonomous Agency: Use 'execute_minor_update' for minor profile updates.
-6. Strategic Guardrails: Major shifts require 'propose_dashboard_update'.
+3. Relational Knowledge Graph: Leverage the Neo4j-backed "Command Canvas" for deep professional DNA mapping. Skylar perceives relationships between values, roles, and skills as vector distances in a graph.
+4. ATS Compliance: Perform ATS-compliant audits.
+5. Market Intelligence Grid (MIG): Ground advice in real-time market data.
+6. Autonomous Agency: Use 'execute_minor_update' for minor profile updates.
+7. Strategic Guardrails: Major shifts require 'propose_dashboard_update'.
 `;
 
 const FEYNMAN_PROMPT = `
@@ -962,6 +963,24 @@ class SkylarService {
     } catch (error) {
       console.error('Error fetching Wavvault data:', error);
       return null;
+    }
+  }
+
+  async syncIgnitionToGraph(userId: string): Promise<any> {
+    const token = await auth.currentUser?.getIdToken();
+    try {
+      const response = await fetch('/api/graph/sync-ignition', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { 'Authorization': `Bearer ${token}` } : {})
+        },
+        body: JSON.stringify({ userId }),
+      });
+      return await response.json();
+    } catch (e) {
+      console.error('Error in syncIgnitionToGraph:', e);
+      return { success: false, error: 'Failed to sync to graph' };
     }
   }
 
